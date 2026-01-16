@@ -23,27 +23,61 @@ export default function Home() {
   const loadData = async () => {
     try {
       // Cargar recetas
-      const { data: recipesData } = await supabase
+      const { data: recipesData, error: recipesError } = await supabase
         .from('recipes')
         .select('*')
         .order('name');
 
-      if (recipesData) {
+      if (recipesError) {
+        console.error('Error loading recipes:', recipesError);
+      } else if (recipesData) {
         setRecipes(recipesData);
       }
 
-      // Cargar items del mercado con su estado de checklist e inventario
-      const { data: itemsData } = await supabase
+      // Cargar items del mercado
+      const { data: itemsData, error: itemsError } = await supabase
         .from('market_items')
-        .select('*, market_checklist(checked), inventory(current_quantity, current_number)')
+        .select('*')
         .order('order_index');
 
+      if (itemsError) {
+        console.error('Error loading items:', itemsError);
+        return;
+      }
+
+      // Cargar checklist separadamente
+      const { data: checklistData, error: checklistError } = await supabase
+        .from('market_checklist')
+        .select('item_id, checked');
+
+      if (checklistError) {
+        console.error('Error loading checklist:', checklistError);
+      }
+
+      // Cargar inventario separadamente
+      const { data: inventoryData, error: inventoryError } = await supabase
+        .from('inventory')
+        .select('item_id, current_quantity, current_number');
+
+      if (inventoryError) {
+        console.error('Error loading inventory:', inventoryError);
+      }
+
+      // Crear mapas para búsqueda rápida
+      const checklistMap = new Map(
+        (checklistData || []).map(c => [c.item_id, c.checked])
+      );
+      const inventoryMap = new Map(
+        (inventoryData || []).map(i => [i.item_id, { qty: i.current_quantity, num: i.current_number }])
+      );
+
+      // Combinar datos
       if (itemsData) {
         const items = itemsData.map(item => ({
           ...item,
-          checked: item.market_checklist?.[0]?.checked || false,
-          currentQuantity: item.inventory?.[0]?.current_quantity || '0',
-          currentNumber: item.inventory?.[0]?.current_number || 0
+          checked: checklistMap.get(item.id) || false,
+          currentQuantity: inventoryMap.get(item.id)?.qty || '0',
+          currentNumber: inventoryMap.get(item.id)?.num || 0
         }));
         setMarketItems(items);
       }
