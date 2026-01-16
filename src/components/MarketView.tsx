@@ -35,12 +35,14 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
 
     try {
       if (item.checked) {
-        await supabase
+        const { error } = await supabase
           .from('market_checklist')
           .delete()
           .eq('item_id', item.id);
+
+        if (error) throw error;
       } else {
-        await supabase
+        const { error: checklistError } = await supabase
           .from('market_checklist')
           .upsert(
             {
@@ -51,9 +53,11 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
             { onConflict: 'item_id' }
           );
 
+        if (checklistError) throw checklistError;
+
         // Al marcar como comprado, actualizar inventario con la cantidad completa
         const required = parseQuantity(item.quantity);
-        await supabase
+        const { error: inventoryError } = await supabase
           .from('inventory')
           .upsert(
             {
@@ -64,6 +68,8 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
             },
             { onConflict: 'item_id' }
           );
+
+        if (inventoryError) throw inventoryError;
       }
 
       onUpdate();
@@ -78,7 +84,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
     setLoading(item.id);
 
     try {
-      await supabase
+      const { error } = await supabase
         .from('inventory')
         .upsert(
           {
@@ -89,6 +95,8 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
           },
           { onConflict: 'item_id' }
         );
+
+      if (error) throw error;
 
       onUpdate();
     } catch (error) {
@@ -127,7 +135,8 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
     if (!confirm('¿Reiniciar toda la lista de mercado?')) return;
 
     try {
-      await supabase.from('market_checklist').delete().neq('item_id', '');
+      const { error } = await supabase.from('market_checklist').delete().neq('item_id', '');
+      if (error) throw error;
       onUpdate();
     } catch (error) {
       console.error('Error resetting market:', error);
