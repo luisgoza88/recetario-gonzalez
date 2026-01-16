@@ -32,16 +32,18 @@ export default function Home() {
         setRecipes(recipesData);
       }
 
-      // Cargar items del mercado con su estado de checklist
+      // Cargar items del mercado con su estado de checklist e inventario
       const { data: itemsData } = await supabase
         .from('market_items')
-        .select('*, market_checklist(checked)')
+        .select('*, market_checklist(checked), inventory(current_quantity, current_number)')
         .order('order_index');
 
       if (itemsData) {
         const items = itemsData.map(item => ({
           ...item,
-          checked: item.market_checklist?.[0]?.checked || false
+          checked: item.market_checklist?.[0]?.checked || false,
+          currentQuantity: item.inventory?.[0]?.current_quantity || '0',
+          currentNumber: item.inventory?.[0]?.current_number || 0
         }));
         setMarketItems(items);
       }

@@ -48,6 +48,17 @@ export interface MarketItem {
   quantity: string;
   checked: boolean;
   order_index: number;
+  // Campos de inventario (despensa)
+  currentQuantity?: string;
+  currentNumber?: number;
+}
+
+export interface InventoryItem {
+  id: string;
+  item_id: string;
+  current_quantity: string;
+  current_number: number;
+  last_updated: string;
 }
 
 export interface MarketChecklist {
