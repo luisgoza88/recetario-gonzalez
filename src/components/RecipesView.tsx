@@ -20,7 +20,12 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
   const [filter, setFilter] = useState<'all' | 'breakfast' | 'lunch' | 'dinner'>('all');
 
   const filteredRecipes = recipes.filter(recipe => {
-    const matchesSearch = recipe.name.toLowerCase().includes(search.toLowerCase());
+    const searchLower = search.toLowerCase();
+    const matchesName = recipe.name.toLowerCase().includes(searchLower);
+    const matchesIngredient = (recipe.ingredients as Ingredient[]).some(
+      ing => ing.name.toLowerCase().includes(searchLower)
+    );
+    const matchesSearch = matchesName || matchesIngredient;
     const matchesFilter = filter === 'all' || recipe.type === filter;
     return matchesSearch && matchesFilter;
   });

@@ -1,16 +1,141 @@
 'use client';
 
-import { X } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { X, Users, Timer, Play, Pause, RotateCcw, Volume2, AlertCircle } from 'lucide-react';
 import { Recipe, Ingredient } from '@/types';
+import { INGREDIENT_SUBSTITUTIONS } from '@/data/substitutions';
 
 interface RecipeModalProps {
   recipe: Recipe;
   onClose: () => void;
+  missingIngredients?: string[];
 }
 
-export default function RecipeModal({ recipe, onClose }: RecipeModalProps) {
+interface ActiveTimer {
+  stepIndex: number;
+  totalSeconds: number;
+  remainingSeconds: number;
+  isRunning: boolean;
+}
+
+export default function RecipeModal({ recipe, onClose, missingIngredients = [] }: RecipeModalProps) {
+  const [scale, setScale] = useState(1);
+  const [activeTimers, setActiveTimers] = useState<ActiveTimer[]>([]);
+  const [showSubstitutions, setShowSubstitutions] = useState(false);
+
   const ingredients = recipe.ingredients as Ingredient[];
   const hasTotal = ingredients[0]?.total;
+
+  // Detectar tiempos en los pasos (ej: "25 minutos", "10 min", "1 hora")
+  const extractTime = (text: string): number | null => {
+    const patterns = [
+      /(\d+)\s*hora/i,
+      /(\d+)\s*min/i,
+      /(\d+)\s*segundo/i,
+    ];
+
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match) {
+        const value = parseInt(match[1]);
+        if (text.toLowerCase().includes('hora')) return value * 3600;
+        if (text.toLowerCase().includes('min')) return value * 60;
+        return value;
+      }
+    }
+    return null;
+  };
+
+  // Timer tick
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveTimers(prev => prev.map(timer => {
+        if (timer.isRunning && timer.remainingSeconds > 0) {
+          const newRemaining = timer.remainingSeconds - 1;
+
+          // Alarma cuando termina
+          if (newRemaining === 0) {
+            playAlarm();
+          }
+
+          return { ...timer, remainingSeconds: newRemaining };
+        }
+        return timer;
+      }));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const playAlarm = () => {
+    // Vibrar si está disponible
+    if (navigator.vibrate) {
+      navigator.vibrate([200, 100, 200, 100, 200]);
+    }
+
+    // Reproducir sonido de alarma
+    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdW+Onp2SfGlqgYyZoZiGcWRtfouZoJaEb2FsfoqXnpWEb2BsfYqXnpWDb19rfImWnZSCbl5qfIiVnJOBbV1pe4eUm5KAbFxoeYaTmpF/a1tnd4SSl5B+altmdoORlY99aVpldIGQlI58aFlkc4CPk4x7Z1hjcoGOkot6ZsijkoqAaF1meoaPkIl4ZlsA');
+    audio.play().catch(() => {});
+
+    // Notificación si está permitida
+    if (Notification.permission === 'granted') {
+      new Notification('Timer terminado', {
+        body: `El tiempo ha terminado para ${recipe.name}`,
+        icon: '/icon.svg'
+      });
+    }
+  };
+
+  const startTimer = (stepIndex: number, seconds: number) => {
+    const existingIndex = activeTimers.findIndex(t => t.stepIndex === stepIndex);
+
+    if (existingIndex >= 0) {
+      // Toggle play/pause
+      setActiveTimers(prev => prev.map((t, i) =>
+        i === existingIndex ? { ...t, isRunning: !t.isRunning } : t
+      ));
+    } else {
+      // Start new timer
+      setActiveTimers(prev => [...prev, {
+        stepIndex,
+        totalSeconds: seconds,
+        remainingSeconds: seconds,
+        isRunning: true
+      }]);
+    }
+  };
+
+  const resetTimer = (stepIndex: number) => {
+    setActiveTimers(prev => prev.map(t =>
+      t.stepIndex === stepIndex
+        ? { ...t, remainingSeconds: t.totalSeconds, isRunning: false }
+        : t
+    ));
+  };
+
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const scaleQuantity = (qty: string): string => {
+    if (scale === 1) return qty;
+
+    const match = qty.match(/^([\d.\/]+)\s*(.*)$/);
+    if (!match) return qty;
+
+    let num: number;
+    if (match[1].includes('/')) {
+      const [numerator, denominator] = match[1].split('/').map(Number);
+      num = numerator / denominator;
+    } else {
+      num = parseFloat(match[1]);
+    }
+
+    const scaled = Math.round(num * scale * 10) / 10;
+    return `${scaled}${match[2] ? ' ' + match[2] : ''}`;
+  };
 
   const getTypeLabel = (type: string) => {
     switch (type) {
@@ -21,30 +146,49 @@ export default function RecipeModal({ recipe, onClose }: RecipeModalProps) {
     }
   };
 
+  // Buscar sustituciones para ingredientes faltantes
+  const getSubstitutions = useCallback(() => {
+    const subs: { ingredient: string; alternatives: string[] }[] = [];
+
+    for (const ing of missingIngredients) {
+      const ingLower = ing.toLowerCase();
+      for (const [key, alternatives] of Object.entries(INGREDIENT_SUBSTITUTIONS)) {
+        if (ingLower.includes(key) || key.includes(ingLower)) {
+          subs.push({ ingredient: ing, alternatives });
+          break;
+        }
+      }
+    }
+
+    return subs;
+  }, [missingIngredients]);
+
+  const substitutions = getSubstitutions();
+
   return (
     <div
       className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl max-w-md w-full max-h-[80vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-2xl max-w-md w-full max-h-[85vh] overflow-hidden flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-4 border-b flex justify-between items-center sticky top-0 bg-white">
-          <h3 className="font-semibold text-lg">{recipe.name}</h3>
+        <div className="p-4 border-b flex justify-between items-center sticky top-0 bg-white z-10">
+          <h3 className="font-semibold text-lg pr-2">{recipe.name}</h3>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 p-1"
+            className="text-gray-500 hover:text-gray-700 p-1 flex-shrink-0"
           >
             <X size={24} />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-5 overflow-y-auto">
+        <div className="p-5 overflow-y-auto flex-1">
           {/* Type Badge */}
-          <div className="mb-4">
+          <div className="mb-4 flex items-center gap-2 flex-wrap">
             <span className={`
               text-sm px-3 py-1 rounded-full
               ${recipe.type === 'breakfast' ? 'bg-orange-100 text-orange-700' : ''}
@@ -53,12 +197,78 @@ export default function RecipeModal({ recipe, onClose }: RecipeModalProps) {
             `}>
               {getTypeLabel(recipe.type)}
             </span>
+
+            {activeTimers.some(t => t.isRunning) && (
+              <span className="text-sm px-3 py-1 rounded-full bg-red-100 text-red-700 animate-pulse flex items-center gap-1">
+                <Timer size={14} />
+                Timer activo
+              </span>
+            )}
           </div>
+
+          {/* Scale Control */}
+          <div className="mb-4 p-3 bg-purple-50 rounded-xl">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-purple-700 flex items-center gap-2">
+                <Users size={16} />
+                Ajustar porciones
+              </span>
+              <span className="text-sm text-purple-600">
+                {scale === 1 ? 'Original' : `×${scale}`}
+              </span>
+            </div>
+            <div className="flex gap-2">
+              {[0.5, 1, 1.5, 2, 3].map(s => (
+                <button
+                  key={s}
+                  onClick={() => setScale(s)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    scale === s
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-white text-purple-600 hover:bg-purple-100'
+                  }`}
+                >
+                  {s === 1 ? '1x' : s < 1 ? '½' : `${s}x`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Missing Ingredients Alert */}
+          {substitutions.length > 0 && (
+            <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-xl">
+              <button
+                onClick={() => setShowSubstitutions(!showSubstitutions)}
+                className="w-full flex items-center justify-between text-orange-700"
+              >
+                <span className="flex items-center gap-2 font-medium">
+                  <AlertCircle size={16} />
+                  {substitutions.length} ingrediente(s) con sustitución disponible
+                </span>
+                <span>{showSubstitutions ? '▲' : '▼'}</span>
+              </button>
+
+              {showSubstitutions && (
+                <div className="mt-3 space-y-2">
+                  {substitutions.map((sub, i) => (
+                    <div key={i} className="text-sm">
+                      <span className="font-medium text-orange-800">{sub.ingredient}:</span>
+                      <ul className="ml-4 text-orange-700">
+                        {sub.alternatives.map((alt, j) => (
+                          <li key={j}>→ {alt}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Portions */}
           {recipe.portions && (
             <div className="mb-4 p-3 bg-gray-50 rounded-lg text-sm">
-              <div className="font-semibold mb-1">Porciones:</div>
+              <div className="font-semibold mb-1">Porciones {scale !== 1 && `(×${scale})`}:</div>
               <div><strong>Luis:</strong> {recipe.portions.luis}</div>
               <div><strong>Mariana:</strong> {recipe.portions.mariana}</div>
             </div>
@@ -67,12 +277,19 @@ export default function RecipeModal({ recipe, onClose }: RecipeModalProps) {
           {/* Total */}
           {recipe.total && (
             <div className="mb-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
-              <strong>Total a preparar:</strong> {recipe.total}
+              <strong>Total a preparar:</strong> {scaleQuantity(recipe.total)}
             </div>
           )}
 
           {/* Ingredients Table */}
-          <h4 className="font-semibold mb-2">Ingredientes</h4>
+          <h4 className="font-semibold mb-2 flex items-center gap-2">
+            Ingredientes
+            {scale !== 1 && (
+              <span className="text-xs text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
+                Escalado ×{scale}
+              </span>
+            )}
+          </h4>
           <div className="overflow-x-auto mb-4">
             <table className="w-full text-sm border-collapse">
               <thead>
@@ -84,24 +301,79 @@ export default function RecipeModal({ recipe, onClose }: RecipeModalProps) {
                 </tr>
               </thead>
               <tbody>
-                {ingredients.map((ing, i) => (
-                  <tr key={i}>
-                    <td className="p-2 border">{ing.name}</td>
-                    {hasTotal && <td className="p-2 border">{ing.total || ''}</td>}
-                    <td className="p-2 border">{ing.luis}</td>
-                    <td className="p-2 border">{ing.mariana}</td>
-                  </tr>
-                ))}
+                {ingredients.map((ing, i) => {
+                  const isMissing = missingIngredients.some(m =>
+                    ing.name.toLowerCase().includes(m.toLowerCase()) ||
+                    m.toLowerCase().includes(ing.name.toLowerCase())
+                  );
+
+                  return (
+                    <tr key={i} className={isMissing ? 'bg-orange-50' : ''}>
+                      <td className="p-2 border">
+                        {ing.name}
+                        {isMissing && <span className="ml-1 text-orange-500">⚠</span>}
+                      </td>
+                      {hasTotal && <td className="p-2 border">{scaleQuantity(ing.total || '')}</td>}
+                      <td className="p-2 border">{scaleQuantity(ing.luis)}</td>
+                      <td className="p-2 border">{scaleQuantity(ing.mariana)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
-          {/* Steps */}
+          {/* Steps with Timers */}
           <h4 className="font-semibold mb-2">Preparación</h4>
-          <ol className="list-decimal pl-5 space-y-2 text-sm">
-            {recipe.steps.map((step, i) => (
-              <li key={i} className="leading-relaxed">{step}</li>
-            ))}
+          <ol className="space-y-3 text-sm">
+            {recipe.steps.map((step, i) => {
+              const timeSeconds = extractTime(step);
+              const timer = activeTimers.find(t => t.stepIndex === i);
+
+              return (
+                <li key={i} className="flex gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-xs font-bold">
+                    {i + 1}
+                  </span>
+                  <div className="flex-1">
+                    <p className="leading-relaxed">{step}</p>
+
+                    {/* Timer UI */}
+                    {timeSeconds && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <button
+                          onClick={() => startTimer(i, timeSeconds)}
+                          className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                            timer?.isRunning
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-green-100 text-green-700 hover:bg-green-200'
+                          }`}
+                        >
+                          {timer?.isRunning ? <Pause size={12} /> : <Play size={12} />}
+                          {timer ? formatTime(timer.remainingSeconds) : formatTime(timeSeconds)}
+                        </button>
+
+                        {timer && (
+                          <button
+                            onClick={() => resetTimer(i)}
+                            className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+                          >
+                            <RotateCcw size={12} />
+                          </button>
+                        )}
+
+                        {timer?.remainingSeconds === 0 && (
+                          <span className="flex items-center gap-1 text-red-600 text-xs animate-pulse">
+                            <Volume2 size={12} />
+                            ¡Tiempo!
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ol>
         </div>
       </div>
