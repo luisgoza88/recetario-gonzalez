@@ -196,10 +196,10 @@ export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-8 pb-24 overflow-y-auto">
+      <div className="bg-white rounded-2xl w-full max-w-md flex flex-col">
         {/* Header */}
-        <div className="bg-green-700 text-white p-4 rounded-t-2xl flex justify-between items-center sticky top-0">
+        <div className="bg-green-700 text-white p-4 rounded-t-2xl flex justify-between items-center flex-shrink-0">
           <div className="flex items-center gap-2">
             <MessageSquare size={20} />
             <span className="font-semibold">Feedback - {mealLabels[mealType]}</span>
