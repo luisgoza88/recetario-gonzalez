@@ -1,0 +1,312 @@
+'use client';
+
+import { useState } from 'react';
+import { X, Plus, Trash2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase/client';
+import { Recipe, Ingredient, MealType } from '@/types';
+
+interface RecipeFormProps {
+  recipe: Recipe | null;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+export default function RecipeForm({ recipe, onClose, onSuccess }: RecipeFormProps) {
+  const [loading, setLoading] = useState(false);
+  const [name, setName] = useState(recipe?.name || '');
+  const [type, setType] = useState<MealType>(recipe?.type || 'lunch');
+  const [total, setTotal] = useState(recipe?.total || '');
+  const [portionsLuis, setPortionsLuis] = useState(recipe?.portions?.luis || '');
+  const [portionsMariana, setPortionsMariana] = useState(recipe?.portions?.mariana || '');
+  const [ingredients, setIngredients] = useState<Ingredient[]>(
+    (recipe?.ingredients as Ingredient[]) || [{ name: '', luis: '', mariana: '', total: '' }]
+  );
+  const [steps, setSteps] = useState<string[]>(recipe?.steps || ['']);
+
+  const addIngredient = () => {
+    setIngredients([...ingredients, { name: '', luis: '', mariana: '', total: '' }]);
+  };
+
+  const removeIngredient = (index: number) => {
+    if (ingredients.length > 1) {
+      setIngredients(ingredients.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateIngredient = (index: number, field: keyof Ingredient, value: string) => {
+    const updated = [...ingredients];
+    updated[index] = { ...updated[index], [field]: value };
+    setIngredients(updated);
+  };
+
+  const addStep = () => {
+    setSteps([...steps, '']);
+  };
+
+  const removeStep = (index: number) => {
+    if (steps.length > 1) {
+      setSteps(steps.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateStep = (index: number, value: string) => {
+    const updated = [...steps];
+    updated[index] = value;
+    setSteps(updated);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!name.trim()) {
+      alert('El nombre es requerido');
+      return;
+    }
+
+    if (ingredients.some(i => !i.name.trim())) {
+      alert('Todos los ingredientes deben tener nombre');
+      return;
+    }
+
+    if (steps.some(s => !s.trim())) {
+      alert('Todos los pasos deben tener contenido');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const recipeData = {
+        name: name.trim(),
+        type,
+        total: total.trim() || null,
+        portions: (portionsLuis || portionsMariana) ? {
+          luis: portionsLuis,
+          mariana: portionsMariana
+        } : null,
+        ingredients: ingredients.filter(i => i.name.trim()),
+        steps: steps.filter(s => s.trim())
+      };
+
+      if (recipe) {
+        // Update
+        const { error } = await supabase
+          .from('recipes')
+          .update(recipeData)
+          .eq('id', recipe.id);
+
+        if (error) throw error;
+      } else {
+        // Create
+        const id = `custom_${Date.now()}`;
+        const { error } = await supabase
+          .from('recipes')
+          .insert({ id, ...recipeData });
+
+        if (error) throw error;
+      }
+
+      onSuccess();
+    } catch (error) {
+      console.error('Error saving recipe:', error);
+      alert('Error al guardar la receta');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="p-4 border-b flex justify-between items-center sticky top-0 bg-white">
+          <h3 className="font-semibold text-lg">
+            {recipe ? 'Editar Receta' : 'Nueva Receta'}
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 p-1"
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-5 overflow-y-auto flex-1">
+          {/* Name */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1">Nombre *</label>
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-700"
+              placeholder="Ej: Pollo a la Criolla"
+            />
+          </div>
+
+          {/* Type */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1">Tipo *</label>
+            <select
+              value={type}
+              onChange={e => setType(e.target.value as MealType)}
+              className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-700"
+            >
+              <option value="breakfast">Desayuno</option>
+              <option value="lunch">Almuerzo</option>
+              <option value="dinner">Cena</option>
+            </select>
+          </div>
+
+          {/* Total (for lunch) */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1">Total a preparar</label>
+            <input
+              type="text"
+              value={total}
+              onChange={e => setTotal(e.target.value)}
+              className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-700"
+              placeholder="Ej: 1.3kg pechuga + 300ml salsa"
+            />
+          </div>
+
+          {/* Portions */}
+          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+            <label className="block text-sm font-medium mb-2">Porciones resumidas</label>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Luis</label>
+                <input
+                  type="text"
+                  value={portionsLuis}
+                  onChange={e => setPortionsLuis(e.target.value)}
+                  className="w-full p-2 border rounded-lg text-sm"
+                  placeholder="Ej: 300g + 2 huevos"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Mariana</label>
+                <input
+                  type="text"
+                  value={portionsMariana}
+                  onChange={e => setPortionsMariana(e.target.value)}
+                  className="w-full p-2 border rounded-lg text-sm"
+                  placeholder="Ej: 180g + 1 huevo"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Ingredients */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">Ingredientes *</label>
+            {ingredients.map((ing, index) => (
+              <div key={index} className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  value={ing.name}
+                  onChange={e => updateIngredient(index, 'name', e.target.value)}
+                  className="flex-1 p-2 border rounded-lg text-sm"
+                  placeholder="Ingrediente"
+                />
+                <input
+                  type="text"
+                  value={ing.total || ''}
+                  onChange={e => updateIngredient(index, 'total', e.target.value)}
+                  className="w-20 p-2 border rounded-lg text-sm"
+                  placeholder="Total"
+                />
+                <input
+                  type="text"
+                  value={ing.luis}
+                  onChange={e => updateIngredient(index, 'luis', e.target.value)}
+                  className="w-20 p-2 border rounded-lg text-sm"
+                  placeholder="Luis"
+                />
+                <input
+                  type="text"
+                  value={ing.mariana}
+                  onChange={e => updateIngredient(index, 'mariana', e.target.value)}
+                  className="w-20 p-2 border rounded-lg text-sm"
+                  placeholder="Mariana"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeIngredient(index)}
+                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                  disabled={ingredients.length === 1}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addIngredient}
+              className="text-sm text-green-700 flex items-center gap-1 hover:underline"
+            >
+              <Plus size={16} /> Agregar ingrediente
+            </button>
+          </div>
+
+          {/* Steps */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">Pasos *</label>
+            {steps.map((step, index) => (
+              <div key={index} className="flex gap-2 mb-2">
+                <span className="text-gray-400 pt-2">{index + 1}.</span>
+                <input
+                  type="text"
+                  value={step}
+                  onChange={e => updateStep(index, e.target.value)}
+                  className="flex-1 p-2 border rounded-lg text-sm"
+                  placeholder={`Paso ${index + 1}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeStep(index)}
+                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                  disabled={steps.length === 1}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addStep}
+              className="text-sm text-green-700 flex items-center gap-1 hover:underline"
+            >
+              <Plus size={16} /> Agregar paso
+            </button>
+          </div>
+
+          {/* Submit */}
+          <div className="flex gap-3 pt-4 border-t">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-3 border rounded-lg hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 py-3 bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:opacity-50"
+            >
+              {loading ? 'Guardando...' : (recipe ? 'Guardar cambios' : 'Crear receta')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
