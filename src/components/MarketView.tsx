@@ -29,14 +29,17 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
           .delete()
           .eq('item_id', item.id);
       } else {
-        // Marcar
+        // Marcar - usar onConflict para manejar items que ya existen
         await supabase
           .from('market_checklist')
-          .upsert({
-            item_id: item.id,
-            checked: true,
-            checked_at: new Date().toISOString()
-          });
+          .upsert(
+            {
+              item_id: item.id,
+              checked: true,
+              checked_at: new Date().toISOString()
+            },
+            { onConflict: 'item_id' }
+          );
       }
 
       onUpdate();
