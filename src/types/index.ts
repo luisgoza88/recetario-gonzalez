@@ -90,3 +90,41 @@ export const MEAL_TYPES = {
 } as const;
 
 export type MealType = keyof typeof MEAL_TYPES;
+
+// Tipos para el sistema de feedback
+export type PortionRating = 'poca' | 'bien' | 'mucha';
+export type LeftoverRating = 'nada' | 'poco' | 'mucho';
+export type SuggestionType = 'portion' | 'ingredient' | 'market';
+export type SuggestionStatus = 'pending' | 'applied' | 'dismissed';
+
+export interface MealFeedback {
+  id: string;
+  date: string;
+  meal_type: MealType;
+  recipe_id: string;
+  recipe_name?: string;
+  portion_rating?: PortionRating;
+  leftover_rating?: LeftoverRating;
+  missing_ingredients?: string[];
+  used_up_ingredients?: string[];
+  notes?: string;
+  created_at?: string;
+}
+
+export interface AdjustmentSuggestion {
+  id: string;
+  suggestion_type: SuggestionType;
+  recipe_id?: string;
+  recipe_name?: string;
+  ingredient_name?: string;
+  item_id?: string;
+  item_name?: string;
+  current_value?: string;
+  suggested_value?: string;
+  change_percent?: number;
+  reason: string;
+  feedback_count: number;
+  status: SuggestionStatus;
+  created_at?: string;
+  applied_at?: string;
+}

@@ -1,14 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Calendar, ShoppingCart, BookOpen, MapPin } from 'lucide-react';
+import { Calendar, ShoppingCart, BookOpen, MapPin, Lightbulb } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import CalendarView from '@/components/CalendarView';
 import MarketView from '@/components/MarketView';
 import RecipesView from '@/components/RecipesView';
+import SuggestionsPanel from '@/components/SuggestionsPanel';
 import { Recipe, MarketItem } from '@/types';
 
-type TabType = 'calendar' | 'market' | 'recipes';
+type TabType = 'calendar' | 'market' | 'recipes' | 'suggestions';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabType>('calendar');
@@ -126,6 +127,11 @@ export default function Home() {
         {activeTab === 'recipes' && (
           <RecipesView recipes={recipes} onUpdate={loadData} />
         )}
+        {activeTab === 'suggestions' && (
+          <div className="p-4 max-w-lg mx-auto">
+            <SuggestionsPanel onUpdate={loadData} />
+          </div>
+        )}
       </main>
 
       {/* Today Button */}
@@ -141,36 +147,47 @@ export default function Home() {
       <nav className="fixed bottom-0 left-0 right-0 bg-white flex justify-around py-2 shadow-[0_-2px_10px_rgba(0,0,0,0.1)] z-50">
         <button
           onClick={() => setActiveTab('calendar')}
-          className={`flex flex-col items-center px-4 py-2 rounded-lg transition-colors ${
+          className={`flex flex-col items-center px-3 py-2 rounded-lg transition-colors ${
             activeTab === 'calendar'
               ? 'text-green-700 bg-green-50'
               : 'text-gray-500'
           }`}
         >
-          <Calendar size={24} />
-          <span className="text-xs mt-1">Calendario</span>
+          <Calendar size={22} />
+          <span className="text-[10px] mt-1">Calendario</span>
         </button>
         <button
           onClick={() => setActiveTab('market')}
-          className={`flex flex-col items-center px-4 py-2 rounded-lg transition-colors ${
+          className={`flex flex-col items-center px-3 py-2 rounded-lg transition-colors ${
             activeTab === 'market'
               ? 'text-green-700 bg-green-50'
               : 'text-gray-500'
           }`}
         >
-          <ShoppingCart size={24} />
-          <span className="text-xs mt-1">Mercado</span>
+          <ShoppingCart size={22} />
+          <span className="text-[10px] mt-1">Mercado</span>
         </button>
         <button
           onClick={() => setActiveTab('recipes')}
-          className={`flex flex-col items-center px-4 py-2 rounded-lg transition-colors ${
+          className={`flex flex-col items-center px-3 py-2 rounded-lg transition-colors ${
             activeTab === 'recipes'
               ? 'text-green-700 bg-green-50'
               : 'text-gray-500'
           }`}
         >
-          <BookOpen size={24} />
-          <span className="text-xs mt-1">Recetas</span>
+          <BookOpen size={22} />
+          <span className="text-[10px] mt-1">Recetas</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('suggestions')}
+          className={`flex flex-col items-center px-3 py-2 rounded-lg transition-colors ${
+            activeTab === 'suggestions'
+              ? 'text-yellow-600 bg-yellow-50'
+              : 'text-gray-500'
+          }`}
+        >
+          <Lightbulb size={22} />
+          <span className="text-[10px] mt-1">Ajustes</span>
         </button>
       </nav>
     </div>

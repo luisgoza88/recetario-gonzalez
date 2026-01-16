@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Check, Star } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Star, MessageSquare } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
-import { Recipe, Ingredient } from '@/types';
+import { Recipe, Ingredient, MealType } from '@/types';
 import RecipeModal from './RecipeModal';
+import FeedbackModal from './FeedbackModal';
 
 interface CalendarViewProps {
   recipes: Recipe[];
@@ -32,6 +33,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
   const [completedDays, setCompletedDays] = useState<Set<string>>(new Set());
   const [expandedRecipe, setExpandedRecipe] = useState<string | null>(null);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [feedbackRecipe, setFeedbackRecipe] = useState<{ recipe: Recipe; mealType: MealType } | null>(null);
 
   useEffect(() => {
     loadMenu();
@@ -247,6 +249,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
             expanded={expandedRecipe === breakfast.id}
             onToggle={() => setExpandedRecipe(expandedRecipe === breakfast.id ? null : breakfast.id)}
             onView={() => setSelectedRecipe(breakfast)}
+            onFeedback={() => setFeedbackRecipe({ recipe: breakfast, mealType: 'breakfast' })}
           />
         )}
 
@@ -258,6 +261,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
             expanded={expandedRecipe === lunch.id}
             onToggle={() => setExpandedRecipe(expandedRecipe === lunch.id ? null : lunch.id)}
             onView={() => setSelectedRecipe(lunch)}
+            onFeedback={() => setFeedbackRecipe({ recipe: lunch, mealType: 'lunch' })}
           />
         )}
 
@@ -269,6 +273,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
             expanded={expandedRecipe === dinner.id}
             onToggle={() => setExpandedRecipe(expandedRecipe === dinner.id ? null : dinner.id)}
             onView={() => setSelectedRecipe(dinner)}
+            onFeedback={() => setFeedbackRecipe({ recipe: dinner, mealType: 'dinner' })}
             isLast
           />
         ) : (
@@ -369,6 +374,19 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
           onClose={() => setSelectedRecipe(null)}
         />
       )}
+
+      {/* Feedback Modal */}
+      {feedbackRecipe && selectedDate && (
+        <FeedbackModal
+          date={selectedDate.toISOString().split('T')[0]}
+          mealType={feedbackRecipe.mealType}
+          recipe={feedbackRecipe.recipe}
+          onClose={() => setFeedbackRecipe(null)}
+          onSaved={() => {
+            // Recargar datos si es necesario
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -380,10 +398,11 @@ interface MealCardProps {
   expanded: boolean;
   onToggle: () => void;
   onView: () => void;
+  onFeedback: () => void;
   isLast?: boolean;
 }
 
-function MealCard({ type, label, recipe, expanded, onToggle, onView, isLast }: MealCardProps) {
+function MealCard({ type, label, recipe, expanded, onToggle, onView, onFeedback, isLast }: MealCardProps) {
   const borderColor = {
     breakfast: 'border-orange-500',
     lunch: 'border-green-700',
@@ -407,6 +426,13 @@ function MealCard({ type, label, recipe, expanded, onToggle, onView, isLast }: M
           className="bg-green-100 text-green-700 py-2 px-4 rounded-full text-sm hover:bg-green-200"
         >
           Abrir
+        </button>
+        <button
+          onClick={onFeedback}
+          className="bg-yellow-100 text-yellow-700 py-2 px-3 rounded-full text-sm hover:bg-yellow-200"
+          title="Dar feedback"
+        >
+          <MessageSquare size={16} />
         </button>
       </div>
 
