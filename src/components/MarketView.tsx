@@ -215,34 +215,55 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
                 {category}
               </div>
               <div className="bg-white rounded-b-lg shadow-sm overflow-hidden">
-                {categoryItems.map(item => (
-                  <label
-                    key={item.id}
-                    className={`
-                      flex items-center p-4 border-b last:border-b-0 cursor-pointer transition-colors
-                      ${item.checked ? 'bg-green-50' : 'hover:bg-gray-50'}
-                    `}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={item.checked}
-                      onChange={() => toggleItem(item)}
-                      disabled={loading === item.id}
-                      className="w-6 h-6 mr-4 accent-green-700 cursor-pointer"
-                    />
-                    <span className={`flex-1 ${item.checked ? 'line-through text-gray-400' : ''}`}>
-                      {item.name}
-                    </span>
-                    <span className={`
-                      text-sm px-3 py-1 rounded-full font-semibold
-                      ${item.checked
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-blue-100 text-blue-700'}
-                    `}>
-                      {item.quantity}
-                    </span>
-                  </label>
-                ))}
+                {categoryItems.map(item => {
+                  const currentNum = item.currentNumber || 0;
+                  const unit = extractUnit(item.quantity);
+
+                  return (
+                    <div
+                      key={item.id}
+                      className={`
+                        flex items-center p-4 border-b last:border-b-0 transition-colors
+                        ${item.checked ? 'bg-green-50' : 'hover:bg-gray-50'}
+                      `}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={item.checked}
+                        onChange={() => toggleItem(item)}
+                        disabled={loading === item.id}
+                        className="w-6 h-6 mr-3 accent-green-700 cursor-pointer"
+                      />
+                      <span className="flex-1 font-medium">
+                        {item.name}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); adjustQuantity(item, -1); }}
+                          disabled={loading === item.id || currentNum <= 0}
+                          className="w-7 h-7 flex items-center justify-center bg-red-100 text-red-700 rounded-md hover:bg-red-200 disabled:opacity-30 text-sm"
+                        >
+                          <Minus size={14} />
+                        </button>
+                        <span className={`
+                          text-sm px-2 py-1 rounded-md font-semibold min-w-[60px] text-center
+                          ${item.checked
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-blue-100 text-blue-700'}
+                        `}>
+                          {currentNum > 0 ? `${currentNum} ${unit}` : item.quantity}
+                        </span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); adjustQuantity(item, 1); }}
+                          disabled={loading === item.id}
+                          className="w-7 h-7 flex items-center justify-center bg-green-100 text-green-700 rounded-md hover:bg-green-200 disabled:opacity-30 text-sm"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))}
