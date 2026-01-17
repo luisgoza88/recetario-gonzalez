@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Check, Star, MessageSquare } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Star, MessageSquare, Sparkles } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { Recipe, Ingredient, MealType } from '@/types';
 import RecipeModal from './RecipeModal';
 import FeedbackModal from './FeedbackModal';
+import SmartSuggestions from './SmartSuggestions';
 
 interface CalendarViewProps {
   recipes: Recipe[];
@@ -34,6 +35,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
   const [expandedRecipe, setExpandedRecipe] = useState<string | null>(null);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [feedbackRecipe, setFeedbackRecipe] = useState<{ recipe: Recipe; mealType: MealType } | null>(null);
+  const [suggestionsRecipe, setSuggestionsRecipe] = useState<{ recipe: Recipe; mealType: MealType } | null>(null);
 
   useEffect(() => {
     loadMenu();
@@ -250,6 +252,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
             onToggle={() => setExpandedRecipe(expandedRecipe === breakfast.id ? null : breakfast.id)}
             onView={() => setSelectedRecipe(breakfast)}
             onFeedback={() => setFeedbackRecipe({ recipe: breakfast, mealType: 'breakfast' })}
+            onSuggestions={() => setSuggestionsRecipe({ recipe: breakfast, mealType: 'breakfast' })}
           />
         )}
 
@@ -262,6 +265,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
             onToggle={() => setExpandedRecipe(expandedRecipe === lunch.id ? null : lunch.id)}
             onView={() => setSelectedRecipe(lunch)}
             onFeedback={() => setFeedbackRecipe({ recipe: lunch, mealType: 'lunch' })}
+            onSuggestions={() => setSuggestionsRecipe({ recipe: lunch, mealType: 'lunch' })}
           />
         )}
 
@@ -274,6 +278,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
             onToggle={() => setExpandedRecipe(expandedRecipe === dinner.id ? null : dinner.id)}
             onView={() => setSelectedRecipe(dinner)}
             onFeedback={() => setFeedbackRecipe({ recipe: dinner, mealType: 'dinner' })}
+            onSuggestions={() => setSuggestionsRecipe({ recipe: dinner, mealType: 'dinner' })}
             isLast
           />
         ) : (
@@ -387,6 +392,20 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
           }}
         />
       )}
+
+      {/* Smart Suggestions Modal */}
+      {suggestionsRecipe && (
+        <SmartSuggestions
+          recipe={suggestionsRecipe.recipe}
+          allRecipes={recipes}
+          mealType={suggestionsRecipe.mealType}
+          onSelectAlternative={(recipe) => {
+            setSelectedRecipe(recipe);
+            setSuggestionsRecipe(null);
+          }}
+          onClose={() => setSuggestionsRecipe(null)}
+        />
+      )}
     </div>
   );
 }
@@ -399,10 +418,11 @@ interface MealCardProps {
   onToggle: () => void;
   onView: () => void;
   onFeedback: () => void;
+  onSuggestions: () => void;
   isLast?: boolean;
 }
 
-function MealCard({ type, label, recipe, expanded, onToggle, onView, onFeedback, isLast }: MealCardProps) {
+function MealCard({ type, label, recipe, expanded, onToggle, onView, onFeedback, onSuggestions, isLast }: MealCardProps) {
   const borderColor = {
     breakfast: 'border-orange-500',
     lunch: 'border-green-700',
@@ -411,10 +431,21 @@ function MealCard({ type, label, recipe, expanded, onToggle, onView, onFeedback,
 
   return (
     <div className={`bg-white border-l-4 ${borderColor} p-4 ${isLast ? 'rounded-b-xl' : ''}`}>
-      <div className="text-gray-500 text-sm">{label}</div>
-      <h4 className="font-semibold text-lg mb-2">{recipe.name}</h4>
+      <div className="flex justify-between items-start">
+        <div>
+          <div className="text-gray-500 text-sm">{label}</div>
+          <h4 className="font-semibold text-lg">{recipe.name}</h4>
+        </div>
+        <button
+          onClick={onSuggestions}
+          className="bg-purple-100 text-purple-700 p-2 rounded-lg hover:bg-purple-200"
+          title="Verificar ingredientes"
+        >
+          <Sparkles size={18} />
+        </button>
+      </div>
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 mt-2">
         <button
           onClick={onToggle}
           className="flex-1 bg-gray-100 text-gray-600 py-2 px-4 rounded-full text-sm hover:bg-gray-200"
