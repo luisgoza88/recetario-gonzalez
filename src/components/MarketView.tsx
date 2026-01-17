@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { RotateCcw, ShoppingCart, Home, Minus, Plus, Edit2, Check, X, AlertTriangle } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { RotateCcw, ShoppingCart, Home, Minus, Plus, Edit2, Check, X, AlertTriangle, Search } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { MarketItem } from '@/types';
 import { CATEGORY_EMOJIS } from '@/data/market';
@@ -18,6 +18,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('shopping');
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const checkedCount = items.filter(i => i.checked).length;
   const totalCount = items.length;
@@ -29,6 +30,17 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
     const required = parseQuantity(i.quantity);
     return current < required * 0.2;
   }).length;
+
+  // Filtrar items por búsqueda
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return items;
+    const query = searchQuery.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return items.filter(item => {
+      const name = item.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const category = item.category.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return name.includes(query) || category.includes(query);
+    });
+  }, [items, searchQuery]);
 
   const toggleItem = async (item: MarketItem) => {
     setLoading(item.id);
@@ -143,8 +155,8 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
     }
   };
 
-  // Agrupar items por categoría
-  const categories = items.reduce((acc, item) => {
+  // Agrupar items filtrados por categoría
+  const categories = filteredItems.reduce((acc, item) => {
     if (!acc[item.category]) {
       acc[item.category] = [];
     }
@@ -184,6 +196,37 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
           )}
         </button>
       </div>
+
+      {/* Search */}
+      <div className="relative mb-4">
+        <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Buscar producto... (ej: champiñones)"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-10 pr-4 py-3 bg-white rounded-xl border border-gray-200 focus:ring-2 focus:ring-green-500 focus:border-green-500"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          >
+            <X size={18} />
+          </button>
+        )}
+      </div>
+
+      {/* Search Results Info */}
+      {searchQuery && (
+        <div className="mb-4 text-sm text-gray-500">
+          {filteredItems.length === 0 ? (
+            <span className="text-red-500">No se encontró "{searchQuery}"</span>
+          ) : (
+            <span>{filteredItems.length} producto{filteredItems.length !== 1 ? 's' : ''} encontrado{filteredItems.length !== 1 ? 's' : ''}</span>
+          )}
+        </div>
+      )}
 
       {viewMode === 'shopping' ? (
         <>
