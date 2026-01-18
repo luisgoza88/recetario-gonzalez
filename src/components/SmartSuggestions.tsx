@@ -68,12 +68,12 @@ export default function SmartSuggestions({
     setLoading(true);
     try {
       const inventory = await loadCurrentInventory();
-      const recipeAvailability = checkRecipeIngredients(recipe, inventory);
+      const recipeAvailability = await checkRecipeIngredients(recipe, inventory);
       setAvailability(recipeAvailability);
 
       // Buscar alternativas solo si faltan ingredientes
       if (!recipeAvailability.canMake) {
-        const alts = findAlternativeRecipes(allRecipes, inventory, recipe.id, mealType);
+        const alts = await findAlternativeRecipes(allRecipes, inventory, recipe.id, mealType);
         setAlternatives(alts.slice(0, 5)); // Top 5 alternativas
       }
 
