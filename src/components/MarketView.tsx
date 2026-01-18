@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { RotateCcw, ShoppingCart, Home, Minus, Plus, Edit2, Check, X, AlertTriangle, Search, Sparkles, Trash2, WifiOff } from 'lucide-react';
+import { RotateCcw, ShoppingCart, Home, Minus, Plus, Edit2, Check, X, AlertTriangle, Search, Sparkles, Trash2, WifiOff, Camera } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { MarketItem, IngredientCategory } from '@/types';
 import { CATEGORY_EMOJIS } from '@/data/market';
 import AddCustomItemModal from './AddCustomItemModal';
+import ScanPantryModal from './ScanPantryModal';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { cacheMarketItems, getCachedMarketItems, cacheInventory, getCachedInventory } from '@/lib/indexedDB';
 
@@ -23,6 +24,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
   const [editValue, setEditValue] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showScanModal, setShowScanModal] = useState(false);
   const [categoryData, setCategoryData] = useState<Record<string, IngredientCategory>>({});
   const [isFromCache, setIsFromCache] = useState(false);
 
@@ -664,20 +666,40 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
         </>
       )}
 
-      {/* Floating Add Button */}
-      <button
-        onClick={() => setShowAddModal(true)}
-        className="fixed bottom-40 left-5 bg-purple-600 text-white p-4 rounded-full font-semibold shadow-lg flex items-center gap-2 hover:bg-purple-700 transition-colors z-40"
-        aria-label="Agregar item personalizado"
-      >
-        <Sparkles size={22} />
-      </button>
+      {/* Floating Buttons */}
+      <div className="fixed bottom-40 left-5 flex flex-col gap-3 z-40">
+        {/* Scan Pantry Button */}
+        <button
+          onClick={() => setShowScanModal(true)}
+          className="bg-green-600 text-white p-4 rounded-full font-semibold shadow-lg flex items-center gap-2 hover:bg-green-700 transition-colors"
+          aria-label="Escanear despensa con IA"
+        >
+          <Camera size={22} />
+        </button>
+
+        {/* Add Custom Item Button */}
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="bg-purple-600 text-white p-4 rounded-full font-semibold shadow-lg flex items-center gap-2 hover:bg-purple-700 transition-colors"
+          aria-label="Agregar item personalizado"
+        >
+          <Sparkles size={22} />
+        </button>
+      </div>
 
       {/* Add Custom Item Modal */}
       {showAddModal && (
         <AddCustomItemModal
           onClose={() => setShowAddModal(false)}
           onAdded={onUpdate}
+        />
+      )}
+
+      {/* Scan Pantry Modal */}
+      {showScanModal && (
+        <ScanPantryModal
+          onClose={() => setShowScanModal(false)}
+          onComplete={onUpdate}
         />
       )}
     </div>

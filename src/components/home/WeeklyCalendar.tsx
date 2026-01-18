@@ -3,14 +3,15 @@
 import { useState, useEffect } from 'react';
 import {
   ChevronLeft, ChevronRight, Calendar, CheckCircle2,
-  Clock, User, Plus, X
+  Clock, User, Plus, X, Circle, Edit3, CalendarDays
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
-import { ScheduledTask, HomeEmployee, Space } from '@/types';
+import { ScheduledTask, HomeEmployee, Space, TaskStatus } from '@/types';
 
 interface WeeklyCalendarProps {
   householdId: string;
   onClose: () => void;
+  onEditTask?: (task: ScheduledTask) => void;
 }
 
 interface DayData {
@@ -24,13 +25,15 @@ interface DayData {
 
 export default function WeeklyCalendar({
   householdId,
-  onClose
+  onClose,
+  onEditTask
 }: WeeklyCalendarProps) {
   const [selectedDay, setSelectedDay] = useState<DayData | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
   const [tasks, setTasks] = useState<ScheduledTask[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     loadTasks();
@@ -150,6 +153,51 @@ export default function WeeklyCalendar({
     setCurrentDate(new Date());
   };
 
+  const toggleTaskStatus = async (task: ScheduledTask) => {
+    setUpdatingTaskId(task.id);
+    const newStatus: ScheduledTask['status'] = task.status === 'completada' ? 'pendiente' : 'completada';
+
+    try {
+      await supabase
+        .from('scheduled_tasks')
+        .update({
+          status: newStatus,
+          completed_at: newStatus === 'completada' ? new Date().toISOString() : null
+        })
+        .eq('id', task.id);
+
+      // Actualizar tareas localmente
+      setTasks(prev => prev.map(t =>
+        t.id === task.id ? { ...t, status: newStatus } : t
+      ));
+
+      // Actualizar selectedDay si está seleccionado
+      if (selectedDay) {
+        const updatedTasks: ScheduledTask[] = selectedDay.tasks.map(t =>
+          t.id === task.id ? { ...t, status: newStatus } : t
+        );
+        setSelectedDay({
+          ...selectedDay,
+          tasks: updatedTasks,
+          completedCount: updatedTasks.filter(t => t.status === 'completada').length
+        });
+      }
+    } catch (error) {
+      console.error('Error updating task:', error);
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  };
+
+  const handleDaySelect = (day: DayData) => {
+    // Si ya está seleccionado el mismo día, deseleccionar
+    if (selectedDay && selectedDay.date.toDateString() === day.date.toDateString()) {
+      setSelectedDay(null);
+    } else {
+      setSelectedDay(day);
+    }
+  };
+
   const formatMonthYear = (date: Date) => {
     return date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
   };
@@ -236,7 +284,8 @@ export default function WeeklyCalendar({
               <DayCell
                 key={i}
                 day={day}
-                onClick={() => setSelectedDay(day)}
+                onClick={() => handleDaySelect(day)}
+                isSelected={selectedDay?.date.toDateString() === day.date.toDateString()}
                 detailed
               />
             ))}
@@ -252,7 +301,8 @@ export default function WeeklyCalendar({
                   <DayCell
                     key={di}
                     day={day}
-                    onClick={() => setSelectedDay(day)}
+                    onClick={() => handleDaySelect(day)}
+                    isSelected={selectedDay?.date.toDateString() === day.date.toDateString()}
                     compact
                   />
                 ))}
@@ -276,35 +326,93 @@ export default function WeeklyCalendar({
       </div>
 
       {/* Selected Day Detail */}
-      {selectedDay && selectedDay.tasks.length > 0 && (
-        <div className="border-t p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold">
-              {selectedDay.date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })}
-            </h3>
+      {selectedDay && (
+        <div className="border-t bg-gray-50">
+          <div className="flex items-center justify-between p-4 border-b bg-white">
+            <div>
+              <h3 className="font-semibold text-gray-800 capitalize">
+                {selectedDay.date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </h3>
+              <p className="text-sm text-gray-500">
+                {selectedDay.totalCount > 0
+                  ? `${selectedDay.completedCount}/${selectedDay.totalCount} tareas completadas`
+                  : 'Sin tareas programadas'}
+              </p>
+            </div>
             <button
               onClick={() => setSelectedDay(null)}
-              className="text-sm text-gray-500 hover:text-gray-700"
+              className="p-2 hover:bg-gray-100 rounded-lg text-gray-400"
             >
-              Cerrar
+              <X size={18} />
             </button>
           </div>
-          <div className="space-y-2 max-h-40 overflow-y-auto">
-            {selectedDay.tasks.map((task, i) => (
-              <div
-                key={i}
-                className={`p-2 rounded-lg text-sm ${
-                  task.status === 'completada'
-                    ? 'bg-green-50 text-green-700'
-                    : 'bg-blue-50 text-blue-700'
-                }`}
-              >
-                <div className="font-medium">{task.task_template?.name}</div>
-                <div className="text-xs opacity-75">
-                  {task.space?.space_type?.icon} {task.space?.custom_name || task.space?.space_type?.name}
-                </div>
+
+          <div className="p-4">
+            {selectedDay.tasks.length > 0 ? (
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {selectedDay.tasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className={`p-3 rounded-xl border ${
+                      task.status === 'completada'
+                        ? 'bg-green-50 border-green-200'
+                        : 'bg-white border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <button
+                        onClick={() => toggleTaskStatus(task)}
+                        disabled={updatingTaskId === task.id}
+                        className={`mt-0.5 flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                          task.status === 'completada'
+                            ? 'bg-green-500 border-green-500 text-white'
+                            : 'border-gray-300 hover:border-green-400'
+                        } ${updatingTaskId === task.id ? 'opacity-50' : ''}`}
+                      >
+                        {task.status === 'completada' && <CheckCircle2 size={14} />}
+                      </button>
+
+                      <div className="flex-1 min-w-0">
+                        <p className={`font-medium ${task.status === 'completada' ? 'text-green-700 line-through' : 'text-gray-800'}`}>
+                          {task.task_template?.name}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                          <span>{task.space?.space_type?.icon} {task.space?.custom_name || task.space?.space_type?.name}</span>
+                          {task.employee && (
+                            <>
+                              <span>•</span>
+                              <span className="flex items-center gap-1">
+                                <User size={12} />
+                                {task.employee.name}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {onEditTask && (
+                        <button
+                          onClick={() => onEditTask(task)}
+                          className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600"
+                        >
+                          <Edit3 size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : (
+              <div className="text-center py-6">
+                <CalendarDays size={40} className="mx-auto text-gray-300 mb-2" />
+                <p className="text-gray-500">No hay tareas para este día</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {selectedDay.date > new Date()
+                    ? 'Puedes programar tareas desde el generador'
+                    : 'Este día ya pasó'}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -330,9 +438,10 @@ interface DayCellProps {
   onClick: () => void;
   detailed?: boolean;
   compact?: boolean;
+  isSelected?: boolean;
 }
 
-function DayCell({ day, onClick, detailed, compact }: DayCellProps) {
+function DayCell({ day, onClick, detailed, compact, isSelected }: DayCellProps) {
   const hasOverdue = day.date < new Date() && day.completedCount < day.totalCount && !day.isToday;
   const allCompleted = day.totalCount > 0 && day.completedCount === day.totalCount;
 
@@ -341,16 +450,18 @@ function DayCell({ day, onClick, detailed, compact }: DayCellProps) {
       onClick={onClick}
       className={`
         ${detailed ? 'min-h-[100px]' : 'min-h-[60px]'}
-        p-2 rounded-lg border transition-all
-        ${day.isToday ? 'border-blue-500 bg-blue-50' : 'border-transparent hover:bg-gray-50'}
+        p-2 rounded-lg border-2 transition-all
+        ${isSelected ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-200' : ''}
+        ${!isSelected && day.isToday ? 'border-blue-500 bg-blue-50' : ''}
+        ${!isSelected && !day.isToday ? 'border-transparent hover:bg-gray-100 hover:border-gray-200' : ''}
         ${!day.isCurrentMonth && 'opacity-40'}
-        ${hasOverdue ? 'bg-amber-50' : ''}
-        ${allCompleted ? 'bg-green-50' : ''}
+        ${!isSelected && hasOverdue ? 'bg-amber-50' : ''}
+        ${!isSelected && allCompleted ? 'bg-green-50' : ''}
       `}
     >
       {/* Date Number */}
       <div className={`text-sm font-semibold mb-1 ${
-        day.isToday ? 'text-blue-600' : ''
+        isSelected ? 'text-purple-600' : day.isToday ? 'text-blue-600' : ''
       }`}>
         {day.date.getDate()}
       </div>
