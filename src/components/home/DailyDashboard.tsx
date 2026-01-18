@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import {
   Calendar, CheckCircle2, Clock, User, ChevronLeft, ChevronRight,
   Star, Camera, Play, Pause, MoreVertical, AlertTriangle,
-  TrendingUp, Sparkles, Filter, Eye
+  TrendingUp, Sparkles, Filter, Eye, X
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { ScheduledTask, HomeEmployee, Space } from '@/types';
@@ -13,7 +13,8 @@ interface DailyDashboardProps {
   householdId: string;
   employees: HomeEmployee[];
   spaces: Space[];
-  onTaskUpdate: () => void;
+  onClose: () => void;
+  onTaskComplete: () => void;
   onOpenInspection: (task: ScheduledTask) => void;
   onOpenRating: (task: ScheduledTask) => void;
 }
@@ -31,7 +32,8 @@ export default function DailyDashboard({
   householdId,
   employees,
   spaces,
-  onTaskUpdate,
+  onClose,
+  onTaskComplete,
   onOpenInspection,
   onOpenRating
 }: DailyDashboardProps) {
@@ -113,7 +115,7 @@ export default function DailyDashboard({
     }
 
     loadTasks();
-    onTaskUpdate();
+    onTaskComplete();
   };
 
   const startTask = async (task: ScheduledTask) => {
@@ -172,39 +174,52 @@ export default function DailyDashboard({
   const progressPercent = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 
   return (
-    <div className="space-y-4">
-      {/* Date Navigation */}
-      <div className="bg-white rounded-xl p-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <button
-            onClick={() => changeDate(-1)}
-            className="p-2 hover:bg-gray-100 rounded-lg"
-          >
-            <ChevronLeft size={20} />
-          </button>
-
-          <div className="text-center">
-            <p className={`font-semibold capitalize ${isToday ? 'text-blue-600' : ''}`}>
-              {isToday ? '📅 Hoy' : formatDate(selectedDate)}
-            </p>
-            {!isToday && (
-              <button
-                onClick={() => setSelectedDate(new Date())}
-                className="text-xs text-blue-600 hover:underline"
-              >
-                Volver a hoy
-              </button>
-            )}
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <Calendar size={20} />
+            <span className="font-semibold">Dashboard del Día</span>
           </div>
-
-          <button
-            onClick={() => changeDate(1)}
-            className="p-2 hover:bg-gray-100 rounded-lg"
-          >
-            <ChevronRight size={20} />
+          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg">
+            <X size={20} />
           </button>
         </div>
-      </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Date Navigation */}
+          <div className="bg-gray-50 rounded-xl p-4">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => changeDate(-1)}
+                className="p-2 hover:bg-gray-200 rounded-lg"
+              >
+                <ChevronLeft size={20} />
+              </button>
+
+              <div className="text-center">
+                <p className={`font-semibold capitalize ${isToday ? 'text-blue-600' : ''}`}>
+                  {isToday ? '📅 Hoy' : formatDate(selectedDate)}
+                </p>
+                {!isToday && (
+                  <button
+                    onClick={() => setSelectedDate(new Date())}
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    Volver a hoy
+                  </button>
+                )}
+              </div>
+
+              <button
+                onClick={() => changeDate(1)}
+                className="p-2 hover:bg-gray-200 rounded-lg"
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
+          </div>
 
       {/* Progress Summary */}
       <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-4 text-white">
@@ -361,6 +376,18 @@ export default function DailyDashboard({
           )}
         </div>
       )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t">
+          <button
+            onClick={onClose}
+            className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200"
+          >
+            Cerrar
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

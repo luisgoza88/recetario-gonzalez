@@ -432,3 +432,18 @@ export interface BudgetSummary {
   isOverBudget: boolean;
   purchases: Purchase[];
 }
+
+// =====================================================
+// TIPOS PARA NAVEGACIÓN PRINCIPAL
+// =====================================================
+
+export type MainSection = 'recetario' | 'hogar' | 'ia' | 'ajustes';
+export type RecetarioTab = 'calendar' | 'market' | 'recipes' | 'suggestions';
+
+export interface FABAction {
+  id: string;
+  icon: React.ReactNode;
+  label: string;
+  color: string;
+  onClick: () => void;
+}

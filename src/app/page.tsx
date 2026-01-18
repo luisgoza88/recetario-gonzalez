@@ -1,19 +1,25 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Calendar, ShoppingCart, BookOpen, MapPin, Lightbulb, Home as HomeIcon } from 'lucide-react';
+import { BookOpen, ShoppingCart, UtensilsCrossed, Sparkles, Home as HomeIcon, Users, ClipboardList, Zap } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
-import CalendarView from '@/components/CalendarView';
-import MarketView from '@/components/MarketView';
-import RecipesView from '@/components/RecipesView';
-import SuggestionsPanel from '@/components/SuggestionsPanel';
+import BottomNavigation from '@/components/navigation/BottomNavigation';
+import RecetarioSection from '@/components/sections/RecetarioSection';
 import HomeView from '@/components/home/HomeView';
-import { Recipe, MarketItem } from '@/types';
-
-type TabType = 'calendar' | 'market' | 'recipes' | 'suggestions' | 'home';
+import AIChat from '@/components/sections/AIChat';
+import SettingsView from '@/components/sections/SettingsView';
+import { Recipe, MarketItem, MainSection, RecetarioTab } from '@/types';
+import { FABAction } from '@/components/navigation/DynamicFAB';
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<TabType>('calendar');
+  // Navegación principal
+  const [activeSection, setActiveSection] = useState<MainSection>('recetario');
+  const [recetarioTab, setRecetarioTab] = useState<RecetarioTab>('calendar');
+
+  // FAB
+  const [fabOpen, setFabOpen] = useState(false);
+
+  // Datos
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [marketItems, setMarketItems] = useState<MarketItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +29,11 @@ export default function Home() {
     loadData();
     loadSuggestionsCount();
   }, []);
+
+  // Cerrar FAB cuando cambia la sección
+  useEffect(() => {
+    setFabOpen(false);
+  }, [activeSection]);
 
   const loadSuggestionsCount = async () => {
     try {
@@ -105,10 +116,111 @@ export default function Home() {
     }
   };
 
-  const goToToday = () => {
-    setActiveTab('calendar');
-    // Disparar evento para que CalendarView seleccione el día actual
-    window.dispatchEvent(new CustomEvent('goToToday'));
+  const handleUpdate = () => {
+    loadData();
+    loadSuggestionsCount();
+  };
+
+  // Acciones del FAB según la sección activa
+  const getRecetarioFABActions = (): FABAction[] => [
+    {
+      id: 'new-recipe',
+      icon: <BookOpen size={20} />,
+      label: 'Nueva receta',
+      color: 'bg-green-500',
+      onClick: () => {
+        setFabOpen(false);
+        setRecetarioTab('recipes');
+        // Disparar evento para abrir modal de nueva receta
+        setTimeout(() => window.dispatchEvent(new CustomEvent('openNewRecipe')), 100);
+      }
+    },
+    {
+      id: 'add-market',
+      icon: <ShoppingCart size={20} />,
+      label: 'Al mercado',
+      color: 'bg-blue-500',
+      onClick: () => {
+        setFabOpen(false);
+        setRecetarioTab('market');
+        setTimeout(() => window.dispatchEvent(new CustomEvent('openAddMarketItem')), 100);
+      }
+    },
+    {
+      id: 'register-meal',
+      icon: <UtensilsCrossed size={20} />,
+      label: 'Registrar',
+      color: 'bg-orange-500',
+      onClick: () => {
+        setFabOpen(false);
+        setRecetarioTab('calendar');
+        setTimeout(() => window.dispatchEvent(new CustomEvent('openMealFeedback')), 100);
+      }
+    },
+    {
+      id: 'ai-suggestion',
+      icon: <Sparkles size={20} />,
+      label: 'Sugerencia IA',
+      color: 'bg-purple-500',
+      onClick: () => {
+        setFabOpen(false);
+        setRecetarioTab('suggestions');
+      }
+    }
+  ];
+
+  const getHomeFABActions = (): FABAction[] => [
+    {
+      id: 'new-space',
+      icon: <HomeIcon size={20} />,
+      label: 'Nuevo espacio',
+      color: 'bg-blue-500',
+      onClick: () => {
+        setFabOpen(false);
+        window.dispatchEvent(new CustomEvent('openSpacesPanel'));
+      }
+    },
+    {
+      id: 'new-employee',
+      icon: <Users size={20} />,
+      label: 'Empleado',
+      color: 'bg-green-500',
+      onClick: () => {
+        setFabOpen(false);
+        window.dispatchEvent(new CustomEvent('openEmployeesPanel'));
+      }
+    },
+    {
+      id: 'new-task',
+      icon: <ClipboardList size={20} />,
+      label: 'Nueva tarea',
+      color: 'bg-orange-500',
+      onClick: () => {
+        setFabOpen(false);
+        window.dispatchEvent(new CustomEvent('openTaskModal'));
+      }
+    },
+    {
+      id: 'quick-routine',
+      icon: <Zap size={20} />,
+      label: 'Rutina rápida',
+      color: 'bg-purple-500',
+      onClick: () => {
+        setFabOpen(false);
+        window.dispatchEvent(new CustomEvent('openRoutinePanel'));
+      }
+    }
+  ];
+
+  const getFABActions = (): FABAction[] => {
+    switch (activeSection) {
+      case 'recetario':
+        return getRecetarioFABActions();
+      case 'hogar':
+        return getHomeFABActions();
+      default:
+        return [];
+    }
   };
 
   if (loading) {
@@ -125,100 +237,40 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Content */}
-      <main className="pb-24">
-        {activeTab === 'calendar' && (
-          <CalendarView recipes={recipes} />
+      <main className="pb-20">
+        {activeSection === 'recetario' && (
+          <RecetarioSection
+            activeTab={recetarioTab}
+            onTabChange={setRecetarioTab}
+            recipes={recipes}
+            marketItems={marketItems}
+            pendingSuggestions={pendingSuggestions}
+            onUpdate={handleUpdate}
+          />
         )}
-        {activeTab === 'market' && (
-          <MarketView items={marketItems} onUpdate={loadData} />
-        )}
-        {activeTab === 'recipes' && (
-          <RecipesView recipes={recipes} onUpdate={loadData} />
-        )}
-        {activeTab === 'suggestions' && (
-          <div className="p-4 max-w-lg mx-auto">
-            <SuggestionsPanel onUpdate={() => { loadData(); loadSuggestionsCount(); }} />
-          </div>
-        )}
-        {activeTab === 'home' && (
+
+        {activeSection === 'hogar' && (
           <HomeView />
+        )}
+
+        {activeSection === 'ia' && (
+          <AIChat />
+        )}
+
+        {activeSection === 'ajustes' && (
+          <SettingsView />
         )}
       </main>
 
-      {/* Today Button */}
-      <button
-        onClick={goToToday}
-        className="fixed bottom-24 right-5 bg-green-700 text-white px-5 py-3 rounded-full font-semibold shadow-lg flex items-center gap-2 hover:bg-green-800 transition-colors z-40"
-      >
-        <MapPin size={18} />
-        Hoy
-      </button>
-
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white flex justify-around py-2 shadow-[0_-2px_10px_rgba(0,0,0,0.1)] z-50">
-        <button
-          onClick={() => setActiveTab('calendar')}
-          className={`flex flex-col items-center px-3 py-2 rounded-lg transition-colors ${
-            activeTab === 'calendar'
-              ? 'text-green-700 bg-green-50'
-              : 'text-gray-500'
-          }`}
-        >
-          <Calendar size={22} />
-          <span className="text-[10px] mt-1">Calendario</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('market')}
-          className={`flex flex-col items-center px-3 py-2 rounded-lg transition-colors ${
-            activeTab === 'market'
-              ? 'text-green-700 bg-green-50'
-              : 'text-gray-500'
-          }`}
-        >
-          <ShoppingCart size={22} />
-          <span className="text-[10px] mt-1">Mercado</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('recipes')}
-          className={`flex flex-col items-center px-3 py-2 rounded-lg transition-colors ${
-            activeTab === 'recipes'
-              ? 'text-green-700 bg-green-50'
-              : 'text-gray-500'
-          }`}
-        >
-          <BookOpen size={22} />
-          <span className="text-[10px] mt-1">Recetas</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('suggestions')}
-          className={`flex flex-col items-center px-3 py-2 rounded-lg transition-colors relative ${
-            activeTab === 'suggestions'
-              ? 'text-yellow-600 bg-yellow-50'
-              : 'text-gray-500'
-          }`}
-        >
-          <div className="relative">
-            <Lightbulb size={22} />
-            {pendingSuggestions > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                {pendingSuggestions > 9 ? '9+' : pendingSuggestions}
-              </span>
-            )}
-          </div>
-          <span className="text-[10px] mt-1">Ajustes</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('home')}
-          className={`flex flex-col items-center px-3 py-2 rounded-lg transition-colors ${
-            activeTab === 'home'
-              ? 'text-blue-600 bg-blue-50'
-              : 'text-gray-500'
-          }`}
-        >
-          <HomeIcon size={22} />
-          <span className="text-[10px] mt-1">Hogar</span>
-        </button>
-      </nav>
+      {/* Bottom Navigation with Dynamic FAB */}
+      <BottomNavigation
+        activeSection={activeSection}
+        onSectionChange={setActiveSection}
+        fabOpen={fabOpen}
+        onFabToggle={() => setFabOpen(!fabOpen)}
+        fabActions={getFABActions()}
+        pendingAlerts={pendingSuggestions}
+      />
     </div>
   );
 }

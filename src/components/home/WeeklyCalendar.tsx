@@ -3,17 +3,14 @@
 import { useState, useEffect } from 'react';
 import {
   ChevronLeft, ChevronRight, Calendar, CheckCircle2,
-  Clock, User, Plus
+  Clock, User, Plus, X
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { ScheduledTask, HomeEmployee, Space } from '@/types';
 
 interface WeeklyCalendarProps {
   householdId: string;
-  employees: HomeEmployee[];
-  spaces: Space[];
-  onDayClick: (date: Date) => void;
-  onTaskClick: (task: ScheduledTask) => void;
+  onClose: () => void;
 }
 
 interface DayData {
@@ -27,11 +24,9 @@ interface DayData {
 
 export default function WeeklyCalendar({
   householdId,
-  employees,
-  spaces,
-  onDayClick,
-  onTaskClick
+  onClose
 }: WeeklyCalendarProps) {
+  const [selectedDay, setSelectedDay] = useState<DayData | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
   const [tasks, setTasks] = useState<ScheduledTask[]>([]);
@@ -162,56 +157,66 @@ export default function WeeklyCalendar({
   const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
   return (
-    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-      {/* Header */}
-      <div className="p-4 border-b">
-        <div className="flex items-center justify-between mb-3">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Modal Header */}
+        <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <Calendar size={20} className="text-blue-600" />
-            <h2 className="font-semibold capitalize">{formatMonthYear(currentDate)}</h2>
+            <Calendar size={20} />
+            <span className="font-semibold">Calendario</span>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={goToToday}
-              className="text-sm text-blue-600 hover:underline"
-            >
-              Hoy
-            </button>
-            <button
-              onClick={() => navigateDate(-1)}
-              className="p-1.5 hover:bg-gray-100 rounded-lg"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <button
-              onClick={() => navigateDate(1)}
-              className="p-1.5 hover:bg-gray-100 rounded-lg"
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
+          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg">
+            <X size={20} />
+          </button>
         </div>
 
-        {/* View Toggle */}
-        <div className="flex bg-gray-100 rounded-lg p-1">
-          <button
-            onClick={() => setViewMode('week')}
-            className={`flex-1 py-1.5 rounded text-sm font-medium transition-colors ${
-              viewMode === 'week' ? 'bg-white shadow-sm' : ''
-            }`}
-          >
-            Semana
-          </button>
-          <button
-            onClick={() => setViewMode('month')}
-            className={`flex-1 py-1.5 rounded text-sm font-medium transition-colors ${
-              viewMode === 'month' ? 'bg-white shadow-sm' : ''
-            }`}
-          >
-            Mes
-          </button>
-        </div>
-      </div>
+        <div className="flex-1 overflow-y-auto">
+          {/* Navigation Header */}
+          <div className="p-4 border-b">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold capitalize text-lg">{formatMonthYear(currentDate)}</h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={goToToday}
+                  className="text-sm text-purple-600 hover:underline"
+                >
+                  Hoy
+                </button>
+                <button
+                  onClick={() => navigateDate(-1)}
+                  className="p-1.5 hover:bg-gray-100 rounded-lg"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <button
+                  onClick={() => navigateDate(1)}
+                  className="p-1.5 hover:bg-gray-100 rounded-lg"
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* View Toggle */}
+            <div className="flex bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('week')}
+                className={`flex-1 py-1.5 rounded text-sm font-medium transition-colors ${
+                  viewMode === 'week' ? 'bg-white shadow-sm' : ''
+                }`}
+              >
+                Semana
+              </button>
+              <button
+                onClick={() => setViewMode('month')}
+                className={`flex-1 py-1.5 rounded text-sm font-medium transition-colors ${
+                  viewMode === 'month' ? 'bg-white shadow-sm' : ''
+                }`}
+              >
+                Mes
+              </button>
+            </div>
+          </div>
 
       {/* Calendar Grid */}
       <div className="p-2">
@@ -231,7 +236,7 @@ export default function WeeklyCalendar({
               <DayCell
                 key={i}
                 day={day}
-                onClick={() => onDayClick(day.date)}
+                onClick={() => setSelectedDay(day)}
                 detailed
               />
             ))}
@@ -247,7 +252,7 @@ export default function WeeklyCalendar({
                   <DayCell
                     key={di}
                     day={day}
-                    onClick={() => onDayClick(day.date)}
+                    onClick={() => setSelectedDay(day)}
                     compact
                   />
                 ))}
@@ -268,6 +273,52 @@ export default function WeeklyCalendar({
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-amber-500" /> Atrasadas
         </span>
+      </div>
+
+      {/* Selected Day Detail */}
+      {selectedDay && selectedDay.tasks.length > 0 && (
+        <div className="border-t p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold">
+              {selectedDay.date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })}
+            </h3>
+            <button
+              onClick={() => setSelectedDay(null)}
+              className="text-sm text-gray-500 hover:text-gray-700"
+            >
+              Cerrar
+            </button>
+          </div>
+          <div className="space-y-2 max-h-40 overflow-y-auto">
+            {selectedDay.tasks.map((task, i) => (
+              <div
+                key={i}
+                className={`p-2 rounded-lg text-sm ${
+                  task.status === 'completada'
+                    ? 'bg-green-50 text-green-700'
+                    : 'bg-blue-50 text-blue-700'
+                }`}
+              >
+                <div className="font-medium">{task.task_template?.name}</div>
+                <div className="text-xs opacity-75">
+                  {task.space?.space_type?.icon} {task.space?.custom_name || task.space?.space_type?.name}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t">
+          <button
+            onClick={onClose}
+            className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200"
+          >
+            Cerrar
+          </button>
+        </div>
       </div>
     </div>
   );

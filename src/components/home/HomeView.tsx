@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import {
   Home, Calendar, CheckCircle2, Clock, AlertTriangle,
-  User, Settings, ChevronRight, Plus, Sparkles, BarChart3
+  User, Settings, ChevronRight, Plus, Sparkles, BarChart3,
+  History, Package, Zap, Eye, FileText, LogIn
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { Household, Space, HomeEmployee, ScheduledTask, TaskTemplate } from '@/types';
@@ -12,6 +13,15 @@ import EmployeesPanel from './EmployeesPanel';
 import SpacesPanel from './SpacesPanel';
 import ScheduleGenerator from './ScheduleGenerator';
 import ScheduleOptimizer from './ScheduleOptimizer';
+import DailyDashboard from './DailyDashboard';
+import WeeklyCalendar from './WeeklyCalendar';
+import QuickRoutines from './QuickRoutines';
+import CleaningRating from './CleaningRating';
+import EmployeeCheckIn from './EmployeeCheckIn';
+import CleaningHistory from './CleaningHistory';
+import SuppliesInventory from './SuppliesInventory';
+import InspectionMode from './InspectionMode';
+import MonthlyReport from './MonthlyReport';
 
 interface HomeViewProps {
   initialHouseholdId?: string;
@@ -29,6 +39,15 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
   const [showSpacesPanel, setShowSpacesPanel] = useState(false);
   const [showScheduleGenerator, setShowScheduleGenerator] = useState(false);
   const [showOptimizer, setShowOptimizer] = useState(false);
+  const [showDailyDashboard, setShowDailyDashboard] = useState(false);
+  const [showWeeklyCalendar, setShowWeeklyCalendar] = useState(false);
+  const [showQuickRoutines, setShowQuickRoutines] = useState(false);
+  const [showRating, setShowRating] = useState<ScheduledTask | null>(null);
+  const [showCheckIn, setShowCheckIn] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [showSupplies, setShowSupplies] = useState(false);
+  const [showInspection, setShowInspection] = useState<ScheduledTask | null>(null);
+  const [showMonthlyReport, setShowMonthlyReport] = useState(false);
 
   useEffect(() => {
     loadHousehold();
@@ -262,33 +281,118 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
         </div>
       )}
 
-      {/* Action Buttons */}
+      {/* Main Action Buttons */}
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <button
+          onClick={() => setShowDailyDashboard(true)}
+          className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl p-4 shadow-sm text-left hover:from-blue-600 hover:to-blue-700 transition-all"
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <Calendar size={20} />
+            <span className="font-semibold">Dashboard</span>
+          </div>
+          <p className="text-xs text-blue-100">Vista detallada del día</p>
+        </button>
+        <button
+          onClick={() => setShowWeeklyCalendar(true)}
+          className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl p-4 shadow-sm text-left hover:from-purple-600 hover:to-purple-700 transition-all"
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <Calendar size={20} />
+            <span className="font-semibold">Calendario</span>
+          </div>
+          <p className="text-xs text-purple-100">Vista semanal/mensual</p>
+        </button>
+      </div>
+
+      {/* Secondary Action Buttons */}
       <div className="grid grid-cols-2 gap-3 mb-4">
         <button
           onClick={() => setShowScheduleGenerator(true)}
-          className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl p-4 shadow-sm text-left hover:from-purple-600 hover:to-purple-700 transition-all"
+          className="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-xl p-4 shadow-sm text-left hover:from-indigo-600 hover:to-indigo-700 transition-all"
         >
           <div className="flex items-center gap-2 mb-1">
             <Sparkles size={20} />
             <span className="font-semibold">Programar</span>
           </div>
-          <p className="text-xs text-purple-100">Generar itinerario</p>
+          <p className="text-xs text-indigo-100">Generar itinerario</p>
         </button>
         <button
           onClick={() => setShowOptimizer(true)}
-          className="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-xl p-4 shadow-sm text-left hover:from-indigo-600 hover:to-indigo-700 transition-all"
+          className="bg-gradient-to-r from-violet-500 to-violet-600 text-white rounded-xl p-4 shadow-sm text-left hover:from-violet-600 hover:to-violet-700 transition-all"
         >
           <div className="flex items-center gap-2 mb-1">
             <BarChart3 size={20} />
             <span className="font-semibold">Analizar</span>
           </div>
-          <p className="text-xs text-indigo-100">Ver carga de trabajo</p>
+          <p className="text-xs text-violet-100">Carga de trabajo</p>
         </button>
+      </div>
+
+      {/* Quick Access Tools */}
+      <div className="bg-white rounded-xl shadow-sm mb-4 p-4">
+        <h3 className="font-semibold text-gray-700 mb-3">Herramientas Rápidas</h3>
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            onClick={() => setShowQuickRoutines(true)}
+            className="flex flex-col items-center p-3 bg-amber-50 rounded-xl hover:bg-amber-100 transition-colors"
+          >
+            <Zap size={24} className="text-amber-600 mb-1" />
+            <span className="text-xs text-amber-700 font-medium">Rutinas</span>
+          </button>
+          <button
+            onClick={() => setShowCheckIn(true)}
+            className="flex flex-col items-center p-3 bg-teal-50 rounded-xl hover:bg-teal-100 transition-colors"
+          >
+            <LogIn size={24} className="text-teal-600 mb-1" />
+            <span className="text-xs text-teal-700 font-medium">Asistencia</span>
+          </button>
+          <button
+            onClick={() => setShowSupplies(true)}
+            className="flex flex-col items-center p-3 bg-emerald-50 rounded-xl hover:bg-emerald-100 transition-colors"
+          >
+            <Package size={24} className="text-emerald-600 mb-1" />
+            <span className="text-xs text-emerald-700 font-medium">Productos</span>
+          </button>
+          <button
+            onClick={() => setShowHistory(true)}
+            className="flex flex-col items-center p-3 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-colors"
+          >
+            <History size={24} className="text-indigo-600 mb-1" />
+            <span className="text-xs text-indigo-700 font-medium">Historial</span>
+          </button>
+          <button
+            onClick={() => setShowMonthlyReport(true)}
+            className="flex flex-col items-center p-3 bg-pink-50 rounded-xl hover:bg-pink-100 transition-colors"
+          >
+            <FileText size={24} className="text-pink-600 mb-1" />
+            <span className="text-xs text-pink-700 font-medium">Reportes</span>
+          </button>
+          <button
+            onClick={() => {
+              if (todayTasks.length > 0) {
+                setShowInspection(todayTasks[0]);
+              }
+            }}
+            disabled={todayTasks.length === 0}
+            className={`flex flex-col items-center p-3 rounded-xl transition-colors ${
+              todayTasks.length > 0
+                ? 'bg-purple-50 hover:bg-purple-100'
+                : 'bg-gray-50 opacity-50 cursor-not-allowed'
+            }`}
+          >
+            <Eye size={24} className={todayTasks.length > 0 ? 'text-purple-600' : 'text-gray-400'} />
+            <span className={`text-xs font-medium ${todayTasks.length > 0 ? 'text-purple-700' : 'text-gray-400'}`}>Inspección</span>
+          </button>
+        </div>
       </div>
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className="bg-white rounded-xl p-4 shadow-sm">
+        <button
+          onClick={() => setShowSpacesPanel(true)}
+          className="bg-white rounded-xl p-4 shadow-sm text-left hover:bg-blue-50 transition-colors active:scale-95"
+        >
           <div className="flex items-center gap-2 mb-2">
             <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
               <Home size={18} className="text-blue-600" />
@@ -296,8 +400,11 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
             <span className="text-2xl font-bold">{interiorSpaces.length}</span>
           </div>
           <p className="text-sm text-gray-500">Espacios interiores</p>
-        </div>
-        <div className="bg-white rounded-xl p-4 shadow-sm">
+        </button>
+        <button
+          onClick={() => setShowSpacesPanel(true)}
+          className="bg-white rounded-xl p-4 shadow-sm text-left hover:bg-green-50 transition-colors active:scale-95"
+        >
           <div className="flex items-center gap-2 mb-2">
             <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
               <span className="text-lg">🌳</span>
@@ -305,7 +412,7 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
             <span className="text-2xl font-bold">{exteriorSpaces.length}</span>
           </div>
           <p className="text-sm text-gray-500">Espacios exteriores</p>
-        </div>
+        </button>
       </div>
 
       {/* Employees */}
@@ -432,6 +539,94 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
           employees={employees}
           onClose={() => setShowOptimizer(false)}
           onApplyOptimization={() => loadHouseholdData(household.id)}
+        />
+      )}
+
+      {showDailyDashboard && household && (
+        <DailyDashboard
+          householdId={household.id}
+          spaces={spaces}
+          employees={employees}
+          onClose={() => setShowDailyDashboard(false)}
+          onTaskComplete={() => loadHouseholdData(household.id)}
+          onOpenRating={(task) => {
+            setShowDailyDashboard(false);
+            setShowRating(task);
+          }}
+          onOpenInspection={(task) => {
+            setShowDailyDashboard(false);
+            setShowInspection(task);
+          }}
+        />
+      )}
+
+      {showWeeklyCalendar && household && (
+        <WeeklyCalendar
+          householdId={household.id}
+          onClose={() => setShowWeeklyCalendar(false)}
+        />
+      )}
+
+      {showQuickRoutines && (
+        <QuickRoutines
+          onClose={() => setShowQuickRoutines(false)}
+          onStartRoutine={() => {}}
+        />
+      )}
+
+      {showRating && household && (
+        <CleaningRating
+          task={showRating}
+          onClose={() => setShowRating(null)}
+          onSave={() => {
+            setShowRating(null);
+            loadHouseholdData(household.id);
+          }}
+        />
+      )}
+
+      {showCheckIn && household && (
+        <EmployeeCheckIn
+          householdId={household.id}
+          employees={employees}
+          onClose={() => setShowCheckIn(false)}
+          onUpdate={() => loadHouseholdData(household.id)}
+        />
+      )}
+
+      {showHistory && household && (
+        <CleaningHistory
+          householdId={household.id}
+          spaces={spaces}
+          employees={employees}
+          onClose={() => setShowHistory(false)}
+        />
+      )}
+
+      {showSupplies && household && (
+        <SuppliesInventory
+          householdId={household.id}
+          onClose={() => setShowSupplies(false)}
+        />
+      )}
+
+      {showInspection && household && (
+        <InspectionMode
+          task={showInspection}
+          onClose={() => setShowInspection(null)}
+          onComplete={() => {
+            setShowInspection(null);
+            loadHouseholdData(household.id);
+          }}
+        />
+      )}
+
+      {showMonthlyReport && household && (
+        <MonthlyReport
+          householdId={household.id}
+          spaces={spaces}
+          employees={employees}
+          onClose={() => setShowMonthlyReport(false)}
         />
       )}
     </div>
