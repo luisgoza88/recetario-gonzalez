@@ -156,8 +156,14 @@ async function findInventoryMatch(
       console.log(`[MATCH-ALIAS] "${ingredientName}" → "${aliasMatch}" (qty: ${data.number})`);
       return data;
     } else {
-      console.log(`[ALIAS-NO-INV] "${ingredientName}" → alias "${aliasMatch}" not in inventory`);
+      // Debug: show all inventory keys to find the issue
+      const inventoryKeys = Array.from(inventory.keys()).filter(k =>
+        k.toLowerCase().includes('bistec') || k.toLowerCase().includes('queso')
+      );
+      console.log(`[ALIAS-NO-INV] "${ingredientName}" → alias "${aliasMatch}" not in inventory. Similar keys: ${inventoryKeys.join(', ')}`);
     }
+  } else {
+    console.log(`[NO-ALIAS] "${ingredientName}" (normalized: "${normalizedIngredient}") has no alias`);
   }
 
   // 3. Buscar coincidencia parcial (uno contiene al otro)

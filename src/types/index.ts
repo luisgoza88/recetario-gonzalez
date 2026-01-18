@@ -167,6 +167,12 @@ export interface Space {
   created_at?: string;
 }
 
+export interface DaySchedule {
+  enabled: boolean;
+  startTime: string;
+  endTime: string;
+}
+
 export interface HomeEmployee {
   id: string;
   household_id: string;
@@ -175,6 +181,7 @@ export interface HomeEmployee {
   zone: 'interior' | 'exterior' | 'ambos';
   work_days: string[];
   hours_per_day: number;
+  schedule?: Record<string, DaySchedule>;
   phone?: string;
   notes?: string;
   active: boolean;

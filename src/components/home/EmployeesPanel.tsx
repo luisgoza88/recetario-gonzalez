@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
-  X, Plus, User, Trash2, Edit2, Check, ChevronDown
+  X, Plus, User, Trash2, Edit2, Check, Clock
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { HomeEmployee } from '@/types';
@@ -14,28 +14,91 @@ interface EmployeesPanelProps {
   onUpdate: () => void;
 }
 
-const DAYS = [
-  { key: 'lunes', label: 'Lun' },
-  { key: 'martes', label: 'Mar' },
-  { key: 'miercoles', label: 'Mié' },
-  { key: 'jueves', label: 'Jue' },
-  { key: 'viernes', label: 'Vie' },
-  { key: 'sabado', label: 'Sáb' },
-];
+interface DaySchedule {
+  enabled: boolean;
+  startTime: string;
+  endTime: string;
+}
 
 interface EmployeeForm {
   id?: string;
   name: string;
   zone: 'interior' | 'exterior' | 'ambos';
-  workDays: string[];
-  hoursPerDay: number;
+  schedule: Record<string, DaySchedule>;
 }
+
+const DAYS = [
+  { key: 'lunes', label: 'Lunes', short: 'Lun' },
+  { key: 'martes', label: 'Martes', short: 'Mar' },
+  { key: 'miercoles', label: 'Miércoles', short: 'Mié' },
+  { key: 'jueves', label: 'Jueves', short: 'Jue' },
+  { key: 'viernes', label: 'Viernes', short: 'Vie' },
+  { key: 'sabado', label: 'Sábado', short: 'Sáb' },
+];
+
+const defaultSchedule: Record<string, DaySchedule> = {
+  lunes: { enabled: true, startTime: '08:00', endTime: '17:00' },
+  martes: { enabled: true, startTime: '08:00', endTime: '17:00' },
+  miercoles: { enabled: true, startTime: '08:00', endTime: '17:00' },
+  jueves: { enabled: true, startTime: '08:00', endTime: '17:00' },
+  viernes: { enabled: true, startTime: '08:00', endTime: '17:00' },
+  sabado: { enabled: false, startTime: '08:00', endTime: '12:00' },
+};
 
 const emptyForm: EmployeeForm = {
   name: '',
   zone: 'interior',
-  workDays: ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'],
-  hoursPerDay: 8
+  schedule: { ...defaultSchedule }
+};
+
+// Calcular horas totales por semana
+const calculateWeeklyHours = (schedule: Record<string, DaySchedule>): number => {
+  let total = 0;
+  for (const day of Object.values(schedule)) {
+    if (day.enabled) {
+      const start = day.startTime.split(':').map(Number);
+      const end = day.endTime.split(':').map(Number);
+      const startMinutes = start[0] * 60 + start[1];
+      const endMinutes = end[0] * 60 + end[1];
+      total += (endMinutes - startMinutes) / 60;
+    }
+  }
+  return Math.round(total * 10) / 10;
+};
+
+// Convertir schedule a work_days y hours_per_day para compatibilidad
+const scheduleToLegacy = (schedule: Record<string, DaySchedule>) => {
+  const workDays = Object.entries(schedule)
+    .filter(([_, s]) => s.enabled)
+    .map(([day]) => day);
+
+  const totalHours = calculateWeeklyHours(schedule);
+  const hoursPerDay = workDays.length > 0 ? Math.round(totalHours / workDays.length) : 8;
+
+  return { workDays, hoursPerDay };
+};
+
+// Convertir datos legacy a schedule
+const legacyToSchedule = (workDays: string[], hoursPerDay: number, existingSchedule?: Record<string, DaySchedule>): Record<string, DaySchedule> => {
+  // Si ya existe un schedule guardado, usarlo
+  if (existingSchedule && Object.keys(existingSchedule).length > 0) {
+    return existingSchedule;
+  }
+
+  // Si no, crear uno basado en workDays y hoursPerDay
+  const schedule: Record<string, DaySchedule> = {};
+  const endHour = 8 + hoursPerDay;
+  const endTime = `${endHour.toString().padStart(2, '0')}:00`;
+
+  for (const day of DAYS) {
+    schedule[day.key] = {
+      enabled: workDays.includes(day.key),
+      startTime: '08:00',
+      endTime: workDays.includes(day.key) ? endTime : '12:00'
+    };
+  }
+
+  return schedule;
 };
 
 export default function EmployeesPanel({
@@ -50,17 +113,22 @@ export default function EmployeesPanel({
   const [deleting, setDeleting] = useState<string | null>(null);
 
   const startNew = () => {
-    setEditingEmployee({ ...emptyForm });
+    setEditingEmployee({ ...emptyForm, schedule: { ...defaultSchedule } });
     setShowForm(true);
   };
 
   const startEdit = (emp: HomeEmployee) => {
+    const schedule = legacyToSchedule(
+      emp.work_days || [],
+      emp.hours_per_day || 8,
+      emp.schedule as Record<string, DaySchedule> | undefined
+    );
+
     setEditingEmployee({
       id: emp.id,
       name: emp.name,
       zone: emp.zone,
-      workDays: emp.work_days || [],
-      hoursPerDay: emp.hours_per_day || 8
+      schedule
     });
     setShowForm(true);
   };
@@ -70,12 +138,32 @@ export default function EmployeesPanel({
     setShowForm(false);
   };
 
-  const toggleDay = (day: string) => {
+  const toggleDay = (dayKey: string) => {
     if (!editingEmployee) return;
-    const days = editingEmployee.workDays.includes(day)
-      ? editingEmployee.workDays.filter(d => d !== day)
-      : [...editingEmployee.workDays, day];
-    setEditingEmployee({ ...editingEmployee, workDays: days });
+    setEditingEmployee({
+      ...editingEmployee,
+      schedule: {
+        ...editingEmployee.schedule,
+        [dayKey]: {
+          ...editingEmployee.schedule[dayKey],
+          enabled: !editingEmployee.schedule[dayKey].enabled
+        }
+      }
+    });
+  };
+
+  const updateDayTime = (dayKey: string, field: 'startTime' | 'endTime', value: string) => {
+    if (!editingEmployee) return;
+    setEditingEmployee({
+      ...editingEmployee,
+      schedule: {
+        ...editingEmployee.schedule,
+        [dayKey]: {
+          ...editingEmployee.schedule[dayKey],
+          [field]: value
+        }
+      }
+    });
   };
 
   const saveEmployee = async () => {
@@ -83,12 +171,15 @@ export default function EmployeesPanel({
 
     setSaving(true);
     try {
+      const { workDays, hoursPerDay } = scheduleToLegacy(editingEmployee.schedule);
+
       const data = {
         household_id: householdId,
         name: editingEmployee.name.trim(),
         zone: editingEmployee.zone,
-        work_days: editingEmployee.workDays,
-        hours_per_day: editingEmployee.hoursPerDay,
+        work_days: workDays,
+        hours_per_day: hoursPerDay,
+        schedule: editingEmployee.schedule,
         active: true
       };
 
@@ -127,6 +218,14 @@ export default function EmployeesPanel({
     } finally {
       setDeleting(null);
     }
+  };
+
+  const getEmployeeHours = (emp: HomeEmployee): string => {
+    if (emp.schedule) {
+      const hours = calculateWeeklyHours(emp.schedule as Record<string, DaySchedule>);
+      return `${hours}h/sem`;
+    }
+    return `${(emp.work_days?.length || 0) * (emp.hours_per_day || 8)}h/sem`;
   };
 
   return (
@@ -173,7 +272,7 @@ export default function EmployeesPanel({
                         <p className="text-sm text-gray-500">
                           {emp.zone === 'interior' ? '🏠 Interior' :
                            emp.zone === 'exterior' ? '🌳 Exterior' : '🏡 Ambos'}
-                          {' • '}{emp.work_days?.length || 0} días/sem
+                          {' • '}{emp.work_days?.length || 0} días • {getEmployeeHours(emp)}
                         </p>
                       </div>
                       <div className="flex gap-1">
@@ -258,44 +357,71 @@ export default function EmployeesPanel({
                 </div>
               </div>
 
-              {/* Work Days */}
+              {/* Schedule by Day */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Días de trabajo
+                  Horario de trabajo
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {DAYS.map(day => (
-                    <button
-                      key={day.key}
-                      onClick={() => toggleDay(day.key)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        editingEmployee.workDays.includes(day.key)
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-600'
-                      }`}
-                    >
-                      {day.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+                <div className="space-y-2">
+                  {DAYS.map(day => {
+                    const daySchedule = editingEmployee.schedule[day.key];
+                    return (
+                      <div
+                        key={day.key}
+                        className={`rounded-xl border-2 transition-colors ${
+                          daySchedule.enabled ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'
+                        }`}
+                      >
+                        <div className="p-3">
+                          <div className="flex items-center justify-between">
+                            <button
+                              onClick={() => toggleDay(day.key)}
+                              className="flex items-center gap-2"
+                            >
+                              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                                daySchedule.enabled
+                                  ? 'bg-blue-600 border-blue-600'
+                                  : 'border-gray-300'
+                              }`}>
+                                {daySchedule.enabled && <Check size={12} className="text-white" />}
+                              </div>
+                              <span className={`font-medium ${daySchedule.enabled ? 'text-blue-800' : 'text-gray-500'}`}>
+                                {day.label}
+                              </span>
+                            </button>
 
-              {/* Hours per day */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Horas por día
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="12"
-                  value={editingEmployee.hoursPerDay}
-                  onChange={(e) => setEditingEmployee({
-                    ...editingEmployee,
-                    hoursPerDay: parseInt(e.target.value) || 8
+                            {daySchedule.enabled && (
+                              <div className="flex items-center gap-2">
+                                <Clock size={14} className="text-blue-600" />
+                                <input
+                                  type="time"
+                                  value={daySchedule.startTime}
+                                  onChange={(e) => updateDayTime(day.key, 'startTime', e.target.value)}
+                                  className="px-2 py-1 border rounded-lg text-sm w-24 bg-white"
+                                />
+                                <span className="text-gray-400">-</span>
+                                <input
+                                  type="time"
+                                  value={daySchedule.endTime}
+                                  onChange={(e) => updateDayTime(day.key, 'endTime', e.target.value)}
+                                  className="px-2 py-1 border rounded-lg text-sm w-24 bg-white"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
                   })}
-                  className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500"
-                />
+                </div>
+
+                {/* Weekly summary */}
+                <div className="mt-3 bg-gray-100 rounded-xl p-3 flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Total semanal</span>
+                  <span className="font-semibold text-blue-600">
+                    {calculateWeeklyHours(editingEmployee.schedule)} horas
+                  </span>
+                </div>
               </div>
 
               {/* Buttons */}
