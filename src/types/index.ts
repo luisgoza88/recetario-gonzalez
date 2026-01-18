@@ -128,3 +128,105 @@ export interface AdjustmentSuggestion {
   created_at?: string;
   applied_at?: string;
 }
+
+// =====================================================
+// TIPOS PARA MÓDULO GESTIÓN DEL HOGAR
+// =====================================================
+
+export interface Household {
+  id: string;
+  name: string;
+  owner_name?: string;
+  address?: string;
+  created_at?: string;
+  updated_at?: string;
+  setup_completed: boolean;
+}
+
+export interface SpaceType {
+  id: string;
+  name: string;
+  category: 'interior' | 'exterior';
+  icon: string;
+  default_tasks: string[];
+  sort_order: number;
+}
+
+export interface Space {
+  id: string;
+  household_id: string;
+  space_type_id?: string;
+  space_type?: SpaceType;
+  custom_name?: string;
+  category: 'interior' | 'exterior';
+  usage_level: 'alto' | 'medio' | 'bajo';
+  has_bathroom: boolean;
+  area_sqm?: number;
+  characteristics?: Record<string, unknown>;
+  notes?: string;
+  created_at?: string;
+}
+
+export interface HomeEmployee {
+  id: string;
+  household_id: string;
+  name: string;
+  role?: string;
+  zone: 'interior' | 'exterior' | 'ambos';
+  work_days: string[];
+  hours_per_day: number;
+  phone?: string;
+  notes?: string;
+  active: boolean;
+  created_at?: string;
+}
+
+export type TaskFrequency = 'diaria' | 'semanal' | 'quincenal' | 'mensual' | 'trimestral' | 'personalizada';
+export type TaskPriority = 'alta' | 'normal' | 'baja';
+export type TaskStatus = 'pendiente' | 'en_progreso' | 'completada' | 'omitida';
+
+export interface TaskTemplate {
+  id: string;
+  household_id: string;
+  space_id: string;
+  space?: Space;
+  name: string;
+  description?: string;
+  frequency: TaskFrequency;
+  frequency_days?: number;
+  estimated_minutes: number;
+  priority: TaskPriority;
+  category?: string;
+  assigned_employee_id?: string;
+  assigned_employee?: HomeEmployee;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface ScheduledTask {
+  id: string;
+  household_id: string;
+  task_template_id: string;
+  task_template?: TaskTemplate;
+  space_id: string;
+  space?: Space;
+  employee_id?: string;
+  employee?: HomeEmployee;
+  scheduled_date: string;
+  status: TaskStatus;
+  completed_at?: string;
+  completed_by?: string;
+  notes?: string;
+  actual_minutes?: number;
+  created_at?: string;
+}
+
+export interface CleaningHistory {
+  id: string;
+  space_id: string;
+  task_name: string;
+  completed_at: string;
+  employee_id?: string;
+  notes?: string;
+  rating?: number;
+}

@@ -1,15 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Calendar, ShoppingCart, BookOpen, MapPin, Lightbulb } from 'lucide-react';
+import { Calendar, ShoppingCart, BookOpen, MapPin, Lightbulb, Home as HomeIcon } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import CalendarView from '@/components/CalendarView';
 import MarketView from '@/components/MarketView';
 import RecipesView from '@/components/RecipesView';
 import SuggestionsPanel from '@/components/SuggestionsPanel';
+import HomeView from '@/components/home/HomeView';
 import { Recipe, MarketItem } from '@/types';
 
-type TabType = 'calendar' | 'market' | 'recipes' | 'suggestions';
+type TabType = 'calendar' | 'market' | 'recipes' | 'suggestions' | 'home';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabType>('calendar');
@@ -132,6 +133,9 @@ export default function Home() {
             <SuggestionsPanel onUpdate={loadData} />
           </div>
         )}
+        {activeTab === 'home' && (
+          <HomeView />
+        )}
       </main>
 
       {/* Today Button */}
@@ -188,6 +192,17 @@ export default function Home() {
         >
           <Lightbulb size={22} />
           <span className="text-[10px] mt-1">Ajustes</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('home')}
+          className={`flex flex-col items-center px-3 py-2 rounded-lg transition-colors ${
+            activeTab === 'home'
+              ? 'text-blue-600 bg-blue-50'
+              : 'text-gray-500'
+          }`}
+        >
+          <HomeIcon size={22} />
+          <span className="text-[10px] mt-1">Hogar</span>
         </button>
       </nav>
     </div>
