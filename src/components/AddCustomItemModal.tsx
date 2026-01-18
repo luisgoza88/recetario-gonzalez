@@ -631,7 +631,7 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
                     {isListening ? 'Escuchando... Toca para detener' : 'Toca para dictar'}
                   </p>
                   {interimTranscript && (
-                    <p className="mt-2 text-purple-600 italic">"{interimTranscript}"</p>
+                    <p className="mt-2 text-purple-600 italic">&ldquo;{interimTranscript}&rdquo;</p>
                   )}
                   {voiceError && (
                     <p className="mt-2 text-red-500 text-sm">{voiceError}</p>

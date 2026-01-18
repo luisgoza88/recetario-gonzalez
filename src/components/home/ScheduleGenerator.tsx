@@ -155,7 +155,7 @@ export default function ScheduleGenerator({
         const frequencyDays = getFrequencyDays(taskName, space.usage_level);
 
         // Calcular fechas para esta tarea
-        let currentDate = new Date(startDate);
+        const currentDate = new Date(startDate);
 
         // Offset inicial para distribuir tareas (evitar todas el mismo día)
         const spaceIndex = spaces.indexOf(space);

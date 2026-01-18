@@ -37,50 +37,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
   const [feedbackRecipe, setFeedbackRecipe] = useState<{ recipe: Recipe; mealType: MealType } | null>(null);
   const [suggestionsRecipe, setSuggestionsRecipe] = useState<{ recipe: Recipe; mealType: MealType } | null>(null);
 
-  useEffect(() => {
-    loadMenu();
-    loadCompletedDays();
-
-    // Auto-select today if it has menu
-    const today = new Date();
-    const cycleDay = getDayOfCycle(today);
-    if (cycleDay >= 0) {
-      setSelectedDate(today);
-    }
-
-    // Listen for goToToday event
-    const handleGoToToday = () => {
-      const today = new Date();
-      setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1));
-      setSelectedDate(today);
-    };
-
-    window.addEventListener('goToToday', handleGoToToday);
-    return () => window.removeEventListener('goToToday', handleGoToToday);
-  }, []);
-
-  const loadMenu = async () => {
-    const { data } = await supabase
-      .from('day_menu')
-      .select('*')
-      .order('day_number');
-
-    if (data) {
-      setDayMenu(data);
-    }
-  };
-
-  const loadCompletedDays = async () => {
-    const { data } = await supabase
-      .from('completed_days')
-      .select('date')
-      .eq('completed', true);
-
-    if (data) {
-      setCompletedDays(new Set(data.map(d => d.date)));
-    }
-  };
-
+  // Define getDayOfCycle before useEffect that uses it
   const getDayOfCycle = useCallback((date: Date): number => {
     if (date.getDay() === 0) return -1; // Domingo
 
@@ -109,6 +66,51 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
     if (cycleDay < 0) return null;
     return dayMenu.find(m => m.day_number === cycleDay);
   }, [dayMenu, getDayOfCycle]);
+
+  // Load functions defined before useEffect
+  const loadMenu = useCallback(async () => {
+    const { data } = await supabase
+      .from('day_menu')
+      .select('*')
+      .order('day_number');
+
+    if (data) {
+      setDayMenu(data);
+    }
+  }, []);
+
+  const loadCompletedDays = useCallback(async () => {
+    const { data } = await supabase
+      .from('completed_days')
+      .select('date')
+      .eq('completed', true);
+
+    if (data) {
+      setCompletedDays(new Set(data.map(d => d.date)));
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMenu();
+    loadCompletedDays();
+
+    // Auto-select today if it has menu
+    const today = new Date();
+    const cycleDay = getDayOfCycle(today);
+    if (cycleDay >= 0) {
+      setSelectedDate(today);
+    }
+
+    // Listen for goToToday event
+    const handleGoToToday = () => {
+      const today = new Date();
+      setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1));
+      setSelectedDate(today);
+    };
+
+    window.addEventListener('goToToday', handleGoToToday);
+    return () => window.removeEventListener('goToToday', handleGoToToday);
+  }, [loadMenu, loadCompletedDays, getDayOfCycle]);
 
   const changeMonth = (delta: number) => {
     const newDate = new Date(currentDate);

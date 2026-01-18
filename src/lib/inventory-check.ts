@@ -340,7 +340,7 @@ export async function checkRecipeIngredients(
     // Separar ingredientes compuestos
     const subIngredients = splitCompoundIngredient(ing.name);
     let totalAvailable = 0;
-    let matchedItems: string[] = [];
+    const matchedItems: string[] = [];
 
     for (const subIng of subIngredients) {
       // Primero verificar si es una preparación
