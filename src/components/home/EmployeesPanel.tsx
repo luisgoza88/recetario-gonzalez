@@ -173,31 +173,41 @@ export default function EmployeesPanel({
     try {
       const { workDays, hoursPerDay } = scheduleToLegacy(editingEmployee.schedule);
 
+      // Datos básicos (sin schedule por ahora - columna pendiente en DB)
       const data = {
         household_id: householdId,
         name: editingEmployee.name.trim(),
         zone: editingEmployee.zone,
         work_days: workDays,
         hours_per_day: hoursPerDay,
-        schedule: editingEmployee.schedule,
         active: true
       };
 
+      let error;
       if (editingEmployee.id) {
-        await supabase
+        const result = await supabase
           .from('home_employees')
           .update(data)
           .eq('id', editingEmployee.id);
+        error = result.error;
       } else {
-        await supabase
+        const result = await supabase
           .from('home_employees')
           .insert(data);
+        error = result.error;
+      }
+
+      if (error) {
+        console.error('Error saving employee:', error);
+        alert('Error al guardar: ' + error.message);
+        return;
       }
 
       onUpdate();
       cancelForm();
     } catch (error) {
       console.error('Error saving employee:', error);
+      alert('Error al guardar empleado');
     } finally {
       setSaving(false);
     }
