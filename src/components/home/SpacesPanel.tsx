@@ -619,16 +619,6 @@ export default function SpacesPanel({
           {/* Space List */}
           {!showForm && (
             <>
-              {/* AI Scanner Button */}
-              <button
-                onClick={() => setShowScanner(true)}
-                className="w-full py-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2 hover:from-violet-600 hover:to-purple-700 transition-all shadow-lg"
-              >
-                <Scan size={20} />
-                Escanear con IA
-                <Sparkles size={16} className="opacity-70" />
-              </button>
-
               {/* Category Tabs */}
               <div className="flex bg-gray-100 rounded-xl p-1">
                 <button
@@ -717,9 +707,19 @@ export default function SpacesPanel({
           {/* Space Form */}
           {showForm && editingSpace && (
             <div className="space-y-4">
-              <h3 className="font-semibold text-lg">
-                {editingSpace.id ? 'Editar Espacio' : 'Nuevo Espacio'}
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-lg">
+                  {editingSpace.id ? 'Editar Espacio' : 'Nuevo Espacio'}
+                </h3>
+                {/* AI Scanner Button - inside form */}
+                <button
+                  onClick={() => setShowScanner(true)}
+                  className="px-3 py-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-lg text-sm font-medium flex items-center gap-2 hover:from-violet-600 hover:to-purple-700 transition-all shadow-sm"
+                >
+                  <Scan size={16} />
+                  Escanear con IA
+                </button>
+              </div>
 
               {/* Space Type */}
               <div>

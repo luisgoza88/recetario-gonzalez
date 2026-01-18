@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import {
-  X, Camera, Upload, Trash2, Sparkles, RefreshCw,
+  X, Camera, Upload, Sparkles, RefreshCw,
   CheckCircle2, AlertTriangle, Image as ImageIcon,
   RotateCcw, Zap, Eye
 } from 'lucide-react';
@@ -40,61 +40,14 @@ interface RoomScannerProps {
   onAnalysisComplete: (analysis: RoomAnalysis) => void;
 }
 
-// Pasos de guía para escanear
-const SCAN_GUIDE_STEPS = [
-  {
-    id: 'overview',
-    title: 'Vista General',
-    instruction: 'Captura una vista panorámica del espacio completo',
-    tip: 'Párate en una esquina para ver la mayor parte posible',
-    icon: '📷',
-    required: true
-  },
-  {
-    id: 'floor',
-    title: 'Piso Completo',
-    instruction: 'Enfoca el piso mostrando el tipo de superficie',
-    tip: 'Incluye una puerta o mueble como referencia de tamaño',
-    icon: '⬇️',
-    required: true
-  },
-  {
-    id: 'corners',
-    title: 'Esquinas y Rincones',
-    instruction: 'Captura las esquinas donde se acumula polvo',
-    tip: 'Las esquinas revelan necesidades de limpieza profunda',
-    icon: '📐',
-    required: false
-  },
-  {
-    id: 'furniture',
-    title: 'Muebles Principales',
-    instruction: 'Enfoca los muebles grandes que requieren limpieza',
-    tip: 'Cama, sofá, mesa, escritorio, estantes',
-    icon: '🛋️',
-    required: true
-  },
-  {
-    id: 'special',
-    title: 'Áreas Especiales',
-    instruction: 'Captura baño, closet, balcón si los hay',
-    tip: 'Estas áreas tienen tareas de limpieza específicas',
-    icon: '🚿',
-    required: false
-  }
-];
-
 export default function RoomScanner({ onClose, onAnalysisComplete }: RoomScannerProps) {
   const [images, setImages] = useState<string[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<RoomAnalysis | null>(null);
-  const [step, setStep] = useState<'intro' | 'guided' | 'capture' | 'preview' | 'analyzing' | 'result'>('intro');
+  const [step, setStep] = useState<'capture' | 'analyzing' | 'result'>('capture');
   const [cameraActive, setCameraActive] = useState(false);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
-  const [guidedStep, setGuidedStep] = useState(0);
-  const [capturedSteps, setCapturedSteps] = useState<Set<string>>(new Set());
-  const [referenceSize, setReferenceSize] = useState<string>('door'); // Para estimar dimensiones
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -160,28 +113,12 @@ export default function RoomScanner({ onClose, onAnalysisComplete }: RoomScanner
     const imageData = canvas.toDataURL('image/jpeg', 0.8);
     setImages(prev => [...prev, imageData]);
 
-    // Marcar paso guiado como capturado
-    if (step === 'guided' && guidedStep < SCAN_GUIDE_STEPS.length) {
-      const currentStep = SCAN_GUIDE_STEPS[guidedStep];
-      setCapturedSteps(prev => new Set([...prev, currentStep.id]));
-
-      // Avanzar al siguiente paso o terminar
-      if (guidedStep < SCAN_GUIDE_STEPS.length - 1) {
-        setGuidedStep(prev => prev + 1);
-      }
-    }
-
     // Efecto de flash
     canvas.style.opacity = '1';
     setTimeout(() => {
       canvas.style.opacity = '0';
     }, 100);
   };
-
-  // Calcular progreso de escaneo guiado
-  const requiredSteps = SCAN_GUIDE_STEPS.filter(s => s.required);
-  const requiredCaptured = requiredSteps.filter(s => capturedSteps.has(s.id)).length;
-  const canAnalyze = requiredCaptured >= requiredSteps.length || images.length >= 3;
 
   // Subir imágenes desde archivo
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -225,9 +162,7 @@ export default function RoomScanner({ onClose, onAnalysisComplete }: RoomScanner
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          images,
-          referenceObject: referenceSize,
-          capturedSteps: Array.from(capturedSteps)
+          images
         })
       });
 
@@ -282,272 +217,6 @@ export default function RoomScanner({ onClose, onAnalysisComplete }: RoomScanner
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {/* Step: Intro - Explicación y selección de referencia */}
-        {step === 'intro' && (
-          <div className="h-full flex flex-col items-center justify-center p-6">
-            <div className="text-center max-w-sm">
-              {/* Icon */}
-              <div className="w-24 h-24 bg-gradient-to-br from-violet-500/30 to-purple-500/30 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Camera size={48} className="text-violet-400" />
-              </div>
-
-              <h2 className="text-2xl font-bold text-white mb-3">
-                Escaneo Inteligente
-              </h2>
-              <p className="text-gray-400 mb-8">
-                Te guiaremos paso a paso para capturar las mejores fotos y obtener un análisis preciso del espacio.
-              </p>
-
-              {/* Reference Object Selection */}
-              <div className="bg-gray-800 rounded-xl p-4 mb-6 text-left">
-                <h3 className="text-white font-medium mb-2 flex items-center gap-2">
-                  📏 Referencia de Tamaño
-                </h3>
-                <p className="text-gray-400 text-sm mb-3">
-                  Selecciona un objeto que aparecerá en las fotos para estimar las dimensiones:
-                </p>
-                <div className="space-y-2">
-                  {[
-                    { id: 'door', label: 'Puerta estándar', size: '~2.10m altura', icon: '🚪' },
-                    { id: 'bed_single', label: 'Cama sencilla', size: '~1.90m largo', icon: '🛏️' },
-                    { id: 'bed_double', label: 'Cama doble/queen', size: '~2.00m largo', icon: '🛏️' },
-                    { id: 'window', label: 'Ventana estándar', size: '~1.20m ancho', icon: '🪟' },
-                    { id: 'sofa', label: 'Sofá 3 puestos', size: '~2.00m largo', icon: '🛋️' },
-                    { id: 'none', label: 'Sin referencia', size: 'Estimación básica', icon: '❓' }
-                  ].map(ref => (
-                    <button
-                      key={ref.id}
-                      onClick={() => setReferenceSize(ref.id)}
-                      className={`w-full p-3 rounded-lg flex items-center gap-3 transition-all ${
-                        referenceSize === ref.id
-                          ? 'bg-violet-600 text-white'
-                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                      }`}
-                    >
-                      <span className="text-xl">{ref.icon}</span>
-                      <div className="flex-1 text-left">
-                        <p className="font-medium text-sm">{ref.label}</p>
-                        <p className={`text-xs ${referenceSize === ref.id ? 'text-violet-200' : 'text-gray-500'}`}>
-                          {ref.size}
-                        </p>
-                      </div>
-                      {referenceSize === ref.id && <CheckCircle2 size={18} />}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Start Buttons */}
-              <div className="space-y-3">
-                <button
-                  onClick={() => { setStep('guided'); startCamera(); }}
-                  className="w-full py-4 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2 hover:opacity-90"
-                >
-                  <Camera size={20} />
-                  Iniciar Escaneo Guiado
-                </button>
-                <button
-                  onClick={() => setStep('capture')}
-                  className="w-full py-3 bg-gray-700 text-gray-300 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-gray-600"
-                >
-                  <Upload size={18} />
-                  Modo Libre / Subir Fotos
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Step: Guided - Captura guiada paso a paso */}
-        {step === 'guided' && (
-          <div className="h-full flex flex-col">
-            {/* Progress Bar */}
-            <div className="bg-gray-900 p-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-white text-sm font-medium">
-                  Paso {guidedStep + 1} de {SCAN_GUIDE_STEPS.length}
-                </span>
-                <span className="text-violet-400 text-sm">
-                  {capturedSteps.size} foto{capturedSteps.size !== 1 ? 's' : ''} capturada{capturedSteps.size !== 1 ? 's' : ''}
-                </span>
-              </div>
-              <div className="flex gap-1">
-                {SCAN_GUIDE_STEPS.map((s, i) => (
-                  <div
-                    key={s.id}
-                    className={`flex-1 h-2 rounded-full transition-all ${
-                      capturedSteps.has(s.id)
-                        ? 'bg-green-500'
-                        : i === guidedStep
-                        ? 'bg-violet-500'
-                        : 'bg-gray-700'
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Camera View with Overlay */}
-            <div className="flex-1 relative bg-black">
-              {cameraActive ? (
-                <>
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full h-full object-cover"
-                  />
-                  <canvas
-                    ref={canvasRef}
-                    className="absolute inset-0 pointer-events-none opacity-0 transition-opacity duration-100 bg-white"
-                  />
-
-                  {/* Guided Instructions Overlay */}
-                  <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/80 to-transparent">
-                    <div className="flex items-start gap-3">
-                      <span className="text-3xl">{SCAN_GUIDE_STEPS[guidedStep].icon}</span>
-                      <div>
-                        <h3 className="text-white font-bold text-lg">
-                          {SCAN_GUIDE_STEPS[guidedStep].title}
-                        </h3>
-                        <p className="text-gray-200 text-sm">
-                          {SCAN_GUIDE_STEPS[guidedStep].instruction}
-                        </p>
-                        <p className="text-violet-300 text-xs mt-1 flex items-center gap-1">
-                          <Sparkles size={12} />
-                          {SCAN_GUIDE_STEPS[guidedStep].tip}
-                        </p>
-                        {!SCAN_GUIDE_STEPS[guidedStep].required && (
-                          <span className="inline-block mt-2 text-xs text-gray-400 bg-gray-700/50 px-2 py-1 rounded">
-                            Opcional
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Already Captured Badge */}
-                  {capturedSteps.has(SCAN_GUIDE_STEPS[guidedStep].id) && (
-                    <div className="absolute top-20 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
-                      <CheckCircle2 size={14} />
-                      Capturado
-                    </div>
-                  )}
-
-                  {/* Capture Controls */}
-                  <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-4">
-                    {/* Skip Button (for optional steps) */}
-                    {!SCAN_GUIDE_STEPS[guidedStep].required && (
-                      <button
-                        onClick={() => {
-                          if (guidedStep < SCAN_GUIDE_STEPS.length - 1) {
-                            setGuidedStep(prev => prev + 1);
-                          }
-                        }}
-                        className="px-4 py-2 bg-white/20 backdrop-blur rounded-lg text-white text-sm hover:bg-white/30"
-                      >
-                        Omitir
-                      </button>
-                    )}
-
-                    {/* Capture Button */}
-                    <button
-                      onClick={capturePhoto}
-                      className="w-18 h-18 bg-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
-                    >
-                      <div className="w-16 h-16 bg-gradient-to-r from-violet-600 to-purple-600 rounded-full flex items-center justify-center">
-                        <Camera size={32} className="text-white" />
-                      </div>
-                    </button>
-
-                    {/* Toggle Camera */}
-                    <button
-                      onClick={toggleCamera}
-                      className="p-3 bg-white/20 backdrop-blur rounded-full hover:bg-white/30"
-                    >
-                      <RotateCcw size={20} className="text-white" />
-                    </button>
-                  </div>
-
-                  {/* Step Navigation Dots */}
-                  <div className="absolute bottom-24 left-0 right-0 flex justify-center gap-2">
-                    {SCAN_GUIDE_STEPS.map((s, i) => (
-                      <button
-                        key={s.id}
-                        onClick={() => setGuidedStep(i)}
-                        className={`w-3 h-3 rounded-full transition-all ${
-                          capturedSteps.has(s.id)
-                            ? 'bg-green-500'
-                            : i === guidedStep
-                            ? 'bg-violet-500 scale-125'
-                            : 'bg-white/30'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="h-full flex items-center justify-center">
-                  <button
-                    onClick={startCamera}
-                    className="py-4 px-8 bg-violet-600 text-white rounded-xl font-semibold flex items-center gap-2"
-                  >
-                    <Camera size={20} />
-                    Activar Cámara
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Bottom Action Bar */}
-            <div className="bg-gray-900 p-4 space-y-3">
-              {/* Thumbnails */}
-              {images.length > 0 && (
-                <div className="flex gap-2 overflow-x-auto pb-2">
-                  {images.map((img, index) => (
-                    <div key={index} className="relative flex-shrink-0">
-                      <img
-                        src={img}
-                        alt={`Foto ${index + 1}`}
-                        className="w-12 h-12 object-cover rounded-lg border-2 border-violet-500"
-                      />
-                      <button
-                        onClick={() => removeImage(index)}
-                        className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center"
-                      >
-                        <X size={10} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex gap-3">
-                <button
-                  onClick={() => { stopCamera(); setStep('capture'); }}
-                  className="flex-1 py-3 bg-gray-700 text-white rounded-xl font-medium"
-                >
-                  Modo Libre
-                </button>
-                <button
-                  onClick={() => { stopCamera(); analyzeImages(); }}
-                  disabled={!canAnalyze}
-                  className={`flex-1 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 ${
-                    canAnalyze
-                      ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white'
-                      : 'bg-gray-600 text-gray-400'
-                  }`}
-                >
-                  <Zap size={18} />
-                  {canAnalyze ? `Analizar (${images.length})` : `Faltan ${requiredSteps.length - requiredCaptured} fotos`}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Step: Capture */}
         {step === 'capture' && (
           <div className="h-full flex flex-col">
