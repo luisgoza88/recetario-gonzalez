@@ -12,6 +12,7 @@ import RoomScanner from './RoomScanner';
 interface SpacesPanelProps {
   householdId: string;
   spaces: Space[];
+  initialCategory?: 'interior' | 'exterior';
   onClose: () => void;
   onUpdate: () => void;
 }
@@ -203,6 +204,7 @@ const FREQUENCIES = [
 export default function SpacesPanel({
   householdId,
   spaces,
+  initialCategory = 'interior',
   onClose,
   onUpdate
 }: SpacesPanelProps) {
@@ -211,7 +213,7 @@ export default function SpacesPanel({
   const [editingSpace, setEditingSpace] = useState<SpaceForm | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState<'interior' | 'exterior'>('interior');
+  const [activeCategory, setActiveCategory] = useState<'interior' | 'exterior'>(initialCategory);
   const [showTasks, setShowTasks] = useState(true);
   const [newTaskName, setNewTaskName] = useState('');
   const [showScanner, setShowScanner] = useState(false);
@@ -593,11 +595,20 @@ export default function SpacesPanel({
   return (
     <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-8 pb-24 overflow-y-auto">
       <div className="bg-white rounded-2xl w-full max-w-lg">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 rounded-t-2xl flex justify-between items-center">
+        {/* Header - dinámico según categoría */}
+        <div className={`text-white p-4 rounded-t-2xl flex justify-between items-center ${
+          activeCategory === 'interior'
+            ? 'bg-gradient-to-r from-blue-600 to-blue-700'
+            : 'bg-gradient-to-r from-green-600 to-green-700'
+        }`}>
           <div className="flex items-center gap-2">
-            <Home size={20} />
-            <span className="font-semibold">Gestionar Espacios</span>
+            {activeCategory === 'interior' ? <Home size={20} /> : <Trees size={20} />}
+            <span className="font-semibold">
+              Espacios {activeCategory === 'interior' ? 'Interiores' : 'Exteriores'}
+            </span>
+            <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
+              {activeCategory === 'interior' ? interiorSpaces.length : exteriorSpaces.length}
+            </span>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg">
             <X size={20} />

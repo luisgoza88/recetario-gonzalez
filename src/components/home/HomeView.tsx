@@ -8,6 +8,26 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { Household, Space, HomeEmployee, ScheduledTask, TaskTemplate } from '@/types';
+
+// Tipo union para consolidar todos los modales en un solo estado
+type ActiveModal =
+  | { type: 'none' }
+  | { type: 'setup' }
+  | { type: 'employees' }
+  | { type: 'spaces'; initialCategory: 'interior' | 'exterior' }
+  | { type: 'scheduleGenerator' }
+  | { type: 'optimizer' }
+  | { type: 'dailyDashboard' }
+  | { type: 'weeklyCalendar' }
+  | { type: 'quickRoutines' }
+  | { type: 'rating'; task: ScheduledTask }
+  | { type: 'checkIn' }
+  | { type: 'history' }
+  | { type: 'supplies' }
+  | { type: 'inspection'; task: ScheduledTask }
+  | { type: 'monthlyReport' }
+  | { type: 'scheduleDashboard' }
+  | { type: 'scheduleEditor' };
 import HomeSetupWizard from './HomeSetupWizard';
 import EmployeesPanel from './EmployeesPanel';
 import SpacesPanel from './SpacesPanel';
@@ -24,6 +44,8 @@ import InspectionMode from './InspectionMode';
 import MonthlyReport from './MonthlyReport';
 import ScheduleDashboard from './ScheduleDashboard';
 import ScheduleTemplateEditor from './ScheduleTemplateEditor';
+import HomeAnalyticsSummary from './HomeAnalyticsSummary';
+import Button from '@/components/ui/Button';
 
 interface HomeViewProps {
   initialHouseholdId?: string;
@@ -36,23 +58,13 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
   const [employees, setEmployees] = useState<HomeEmployee[]>([]);
   const [todayTasks, setTodayTasks] = useState<ScheduledTask[]>([]);
   const [pendingTasks, setPendingTasks] = useState<number>(0);
-  const [showSetup, setShowSetup] = useState(false);
-  const [showEmployeesPanel, setShowEmployeesPanel] = useState(false);
-  const [showSpacesPanel, setShowSpacesPanel] = useState(false);
-  const [spacesInitialCategory, setSpacesInitialCategory] = useState<'interior' | 'exterior'>('interior');
-  const [showScheduleGenerator, setShowScheduleGenerator] = useState(false);
-  const [showOptimizer, setShowOptimizer] = useState(false);
-  const [showDailyDashboard, setShowDailyDashboard] = useState(false);
-  const [showWeeklyCalendar, setShowWeeklyCalendar] = useState(false);
-  const [showQuickRoutines, setShowQuickRoutines] = useState(false);
-  const [showRating, setShowRating] = useState<ScheduledTask | null>(null);
-  const [showCheckIn, setShowCheckIn] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-  const [showSupplies, setShowSupplies] = useState(false);
-  const [showInspection, setShowInspection] = useState<ScheduledTask | null>(null);
-  const [showMonthlyReport, setShowMonthlyReport] = useState(false);
-  const [showScheduleDashboard, setShowScheduleDashboard] = useState(false);
-  const [showScheduleEditor, setShowScheduleEditor] = useState(false);
+
+  // Estado consolidado para todos los modales (reduce de 17 estados a 1)
+  const [activeModal, setActiveModal] = useState<ActiveModal>({ type: 'none' });
+
+  // Helpers para cerrar modal y abrir modales específicos
+  const closeModal = () => setActiveModal({ type: 'none' });
+  const openModal = (modal: ActiveModal) => setActiveModal(modal);
 
   useEffect(() => {
     loadHousehold();
@@ -75,11 +87,11 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
       if (h.setup_completed) {
         await loadHouseholdData(h.id);
       } else {
-        setShowSetup(true);
+        openModal({ type: 'setup' });
       }
     } else {
       // No hay hogar, mostrar setup
-      setShowSetup(true);
+      openModal({ type: 'setup' });
     }
 
     setLoading(false);
@@ -125,7 +137,7 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
   };
 
   const handleSetupComplete = (householdId: string) => {
-    setShowSetup(false);
+    closeModal();
     loadHousehold();
   };
 
@@ -157,7 +169,7 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
     );
   }
 
-  if (showSetup) {
+  if (activeModal.type === 'setup') {
     return <HomeSetupWizard onComplete={handleSetupComplete} />;
   }
 
@@ -171,12 +183,13 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
         <p className="text-gray-600 mb-6">
           Aún no has configurado tu hogar. Inicia el asistente para comenzar.
         </p>
-        <button
-          onClick={() => setShowSetup(true)}
-          className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold"
+        <Button
+          variant="secondary"
+          size="lg"
+          onClick={() => openModal({ type: 'setup' })}
         >
           Comenzar Configuración
-        </button>
+        </Button>
       </div>
     );
   }
@@ -276,19 +289,31 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
         <div className="bg-white rounded-xl p-6 shadow-sm mb-4 text-center">
           <div className="text-4xl mb-2">✨</div>
           <p className="text-gray-600">No hay tareas programadas para hoy</p>
-          <button
-            onClick={() => setShowScheduleGenerator(true)}
-            className="mt-3 bg-purple-600 text-white px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 mx-auto hover:bg-purple-700"
+          <Button
+            variant="primary"
+            size="sm"
+            icon={<Plus size={16} />}
+            onClick={() => openModal({ type: 'scheduleGenerator' })}
+            className="mt-3"
           >
-            <Plus size={16} />
             Generar programación
-          </button>
+          </Button>
         </div>
       )}
 
+      {/* Weekly Analytics Summary */}
+      <div className="mb-4">
+        <HomeAnalyticsSummary
+          householdId={household.id}
+          employees={employees}
+          onViewDetails={() => openModal({ type: 'monthlyReport' })}
+          compact
+        />
+      </div>
+
       {/* Schedule Dashboard - Cronograma 4 Semanas */}
       <button
-        onClick={() => setShowScheduleDashboard(true)}
+        onClick={() => openModal({ type: 'scheduleDashboard' })}
         className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl p-4 shadow-sm mb-4 text-left hover:from-indigo-700 hover:to-purple-700 transition-all"
       >
         <div className="flex items-center justify-between">
@@ -306,7 +331,7 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
       {/* Main Action Buttons */}
       <div className="grid grid-cols-2 gap-3 mb-4">
         <button
-          onClick={() => setShowDailyDashboard(true)}
+          onClick={() => openModal({ type: 'dailyDashboard' })}
           className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl p-4 shadow-sm text-left hover:from-blue-600 hover:to-blue-700 transition-all"
         >
           <div className="flex items-center gap-2 mb-1">
@@ -316,7 +341,7 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
           <p className="text-xs text-blue-100">Vista detallada del día</p>
         </button>
         <button
-          onClick={() => setShowWeeklyCalendar(true)}
+          onClick={() => openModal({ type: 'weeklyCalendar' })}
           className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl p-4 shadow-sm text-left hover:from-purple-600 hover:to-purple-700 transition-all"
         >
           <div className="flex items-center gap-2 mb-1">
@@ -330,7 +355,7 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
       {/* Secondary Action Buttons */}
       <div className="grid grid-cols-2 gap-3 mb-4">
         <button
-          onClick={() => setShowScheduleGenerator(true)}
+          onClick={() => openModal({ type: 'scheduleGenerator' })}
           className="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-xl p-4 shadow-sm text-left hover:from-indigo-600 hover:to-indigo-700 transition-all"
         >
           <div className="flex items-center gap-2 mb-1">
@@ -340,7 +365,7 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
           <p className="text-xs text-indigo-100">Generar itinerario</p>
         </button>
         <button
-          onClick={() => setShowOptimizer(true)}
+          onClick={() => openModal({ type: 'optimizer' })}
           className="bg-gradient-to-r from-violet-500 to-violet-600 text-white rounded-xl p-4 shadow-sm text-left hover:from-violet-600 hover:to-violet-700 transition-all"
         >
           <div className="flex items-center gap-2 mb-1">
@@ -356,35 +381,35 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
         <h3 className="font-semibold text-gray-700 mb-3">Herramientas Rápidas</h3>
         <div className="grid grid-cols-3 gap-2">
           <button
-            onClick={() => setShowQuickRoutines(true)}
+            onClick={() => openModal({ type: 'quickRoutines' })}
             className="flex flex-col items-center p-3 bg-amber-50 rounded-xl hover:bg-amber-100 transition-colors"
           >
             <Zap size={24} className="text-amber-600 mb-1" />
             <span className="text-xs text-amber-700 font-medium">Rutinas</span>
           </button>
           <button
-            onClick={() => setShowCheckIn(true)}
+            onClick={() => openModal({ type: 'checkIn' })}
             className="flex flex-col items-center p-3 bg-teal-50 rounded-xl hover:bg-teal-100 transition-colors"
           >
             <LogIn size={24} className="text-teal-600 mb-1" />
             <span className="text-xs text-teal-700 font-medium">Asistencia</span>
           </button>
           <button
-            onClick={() => setShowSupplies(true)}
+            onClick={() => openModal({ type: 'supplies' })}
             className="flex flex-col items-center p-3 bg-emerald-50 rounded-xl hover:bg-emerald-100 transition-colors"
           >
             <Package size={24} className="text-emerald-600 mb-1" />
             <span className="text-xs text-emerald-700 font-medium">Productos</span>
           </button>
           <button
-            onClick={() => setShowHistory(true)}
+            onClick={() => openModal({ type: 'history' })}
             className="flex flex-col items-center p-3 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-colors"
           >
             <History size={24} className="text-indigo-600 mb-1" />
             <span className="text-xs text-indigo-700 font-medium">Historial</span>
           </button>
           <button
-            onClick={() => setShowMonthlyReport(true)}
+            onClick={() => openModal({ type: 'monthlyReport' })}
             className="flex flex-col items-center p-3 bg-pink-50 rounded-xl hover:bg-pink-100 transition-colors"
           >
             <FileText size={24} className="text-pink-600 mb-1" />
@@ -393,7 +418,7 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
           <button
             onClick={() => {
               if (todayTasks.length > 0) {
-                setShowInspection(todayTasks[0]);
+                openModal({ type: 'inspection', task: todayTasks[0] });
               }
             }}
             disabled={todayTasks.length === 0}
@@ -412,10 +437,7 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
       {/* Quick Stats - Espacios */}
       <div className="grid grid-cols-2 gap-3 mb-4">
         <button
-          onClick={() => {
-            setSpacesInitialCategory('interior');
-            setShowSpacesPanel(true);
-          }}
+          onClick={() => openModal({ type: 'spaces', initialCategory: 'interior' })}
           className="bg-white rounded-xl p-4 shadow-sm text-left hover:bg-blue-50 transition-colors active:scale-95"
         >
           <div className="flex items-center gap-2 mb-2">
@@ -427,10 +449,7 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
           <p className="text-sm text-gray-500">Espacios interiores</p>
         </button>
         <button
-          onClick={() => {
-            setSpacesInitialCategory('exterior');
-            setShowSpacesPanel(true);
-          }}
+          onClick={() => openModal({ type: 'spaces', initialCategory: 'exterior' })}
           className="bg-white rounded-xl p-4 shadow-sm text-left hover:bg-green-50 transition-colors active:scale-95"
         >
           <div className="flex items-center gap-2 mb-2">
@@ -446,7 +465,7 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
       {/* Employees */}
       <div className="bg-white rounded-xl shadow-sm mb-4 overflow-hidden">
         <button
-          onClick={() => setShowEmployeesPanel(true)}
+          onClick={() => openModal({ type: 'employees' })}
           className="w-full px-4 py-3 border-b flex items-center justify-between hover:bg-gray-50 transition-colors"
         >
           <span className="font-semibold flex items-center gap-2">
@@ -492,151 +511,142 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
         )}
       </div>
 
-      {/* Panels */}
-      {showEmployeesPanel && household && (
+      {/* Panels - renderizado condicional basado en activeModal */}
+      {activeModal.type === 'employees' && household && (
         <EmployeesPanel
           householdId={household.id}
           employees={employees}
-          onClose={() => setShowEmployeesPanel(false)}
+          onClose={closeModal}
           onUpdate={() => loadHouseholdData(household.id)}
         />
       )}
 
-      {showSpacesPanel && household && (
+      {activeModal.type === 'spaces' && household && (
         <SpacesPanel
           householdId={household.id}
           spaces={spaces}
-          initialCategory={spacesInitialCategory}
-          onClose={() => setShowSpacesPanel(false)}
+          initialCategory={activeModal.initialCategory}
+          onClose={closeModal}
           onUpdate={() => loadHouseholdData(household.id)}
         />
       )}
 
-      {showScheduleGenerator && household && (
+      {activeModal.type === 'scheduleGenerator' && household && (
         <ScheduleGenerator
           householdId={household.id}
           spaces={spaces}
           employees={employees}
-          onClose={() => setShowScheduleGenerator(false)}
+          onClose={closeModal}
           onComplete={() => loadHouseholdData(household.id)}
         />
       )}
 
-      {showOptimizer && household && (
+      {activeModal.type === 'optimizer' && household && (
         <ScheduleOptimizer
           householdId={household.id}
           spaces={spaces}
           employees={employees}
-          onClose={() => setShowOptimizer(false)}
+          onClose={closeModal}
           onApplyOptimization={() => loadHouseholdData(household.id)}
         />
       )}
 
-      {showDailyDashboard && household && (
+      {activeModal.type === 'dailyDashboard' && household && (
         <DailyDashboard
           householdId={household.id}
           spaces={spaces}
           employees={employees}
-          onClose={() => setShowDailyDashboard(false)}
+          onClose={closeModal}
           onTaskComplete={() => loadHouseholdData(household.id)}
-          onOpenRating={(task) => {
-            setShowDailyDashboard(false);
-            setShowRating(task);
-          }}
-          onOpenInspection={(task) => {
-            setShowDailyDashboard(false);
-            setShowInspection(task);
-          }}
+          onOpenRating={(task) => openModal({ type: 'rating', task })}
+          onOpenInspection={(task) => openModal({ type: 'inspection', task })}
         />
       )}
 
-      {showWeeklyCalendar && household && (
+      {activeModal.type === 'weeklyCalendar' && household && (
         <WeeklyCalendar
           householdId={household.id}
-          onClose={() => setShowWeeklyCalendar(false)}
+          onClose={closeModal}
         />
       )}
 
-      {showQuickRoutines && (
+      {activeModal.type === 'quickRoutines' && (
         <QuickRoutines
-          onClose={() => setShowQuickRoutines(false)}
+          onClose={closeModal}
           onStartRoutine={() => {}}
         />
       )}
 
-      {showRating && household && (
+      {activeModal.type === 'rating' && household && (
         <CleaningRating
-          task={showRating}
-          onClose={() => setShowRating(null)}
+          task={activeModal.task}
+          onClose={closeModal}
           onSave={() => {
-            setShowRating(null);
+            closeModal();
             loadHouseholdData(household.id);
           }}
         />
       )}
 
-      {showCheckIn && household && (
+      {activeModal.type === 'checkIn' && household && (
         <EmployeeCheckIn
           householdId={household.id}
           employees={employees}
-          onClose={() => setShowCheckIn(false)}
+          onClose={closeModal}
           onUpdate={() => loadHouseholdData(household.id)}
         />
       )}
 
-      {showHistory && household && (
+      {activeModal.type === 'history' && household && (
         <CleaningHistory
           householdId={household.id}
           spaces={spaces}
           employees={employees}
-          onClose={() => setShowHistory(false)}
+          onClose={closeModal}
         />
       )}
 
-      {showSupplies && household && (
+      {activeModal.type === 'supplies' && household && (
         <SuppliesInventory
           householdId={household.id}
-          onClose={() => setShowSupplies(false)}
+          onClose={closeModal}
         />
       )}
 
-      {showInspection && household && (
+      {activeModal.type === 'inspection' && household && (
         <InspectionMode
-          task={showInspection}
-          onClose={() => setShowInspection(null)}
+          task={activeModal.task}
+          onClose={closeModal}
           onComplete={() => {
-            setShowInspection(null);
+            closeModal();
             loadHouseholdData(household.id);
           }}
         />
       )}
 
-      {showMonthlyReport && household && (
+      {activeModal.type === 'monthlyReport' && household && (
         <MonthlyReport
           householdId={household.id}
           spaces={spaces}
           employees={employees}
-          onClose={() => setShowMonthlyReport(false)}
+          onClose={closeModal}
         />
       )}
 
-      {showScheduleDashboard && household && (
+      {activeModal.type === 'scheduleDashboard' && household && (
         <ScheduleDashboard
           householdId={household.id}
           employees={employees}
-          onClose={() => setShowScheduleDashboard(false)}
-          onOpenEditor={() => {
-            setShowScheduleDashboard(false);
-            setShowScheduleEditor(true);
-          }}
+          onClose={closeModal}
+          onOpenEditor={() => openModal({ type: 'scheduleEditor' })}
         />
       )}
 
-      {showScheduleEditor && household && (
+      {activeModal.type === 'scheduleEditor' && household && (
         <ScheduleTemplateEditor
           householdId={household.id}
           employees={employees}
-          onClose={() => setShowScheduleEditor(false)}
+          onClose={closeModal}
           onSave={() => {
             // Recargar datos después de guardar
           }}

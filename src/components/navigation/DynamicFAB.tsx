@@ -14,13 +14,19 @@ interface DynamicFABProps {
   open: boolean;
   onToggle: () => void;
   actions: FABAction[];
-  activeSection: 'recetario' | 'hogar' | 'ia' | 'ajustes';
+  activeSection: 'hoy' | 'recetario' | 'hogar' | 'ia' | 'ajustes';
 }
 
 export default function DynamicFAB({ open, onToggle, actions, activeSection }: DynamicFABProps) {
-  const gradientClass = activeSection === 'hogar'
-    ? 'from-blue-500 to-blue-700'
-    : 'from-green-500 to-green-700';
+  const getGradientClass = () => {
+    switch (activeSection) {
+      case 'hoy': return 'from-orange-500 to-orange-600';
+      case 'hogar': return 'from-blue-500 to-blue-700';
+      case 'ia': return 'from-purple-500 to-purple-700';
+      default: return 'from-green-500 to-green-700';
+    }
+  };
+  const gradientClass = getGradientClass();
 
   // Solo mostrar FAB en secciones que tienen acciones
   const hasActions = actions.length > 0;

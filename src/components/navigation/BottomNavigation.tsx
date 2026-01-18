@@ -1,9 +1,9 @@
 'use client';
 
-import { UtensilsCrossed, Home, Bot, Settings, Calendar, ShoppingCart, BookOpen, Lightbulb } from 'lucide-react';
+import { UtensilsCrossed, Home, Bot, Settings, Calendar, ShoppingCart, BookOpen, Lightbulb, Sun } from 'lucide-react';
 import DynamicFAB, { FABAction } from './DynamicFAB';
 
-type MainSection = 'recetario' | 'hogar' | 'ia' | 'ajustes';
+type MainSection = 'hoy' | 'recetario' | 'hogar' | 'ia' | 'ajustes';
 type RecetarioTab = 'calendar' | 'market' | 'recipes' | 'suggestions';
 
 interface BottomNavigationProps {
@@ -114,25 +114,25 @@ export default function BottomNavigation({
         )}
 
         {/* Navegación principal */}
-        <div className="flex items-end justify-between py-2 px-2">
+        <div className="flex items-end justify-around py-2 px-1">
+          {/* Hoy */}
+          <NavItem
+            icon={<Sun size={22} />}
+            label="Hoy"
+            active={activeSection === 'hoy'}
+            onClick={() => onSectionChange('hoy')}
+            activeColor="text-orange-600"
+            activeBg="bg-orange-50"
+          />
+
           {/* Recetario */}
           <NavItem
-            icon={<UtensilsCrossed size={24} />}
+            icon={<UtensilsCrossed size={22} />}
             label="Recetario"
             active={activeSection === 'recetario'}
             onClick={() => onSectionChange('recetario')}
             activeColor="text-green-700"
             activeBg="bg-green-50"
-          />
-
-          {/* Hogar */}
-          <NavItem
-            icon={<Home size={24} />}
-            label="Hogar"
-            active={activeSection === 'hogar'}
-            onClick={() => onSectionChange('hogar')}
-            activeColor="text-blue-700"
-            activeBg="bg-blue-50"
           />
 
           {/* FAB - Center elevated button */}
@@ -145,25 +145,25 @@ export default function BottomNavigation({
             />
           </div>
 
+          {/* Hogar */}
+          <NavItem
+            icon={<Home size={22} />}
+            label="Hogar"
+            active={activeSection === 'hogar'}
+            onClick={() => onSectionChange('hogar')}
+            activeColor="text-blue-700"
+            activeBg="bg-blue-50"
+          />
+
           {/* IA */}
           <NavItem
-            icon={<Bot size={24} />}
+            icon={<Bot size={22} />}
             label="IA"
             active={activeSection === 'ia'}
             onClick={() => onSectionChange('ia')}
+            badge={pendingAlerts}
             activeColor="text-purple-700"
             activeBg="bg-purple-50"
-          />
-
-          {/* Ajustes */}
-          <NavItem
-            icon={<Settings size={24} />}
-            label="Ajustes"
-            active={activeSection === 'ajustes'}
-            onClick={() => onSectionChange('ajustes')}
-            badge={pendingAlerts}
-            activeColor="text-gray-700"
-            activeBg="bg-gray-100"
           />
         </div>
       </div>

@@ -19,6 +19,7 @@ import {
   Coffee
 } from 'lucide-react';
 import { Recipe } from '@/types';
+import { supabase } from '@/lib/supabase/client';
 import {
   RecipeAvailability,
   IngredientStatus,
@@ -229,29 +230,84 @@ export default function SmartSuggestions({
     setShowStyleSelector(true);
   };
 
+  // Helper para parsear tiempo (ej: "15 min" -> 15)
+  const parseTime = (timeStr: string): number => {
+    const match = timeStr.match(/(\d+)/);
+    return match ? parseInt(match[1], 10) : 0;
+  };
+
+  // Helper para parsear calorías (ej: "450 kcal" -> 450)
+  const parseCalories = (calStr: string): number => {
+    const match = calStr.match(/(\d+)/);
+    return match ? parseInt(match[1], 10) : 0;
+  };
+
   const saveAIRecipe = async () => {
     if (!aiRecipe) return;
 
     setSavingRecipe(true);
     try {
-      // Aquí podrías guardar la receta en Supabase
-      // Por ahora, mostrar como alternativa
-      const newRecipe: Recipe = {
-        id: `ai-${Date.now()}`,
+      // Preparar ingredientes en formato correcto
+      const ingredients = aiRecipe.ingredients.map(i => ({
+        name: i.name,
+        total: i.total,
+        luis: i.luis,
+        mariana: i.mariana
+      }));
+
+      // Preparar la receta para Supabase
+      const recipeToSave = {
         name: aiRecipe.name,
         type: mealType,
-        ingredients: aiRecipe.ingredients.map(i => ({
-          name: i.name,
-          total: i.total,
-          luis: i.luis,
-          mariana: i.mariana
-        })),
-        steps: aiRecipe.steps
+        description: aiRecipe.description,
+        ingredients: ingredients,
+        steps: aiRecipe.steps,
+        prep_time: parseTime(aiRecipe.prepTime),
+        cook_time: parseTime(aiRecipe.cookTime),
+        total_time: parseTime(aiRecipe.totalTime),
+        tips: aiRecipe.tips,
+        source: 'ai_generated' as const,
+        nutrition: {
+          calories: parseCalories(aiRecipe.calories),
+          protein: 0, // La IA no devuelve estos detalles
+          carbs: 0,
+          fat: 0
+        }
       };
 
-      onSelectAlternative(newRecipe);
+      // Guardar en Supabase
+      const { data, error } = await supabase
+        .from('recipes')
+        .insert(recipeToSave)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error saving AI recipe to database:', error);
+        throw error;
+      }
+
+      // Usar la receta guardada con el ID real de la base de datos
+      const savedRecipe: Recipe = {
+        id: data.id,
+        name: data.name,
+        type: data.type,
+        description: data.description,
+        ingredients: data.ingredients,
+        steps: data.steps,
+        prep_time: data.prep_time,
+        cook_time: data.cook_time,
+        total_time: data.total_time,
+        tips: data.tips,
+        source: data.source,
+        nutrition: data.nutrition,
+        created_at: data.created_at
+      };
+
+      onSelectAlternative(savedRecipe);
     } catch (error) {
       console.error('Error saving recipe:', error);
+      setAiError('Error al guardar la receta. Intenta de nuevo.');
     } finally {
       setSavingRecipe(false);
     }
