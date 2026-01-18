@@ -201,48 +201,60 @@ export default function ScheduleGenerator({
     setGenerating(true);
 
     try {
-      // Primero crear/actualizar task_templates
+      // 1. Obtener todas las plantillas existentes de una vez
+      const { data: existingTemplates } = await supabase
+        .from('task_templates')
+        .select('id, space_id, name')
+        .eq('household_id', householdId);
+
       const templateMap = new Map<string, string>();
+
+      // Mapear plantillas existentes
+      existingTemplates?.forEach(t => {
+        templateMap.set(`${t.space_id}-${t.name}`, t.id);
+      });
+
+      // 2. Identificar plantillas que necesitan crearse
+      const uniqueNewTemplates = new Map<string, {
+        household_id: string;
+        space_id: string;
+        name: string;
+        frequency: string;
+        estimated_minutes: number;
+        priority: string;
+        is_active: boolean;
+      }>();
 
       for (const task of preview) {
         const templateKey = `${task.spaceId}-${task.taskName}`;
-
-        if (!templateMap.has(templateKey)) {
-          // Verificar si ya existe
-          const { data: existing } = await supabase
-            .from('task_templates')
-            .select('id')
-            .eq('space_id', task.spaceId)
-            .eq('name', task.taskName)
-            .single();
-
-          if (existing) {
-            templateMap.set(templateKey, existing.id);
-          } else {
-            // Crear nueva plantilla
-            const { data: newTemplate } = await supabase
-              .from('task_templates')
-              .insert({
-                household_id: householdId,
-                space_id: task.spaceId,
-                name: task.taskName,
-                frequency: task.frequency === 'Diaria' ? 'diaria' :
-                          task.frequency === 'Semanal' ? 'semanal' : 'quincenal',
-                estimated_minutes: task.estimatedMinutes,
-                priority: 'normal',
-                is_active: true
-              })
-              .select('id')
-              .single();
-
-            if (newTemplate) {
-              templateMap.set(templateKey, newTemplate.id);
-            }
-          }
+        if (!templateMap.has(templateKey) && !uniqueNewTemplates.has(templateKey)) {
+          uniqueNewTemplates.set(templateKey, {
+            household_id: householdId,
+            space_id: task.spaceId,
+            name: task.taskName,
+            frequency: task.frequency === 'Diaria' ? 'diaria' :
+                      task.frequency === 'Semanal' ? 'semanal' : 'quincenal',
+            estimated_minutes: task.estimatedMinutes,
+            priority: 'normal',
+            is_active: true
+          });
         }
       }
 
-      // Luego crear scheduled_tasks
+      // 3. Insertar todas las nuevas plantillas de una vez
+      if (uniqueNewTemplates.size > 0) {
+        const templatesToInsert = Array.from(uniqueNewTemplates.values());
+        const { data: newTemplates } = await supabase
+          .from('task_templates')
+          .insert(templatesToInsert)
+          .select('id, space_id, name');
+
+        newTemplates?.forEach(t => {
+          templateMap.set(`${t.space_id}-${t.name}`, t.id);
+        });
+      }
+
+      // 4. Crear scheduled_tasks
       const tasksToInsert = preview.map(task => ({
         household_id: householdId,
         task_template_id: templateMap.get(`${task.spaceId}-${task.taskName}`),
@@ -252,8 +264,8 @@ export default function ScheduleGenerator({
         status: 'pendiente'
       })).filter(t => t.task_template_id);
 
-      // Insertar en lotes de 50
-      const batchSize = 50;
+      // 5. Insertar en lotes más grandes (100)
+      const batchSize = 100;
       let inserted = 0;
 
       for (let i = 0; i < tasksToInsert.length; i += batchSize) {
@@ -265,9 +277,11 @@ export default function ScheduleGenerator({
         if (!error) {
           inserted += batch.length;
         }
+
+        // Actualizar progreso visual
+        setSavedCount(inserted);
       }
 
-      setSavedCount(inserted);
       setStep('done');
     } catch (error) {
       console.error('Error saving schedule:', error);
@@ -460,7 +474,10 @@ export default function ScheduleGenerator({
                   className="flex-1 py-3 bg-purple-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {generating ? (
-                    <RefreshCw size={20} className="animate-spin" />
+                    <>
+                      <RefreshCw size={20} className="animate-spin" />
+                      {savedCount > 0 ? `${savedCount}/${preview.length}` : 'Guardando...'}
+                    </>
                   ) : (
                     <>
                       <CheckCircle2 size={20} />
