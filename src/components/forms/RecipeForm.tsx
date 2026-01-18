@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Plus, Trash2 } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { X, Plus, Trash2, Sparkles, Camera, Upload, Loader2, Wand2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { Recipe, Ingredient, MealType } from '@/types';
 import ImageUpload from '../ImageUpload';
@@ -24,6 +24,15 @@ export default function RecipeForm({ recipe, onClose, onSuccess }: RecipeFormPro
     (recipe?.ingredients as Ingredient[]) || [{ name: '', luis: '', mariana: '', total: '' }]
   );
   const [steps, setSteps] = useState<string[]>(recipe?.steps || ['']);
+
+  // AI Generation state
+  const [showAIPanel, setShowAIPanel] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiDescription, setAiDescription] = useState('');
+  const [aiImagePreview, setAiImagePreview] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addIngredient = () => {
     setIngredients([...ingredients, { name: '', luis: '', mariana: '', total: '' }]);
@@ -55,6 +64,87 @@ export default function RecipeForm({ recipe, onClose, onSuccess }: RecipeFormPro
     const updated = [...steps];
     updated[index] = value;
     setSteps(updated);
+  };
+
+  // AI Functions
+  const handleAIImageCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAiImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const generateWithAI = async () => {
+    if (!aiDescription && !aiImagePreview) {
+      setAiError('Ingresa una descripción o sube una foto del plato');
+      return;
+    }
+
+    setAiLoading(true);
+    setAiError(null);
+
+    try {
+      const response = await fetch('/api/generate-recipe-from-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image: aiImagePreview,
+          description: aiDescription,
+          type: type !== 'lunch' ? type : undefined // Only send if user changed it
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      const generatedRecipe = data.recipe;
+
+      // Fill form with generated data
+      setName(generatedRecipe.name);
+      setType(generatedRecipe.type);
+      setTotal(generatedRecipe.total || '');
+      setPortionsLuis(generatedRecipe.portions?.luis || '');
+      setPortionsMariana(generatedRecipe.portions?.mariana || '');
+
+      // Set ingredients
+      if (generatedRecipe.ingredients && generatedRecipe.ingredients.length > 0) {
+        setIngredients(generatedRecipe.ingredients.map((ing: { name: string; total?: string; luis?: string; mariana?: string }) => ({
+          name: ing.name,
+          total: ing.total || '',
+          luis: ing.luis || '',
+          mariana: ing.mariana || ''
+        })));
+      }
+
+      // Set steps
+      if (generatedRecipe.steps && generatedRecipe.steps.length > 0) {
+        setSteps(generatedRecipe.steps);
+      }
+
+      // Close AI panel
+      setShowAIPanel(false);
+      setAiDescription('');
+      setAiImagePreview(null);
+
+    } catch (err) {
+      console.error('Error generating recipe:', err);
+      setAiError(err instanceof Error ? err.message : 'Error al generar la receta');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const clearAIImage = () => {
+    setAiImagePreview(null);
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -142,6 +232,128 @@ export default function RecipeForm({ recipe, onClose, onSuccess }: RecipeFormPro
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-5 overflow-y-auto flex-1">
+          {/* AI Generation Button - Only for new recipes */}
+          {!recipe && (
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={() => setShowAIPanel(!showAIPanel)}
+                className={`w-full py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-all ${
+                  showAIPanel
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-gradient-to-r from-purple-50 to-indigo-50 text-purple-700 border border-purple-200 hover:from-purple-100 hover:to-indigo-100'
+                }`}
+              >
+                <Sparkles size={18} />
+                {showAIPanel ? 'Ocultar asistente IA' : 'Generar con IA'}
+              </button>
+
+              {/* AI Panel */}
+              {showAIPanel && (
+                <div className="mt-3 p-4 bg-purple-50 rounded-xl border border-purple-200">
+                  <p className="text-sm text-purple-700 mb-3">
+                    Sube una foto de un plato o describe lo que quieres cocinar y la IA generará la receta completa.
+                  </p>
+
+                  {/* AI Error */}
+                  {aiError && (
+                    <div className="mb-3 p-2 bg-red-100 text-red-700 rounded-lg text-sm">
+                      {aiError}
+                    </div>
+                  )}
+
+                  {/* Image Preview */}
+                  {aiImagePreview && (
+                    <div className="mb-3 relative">
+                      <img
+                        src={aiImagePreview}
+                        alt="Preview"
+                        className="w-full h-40 object-cover rounded-lg"
+                      />
+                      <button
+                        type="button"
+                        onClick={clearAIImage}
+                        className="absolute top-2 right-2 p-1 bg-white/90 rounded-full shadow"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Image capture buttons */}
+                  {!aiImagePreview && (
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <button
+                        type="button"
+                        onClick={() => cameraInputRef.current?.click()}
+                        className="flex items-center justify-center gap-2 py-2 bg-white rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-100 text-sm"
+                      >
+                        <Camera size={16} />
+                        Tomar foto
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex items-center justify-center gap-2 py-2 bg-white rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-100 text-sm"
+                      >
+                        <Upload size={16} />
+                        Subir imagen
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Hidden inputs */}
+                  <input
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleAIImageCapture}
+                    className="hidden"
+                  />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAIImageCapture}
+                    className="hidden"
+                  />
+
+                  {/* Description input */}
+                  <div className="mb-3">
+                    <input
+                      type="text"
+                      value={aiDescription}
+                      onChange={(e) => setAiDescription(e.target.value)}
+                      placeholder="Ej: Arroz con pollo colombiano, Pasta carbonara..."
+                      className="w-full p-3 border border-purple-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+
+                  {/* Generate button */}
+                  <button
+                    type="button"
+                    onClick={generateWithAI}
+                    disabled={aiLoading || (!aiDescription && !aiImagePreview)}
+                    className="w-full py-3 bg-purple-600 text-white rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {aiLoading ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" />
+                        Generando receta...
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 size={18} />
+                        Generar receta
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Image Upload */}
           <div className="mb-4">
             <label className="block text-sm font-medium mb-2">Foto de la receta</label>

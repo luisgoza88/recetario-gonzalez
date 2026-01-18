@@ -200,24 +200,33 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
       const dateKey = date.toISOString().split('T')[0];
       const isCompleted = completedDays.has(dateKey);
 
+      // Domingos son seleccionables también (para generar con IA)
+      const isSelectable = hasMenu || isSunday;
+
       days.push(
         <button
           key={day}
-          onClick={() => hasMenu && selectDate(date)}
-          disabled={!hasMenu}
+          onClick={() => isSelectable && selectDate(date)}
+          disabled={!isSelectable}
           className={`
             aspect-square flex flex-col items-center justify-center rounded-lg text-sm relative transition-all
-            ${isSunday ? 'bg-gray-50 text-gray-400' : ''}
+            ${isSunday && !isSelected ? 'bg-purple-50 text-purple-500 font-medium hover:bg-purple-100 border border-purple-200' : ''}
             ${hasMenu && !isSelected ? 'bg-green-50 text-green-700 font-semibold hover:bg-green-100' : ''}
             ${!hasMenu && !isSunday ? 'text-gray-300' : ''}
             ${isToday ? 'ring-2 ring-green-700' : ''}
-            ${isSelected ? 'bg-green-700 text-white' : ''}
+            ${isSelected && isSunday ? 'bg-purple-600 text-white' : ''}
+            ${isSelected && !isSunday ? 'bg-green-700 text-white' : ''}
           `}
         >
           <span>{day}</span>
           {hasMenu && (
             <span className={`text-[0.6rem] ${isSelected ? 'opacity-80' : 'opacity-70'}`}>
               D{cycleDay + 1}
+            </span>
+          )}
+          {isSunday && !hasMenu && (
+            <span className={`text-[0.5rem] ${isSelected ? 'opacity-80' : 'opacity-70'}`}>
+              IA
             </span>
           )}
           {isCompleted && (
