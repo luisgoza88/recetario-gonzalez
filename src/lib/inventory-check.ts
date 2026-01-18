@@ -62,11 +62,21 @@ async function loadAliases(): Promise<Map<string, string>> {
     console.log(`[ALIASES-RAW] Found ${data.length} alias records in DB`);
 
     // También cargar nombres de market_items para mapear
-    const { data: items } = await supabase
+    const { data: items, error: itemsError } = await supabase
       .from('market_items')
       .select('id, name');
 
-    const itemNames = new Map(items?.map(i => [i.id, i.name]) || []);
+    if (itemsError) {
+      console.error('[ALIASES-ERROR] Failed to load market_items:', itemsError);
+      return aliasesCache;
+    }
+
+    if (!items || items.length === 0) {
+      console.error('[ALIASES-ERROR] No market_items returned from query');
+      return aliasesCache;
+    }
+
+    const itemNames = new Map(items.map(i => [i.id, i.name]));
     console.log(`[MARKET-ITEMS] Loaded ${itemNames.size} market items`);
 
     for (const alias of data) {
@@ -76,11 +86,17 @@ async function loadAliases(): Promise<Map<string, string>> {
         aliasesCache.set(normalizedAlias, itemName);
         // Log some sample aliases for debugging
         if (alias.alias.toLowerCase().includes('bistec') || alias.alias.toLowerCase().includes('queso')) {
-          console.log(`[ALIAS-MAPPED] "${alias.alias}" (normalized: "${normalizedAlias}") → "${itemName}"`);
+          console.log(`[ALIAS-MAPPED] "${alias.alias}" (normalized: "${normalizedAlias}") → "${itemName}" (market_item_id: ${alias.market_item_id})`);
         }
+      } else {
+        console.log(`[ALIAS-ORPHAN] alias "${alias.alias}" has market_item_id "${alias.market_item_id}" but no matching item found`);
       }
     }
     console.log(`[ALIASES-LOADED] ${aliasesCache.size} aliases loaded into cache`);
+
+    // Debug: print first few alias entries
+    const aliasEntries = Array.from(aliasesCache.entries()).slice(0, 10);
+    console.log(`[ALIASES-SAMPLE] First 10 entries: ${aliasEntries.map(([k, v]) => `"${k}" → "${v}"`).join(' | ')}`);
   }
 
   return aliasesCache;
