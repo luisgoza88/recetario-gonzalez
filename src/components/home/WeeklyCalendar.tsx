@@ -23,6 +23,14 @@ interface DayData {
   totalCount: number;
 }
 
+// Helper para formatear fecha en timezone local (evita problemas con UTC)
+const formatLocalDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function WeeklyCalendar({
   householdId,
   onClose,
@@ -44,7 +52,9 @@ export default function WeeklyCalendar({
 
     const { startDate, endDate } = getDateRange();
 
-    const { data } = await supabase
+    console.log('WeeklyCalendar loadTasks:', { householdId, startDate, endDate });
+
+    const { data, error } = await supabase
       .from('scheduled_tasks')
       .select(`
         *,
@@ -57,6 +67,12 @@ export default function WeeklyCalendar({
       .lte('scheduled_date', endDate)
       .order('scheduled_date');
 
+    console.log('WeeklyCalendar query result:', { dataLength: data?.length, error });
+
+    if (error) {
+      console.error('Error loading tasks:', error);
+    }
+
     if (data) setTasks(data);
     setLoading(false);
   };
@@ -68,15 +84,15 @@ export default function WeeklyCalendar({
       const end = new Date(start);
       end.setDate(end.getDate() + 6); // Sábado
       return {
-        startDate: start.toISOString().split('T')[0],
-        endDate: end.toISOString().split('T')[0]
+        startDate: formatLocalDate(start),
+        endDate: formatLocalDate(end)
       };
     } else {
       const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
       const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
       return {
-        startDate: start.toISOString().split('T')[0],
-        endDate: end.toISOString().split('T')[0]
+        startDate: formatLocalDate(start),
+        endDate: formatLocalDate(end)
       };
     }
   };
@@ -89,7 +105,7 @@ export default function WeeklyCalendar({
     for (let i = 0; i < 7; i++) {
       const date = new Date(start);
       date.setDate(date.getDate() + i);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = formatLocalDate(date);
       const dayTasks = tasks.filter(t => t.scheduled_date === dateStr);
 
       days.push({
@@ -118,7 +134,7 @@ export default function WeeklyCalendar({
 
     for (let d = new Date(start); d <= lastDay || currentWeek.length < 7; d.setDate(d.getDate() + 1)) {
       const date = new Date(d);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = formatLocalDate(date);
       const dayTasks = tasks.filter(t => t.scheduled_date === dateStr);
 
       currentWeek.push({
