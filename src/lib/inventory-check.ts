@@ -44,11 +44,16 @@ function extractNumber(qty: string): number {
 async function loadAliases(): Promise<Map<string, string>> {
   if (aliasesCache) return aliasesCache;
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('ingredient_aliases')
     .select('alias, market_item_id');
 
   aliasesCache = new Map();
+
+  if (error) {
+    console.error('[ALIASES-ERROR]', error);
+    return aliasesCache;
+  }
 
   if (data) {
     // También cargar nombres de market_items para mapear
@@ -64,6 +69,7 @@ async function loadAliases(): Promise<Map<string, string>> {
         aliasesCache.set(normalizeIngredient(alias.alias), itemName);
       }
     }
+    console.log(`[ALIASES-LOADED] ${aliasesCache.size} aliases loaded`);
   }
 
   return aliasesCache;
@@ -135,6 +141,7 @@ async function findInventoryMatch(
   // 1. Buscar coincidencia exacta en inventario
   for (const [itemName, data] of inventory.entries()) {
     if (normalizeIngredient(itemName) === normalizedIngredient) {
+      console.log(`[MATCH-EXACT] "${ingredientName}" → "${itemName}" (qty: ${data.number})`);
       return data;
     }
   }
@@ -143,8 +150,14 @@ async function findInventoryMatch(
   const aliases = await loadAliases();
   const aliasMatch = aliases.get(normalizedIngredient);
   if (aliasMatch) {
+    console.log(`[ALIAS-FOUND] "${ingredientName}" → alias: "${aliasMatch}"`);
     const data = inventory.get(aliasMatch);
-    if (data) return data;
+    if (data) {
+      console.log(`[MATCH-ALIAS] "${ingredientName}" → "${aliasMatch}" (qty: ${data.number})`);
+      return data;
+    } else {
+      console.log(`[ALIAS-NO-INV] "${ingredientName}" → alias "${aliasMatch}" not in inventory`);
+    }
   }
 
   // 3. Buscar coincidencia parcial (uno contiene al otro)
@@ -167,11 +180,13 @@ async function findInventoryMatch(
     // Si la primera palabra clave coincide
     for (const word of ingredientWords) {
       if (word.length >= 4 && normalizedItem.includes(word)) {
+        console.log(`[MATCH-FUZZY] "${ingredientName}" → "${itemName}" (word: ${word}, qty: ${data.number})`);
         return data;
       }
     }
   }
 
+  console.log(`[NO-MATCH] "${ingredientName}" - no match found`);
   return null;
 }
 
@@ -200,13 +215,16 @@ async function checkPreparationAvailable(
 
 // Cargar inventario actual
 export async function loadCurrentInventory(): Promise<Map<string, { quantity: string; number: number; itemName: string }>> {
-  const { data: items } = await supabase
+  const { data: items, error: itemsError } = await supabase
     .from('market_items')
     .select('id, name');
 
-  const { data: inventory } = await supabase
+  const { data: inventory, error: invError } = await supabase
     .from('inventory')
     .select('item_id, current_quantity, current_number');
+
+  if (itemsError) console.error('[INVENTORY-ERROR] items:', itemsError);
+  if (invError) console.error('[INVENTORY-ERROR] inventory:', invError);
 
   const inventoryMap = new Map<string, { quantity: string; number: number; itemName: string }>();
 
@@ -215,12 +233,18 @@ export async function loadCurrentInventory(): Promise<Map<string, { quantity: st
 
     for (const item of items) {
       const inv = invMap.get(item.id);
+      // Ensure number is actually a number
+      const numValue = inv?.current_number ? Number(inv.current_number) : 0;
       inventoryMap.set(item.name, {
         quantity: inv?.current_quantity || '0',
-        number: inv?.current_number || 0,
+        number: numValue,
         itemName: item.name
       });
     }
+
+    // Log items with stock
+    const withStock = Array.from(inventoryMap.entries()).filter(([, v]) => v.number > 0);
+    console.log(`[INVENTORY-LOADED] ${inventoryMap.size} items, ${withStock.length} with stock`);
   }
 
   return inventoryMap;
