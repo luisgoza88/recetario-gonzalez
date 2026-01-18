@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { RotateCcw, ShoppingCart, Home, Minus, Plus, Edit2, Check, X, AlertTriangle, Search } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { RotateCcw, ShoppingCart, Home, Minus, Plus, Edit2, Check, X, AlertTriangle, Search, Sparkles, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
-import { MarketItem } from '@/types';
+import { MarketItem, IngredientCategory } from '@/types';
 import { CATEGORY_EMOJIS } from '@/data/market';
+import AddCustomItemModal from './AddCustomItemModal';
 
 interface MarketViewProps {
   items: MarketItem[];
@@ -19,6 +20,27 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [categoryData, setCategoryData] = useState<Record<string, IngredientCategory>>({});
+
+  // Cargar datos de categorías
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  const loadCategories = async () => {
+    const { data } = await supabase
+      .from('ingredient_categories')
+      .select('*');
+
+    if (data) {
+      const catMap: Record<string, IngredientCategory> = {};
+      data.forEach(cat => {
+        catMap[cat.id] = cat;
+      });
+      setCategoryData(catMap);
+    }
+  };
 
   const checkedCount = items.filter(i => i.checked).length;
   const totalCount = items.length;
@@ -155,6 +177,49 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
     }
   };
 
+  const deleteCustomItem = async (item: MarketItem) => {
+    if (!confirm(`¿Eliminar "${item.name}" de tu lista?`)) return;
+
+    setLoading(item.id);
+    try {
+      // Eliminar de inventory primero
+      await supabase
+        .from('inventory')
+        .delete()
+        .eq('item_id', item.id);
+
+      // Eliminar de market_checklist
+      await supabase
+        .from('market_checklist')
+        .delete()
+        .eq('item_id', item.id);
+
+      // Eliminar de market_items
+      const { error } = await supabase
+        .from('market_items')
+        .delete()
+        .eq('id', item.id);
+
+      if (error) throw error;
+      onUpdate();
+    } catch (error) {
+      console.error('Error deleting custom item:', error);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  // Obtener emoji de categoría (usando category_id o category legacy)
+  const getCategoryEmoji = (item: MarketItem) => {
+    if (item.category_id && categoryData[item.category_id]) {
+      return categoryData[item.category_id].icon;
+    }
+    return CATEGORY_EMOJIS[item.category] || '📦';
+  };
+
+  // Contar items personalizados
+  const customItemsCount = items.filter(i => i.is_custom).length;
+
   // Agrupar items filtrados por categoría
   const categories = filteredItems.reduce((acc, item) => {
     if (!acc[item.category]) {
@@ -177,7 +242,12 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
           }`}
         >
           <ShoppingCart size={18} />
-          Lista de Compras
+          Compras
+          {customItemsCount > 0 && (
+            <span className="bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full">
+              +{customItemsCount}
+            </span>
+          )}
         </button>
         <button
           onClick={() => setViewMode('pantry')}
@@ -254,7 +324,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
           {Object.entries(categories).map(([category, categoryItems]) => (
             <div key={category} className="mb-4">
               <div className="bg-green-700 text-white px-4 py-3 rounded-t-lg font-semibold flex items-center gap-2">
-                <span>{CATEGORY_EMOJIS[category] || '📦'}</span>
+                <span>{getCategoryEmoji(categoryItems[0])}</span>
                 {category}
               </div>
               <div className="bg-white rounded-b-lg shadow-sm overflow-hidden">
@@ -268,6 +338,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
                       className={`
                         flex items-center p-4 border-b last:border-b-0 transition-colors
                         ${item.checked ? 'bg-green-50' : 'hover:bg-gray-50'}
+                        ${item.is_custom ? 'border-l-4 border-l-purple-400' : ''}
                       `}
                     >
                       <input
@@ -277,9 +348,17 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
                         disabled={loading === item.id}
                         className="w-6 h-6 mr-3 accent-green-700 cursor-pointer"
                       />
-                      <span className="flex-1 font-medium">
-                        {item.name}
-                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium truncate">{item.name}</span>
+                          {item.is_custom && (
+                            <span className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                              <Sparkles size={10} />
+                              nuevo
+                            </span>
+                          )}
+                        </div>
+                      </div>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={(e) => { e.stopPropagation(); adjustQuantity(item, -1); }}
@@ -303,6 +382,15 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
                         >
                           <Plus size={14} />
                         </button>
+                        {item.is_custom && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); deleteCustomItem(item); }}
+                            disabled={loading === item.id}
+                            className="w-7 h-7 flex items-center justify-center bg-gray-100 text-gray-500 rounded-md hover:bg-red-100 hover:text-red-600 disabled:opacity-30 text-sm ml-1"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -322,7 +410,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
           {Object.entries(categories).map(([category, categoryItems]) => (
             <div key={category} className="mb-4">
               <div className="bg-orange-600 text-white px-4 py-3 rounded-t-lg font-semibold flex items-center gap-2">
-                <span>{CATEGORY_EMOJIS[category] || '📦'}</span>
+                <span>{getCategoryEmoji(categoryItems[0])}</span>
                 {category}
               </div>
               <div className="bg-white rounded-b-lg shadow-sm overflow-hidden">
@@ -347,10 +435,27 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
                             <AlertTriangle size={16} className={isEmpty ? 'text-red-500' : 'text-orange-500'} />
                           )}
                           <span className="font-medium">{item.name}</span>
+                          {item.is_custom && (
+                            <span className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                              <Sparkles size={10} />
+                              nuevo
+                            </span>
+                          )}
                         </div>
-                        <span className="text-xs text-gray-400">
-                          Necesitas: {item.quantity}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-400">
+                            Necesitas: {item.quantity}
+                          </span>
+                          {item.is_custom && (
+                            <button
+                              onClick={() => deleteCustomItem(item)}
+                              disabled={loading === item.id}
+                              className="p-1 text-gray-400 hover:text-red-500 disabled:opacity-30"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {/* Progress bar */}
@@ -428,6 +533,23 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
             </div>
           ))}
         </>
+      )}
+
+      {/* Floating Add Button */}
+      <button
+        onClick={() => setShowAddModal(true)}
+        className="fixed bottom-24 left-5 bg-purple-600 text-white p-4 rounded-full font-semibold shadow-lg flex items-center gap-2 hover:bg-purple-700 transition-colors z-40"
+        aria-label="Agregar item personalizado"
+      >
+        <Sparkles size={22} />
+      </button>
+
+      {/* Add Custom Item Modal */}
+      {showAddModal && (
+        <AddCustomItemModal
+          onClose={() => setShowAddModal(false)}
+          onAdded={onUpdate}
+        />
       )}
     </div>
   );

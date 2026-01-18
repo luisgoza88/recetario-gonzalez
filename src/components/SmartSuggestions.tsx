@@ -1,7 +1,23 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AlertTriangle, ChefHat, Sparkles, X, Check, RefreshCw, Save, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  AlertTriangle,
+  ChefHat,
+  Sparkles,
+  X,
+  Check,
+  RefreshCw,
+  Save,
+  ChevronDown,
+  ChevronUp,
+  Zap,
+  Heart,
+  Leaf,
+  Flame,
+  Coins,
+  Coffee
+} from 'lucide-react';
 import { Recipe } from '@/types';
 import {
   RecipeAvailability,
@@ -11,6 +27,70 @@ import {
   findAlternativeRecipes,
   getAvailableIngredientsList
 } from '@/lib/inventory-check';
+
+// Tipos de estilo de receta
+type RecipeStyle =
+  | 'saludable'
+  | 'rapida'
+  | 'economica'
+  | 'alta-proteina'
+  | 'baja-carbohidrato'
+  | 'vegetariana'
+  | 'comfort'
+  | 'ligera';
+
+interface RecipeStyleOption {
+  id: RecipeStyle;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+  color: string;
+}
+
+const RECIPE_STYLES: RecipeStyleOption[] = [
+  {
+    id: 'saludable',
+    label: 'Saludable',
+    description: 'Balanceada y nutritiva',
+    icon: <Heart size={18} />,
+    color: 'bg-green-100 text-green-700 border-green-300'
+  },
+  {
+    id: 'rapida',
+    label: 'Rápida',
+    description: 'Menos de 30 min',
+    icon: <Zap size={18} />,
+    color: 'bg-yellow-100 text-yellow-700 border-yellow-300'
+  },
+  {
+    id: 'alta-proteina',
+    label: 'Alta Proteína',
+    description: 'Rica en proteínas',
+    icon: <Flame size={18} />,
+    color: 'bg-red-100 text-red-700 border-red-300'
+  },
+  {
+    id: 'ligera',
+    label: 'Ligera',
+    description: 'Baja en calorías',
+    icon: <Leaf size={18} />,
+    color: 'bg-teal-100 text-teal-700 border-teal-300'
+  },
+  {
+    id: 'economica',
+    label: 'Económica',
+    description: 'Bajo presupuesto',
+    icon: <Coins size={18} />,
+    color: 'bg-blue-100 text-blue-700 border-blue-300'
+  },
+  {
+    id: 'comfort',
+    label: 'Comfort',
+    description: 'Reconfortante',
+    icon: <Coffee size={18} />,
+    color: 'bg-orange-100 text-orange-700 border-orange-300'
+  }
+];
 
 interface SmartSuggestionsProps {
   recipe: Recipe;
@@ -59,6 +139,8 @@ export default function SmartSuggestions({
   const [aiError, setAiError] = useState<string | null>(null);
   const [showIngredients, setShowIngredients] = useState(false);
   const [savingRecipe, setSavingRecipe] = useState(false);
+  const [selectedStyle, setSelectedStyle] = useState<RecipeStyle>('saludable');
+  const [showStyleSelector, setShowStyleSelector] = useState(true);
 
   useEffect(() => {
     checkInventory();
@@ -90,6 +172,7 @@ export default function SmartSuggestions({
   const generateAIRecipe = async () => {
     setGeneratingAI(true);
     setAiError(null);
+    setShowStyleSelector(false); // Ocultar selector mientras genera
 
     try {
       const response = await fetch('/api/generate-recipe', {
@@ -99,7 +182,8 @@ export default function SmartSuggestions({
           availableIngredients,
           mealType,
           servings: 5,
-          preferences: ['Saludable', 'Fácil de preparar']
+          recipeStyle: selectedStyle,
+          preferences: ['Fácil de preparar']
         })
       });
 
@@ -113,9 +197,16 @@ export default function SmartSuggestions({
     } catch (error) {
       console.error('AI recipe error:', error);
       setAiError(error instanceof Error ? error.message : 'Error al generar receta');
+      setShowStyleSelector(true); // Mostrar selector si hay error
     } finally {
       setGeneratingAI(false);
     }
+  };
+
+  const resetAIGeneration = () => {
+    setAiRecipe(null);
+    setAiError(null);
+    setShowStyleSelector(true);
   };
 
   const saveAIRecipe = async () => {
@@ -272,11 +363,39 @@ export default function SmartSuggestions({
                   Generar receta nueva con IA
                 </h4>
                 <p className="text-xs text-purple-600 mt-1">
-                  Crea una receta saludable usando solo los ingredientes que tienes
+                  Elige el tipo de receta y la generamos con tus ingredientes
                 </p>
               </div>
 
               <div className="p-3">
+                {/* Recipe Style Selector */}
+                {showStyleSelector && !aiRecipe && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      ¿Qué tipo de receta quieres?
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {RECIPE_STYLES.map((style) => (
+                        <button
+                          key={style.id}
+                          onClick={() => setSelectedStyle(style.id)}
+                          className={`p-2 rounded-lg border-2 text-left transition-all ${
+                            selectedStyle === style.id
+                              ? `${style.color} border-current`
+                              : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            {style.icon}
+                            <span className="font-medium text-sm">{style.label}</span>
+                          </div>
+                          <p className="text-xs opacity-75 mt-0.5">{style.description}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Available ingredients toggle */}
                 <button
                   onClick={() => setShowIngredients(!showIngredients)}
@@ -307,12 +426,12 @@ export default function SmartSuggestions({
                     {generatingAI ? (
                       <>
                         <RefreshCw size={18} className="animate-spin" />
-                        Generando receta...
+                        Generando receta {RECIPE_STYLES.find(s => s.id === selectedStyle)?.label.toLowerCase()}...
                       </>
                     ) : (
                       <>
                         <Sparkles size={18} />
-                        Generar Receta con IA
+                        Generar Receta {RECIPE_STYLES.find(s => s.id === selectedStyle)?.label}
                       </>
                     )}
                   </button>
@@ -365,10 +484,17 @@ export default function SmartSuggestions({
                         onClick={generateAIRecipe}
                         disabled={generatingAI}
                         className="px-4 py-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200"
+                        title="Regenerar misma receta"
                       >
                         <RefreshCw size={18} className={generatingAI ? 'animate-spin' : ''} />
                       </button>
                     </div>
+                    <button
+                      onClick={resetAIGeneration}
+                      className="w-full text-sm text-purple-600 hover:text-purple-800 mt-2"
+                    >
+                      ← Elegir otro tipo de receta
+                    </button>
                   </div>
                 )}
 

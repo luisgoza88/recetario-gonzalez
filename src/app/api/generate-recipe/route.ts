@@ -7,12 +7,33 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+interface IngredientWithContext {
+  name: string;
+  quantity: string;
+  category?: string;
+  isCustom?: boolean;
+}
+
+// Tipos de receta disponibles
+export type RecipeStyle =
+  | 'saludable'      // Balanceada, nutritiva
+  | 'rapida'         // Menos de 30 minutos
+  | 'economica'      // Ingredientes económicos
+  | 'alta-proteina'  // Rica en proteínas
+  | 'baja-carbohidrato' // Low carb / keto friendly
+  | 'vegetariana'    // Sin carne
+  | 'comfort'        // Reconfortante, tradicional
+  | 'ligera';        // Baja en calorías
+
 interface GenerateRecipeRequest {
-  availableIngredients: string[];
+  availableIngredients: string[] | IngredientWithContext[];
   mealType: 'breakfast' | 'lunch' | 'dinner';
   servings?: number;
   preferences?: string[];
+  recipeStyle?: RecipeStyle; // Nuevo: tipo de receta deseada
   recentRecipes?: string[]; // Nombres de recetas recientes a evitar
+  ingredientsByCategory?: Record<string, string[]>; // Ingredientes agrupados por categoría
+  customItems?: string[]; // Items personalizados/nuevos en despensa
 }
 
 interface Preparation {
@@ -87,7 +108,30 @@ export async function POST(request: NextRequest) {
     }
 
     const body: GenerateRecipeRequest = await request.json();
-    const { availableIngredients, mealType, servings = 5, preferences = [], recentRecipes = [] } = body;
+    const {
+      availableIngredients,
+      mealType,
+      servings = 5,
+      preferences = [],
+      recipeStyle = 'saludable',
+      recentRecipes = [],
+      ingredientsByCategory,
+      customItems = []
+    } = body;
+
+    // Instrucciones específicas según el estilo de receta
+    const styleInstructions: Record<RecipeStyle, string> = {
+      'saludable': 'La receta debe ser balanceada y nutritiva, con buen aporte de proteínas, carbohidratos complejos y vegetales.',
+      'rapida': 'IMPORTANTE: La receta debe poder prepararse en MENOS DE 30 MINUTOS en total. Prioriza técnicas de cocción rápidas.',
+      'economica': 'Usa ingredientes económicos y aprovecha al máximo los ingredientes disponibles. Evita ingredientes costosos.',
+      'alta-proteina': 'La receta debe ser ALTA EN PROTEÍNAS (mínimo 25g por porción). Prioriza carnes, huevos, legumbres o lácteos.',
+      'baja-carbohidrato': 'La receta debe ser BAJA EN CARBOHIDRATOS (menos de 20g por porción). Evita arroz, pasta, pan y azúcares.',
+      'vegetariana': 'La receta debe ser VEGETARIANA. NO uses ningún tipo de carne, pollo, pescado o mariscos.',
+      'comfort': 'La receta debe ser reconfortante y tradicional colombiana/latinoamericana. Sabores caseros y abundantes.',
+      'ligera': 'La receta debe ser LIGERA y baja en calorías (menos de 350 kcal por porción). Prioriza vegetales y proteínas magras.'
+    };
+
+    const selectedStyleInstruction = styleInstructions[recipeStyle] || styleInstructions['saludable'];
 
     if (!availableIngredients || availableIngredients.length === 0) {
       return NextResponse.json(
@@ -96,9 +140,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Normalizar ingredientes a string[]
+    const ingredientsList = availableIngredients.map(ing =>
+      typeof ing === 'string' ? ing : `${ing.name} (${ing.quantity})`
+    );
+
     // Obtener preparaciones disponibles y recetas recientes
     const [availablePreparations, dbRecentRecipes] = await Promise.all([
-      getAvailablePreparations(availableIngredients),
+      getAvailablePreparations(ingredientsList),
       getRecentRecipeNames()
     ]);
 
@@ -133,16 +182,39 @@ Por favor NO sugieras estas recetas ni variaciones muy similares.
 `;
     }
 
+    // Construir sección de ingredientes por categoría (si está disponible)
+    let ingredientsSection = '';
+    if (ingredientsByCategory && Object.keys(ingredientsByCategory).length > 0) {
+      ingredientsSection = Object.entries(ingredientsByCategory)
+        .map(([category, items]) => `📦 ${category}:\n${items.map(i => `  - ${i}`).join('\n')}`)
+        .join('\n\n');
+    } else {
+      ingredientsSection = ingredientsList.join('\n');
+    }
+
+    // Construir sección de items personalizados
+    let customSection = '';
+    if (customItems.length > 0) {
+      customSection = `
+⭐ INGREDIENTES ESPECIALES (Compras recientes/regalos que queremos usar):
+${customItems.map(c => `- ${c}`).join('\n')}
+
+¡PRIORIZA usar estos ingredientes especiales! La familia los tiene disponibles y quiere aprovecharlos.
+`;
+    }
+
     const prompt = `Eres un chef profesional especializado en cocina colombiana y latinoamericana saludable.
 Trabajas para la Familia González: Luis come porciones más grandes (3 porciones) y Mariana porciones medianas (2 porciones).
 
 INGREDIENTES DISPONIBLES EN LA DESPENSA:
-${availableIngredients.join('\n')}
-${preparationsSection}${avoidSection}
+${ingredientsSection}
+${customSection}${preparationsSection}${avoidSection}
 REQUERIMIENTOS:
 - Tipo de comida: ${mealTypeLabels[mealType]}
 - Porciones totales: ${servings} (3 para Luis + 2 para Mariana)
-- Preferencias: ${preferences.length > 0 ? preferences.join(', ') : 'Saludable, balanceada, fácil de preparar'}
+- Estilo de receta: ${recipeStyle.toUpperCase()}
+- ${selectedStyleInstruction}
+- Preferencias adicionales: ${preferences.length > 0 ? preferences.join(', ') : 'Fácil de preparar'}
 
 CONTEXTO IMPORTANTE:
 - Prioriza usar ingredientes que YA están disponibles
@@ -227,20 +299,54 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura exacta:
       );
     }
 
-    // Parse JSON response
+    // Parse JSON response with robust cleaning
     try {
-      // Remove markdown code blocks if present
-      const jsonContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      let jsonContent = content;
+
+      // Remove markdown code blocks (various formats)
+      jsonContent = jsonContent.replace(/```json\s*/gi, '');
+      jsonContent = jsonContent.replace(/```\s*/g, '');
+
+      // Remove any text before the first {
+      const firstBrace = jsonContent.indexOf('{');
+      if (firstBrace > 0) {
+        jsonContent = jsonContent.slice(firstBrace);
+      }
+
+      // Remove any text after the last }
+      const lastBrace = jsonContent.lastIndexOf('}');
+      if (lastBrace !== -1 && lastBrace < jsonContent.length - 1) {
+        jsonContent = jsonContent.slice(0, lastBrace + 1);
+      }
+
+      // Clean common JSON issues
+      jsonContent = jsonContent
+        .replace(/[\x00-\x1F\x7F]/g, ' ') // Remove control characters
+        .replace(/,\s*}/g, '}')           // Remove trailing commas before }
+        .replace(/,\s*]/g, ']')           // Remove trailing commas before ]
+        .trim();
+
       const recipe = JSON.parse(jsonContent);
+
+      // Validate essential fields
+      if (!recipe.name || !recipe.ingredients || !recipe.steps) {
+        throw new Error('Missing required recipe fields');
+      }
 
       return NextResponse.json({
         success: true,
         recipe
       });
     } catch (parseError) {
-      console.error('JSON parse error:', parseError, 'Content:', content);
+      console.error('JSON parse error:', parseError);
+      console.error('Raw content:', content.slice(0, 500));
+
+      // Return a more helpful error
       return NextResponse.json(
-        { error: 'Invalid recipe format from AI' },
+        {
+          error: 'Error al procesar la receta generada. Por favor intenta de nuevo.',
+          details: parseError instanceof Error ? parseError.message : 'Parse error'
+        },
         { status: 500 }
       );
     }

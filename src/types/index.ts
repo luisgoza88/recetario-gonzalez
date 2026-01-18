@@ -1,5 +1,32 @@
 // Tipos principales del Recetario
 
+// Información nutricional por porción
+export interface NutritionInfo {
+  calories: number;        // kcal por porción
+  protein: number;         // gramos
+  carbs: number;           // gramos
+  fat: number;             // gramos
+  fiber?: number;          // gramos
+  sodium?: number;         // mg
+  sugar?: number;          // gramos
+}
+
+// Tags dietéticos para filtrado
+export type DietaryTag =
+  | 'vegetariano'
+  | 'vegano'
+  | 'sin-gluten'
+  | 'sin-lactosa'
+  | 'bajo-carbohidrato'
+  | 'alto-proteina'
+  | 'bajo-sodio'
+  | 'bajo-azucar'
+  | 'keto'
+  | 'paleo';
+
+// Dificultad de la receta
+export type RecipeDifficulty = 'fácil' | 'media' | 'difícil';
+
 export interface Recipe {
   id: string;
   name: string;
@@ -11,6 +38,19 @@ export interface Recipe {
   total?: string;
   ingredients: Ingredient[];
   steps: string[];
+  // Campos de tiempo (en minutos)
+  prep_time?: number;
+  cook_time?: number;
+  total_time?: number;
+  // Información nutricional (por porción)
+  nutrition?: NutritionInfo;
+  // Metadatos adicionales
+  difficulty?: RecipeDifficulty;
+  dietary_tags?: DietaryTag[];
+  description?: string;
+  tips?: string;
+  source?: 'manual' | 'ai_generated';
+  image_url?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -41,13 +81,29 @@ export interface CompletedDay {
   created_at?: string;
 }
 
+export interface IngredientCategory {
+  id: string;
+  name: string;
+  name_es: string;
+  icon: string;
+  color: string;
+  ai_description?: string;
+  sort_order: number;
+}
+
 export interface MarketItem {
   id: string;
-  category: string;
+  category: string; // Deprecated: usar category_id
+  category_id?: string;
+  category_data?: IngredientCategory;
   name: string;
   quantity: string;
   checked: boolean;
   order_index: number;
+  is_custom?: boolean;
+  ai_tags?: string[];
+  unit?: string;
+  created_at?: string;
   // Campos de inventario (despensa)
   currentQuantity?: string;
   currentNumber?: number;
@@ -68,7 +124,7 @@ export interface MarketChecklist {
   checked_at?: string;
 }
 
-// Categorías del mercado
+// Categorías del mercado (legacy - para compatibilidad)
 export const MARKET_CATEGORIES = [
   'Proteínas Premium',
   'Proteínas Económicas',
@@ -81,6 +137,22 @@ export const MARKET_CATEGORIES = [
 ] as const;
 
 export type MarketCategory = typeof MARKET_CATEGORIES[number];
+
+// Nuevas categorías de ingredientes (desde DB)
+export const INGREDIENT_CATEGORY_IDS = [
+  'proteins',
+  'dairy',
+  'vegetables',
+  'fruits',
+  'grains',
+  'pantry',
+  'spices',
+  'beverages',
+  'frozen',
+  'other'
+] as const;
+
+export type IngredientCategoryId = typeof INGREDIENT_CATEGORY_IDS[number];
 
 // Tipos de comida
 export const MEAL_TYPES = {
@@ -152,6 +224,16 @@ export interface SpaceType {
   sort_order: number;
 }
 
+export interface SpaceAttributes {
+  has_bathroom: boolean;
+  has_walkin_closet: boolean;
+  has_balcony: boolean;
+  has_windows: number; // cantidad de ventanas
+  floor_type: 'tile' | 'wood' | 'carpet' | 'concrete' | 'other';
+  has_curtains: boolean;
+  has_air_conditioning: boolean;
+}
+
 export interface Space {
   id: string;
   household_id: string;
@@ -162,6 +244,7 @@ export interface Space {
   usage_level: 'alto' | 'medio' | 'bajo';
   has_bathroom: boolean;
   area_sqm?: number;
+  attributes?: SpaceAttributes;
   characteristics?: Record<string, unknown>;
   notes?: string;
   created_at?: string;
@@ -236,4 +319,116 @@ export interface CleaningHistory {
   employee_id?: string;
   notes?: string;
   rating?: number;
+}
+
+// =====================================================
+// TIPOS PARA ANÁLISIS Y OPTIMIZACIÓN DE HORARIOS
+// =====================================================
+
+export interface WorkloadAnalysis {
+  employeeId: string;
+  employeeName: string;
+  day: string;
+  totalMinutes: number;
+  availableMinutes: number;
+  taskCount: number;
+  utilizationPercent: number;
+  isOverloaded: boolean;
+  tasks: {
+    taskName: string;
+    spaceName: string;
+    minutes: number;
+  }[];
+}
+
+export interface ScheduleIssue {
+  type: 'overload' | 'uncovered_space' | 'uncovered_task' | 'time_conflict' | 'inefficient_distribution';
+  severity: 'high' | 'medium' | 'low';
+  description: string;
+  affectedDay?: string;
+  affectedEmployee?: string;
+  affectedSpace?: string;
+  suggestion: string;
+}
+
+export interface ScheduleOptimization {
+  id: string;
+  type: 'redistribute' | 'reschedule' | 'add_employee' | 'reduce_frequency' | 'combine_tasks';
+  description: string;
+  impact: string;
+  tasks: {
+    taskId: string;
+    currentDay: string;
+    suggestedDay?: string;
+    currentEmployee?: string;
+    suggestedEmployee?: string;
+  }[];
+  estimatedImprovement: number; // porcentaje de mejora
+}
+
+export interface CoverageReport {
+  totalSpaces: number;
+  coveredSpaces: number;
+  uncoveredSpaces: Space[];
+  totalTasks: number;
+  scheduledTasks: number;
+  unscheduledTasks: {
+    spaceName: string;
+    taskName: string;
+    reason: string;
+  }[];
+  weeklyWorkload: {
+    day: string;
+    totalMinutes: number;
+    employeeWorkloads: WorkloadAnalysis[];
+  }[];
+}
+
+// =====================================================
+// TIPOS PARA SISTEMA DE PRESUPUESTO
+// =====================================================
+
+export interface PriceHistory {
+  id: string;
+  item_id: string;
+  price: number;
+  price_unit: string;
+  source?: string;
+  recorded_at: string;
+}
+
+export interface Budget {
+  id: string;
+  period_type: 'weekly' | 'monthly';
+  period_start: string;
+  period_end: string;
+  budget_amount: number;
+  actual_spent: number;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Purchase {
+  id: string;
+  item_id?: string;
+  item_name: string;
+  quantity?: string;
+  price: number;
+  store?: string;
+  purchased_at: string;
+  budget_id?: string;
+  notes?: string;
+}
+
+export interface BudgetSummary {
+  budget: Budget | null;
+  totalSpent: number;
+  remaining: number;
+  percentUsed: number;
+  averageDailySpend: number;
+  daysRemaining: number;
+  projectedTotal: number;
+  isOverBudget: boolean;
+  purchases: Purchase[];
 }

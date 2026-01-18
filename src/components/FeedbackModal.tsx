@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { X, MessageSquare, Check } from 'lucide-react';
+import { X, MessageSquare, Check, Brain } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
-import { Recipe, MealType, PortionRating, LeftoverRating, Ingredient } from '@/types';
+import { Recipe, MealType, PortionRating, LeftoverRating, Ingredient, MealFeedback } from '@/types';
+import { analyzeNewFeedback } from '@/lib/feedback-learning';
 
 interface FeedbackModalProps {
   date: string;
@@ -63,8 +64,18 @@ export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved
         await updateInventoryForUsedUp(usedUpIngredients);
       }
 
-      // Analizar y generar sugerencias
-      await analyzeAndGenerateSuggestions(recipe.id, portionRating, leftoverRating);
+      // Analizar y generar sugerencias con el nuevo sistema de aprendizaje
+      await analyzeAndGenerateSuggestions({
+        id: '',
+        date,
+        meal_type: mealType,
+        recipe_id: recipe.id,
+        recipe_name: recipe.name,
+        portion_rating: portionRating || undefined,
+        leftover_rating: leftoverRating || undefined,
+        missing_ingredients: missingIngredients.length > 0 ? missingIngredients : undefined,
+        notes: notes.trim() || undefined
+      });
 
       setSaved(true);
       setTimeout(() => {
@@ -100,86 +111,12 @@ export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved
     }
   };
 
-  const analyzeAndGenerateSuggestions = async (recipeId: string, portion: PortionRating | null, leftover: LeftoverRating | null) => {
-    if (!portion && !leftover) return;
-
-    // Contar feedbacks similares para esta receta
-    const { data: feedbacks } = await supabase
-      .from('meal_feedback')
-      .select('portion_rating, leftover_rating')
-      .eq('recipe_id', recipeId)
-      .order('created_at', { ascending: false })
-      .limit(5);
-
-    if (!feedbacks) return;
-
-    // Analizar patrones de porción
-    if (portion === 'mucha' || portion === 'poca') {
-      const similarCount = feedbacks.filter(f => f.portion_rating === portion).length;
-
-      if (similarCount >= 2) {
-        const changePercent = portion === 'mucha' ? -15 : 15;
-        const reason = portion === 'mucha'
-          ? `${similarCount} reportes de "porción muy grande" para ${recipe.name}`
-          : `${similarCount} reportes de "porción muy pequeña" para ${recipe.name}`;
-
-        // Verificar si ya existe una sugerencia pendiente similar
-        const { data: existing } = await supabase
-          .from('adjustment_suggestions')
-          .select('id, feedback_count')
-          .eq('recipe_id', recipeId)
-          .eq('suggestion_type', 'portion')
-          .eq('status', 'pending')
-          .limit(1);
-
-        if (existing && existing.length > 0) {
-          // Actualizar contador
-          await supabase
-            .from('adjustment_suggestions')
-            .update({ feedback_count: similarCount, reason })
-            .eq('id', existing[0].id);
-        } else {
-          // Crear nueva sugerencia
-          await supabase
-            .from('adjustment_suggestions')
-            .insert({
-              suggestion_type: 'portion',
-              recipe_id: recipeId,
-              change_percent: changePercent,
-              reason,
-              feedback_count: similarCount
-            });
-        }
-      }
-    }
-
-    // Analizar patrones de sobras
-    if (leftover === 'mucho') {
-      const similarCount = feedbacks.filter(f => f.leftover_rating === 'mucho').length;
-
-      if (similarCount >= 2) {
-        const reason = `${similarCount} reportes de "sobró mucha comida" para ${recipe.name}`;
-
-        const { data: existing } = await supabase
-          .from('adjustment_suggestions')
-          .select('id')
-          .eq('recipe_id', recipeId)
-          .eq('suggestion_type', 'market')
-          .eq('status', 'pending')
-          .limit(1);
-
-        if (!existing || existing.length === 0) {
-          await supabase
-            .from('adjustment_suggestions')
-            .insert({
-              suggestion_type: 'market',
-              recipe_id: recipeId,
-              change_percent: -20,
-              reason,
-              feedback_count: similarCount
-            });
-        }
-      }
+  const analyzeAndGenerateSuggestions = async (feedbackData: Partial<MealFeedback>) => {
+    // Usar el nuevo sistema de aprendizaje con pesos temporales
+    try {
+      await analyzeNewFeedback(feedbackData as MealFeedback);
+    } catch (error) {
+      console.error('Error in feedback learning analysis:', error);
     }
   };
 

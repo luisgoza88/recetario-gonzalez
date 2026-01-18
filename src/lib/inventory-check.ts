@@ -1,14 +1,18 @@
 import { supabase } from './supabase/client';
 import { Recipe, Ingredient } from '@/types';
+import { compareQuantities, normalizeQuantity, parseQuantity, formatQuantity } from './units';
 
 export interface IngredientStatus {
   name: string;
   required: string;
-  available: number;
-  needed: number;
+  available: string;        // Cantidad disponible formateada
+  availableNumber: number;  // Número disponible (normalizado)
+  needed: string;           // Cantidad faltante formateada
+  neededNumber: number;     // Número faltante
   hasEnough: boolean;
   percentAvailable: number;
-  matchedItem?: string; // Nombre del item del inventario que coincidió
+  matchedItem?: string;     // Nombre del item del inventario que coincidió
+  unitCompatible: boolean;  // Si las unidades son comparables
 }
 
 export interface RecipeAvailability {
@@ -33,11 +37,11 @@ function normalizeIngredient(name: string): string {
     .trim();
 }
 
-// Extraer número de una cantidad string
+// Extraer número de una cantidad string (legacy - usar parseQuantity para mejor precisión)
 function extractNumber(qty: string): number {
   if (!qty) return 0;
-  const match = qty.match(/[\d.]+/);
-  return match ? parseFloat(match[0]) : 0;
+  const parsed = parseQuantity(qty);
+  return parsed.value;
 }
 
 // Cargar aliases desde la base de datos
@@ -363,27 +367,56 @@ export async function checkRecipeIngredients(
       }
     }
 
-    // FIXED: Simplified availability check
-    // The old logic failed because units are inconsistent:
-    // - Inventory has current_number like 5 (meaning "5 kg" or "5 units")
-    // - Recipe requests like "280g" which extracts to 280
-    // This caused 5 >= 140 = false, even though we clearly have enough beef!
-    //
-    // NEW LOGIC: If we found the ingredient and it has stock > 0, it's available
-    // The actual quantity check is not meaningful with mixed units
-    const hasEnough = totalAvailable > 0;
-    console.log(`[HAS-ENOUGH] "${ing.name}": totalAvailable=${totalAvailable}, hasEnough=${hasEnough} (simplified check)`);
-    // Simplified percent: 100% if we have stock, 0% if not
-    const percentAvailable = hasEnough ? 100 : 0;
+    // IMPROVED: Proper quantity comparison with unit conversion
+    // Now we compare quantities intelligently using the units library
+    let hasEnough = false;
+    let percentAvailable = 0;
+    let availableStr = '0';
+    let neededStr = '0';
+    let neededNumber = 0;
+    let unitCompatible = true;
+
+    if (totalAvailable > 0 && matchedItems.length > 0) {
+      // Obtener la cantidad del inventario del primer item matched
+      const matchedData = await findInventoryMatch(subIngredients[0], inventory);
+      if (matchedData) {
+        availableStr = matchedData.quantity;
+
+        // Comparar usando el sistema de unidades
+        const comparison = compareQuantities(matchedData.quantity, requiredQty, 0.8);
+        hasEnough = comparison.hasEnough;
+        percentAvailable = comparison.percentAvailable;
+        unitCompatible = comparison.compatible;
+
+        // Calcular lo que falta
+        if (!hasEnough && comparison.compatible) {
+          neededNumber = Math.max(0, comparison.requiredNormalized - comparison.availableNormalized);
+          const parsed = parseQuantity(requiredQty);
+          neededStr = formatQuantity(neededNumber, parsed.unit);
+        }
+
+        console.log(`[QUANTITY-CHECK] "${ing.name}": available="${availableStr}", required="${requiredQty}", hasEnough=${hasEnough}, percent=${percentAvailable}%, compatible=${unitCompatible}`);
+      }
+    } else {
+      // No se encontró en inventario
+      hasEnough = false;
+      percentAvailable = 0;
+      neededStr = requiredQty;
+      neededNumber = requiredNum;
+      console.log(`[QUANTITY-CHECK] "${ing.name}": NOT FOUND in inventory, need ${requiredQty}`);
+    }
 
     const status: IngredientStatus = {
       name: ing.name,
       required: requiredQty,
-      available: totalAvailable,
-      needed: Math.max(0, requiredNum - totalAvailable),
+      available: availableStr,
+      availableNumber: totalAvailable,
+      needed: neededStr,
+      neededNumber,
       hasEnough,
       percentAvailable,
-      matchedItem: matchedItems.length > 0 ? matchedItems.join(', ') : undefined
+      matchedItem: matchedItems.length > 0 ? matchedItems.join(', ') : undefined,
+      unitCompatible
     };
 
     if (hasEnough) {
@@ -445,6 +478,75 @@ export function getAvailableIngredientsList(
   }
 
   return available;
+}
+
+// Obtener ingredientes con categorías para contexto de IA más rico
+export interface IngredientWithCategory {
+  name: string;
+  quantity: string;
+  category: string;
+  categoryName: string;
+  isCustom: boolean;
+}
+
+export async function getAvailableIngredientsWithCategories(): Promise<{
+  ingredients: IngredientWithCategory[];
+  byCategory: Record<string, IngredientWithCategory[]>;
+  customItems: IngredientWithCategory[];
+}> {
+  // Cargar items del mercado con categorías
+  const { data: items } = await supabase
+    .from('market_items')
+    .select('id, name, category, category_id, is_custom');
+
+  // Cargar categorías
+  const { data: categories } = await supabase
+    .from('ingredient_categories')
+    .select('id, name_es');
+
+  // Cargar inventario
+  const { data: inventory } = await supabase
+    .from('inventory')
+    .select('item_id, current_quantity, current_number');
+
+  const categoryMap = new Map(categories?.map(c => [c.id, c.name_es]) || []);
+  const invMap = new Map(inventory?.map(i => [i.item_id, { qty: i.current_quantity, num: i.current_number }]) || []);
+
+  const ingredients: IngredientWithCategory[] = [];
+  const byCategory: Record<string, IngredientWithCategory[]> = {};
+  const customItems: IngredientWithCategory[] = [];
+
+  for (const item of items || []) {
+    const inv = invMap.get(item.id);
+    if (!inv || inv.num <= 0) continue;
+
+    const categoryName = item.category_id
+      ? (categoryMap.get(item.category_id) || item.category)
+      : item.category;
+
+    const ingredient: IngredientWithCategory = {
+      name: item.name,
+      quantity: inv.qty,
+      category: item.category_id || 'other',
+      categoryName,
+      isCustom: item.is_custom || false
+    };
+
+    ingredients.push(ingredient);
+
+    // Agrupar por categoría
+    if (!byCategory[categoryName]) {
+      byCategory[categoryName] = [];
+    }
+    byCategory[categoryName].push(ingredient);
+
+    // Separar custom items
+    if (item.is_custom) {
+      customItems.push(ingredient);
+    }
+  }
+
+  return { ingredients, byCategory, customItems };
 }
 
 // Limpiar cache (llamar cuando se actualicen aliases o preparaciones)

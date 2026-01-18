@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { X, Users, Timer, Play, Pause, RotateCcw, Volume2, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Users, Timer, Play, Pause, RotateCcw, Volume2, Lightbulb } from 'lucide-react';
 import { Recipe, Ingredient } from '@/types';
-import { INGREDIENT_SUBSTITUTIONS } from '@/data/substitutions';
+import NutritionDisplay, { DietaryTags, PrepTimeDisplay, DifficultyDisplay } from './NutritionDisplay';
+import SmartSubstitutionPanel from './SmartSubstitutionPanel';
 
 interface RecipeModalProps {
   recipe: Recipe;
@@ -21,10 +22,18 @@ interface ActiveTimer {
 export default function RecipeModal({ recipe, onClose, missingIngredients = [] }: RecipeModalProps) {
   const [scale, setScale] = useState(1);
   const [activeTimers, setActiveTimers] = useState<ActiveTimer[]>([]);
-  const [showSubstitutions, setShowSubstitutions] = useState(false);
+  const [selectedSubstitutions, setSelectedSubstitutions] = useState<Map<string, string>>(new Map());
 
   const ingredients = recipe.ingredients as Ingredient[];
   const hasTotal = ingredients[0]?.total;
+
+  const handleSubstitutionSelect = (original: string, substitute: string) => {
+    setSelectedSubstitutions(prev => {
+      const next = new Map(prev);
+      next.set(original, substitute);
+      return next;
+    });
+  };
 
   // Detectar tiempos en los pasos (ej: "25 minutos", "10 min", "1 hora")
   const extractTime = (text: string): number | null => {
@@ -146,25 +155,6 @@ export default function RecipeModal({ recipe, onClose, missingIngredients = [] }
     }
   };
 
-  // Buscar sustituciones para ingredientes faltantes
-  const getSubstitutions = useCallback(() => {
-    const subs: { ingredient: string; alternatives: string[] }[] = [];
-
-    for (const ing of missingIngredients) {
-      const ingLower = ing.toLowerCase();
-      for (const [key, alternatives] of Object.entries(INGREDIENT_SUBSTITUTIONS)) {
-        if (ingLower.includes(key) || key.includes(ingLower)) {
-          subs.push({ ingredient: ing, alternatives });
-          break;
-        }
-      }
-    }
-
-    return subs;
-  }, [missingIngredients]);
-
-  const substitutions = getSubstitutions();
-
   return (
     <div
       className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4"
@@ -187,7 +177,7 @@ export default function RecipeModal({ recipe, onClose, missingIngredients = [] }
 
         {/* Content */}
         <div className="p-5 overflow-y-auto flex-1">
-          {/* Type Badge */}
+          {/* Type Badge + Difficulty */}
           <div className="mb-4 flex items-center gap-2 flex-wrap">
             <span className={`
               text-sm px-3 py-1 rounded-full
@@ -198,6 +188,10 @@ export default function RecipeModal({ recipe, onClose, missingIngredients = [] }
               {getTypeLabel(recipe.type)}
             </span>
 
+            {recipe.difficulty && (
+              <DifficultyDisplay difficulty={recipe.difficulty} />
+            )}
+
             {activeTimers.some(t => t.isRunning) && (
               <span className="text-sm px-3 py-1 rounded-full bg-red-100 text-red-700 animate-pulse flex items-center gap-1">
                 <Timer size={14} />
@@ -205,6 +199,31 @@ export default function RecipeModal({ recipe, onClose, missingIngredients = [] }
               </span>
             )}
           </div>
+
+          {/* Description */}
+          {recipe.description && (
+            <p className="mb-4 text-sm text-gray-600 italic">
+              {recipe.description}
+            </p>
+          )}
+
+          {/* Prep Time Display */}
+          {(recipe.prep_time || recipe.cook_time || recipe.total_time) && (
+            <div className="mb-4">
+              <PrepTimeDisplay
+                prepTime={recipe.prep_time}
+                cookTime={recipe.cook_time}
+                totalTime={recipe.total_time}
+              />
+            </div>
+          )}
+
+          {/* Dietary Tags */}
+          {recipe.dietary_tags && recipe.dietary_tags.length > 0 && (
+            <div className="mb-4">
+              <DietaryTags tags={recipe.dietary_tags} />
+            </div>
+          )}
 
           {/* Scale Control */}
           <div className="mb-4 p-3 bg-purple-50 rounded-xl">
@@ -234,34 +253,14 @@ export default function RecipeModal({ recipe, onClose, missingIngredients = [] }
             </div>
           </div>
 
-          {/* Missing Ingredients Alert */}
-          {substitutions.length > 0 && (
-            <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-xl">
-              <button
-                onClick={() => setShowSubstitutions(!showSubstitutions)}
-                className="w-full flex items-center justify-between text-orange-700"
-              >
-                <span className="flex items-center gap-2 font-medium">
-                  <AlertCircle size={16} />
-                  {substitutions.length} ingrediente(s) con sustitución disponible
-                </span>
-                <span>{showSubstitutions ? '▲' : '▼'}</span>
-              </button>
-
-              {showSubstitutions && (
-                <div className="mt-3 space-y-2">
-                  {substitutions.map((sub, i) => (
-                    <div key={i} className="text-sm">
-                      <span className="font-medium text-orange-800">{sub.ingredient}:</span>
-                      <ul className="ml-4 text-orange-700">
-                        {sub.alternatives.map((alt, j) => (
-                          <li key={j}>→ {alt}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              )}
+          {/* Smart Substitutions Panel */}
+          {missingIngredients.length > 0 && (
+            <div className="mb-4">
+              <SmartSubstitutionPanel
+                missingIngredients={missingIngredients}
+                dietaryTags={recipe.dietary_tags}
+                onSubstitutionSelect={handleSubstitutionSelect}
+              />
             </div>
           )}
 
@@ -375,6 +374,26 @@ export default function RecipeModal({ recipe, onClose, missingIngredients = [] }
               );
             })}
           </ol>
+
+          {/* Tips */}
+          {recipe.tips && (
+            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+              <div className="flex items-start gap-2">
+                <Lightbulb size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h5 className="text-sm font-medium text-amber-700 mb-1">Tips</h5>
+                  <p className="text-sm text-amber-800">{recipe.tips}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Nutrition Info */}
+          {recipe.nutrition && (
+            <div className="mt-4">
+              <NutritionDisplay nutrition={recipe.nutrition} />
+            </div>
+          )}
         </div>
       </div>
     </div>

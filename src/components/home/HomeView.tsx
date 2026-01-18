@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import {
   Home, Calendar, CheckCircle2, Clock, AlertTriangle,
-  User, Settings, ChevronRight, Plus
+  User, Settings, ChevronRight, Plus, Sparkles, BarChart3
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { Household, Space, HomeEmployee, ScheduledTask, TaskTemplate } from '@/types';
@@ -11,6 +11,7 @@ import HomeSetupWizard from './HomeSetupWizard';
 import EmployeesPanel from './EmployeesPanel';
 import SpacesPanel from './SpacesPanel';
 import ScheduleGenerator from './ScheduleGenerator';
+import ScheduleOptimizer from './ScheduleOptimizer';
 
 interface HomeViewProps {
   initialHouseholdId?: string;
@@ -27,6 +28,7 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
   const [showEmployeesPanel, setShowEmployeesPanel] = useState(false);
   const [showSpacesPanel, setShowSpacesPanel] = useState(false);
   const [showScheduleGenerator, setShowScheduleGenerator] = useState(false);
+  const [showOptimizer, setShowOptimizer] = useState(false);
 
   useEffect(() => {
     loadHousehold();
@@ -260,6 +262,30 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
         </div>
       )}
 
+      {/* Action Buttons */}
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <button
+          onClick={() => setShowScheduleGenerator(true)}
+          className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl p-4 shadow-sm text-left hover:from-purple-600 hover:to-purple-700 transition-all"
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <Sparkles size={20} />
+            <span className="font-semibold">Programar</span>
+          </div>
+          <p className="text-xs text-purple-100">Generar itinerario</p>
+        </button>
+        <button
+          onClick={() => setShowOptimizer(true)}
+          className="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-xl p-4 shadow-sm text-left hover:from-indigo-600 hover:to-indigo-700 transition-all"
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <BarChart3 size={20} />
+            <span className="font-semibold">Analizar</span>
+          </div>
+          <p className="text-xs text-indigo-100">Ver carga de trabajo</p>
+        </button>
+      </div>
+
       {/* Quick Stats */}
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div className="bg-white rounded-xl p-4 shadow-sm">
@@ -396,6 +422,16 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
           employees={employees}
           onClose={() => setShowScheduleGenerator(false)}
           onComplete={() => loadHouseholdData(household.id)}
+        />
+      )}
+
+      {showOptimizer && household && (
+        <ScheduleOptimizer
+          householdId={household.id}
+          spaces={spaces}
+          employees={employees}
+          onClose={() => setShowOptimizer(false)}
+          onApplyOptimization={() => loadHouseholdData(household.id)}
         />
       )}
     </div>
