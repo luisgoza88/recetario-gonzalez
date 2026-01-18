@@ -1,9 +1,10 @@
 'use client';
 
-import { UtensilsCrossed, Home, Bot, Settings } from 'lucide-react';
+import { UtensilsCrossed, Home, Bot, Settings, Calendar, ShoppingCart, BookOpen, Lightbulb } from 'lucide-react';
 import DynamicFAB, { FABAction } from './DynamicFAB';
 
 type MainSection = 'recetario' | 'hogar' | 'ia' | 'ajustes';
+type RecetarioTab = 'calendar' | 'market' | 'recipes' | 'suggestions';
 
 interface BottomNavigationProps {
   activeSection: MainSection;
@@ -12,6 +13,10 @@ interface BottomNavigationProps {
   onFabToggle: () => void;
   fabActions: FABAction[];
   pendingAlerts?: number;
+  // Props para tabs secundarios de recetario
+  recetarioTab?: RecetarioTab;
+  onRecetarioTabChange?: (tab: RecetarioTab) => void;
+  pendingSuggestions?: number;
 }
 
 interface NavItemProps {
@@ -49,18 +54,67 @@ function NavItem({ icon, label, active, onClick, badge, activeColor, activeBg }:
   );
 }
 
+// Tabs secundarios del Recetario
+const RECETARIO_TABS: { id: RecetarioTab; label: string; icon: React.ReactNode }[] = [
+  { id: 'calendar', label: 'Calendario', icon: <Calendar size={16} /> },
+  { id: 'market', label: 'Mercado', icon: <ShoppingCart size={16} /> },
+  { id: 'recipes', label: 'Recetas', icon: <BookOpen size={16} /> },
+  { id: 'suggestions', label: 'Sugerencias', icon: <Lightbulb size={16} /> },
+];
+
 export default function BottomNavigation({
   activeSection,
   onSectionChange,
   fabOpen,
   onFabToggle,
   fabActions,
-  pendingAlerts = 0
+  pendingAlerts = 0,
+  recetarioTab = 'calendar',
+  onRecetarioTabChange,
+  pendingSuggestions = 0
 }: BottomNavigationProps) {
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 safe-area-pb">
-      <div className="max-w-lg mx-auto px-2">
-        <div className="flex items-end justify-between py-2">
+      <div className="max-w-lg mx-auto">
+        {/* Tabs secundarios del Recetario - Solo visible cuando está activo */}
+        {activeSection === 'recetario' && onRecetarioTabChange && (
+          <div className="flex border-b border-gray-100 bg-gray-50/80">
+            {RECETARIO_TABS.map((tab) => {
+              const isActive = recetarioTab === tab.id;
+              const showBadge = tab.id === 'suggestions' && pendingSuggestions > 0;
+
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => onRecetarioTabChange(tab.id)}
+                  className={`
+                    flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2
+                    transition-all duration-200 relative
+                    ${isActive
+                      ? 'text-green-700 bg-white'
+                      : 'text-gray-500 hover:text-gray-700'
+                    }
+                  `}
+                >
+                  {/* Indicador activo */}
+                  {isActive && (
+                    <div className="absolute top-0 left-2 right-2 h-0.5 bg-green-600 rounded-full" />
+                  )}
+                  {tab.icon}
+                  <span className="text-xs font-medium hidden sm:inline">{tab.label}</span>
+                  {showBadge && (
+                    <span className="w-4 h-4 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold">
+                      {pendingSuggestions > 9 ? '9+' : pendingSuggestions}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Navegación principal */}
+        <div className="flex items-end justify-between py-2 px-2">
           {/* Recetario */}
           <NavItem
             icon={<UtensilsCrossed size={24} />}

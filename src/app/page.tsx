@@ -236,8 +236,8 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Content */}
-      <main className="pb-20">
+      {/* Content - pb-32 para dejar espacio para los tabs secundarios */}
+      <main className="pb-32">
         {activeSection === 'recetario' && (
           <RecetarioSection
             activeTab={recetarioTab}
@@ -270,6 +270,9 @@ export default function Home() {
         onFabToggle={() => setFabOpen(!fabOpen)}
         fabActions={getFABActions()}
         pendingAlerts={pendingSuggestions}
+        recetarioTab={recetarioTab}
+        onRecetarioTabChange={setRecetarioTab}
+        pendingSuggestions={pendingSuggestions}
       />
     </div>
   );

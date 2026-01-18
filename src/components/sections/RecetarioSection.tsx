@@ -1,6 +1,5 @@
 'use client';
 
-import RecetarioSubNav from '../navigation/RecetarioSubNav';
 import CalendarView from '../CalendarView';
 import MarketView from '../MarketView';
 import RecipesView from '../RecipesView';
@@ -20,23 +19,14 @@ interface RecetarioSectionProps {
 
 export default function RecetarioSection({
   activeTab,
-  onTabChange,
   recipes,
   marketItems,
-  pendingSuggestions,
   onUpdate
 }: RecetarioSectionProps) {
   return (
     <div className="flex flex-col h-full">
-      {/* Sub-navigation */}
-      <RecetarioSubNav
-        activeTab={activeTab}
-        onTabChange={onTabChange}
-        pendingSuggestions={pendingSuggestions}
-      />
-
-      {/* Content */}
-      <div className="flex-1 overflow-auto">
+      {/* Content - Sin sub-navigation arriba, ahora está en el BottomNavigation */}
+      <div className="flex-1 overflow-auto pb-12">
         {activeTab === 'calendar' && (
           <CalendarView recipes={recipes} />
         )}
