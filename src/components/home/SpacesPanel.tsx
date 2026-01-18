@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import {
-  X, Plus, Home, Trash2, Edit2, Check, Trees
+  X, Plus, Home, Trash2, Edit2, Check, Trees, Clock,
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
-import { Space, SpaceType } from '@/types';
+import { Space, SpaceType, TaskTemplate } from '@/types';
 
 interface SpacesPanelProps {
   householdId: string;
@@ -14,13 +15,119 @@ interface SpacesPanelProps {
   onUpdate: () => void;
 }
 
+interface TaskConfig {
+  id?: string;
+  name: string;
+  frequency: 'diaria' | 'semanal' | 'quincenal' | 'mensual';
+  enabled: boolean;
+  estimatedMinutes: number;
+  isCustom?: boolean;
+}
+
 interface SpaceForm {
   id?: string;
   spaceTypeId: string;
   customName: string;
   category: 'interior' | 'exterior';
   usageLevel: 'alto' | 'medio' | 'bajo';
+  tasks: TaskConfig[];
 }
+
+// Tareas predeterminadas por tipo de espacio
+const DEFAULT_TASKS: Record<string, TaskConfig[]> = {
+  'sala': [
+    { name: 'Barrer/Aspirar', frequency: 'semanal', enabled: true, estimatedMinutes: 20 },
+    { name: 'Trapear', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
+    { name: 'Sacudir muebles', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
+    { name: 'Limpiar vidrios', frequency: 'quincenal', enabled: true, estimatedMinutes: 20 },
+    { name: 'Limpiar cortinas', frequency: 'mensual', enabled: false, estimatedMinutes: 30 },
+  ],
+  'cocina': [
+    { name: 'Limpiar mesones', frequency: 'diaria', enabled: true, estimatedMinutes: 10 },
+    { name: 'Barrer/Trapear', frequency: 'diaria', enabled: true, estimatedMinutes: 15 },
+    { name: 'Lavar platos', frequency: 'diaria', enabled: true, estimatedMinutes: 20 },
+    { name: 'Limpiar estufa', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
+    { name: 'Limpiar nevera por fuera', frequency: 'semanal', enabled: true, estimatedMinutes: 10 },
+    { name: 'Limpiar nevera por dentro', frequency: 'quincenal', enabled: true, estimatedMinutes: 30 },
+    { name: 'Limpiar horno', frequency: 'mensual', enabled: true, estimatedMinutes: 30 },
+    { name: 'Organizar alacena', frequency: 'mensual', enabled: false, estimatedMinutes: 45 },
+  ],
+  'habitacion': [
+    { name: 'Tender cama', frequency: 'diaria', enabled: true, estimatedMinutes: 5 },
+    { name: 'Barrer/Aspirar', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
+    { name: 'Trapear', frequency: 'semanal', enabled: true, estimatedMinutes: 10 },
+    { name: 'Sacudir muebles', frequency: 'semanal', enabled: true, estimatedMinutes: 10 },
+    { name: 'Cambiar sábanas', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
+    { name: 'Organizar closet', frequency: 'mensual', enabled: false, estimatedMinutes: 60 },
+  ],
+  'baño': [
+    { name: 'Limpiar sanitario', frequency: 'diaria', enabled: true, estimatedMinutes: 10 },
+    { name: 'Limpiar lavamanos', frequency: 'diaria', enabled: true, estimatedMinutes: 5 },
+    { name: 'Limpiar espejo', frequency: 'semanal', enabled: true, estimatedMinutes: 5 },
+    { name: 'Limpiar ducha', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
+    { name: 'Trapear', frequency: 'semanal', enabled: true, estimatedMinutes: 10 },
+    { name: 'Cambiar toallas', frequency: 'semanal', enabled: true, estimatedMinutes: 5 },
+    { name: 'Desinfección profunda', frequency: 'quincenal', enabled: true, estimatedMinutes: 30 },
+  ],
+  'comedor': [
+    { name: 'Limpiar mesa', frequency: 'diaria', enabled: true, estimatedMinutes: 5 },
+    { name: 'Limpiar sillas', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
+    { name: 'Barrer', frequency: 'semanal', enabled: true, estimatedMinutes: 10 },
+    { name: 'Trapear', frequency: 'semanal', enabled: true, estimatedMinutes: 10 },
+  ],
+  'estudio': [
+    { name: 'Organizar escritorio', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
+    { name: 'Barrer/Aspirar', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
+    { name: 'Sacudir muebles', frequency: 'semanal', enabled: true, estimatedMinutes: 10 },
+    { name: 'Limpiar computador', frequency: 'quincenal', enabled: true, estimatedMinutes: 15 },
+  ],
+  'lavanderia': [
+    { name: 'Lavar ropa blanca', frequency: 'semanal', enabled: true, estimatedMinutes: 60 },
+    { name: 'Lavar ropa de color', frequency: 'semanal', enabled: true, estimatedMinutes: 60 },
+    { name: 'Planchar', frequency: 'semanal', enabled: true, estimatedMinutes: 90 },
+    { name: 'Limpiar lavadora', frequency: 'quincenal', enabled: true, estimatedMinutes: 20 },
+    { name: 'Organizar productos', frequency: 'mensual', enabled: false, estimatedMinutes: 20 },
+  ],
+  'jardin': [
+    { name: 'Regar plantas', frequency: 'diaria', enabled: true, estimatedMinutes: 20 },
+    { name: 'Podar plantas', frequency: 'semanal', enabled: true, estimatedMinutes: 30 },
+    { name: 'Recoger hojas', frequency: 'semanal', enabled: true, estimatedMinutes: 20 },
+    { name: 'Cortar césped', frequency: 'quincenal', enabled: true, estimatedMinutes: 60 },
+    { name: 'Fertilizar', frequency: 'mensual', enabled: true, estimatedMinutes: 30 },
+    { name: 'Fumigar', frequency: 'mensual', enabled: false, estimatedMinutes: 45 },
+  ],
+  'piscina': [
+    { name: 'Verificar químicos', frequency: 'diaria', enabled: true, estimatedMinutes: 10 },
+    { name: 'Limpiar superficie', frequency: 'diaria', enabled: true, estimatedMinutes: 15 },
+    { name: 'Aspirar fondo', frequency: 'semanal', enabled: true, estimatedMinutes: 45 },
+    { name: 'Limpiar filtros', frequency: 'semanal', enabled: true, estimatedMinutes: 20 },
+    { name: 'Limpiar bordes', frequency: 'semanal', enabled: true, estimatedMinutes: 20 },
+    { name: 'Mantenimiento bomba', frequency: 'mensual', enabled: true, estimatedMinutes: 30 },
+  ],
+  'terraza': [
+    { name: 'Barrer', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
+    { name: 'Limpiar muebles', frequency: 'semanal', enabled: true, estimatedMinutes: 20 },
+    { name: 'Regar plantas', frequency: 'diaria', enabled: true, estimatedMinutes: 10 },
+    { name: 'Lavar piso', frequency: 'quincenal', enabled: true, estimatedMinutes: 30 },
+  ],
+  'garaje': [
+    { name: 'Barrer', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
+    { name: 'Organizar', frequency: 'mensual', enabled: true, estimatedMinutes: 60 },
+    { name: 'Limpiar manchas', frequency: 'mensual', enabled: false, estimatedMinutes: 30 },
+  ],
+  'patio': [
+    { name: 'Barrer', frequency: 'semanal', enabled: true, estimatedMinutes: 20 },
+    { name: 'Recoger basura', frequency: 'semanal', enabled: true, estimatedMinutes: 10 },
+    { name: 'Lavar piso', frequency: 'quincenal', enabled: true, estimatedMinutes: 30 },
+  ],
+};
+
+const FREQUENCIES = [
+  { value: 'diaria', label: 'Diaria', color: 'red' },
+  { value: 'semanal', label: 'Semanal', color: 'blue' },
+  { value: 'quincenal', label: 'Quincenal', color: 'green' },
+  { value: 'mensual', label: 'Mensual', color: 'gray' },
+];
 
 export default function SpacesPanel({
   householdId,
@@ -34,6 +141,8 @@ export default function SpacesPanel({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<'interior' | 'exterior'>('interior');
+  const [showTasks, setShowTasks] = useState(true);
+  const [newTaskName, setNewTaskName] = useState('');
 
   useEffect(() => {
     loadSpaceTypes();
@@ -47,29 +156,79 @@ export default function SpacesPanel({
     if (data) setSpaceTypes(data);
   };
 
+  const loadSpaceTasks = async (spaceId: string): Promise<TaskConfig[]> => {
+    const { data } = await supabase
+      .from('task_templates')
+      .select('*')
+      .eq('space_id', spaceId);
+
+    if (data && data.length > 0) {
+      return data.map(t => ({
+        id: t.id,
+        name: t.name,
+        frequency: t.frequency as TaskConfig['frequency'],
+        enabled: t.is_active,
+        estimatedMinutes: t.estimated_minutes,
+        isCustom: false
+      }));
+    }
+
+    return [];
+  };
+
+  const getDefaultTasksForType = (typeName: string): TaskConfig[] => {
+    const normalizedName = typeName.toLowerCase();
+
+    for (const [key, tasks] of Object.entries(DEFAULT_TASKS)) {
+      if (normalizedName.includes(key)) {
+        return tasks.map(t => ({ ...t }));
+      }
+    }
+
+    // Tareas genéricas
+    return [
+      { name: 'Barrer/Aspirar', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
+      { name: 'Trapear', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
+      { name: 'Limpiar polvo', frequency: 'semanal', enabled: true, estimatedMinutes: 10 },
+    ];
+  };
+
   const interiorSpaces = spaces.filter(s => s.category === 'interior');
   const exteriorSpaces = spaces.filter(s => s.category === 'exterior');
   const interiorTypes = spaceTypes.filter(st => st.category === 'interior');
   const exteriorTypes = spaceTypes.filter(st => st.category === 'exterior');
 
-  const startNew = (category: 'interior' | 'exterior') => {
+  const startNew = async (category: 'interior' | 'exterior') => {
     const types = category === 'interior' ? interiorTypes : exteriorTypes;
+    const selectedType = types[0];
+    const defaultTasks = selectedType ? getDefaultTasksForType(selectedType.name) : [];
+
     setEditingSpace({
-      spaceTypeId: types[0]?.id || '',
+      spaceTypeId: selectedType?.id || '',
       customName: '',
       category,
-      usageLevel: 'medio'
+      usageLevel: 'medio',
+      tasks: defaultTasks
     });
     setShowForm(true);
   };
 
-  const startEdit = (space: Space) => {
+  const startEdit = async (space: Space) => {
+    // Cargar tareas existentes del espacio
+    const existingTasks = await loadSpaceTasks(space.id);
+
+    // Si no hay tareas, usar las predeterminadas
+    const tasks = existingTasks.length > 0
+      ? existingTasks
+      : getDefaultTasksForType(space.space_type?.name || '');
+
     setEditingSpace({
       id: space.id,
       spaceTypeId: space.space_type_id || '',
       customName: space.custom_name || '',
       category: space.category,
-      usageLevel: space.usage_level
+      usageLevel: space.usage_level,
+      tasks
     });
     setActiveCategory(space.category);
     setShowForm(true);
@@ -78,6 +237,53 @@ export default function SpacesPanel({
   const cancelForm = () => {
     setEditingSpace(null);
     setShowForm(false);
+    setNewTaskName('');
+  };
+
+  const updateSpaceType = (typeId: string) => {
+    if (!editingSpace) return;
+
+    const selectedType = spaceTypes.find(st => st.id === typeId);
+    const newTasks = selectedType ? getDefaultTasksForType(selectedType.name) : [];
+
+    setEditingSpace({
+      ...editingSpace,
+      spaceTypeId: typeId,
+      tasks: newTasks
+    });
+  };
+
+  const toggleTask = (index: number) => {
+    if (!editingSpace) return;
+    const tasks = [...editingSpace.tasks];
+    tasks[index] = { ...tasks[index], enabled: !tasks[index].enabled };
+    setEditingSpace({ ...editingSpace, tasks });
+  };
+
+  const updateTaskFrequency = (index: number, frequency: TaskConfig['frequency']) => {
+    if (!editingSpace) return;
+    const tasks = [...editingSpace.tasks];
+    tasks[index] = { ...tasks[index], frequency };
+    setEditingSpace({ ...editingSpace, tasks });
+  };
+
+  const removeTask = (index: number) => {
+    if (!editingSpace) return;
+    const tasks = editingSpace.tasks.filter((_, i) => i !== index);
+    setEditingSpace({ ...editingSpace, tasks });
+  };
+
+  const addCustomTask = () => {
+    if (!editingSpace || !newTaskName.trim()) return;
+    const tasks = [...editingSpace.tasks, {
+      name: newTaskName.trim(),
+      frequency: 'semanal' as const,
+      enabled: true,
+      estimatedMinutes: 15,
+      isCustom: true
+    }];
+    setEditingSpace({ ...editingSpace, tasks });
+    setNewTaskName('');
   };
 
   const saveSpace = async () => {
@@ -85,7 +291,7 @@ export default function SpacesPanel({
 
     setSaving(true);
     try {
-      const data = {
+      const spaceData = {
         household_id: householdId,
         space_type_id: editingSpace.spaceTypeId,
         custom_name: editingSpace.customName.trim() || null,
@@ -93,48 +299,70 @@ export default function SpacesPanel({
         usage_level: editingSpace.usageLevel
       };
 
+      let spaceId = editingSpace.id;
+
       if (editingSpace.id) {
-        await supabase
+        const { error } = await supabase
           .from('spaces')
-          .update(data)
+          .update(spaceData)
           .eq('id', editingSpace.id);
+        if (error) throw error;
       } else {
-        await supabase
+        const { data, error } = await supabase
           .from('spaces')
-          .insert(data);
+          .insert(spaceData)
+          .select('id')
+          .single();
+        if (error) throw error;
+        spaceId = data.id;
+      }
+
+      // Guardar tareas
+      if (spaceId) {
+        // Eliminar tareas existentes
+        await supabase
+          .from('task_templates')
+          .delete()
+          .eq('space_id', spaceId);
+
+        // Insertar nuevas tareas (solo las habilitadas)
+        const tasksToInsert = editingSpace.tasks
+          .filter(t => t.enabled)
+          .map(t => ({
+            household_id: householdId,
+            space_id: spaceId,
+            name: t.name,
+            frequency: t.frequency,
+            estimated_minutes: t.estimatedMinutes,
+            priority: 'normal',
+            is_active: true
+          }));
+
+        if (tasksToInsert.length > 0) {
+          await supabase
+            .from('task_templates')
+            .insert(tasksToInsert);
+        }
       }
 
       onUpdate();
       cancelForm();
     } catch (error) {
       console.error('Error saving space:', error);
+      alert('Error al guardar el espacio');
     } finally {
       setSaving(false);
     }
   };
 
   const deleteSpace = async (id: string) => {
-    if (!confirm('¿Estás seguro de eliminar este espacio? También se eliminarán las tareas asociadas.')) return;
+    if (!confirm('¿Eliminar este espacio y todas sus tareas?')) return;
 
     setDeleting(id);
     try {
-      // Eliminar tareas asociadas primero
-      await supabase
-        .from('task_templates')
-        .delete()
-        .eq('space_id', id);
-
-      await supabase
-        .from('scheduled_tasks')
-        .delete()
-        .eq('space_id', id);
-
-      // Luego eliminar el espacio
-      await supabase
-        .from('spaces')
-        .delete()
-        .eq('id', id);
-
+      await supabase.from('scheduled_tasks').delete().eq('space_id', id);
+      await supabase.from('task_templates').delete().eq('space_id', id);
+      await supabase.from('spaces').delete().eq('id', id);
       onUpdate();
     } catch (error) {
       console.error('Error deleting space:', error);
@@ -146,6 +374,8 @@ export default function SpacesPanel({
   const getSelectedSpaceType = () => {
     return spaceTypes.find(st => st.id === editingSpace?.spaceTypeId);
   };
+
+  const enabledTasksCount = editingSpace?.tasks.filter(t => t.enabled).length || 0;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-8 pb-24 overflow-y-auto">
@@ -262,12 +492,12 @@ export default function SpacesPanel({
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Tipo de espacio
                 </label>
-                <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                <div className="grid grid-cols-4 gap-2 max-h-32 overflow-y-auto">
                   {(editingSpace.category === 'interior' ? interiorTypes : exteriorTypes).map(type => (
                     <button
                       key={type.id}
-                      onClick={() => setEditingSpace({ ...editingSpace, spaceTypeId: type.id })}
-                      className={`p-3 rounded-xl text-center transition-colors ${
+                      onClick={() => updateSpaceType(type.id)}
+                      className={`p-2 rounded-xl text-center transition-colors ${
                         editingSpace.spaceTypeId === type.id
                           ? editingSpace.category === 'interior'
                             ? 'bg-blue-100 border-2 border-blue-600'
@@ -275,8 +505,8 @@ export default function SpacesPanel({
                           : 'bg-gray-50 border-2 border-transparent'
                       }`}
                     >
-                      <div className="text-2xl mb-1">{type.icon}</div>
-                      <div className="text-xs font-medium">{type.name}</div>
+                      <div className="text-xl">{type.icon}</div>
+                      <div className="text-[10px] font-medium truncate">{type.name}</div>
                     </button>
                   ))}
                 </div>
@@ -291,7 +521,7 @@ export default function SpacesPanel({
                   type="text"
                   value={editingSpace.customName}
                   onChange={(e) => setEditingSpace({ ...editingSpace, customName: e.target.value })}
-                  placeholder={`Ej: ${getSelectedSpaceType()?.name || 'Mi espacio'} principal`}
+                  placeholder={`Ej: ${getSelectedSpaceType()?.name || ''} principal`}
                   className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -299,13 +529,13 @@ export default function SpacesPanel({
               {/* Usage Level */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nivel de uso (define frecuencia de limpieza)
+                  Nivel de uso
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { value: 'alto', label: '🔥 Alto', desc: 'Limpieza frecuente' },
-                    { value: 'medio', label: '⚡ Medio', desc: 'Limpieza regular' },
-                    { value: 'bajo', label: '💤 Bajo', desc: 'Limpieza ocasional' }
+                    { value: 'alto', label: '🔥 Alto' },
+                    { value: 'medio', label: '⚡ Medio' },
+                    { value: 'bajo', label: '💤 Bajo' }
                   ].map(option => (
                     <button
                       key={option.value}
@@ -313,19 +543,106 @@ export default function SpacesPanel({
                         ...editingSpace,
                         usageLevel: option.value as 'alto' | 'medio' | 'bajo'
                       })}
-                      className={`p-3 rounded-xl text-center transition-colors ${
+                      className={`py-2 rounded-xl text-sm font-medium transition-colors ${
                         editingSpace.usageLevel === option.value
                           ? 'bg-blue-600 text-white'
                           : 'bg-gray-100 text-gray-700'
                       }`}
                     >
-                      <div className="text-lg">{option.label.split(' ')[0]}</div>
-                      <div className="text-xs mt-1">
-                        {editingSpace.usageLevel === option.value ? option.desc : option.label.split(' ')[1]}
-                      </div>
+                      {option.label}
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Tasks Section */}
+              <div>
+                <button
+                  onClick={() => setShowTasks(!showTasks)}
+                  className="w-full flex items-center justify-between text-sm font-medium text-gray-700 mb-2"
+                >
+                  <span className="flex items-center gap-2">
+                    <Clock size={16} />
+                    Tareas de limpieza ({enabledTasksCount} activas)
+                  </span>
+                  {showTasks ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </button>
+
+                {showTasks && (
+                  <div className="border rounded-xl overflow-hidden">
+                    <div className="max-h-60 overflow-y-auto divide-y">
+                      {editingSpace.tasks.map((task, index) => (
+                        <div
+                          key={index}
+                          className={`p-3 ${task.enabled ? 'bg-white' : 'bg-gray-50'}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => toggleTask(index)}
+                              className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                                task.enabled
+                                  ? 'bg-blue-600 border-blue-600'
+                                  : 'border-gray-300'
+                              }`}
+                            >
+                              {task.enabled && <Check size={12} className="text-white" />}
+                            </button>
+                            <span className={`flex-1 text-sm ${!task.enabled && 'text-gray-400'}`}>
+                              {task.name}
+                            </span>
+                            {task.isCustom && (
+                              <button
+                                onClick={() => removeTask(index)}
+                                className="p-1 text-red-500 hover:bg-red-50 rounded"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                          {task.enabled && (
+                            <div className="flex gap-1 mt-2 ml-7">
+                              {FREQUENCIES.map(freq => (
+                                <button
+                                  key={freq.value}
+                                  onClick={() => updateTaskFrequency(index, freq.value as TaskConfig['frequency'])}
+                                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                                    task.frequency === freq.value
+                                      ? freq.color === 'red' ? 'bg-red-100 text-red-700' :
+                                        freq.color === 'blue' ? 'bg-blue-100 text-blue-700' :
+                                        freq.color === 'green' ? 'bg-green-100 text-green-700' :
+                                        'bg-gray-200 text-gray-700'
+                                      : 'bg-gray-100 text-gray-500'
+                                  }`}
+                                >
+                                  {freq.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Add custom task */}
+                    <div className="p-3 bg-gray-50 border-t flex gap-2">
+                      <input
+                        type="text"
+                        value={newTaskName}
+                        onChange={(e) => setNewTaskName(e.target.value)}
+                        placeholder="Nueva tarea..."
+                        className="flex-1 px-3 py-2 border rounded-lg text-sm"
+                        onKeyDown={(e) => e.key === 'Enter' && addCustomTask()}
+                      />
+                      <button
+                        onClick={addCustomTask}
+                        disabled={!newTaskName.trim()}
+                        className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm disabled:opacity-50"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Buttons */}
@@ -354,7 +671,7 @@ export default function SpacesPanel({
             </div>
           )}
 
-          {/* Close button when not in form */}
+          {/* Close button */}
           {!showForm && (
             <button
               onClick={onClose}
