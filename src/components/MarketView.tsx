@@ -667,7 +667,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
       {/* Floating Add Button */}
       <button
         onClick={() => setShowAddModal(true)}
-        className="fixed bottom-24 left-5 bg-purple-600 text-white p-4 rounded-full font-semibold shadow-lg flex items-center gap-2 hover:bg-purple-700 transition-colors z-40"
+        className="fixed bottom-40 left-5 bg-purple-600 text-white p-4 rounded-full font-semibold shadow-lg flex items-center gap-2 hover:bg-purple-700 transition-colors z-40"
         aria-label="Agregar item personalizado"
       >
         <Sparkles size={22} />

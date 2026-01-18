@@ -56,10 +56,10 @@ function NavItem({ icon, label, active, onClick, badge, activeColor, activeBg }:
 
 // Tabs secundarios del Recetario
 const RECETARIO_TABS: { id: RecetarioTab; label: string; icon: React.ReactNode }[] = [
-  { id: 'calendar', label: 'Calendario', icon: <Calendar size={16} /> },
-  { id: 'market', label: 'Mercado', icon: <ShoppingCart size={16} /> },
-  { id: 'recipes', label: 'Recetas', icon: <BookOpen size={16} /> },
-  { id: 'suggestions', label: 'Sugerencias', icon: <Lightbulb size={16} /> },
+  { id: 'calendar', label: 'Calendario', icon: <Calendar size={20} /> },
+  { id: 'market', label: 'Mercado', icon: <ShoppingCart size={20} /> },
+  { id: 'recipes', label: 'Recetas', icon: <BookOpen size={20} /> },
+  { id: 'suggestions', label: 'Sugerencias', icon: <Lightbulb size={20} /> },
 ];
 
 export default function BottomNavigation({
@@ -88,7 +88,7 @@ export default function BottomNavigation({
                   key={tab.id}
                   onClick={() => onRecetarioTabChange(tab.id)}
                   className={`
-                    flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2
+                    flex-1 flex items-center justify-center gap-2 py-3.5 px-2
                     transition-all duration-200 relative
                     ${isActive
                       ? 'text-green-700 bg-white'
