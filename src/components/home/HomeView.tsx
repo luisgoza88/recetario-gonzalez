@@ -8,6 +8,9 @@ import {
 import { supabase } from '@/lib/supabase/client';
 import { Household, Space, HomeEmployee, ScheduledTask, TaskTemplate } from '@/types';
 import HomeSetupWizard from './HomeSetupWizard';
+import EmployeesPanel from './EmployeesPanel';
+import SpacesPanel from './SpacesPanel';
+import ScheduleGenerator from './ScheduleGenerator';
 
 interface HomeViewProps {
   initialHouseholdId?: string;
@@ -21,6 +24,9 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
   const [todayTasks, setTodayTasks] = useState<ScheduledTask[]>([]);
   const [pendingTasks, setPendingTasks] = useState<number>(0);
   const [showSetup, setShowSetup] = useState(false);
+  const [showEmployeesPanel, setShowEmployeesPanel] = useState(false);
+  const [showSpacesPanel, setShowSpacesPanel] = useState(false);
+  const [showScheduleGenerator, setShowScheduleGenerator] = useState(false);
 
   useEffect(() => {
     loadHousehold();
@@ -244,7 +250,10 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
         <div className="bg-white rounded-xl p-6 shadow-sm mb-4 text-center">
           <div className="text-4xl mb-2">✨</div>
           <p className="text-gray-600">No hay tareas programadas para hoy</p>
-          <button className="mt-3 text-blue-600 text-sm font-medium flex items-center gap-1 mx-auto">
+          <button
+            onClick={() => setShowScheduleGenerator(true)}
+            className="mt-3 bg-purple-600 text-white px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 mx-auto hover:bg-purple-700"
+          >
             <Plus size={16} />
             Generar programación
           </button>
@@ -274,15 +283,26 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
       </div>
 
       {/* Employees */}
-      {employees.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm mb-4 overflow-hidden">
-          <div className="px-4 py-3 border-b flex items-center justify-between">
-            <span className="font-semibold flex items-center gap-2">
-              <User size={18} className="text-gray-600" />
-              Empleados
-            </span>
+      <div className="bg-white rounded-xl shadow-sm mb-4 overflow-hidden">
+        <button
+          onClick={() => setShowEmployeesPanel(true)}
+          className="w-full px-4 py-3 border-b flex items-center justify-between hover:bg-gray-50 transition-colors"
+        >
+          <span className="font-semibold flex items-center gap-2">
+            <User size={18} className="text-gray-600" />
+            Empleados
+            {employees.length > 0 && (
+              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                {employees.length}
+              </span>
+            )}
+          </span>
+          <div className="flex items-center gap-2">
+            <Plus size={16} className="text-blue-600" />
             <ChevronRight size={18} className="text-gray-400" />
           </div>
+        </button>
+        {employees.length > 0 && (
           <div className="divide-y">
             {employees.map(emp => (
               <div key={emp.id} className="p-4 flex items-center gap-3">
@@ -308,15 +328,26 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Spaces Overview */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="px-4 py-3 border-b flex items-center justify-between">
-          <span className="font-semibold">Espacios del Hogar</span>
-          <ChevronRight size={18} className="text-gray-400" />
-        </div>
+        <button
+          onClick={() => setShowSpacesPanel(true)}
+          className="w-full px-4 py-3 border-b flex items-center justify-between hover:bg-gray-50 transition-colors"
+        >
+          <span className="font-semibold flex items-center gap-2">
+            Espacios del Hogar
+            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+              {spaces.length}
+            </span>
+          </span>
+          <div className="flex items-center gap-2">
+            <Plus size={16} className="text-blue-600" />
+            <ChevronRight size={18} className="text-gray-400" />
+          </div>
+        </button>
         <div className="p-4">
           <div className="flex flex-wrap gap-2">
             {spaces.slice(0, 8).map(space => (
@@ -338,6 +369,35 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
           </div>
         </div>
       </div>
+
+      {/* Panels */}
+      {showEmployeesPanel && household && (
+        <EmployeesPanel
+          householdId={household.id}
+          employees={employees}
+          onClose={() => setShowEmployeesPanel(false)}
+          onUpdate={() => loadHouseholdData(household.id)}
+        />
+      )}
+
+      {showSpacesPanel && household && (
+        <SpacesPanel
+          householdId={household.id}
+          spaces={spaces}
+          onClose={() => setShowSpacesPanel(false)}
+          onUpdate={() => loadHouseholdData(household.id)}
+        />
+      )}
+
+      {showScheduleGenerator && household && (
+        <ScheduleGenerator
+          householdId={household.id}
+          spaces={spaces}
+          employees={employees}
+          onClose={() => setShowScheduleGenerator(false)}
+          onComplete={() => loadHouseholdData(household.id)}
+        />
+      )}
     </div>
   );
 }

@@ -83,61 +83,68 @@ OPENAI_API_KEY=...
 
 ---
 
-## PROBLEMAS CONOCIDOS (Enero 2025)
+## MEJORAS IMPLEMENTADAS (Enero 2025)
 
-### 1. Matching de Ingredientes NO Funciona Bien
+### 1. Sistema de Matching de Ingredientes MEJORADO
 **Archivo**: `src/lib/inventory-check.ts`
 
-**Problema**: La función `findInventoryMatch()` usa comparación parcial simple:
-```typescript
-// Actual: falla cuando nombres son similares pero no idénticos
-normalizedItem.includes(normalizedIngredient) ||
-normalizedIngredient.includes(normalizedItem)
-```
+El algoritmo ahora usa 4 pasos de búsqueda:
+1. **Coincidencia exacta** en inventario
+2. **Búsqueda en aliases** desde tabla `ingredient_aliases`
+3. **Coincidencia parcial** (uno contiene al otro)
+4. **Fuzzy matching** por palabras clave (>=4 caracteres)
 
-**Casos que FALLAN**:
-- "Jamón en cubos" (receta) vs "Jamón de pierna" (inventario) → NO MATCH
-- "Hogao + Aguacate" (receta) → NO se separa en componentes
-- "Queso cuajada" vs "Queso costeño/cuajada" → FALLA
+**Nuevas tablas creadas**:
+- `ingredient_aliases` (51+ registros): Mapea nombres de recetas a items del mercado
+  - "Jamón en cubos" → "Jamón de pierna"
+  - "Queso rallado" → "Queso mozzarella"
+  - "Huevos revueltos" → "Huevos"
+- `preparations` (17 registros): Define preparaciones caseras
+  - "Hogao" → ["Tomate", "Cebolla", "Ajo", "Aceite"]
+  - "Chimichurri" → ["Perejil", "Ajo", "Aceite", "Vinagre"]
+  - "Guacamole" → ["Aguacate", "Tomate", "Cebolla", "Limón", "Cilantro"]
 
-### 2. Ingredientes Compuestos
-Las recetas usan ingredientes como `"Hogao + Aguacate"` pero:
-- El sistema no separa por "+"
-- "Hogao" es una preparación, no un item de mercado
+**Ingredientes compuestos**: Ahora se separan por "+" automáticamente
+- "Hogao + Aguacate" → se verifica ["Hogao", "Aguacate"] por separado
 
-### 3. Preparaciones vs Items de Mercado
-No hay distinción entre:
-- **Items comprables**: aguacate, queso, jamón
-- **Preparaciones**: hogao (tomate+cebolla+ajo), chimichurri, salsa criolla
+### 2. Preparaciones vs Items de Mercado RESUELTO
+- Las preparaciones se reconocen automáticamente
+- Se verifica que al menos 70% de los ingredientes de la preparación estén disponibles
+- Si están disponibles, la preparación cuenta como "disponible"
 
-### 4. Sistema de Feedback Sin Usar
-Las tablas `meal_feedback` y `adjustment_suggestions` están vacías.
-El sistema de aprendizaje automático no está funcionando.
+### 3. Sistema de IA MEJORADO
+**Archivo**: `src/app/api/generate-recipe/route.ts`
+
+Mejoras implementadas:
+- **Contexto de preparaciones**: La IA conoce qué preparaciones caseras están disponibles
+- **Historial de recetas**: Evita sugerir recetas consumidas recientemente
+- **Contexto familiar**: Conoce las preferencias de Luis (porciones grandes) y Mariana (porciones ligeras)
+- **Campo usedPreparations**: Las recetas generadas indican qué preparaciones caseras usan
+
+### 4. Sistema de Feedback ACTIVO
+- **Badge de notificación**: Muestra número de sugerencias pendientes en la navegación
+- **Guardado de recipe_name**: Permite al sistema de IA evitar repetición
+- **SuggestionsPanel**: Panel completo para ver y aplicar sugerencias de ajustes
+
+### 5. Cache Inteligente
+- Aliases y preparaciones se cachean en memoria para evitar queries repetidas
+- Función `clearInventoryCache()` para limpiar cache cuando se actualizan datos
 
 ---
 
-## MEJORAS PENDIENTES
+## Tablas de Base de Datos (Actualizado)
 
-### Prioridad 1: Arreglar Matching de Ingredientes
-1. Crear tabla `ingredient_aliases` con sinónimos
-2. Separar ingredientes compuestos por "+"
-3. Crear tabla `preparations` que mapee a ingredientes base
-4. Implementar fuzzy matching (distancia Levenshtein)
-
-### Prioridad 2: Normalizar Datos
-1. Unificar nombres de ingredientes (recetas ↔ mercado)
-2. Normalizar unidades de medida
-3. Crear mapeo: "Jamón en cubos" = "Jamón de pierna"
-
-### Prioridad 3: Activar Sistema de Feedback
-1. Promover uso del FeedbackModal
-2. Generar sugerencias automáticas basadas en feedback
-3. Ajustar porciones según historial
-
-### Prioridad 4: Mejorar IA
-1. Incluir contexto de preparaciones disponibles
-2. Usar historial de comidas para evitar repetición
-3. Considerar preferencias y restricciones
+| Tabla | Registros | Propósito |
+|-------|-----------|-----------|
+| `recipes` | 28 | Recetas con ingredientes JSONB |
+| `day_menu` | 12 | Menú rotativo (día → recetas) |
+| `market_items` | 82 | Items de compra base |
+| `inventory` | ~70 | Stock actual (item_id, current_number) |
+| `market_checklist` | ~68 | Estado de compra (checked) |
+| `ingredient_aliases` | 51+ | Sinónimos de ingredientes |
+| `preparations` | 17 | Preparaciones caseras (hogao, guacamole, etc.) |
+| `meal_feedback` | variable | Feedback de comidas |
+| `adjustment_suggestions` | variable | Sugerencias automáticas |
 
 ---
 

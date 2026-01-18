@@ -48,6 +48,7 @@ export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved
           date,
           meal_type: mealType,
           recipe_id: recipe.id,
+          recipe_name: recipe.name, // Guardar nombre para historial de IA
           portion_rating: portionRating,
           leftover_rating: leftoverRating,
           missing_ingredients: missingIngredients.length > 0 ? missingIngredients : null,
