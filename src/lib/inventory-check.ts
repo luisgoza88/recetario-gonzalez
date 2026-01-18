@@ -325,9 +325,13 @@ export async function checkRecipeIngredients(
   const missingIngredients: IngredientStatus[] = [];
   const availableIngredients: IngredientStatus[] = [];
 
+  console.log(`[CHECK-RECIPE] Checking recipe: ${recipe.name}`);
+
   for (const ing of ingredients) {
     const requiredQty = ing.total || ing.luis || '1';
     const requiredNum = extractNumber(requiredQty);
+
+    console.log(`[INGREDIENT-CHECK] "${ing.name}" requires "${requiredQty}" (parsed: ${requiredNum})`);
 
     // Separar ingredientes compuestos
     const subIngredients = splitCompoundIngredient(ing.name);
@@ -341,18 +345,36 @@ export async function checkRecipeIngredients(
       if (isPrep) {
         totalAvailable += 1;
         matchedItems.push(`${subIng} (preparación)`);
+        console.log(`[PREP-FOUND] "${subIng}" is available as preparation`);
       } else {
         // Buscar en inventario
         const inventoryMatch = await findInventoryMatch(subIng, inventory);
-        if (inventoryMatch && inventoryMatch.number > 0) {
-          totalAvailable += inventoryMatch.number;
-          matchedItems.push(inventoryMatch.itemName);
+        if (inventoryMatch) {
+          console.log(`[INV-MATCH] "${subIng}" found → ${inventoryMatch.itemName} (number: ${inventoryMatch.number}, qty: ${inventoryMatch.quantity})`);
+          if (inventoryMatch.number > 0) {
+            totalAvailable += inventoryMatch.number;
+            matchedItems.push(inventoryMatch.itemName);
+          } else {
+            console.log(`[INV-ZERO] "${subIng}" matched but has 0 stock`);
+          }
+        } else {
+          console.log(`[INV-NO-MATCH] "${subIng}" not found in inventory`);
         }
       }
     }
 
-    const hasEnough = totalAvailable > 0 && totalAvailable >= requiredNum * 0.5;
-    const percentAvailable = requiredNum > 0 ? Math.min(100, (totalAvailable / requiredNum) * 100) : 100;
+    // FIXED: Simplified availability check
+    // The old logic failed because units are inconsistent:
+    // - Inventory has current_number like 5 (meaning "5 kg" or "5 units")
+    // - Recipe requests like "280g" which extracts to 280
+    // This caused 5 >= 140 = false, even though we clearly have enough beef!
+    //
+    // NEW LOGIC: If we found the ingredient and it has stock > 0, it's available
+    // The actual quantity check is not meaningful with mixed units
+    const hasEnough = totalAvailable > 0;
+    console.log(`[HAS-ENOUGH] "${ing.name}": totalAvailable=${totalAvailable}, hasEnough=${hasEnough} (simplified check)`);
+    // Simplified percent: 100% if we have stock, 0% if not
+    const percentAvailable = hasEnough ? 100 : 0;
 
     const status: IngredientStatus = {
       name: ing.name,
