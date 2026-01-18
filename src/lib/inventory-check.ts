@@ -208,6 +208,7 @@ async function findInventoryMatch(
   }
 
   // 3. Buscar coincidencia parcial (uno contiene al otro)
+  console.log(`[STEP-3] Checking partial matches for "${normalizedIngredient}"`);
   for (const [itemName, data] of inventory.entries()) {
     const normalizedItem = normalizeIngredient(itemName);
 
@@ -215,11 +216,14 @@ async function findInventoryMatch(
       normalizedItem.includes(normalizedIngredient) ||
       normalizedIngredient.includes(normalizedItem)
     ) {
+      console.log(`[MATCH-PARTIAL] "${ingredientName}" → "${itemName}" (qty: ${data.number})`);
       return data;
     }
   }
+  console.log(`[STEP-3] No partial match found`);
 
   // 4. Fuzzy matching - buscar palabras clave
+  console.log(`[STEP-4] Checking fuzzy matches for words: ${normalizedIngredient.split(' ').join(', ')}`);
   const ingredientWords = normalizedIngredient.split(' ');
   for (const [itemName, data] of inventory.entries()) {
     const normalizedItem = normalizeIngredient(itemName);
@@ -233,7 +237,7 @@ async function findInventoryMatch(
     }
   }
 
-  console.log(`[NO-MATCH] "${ingredientName}" - no match found`);
+  console.log(`[NO-MATCH] "${ingredientName}" - no match found after all 4 steps`);
   return null;
 }
 
