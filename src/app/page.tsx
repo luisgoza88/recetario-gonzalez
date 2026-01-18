@@ -7,14 +7,16 @@ import BottomNavigation from '@/components/navigation/BottomNavigation';
 import RecetarioSection from '@/components/sections/RecetarioSection';
 import HomeView from '@/components/home/HomeView';
 import AIChat from '@/components/sections/AIChat';
+import TodayDashboard from '@/components/sections/TodayDashboard';
 import SettingsView from '@/components/sections/SettingsView';
 import { Recipe, MarketItem, MainSection, RecetarioTab } from '@/types';
 import { FABAction } from '@/components/navigation/DynamicFAB';
 
 export default function Home() {
-  // Navegación principal
-  const [activeSection, setActiveSection] = useState<MainSection>('recetario');
+  // Navegación principal - "hoy" como vista por defecto
+  const [activeSection, setActiveSection] = useState<MainSection>('hoy');
   const [recetarioTab, setRecetarioTab] = useState<RecetarioTab>('calendar');
+  const [showSettings, setShowSettings] = useState(false);
 
   // FAB
   const [fabOpen, setFabOpen] = useState(false);
@@ -30,9 +32,10 @@ export default function Home() {
     loadSuggestionsCount();
   }, []);
 
-  // Cerrar FAB cuando cambia la sección
+  // Cerrar FAB y Settings cuando cambia la sección
   useEffect(() => {
     setFabOpen(false);
+    setShowSettings(false);
   }, [activeSection]);
 
   const loadSuggestionsCount = async () => {
@@ -212,8 +215,55 @@ export default function Home() {
     }
   ];
 
+  const getHoyFABActions = (): FABAction[] => [
+    {
+      id: 'go-calendar',
+      icon: <UtensilsCrossed size={20} />,
+      label: 'Ver menú',
+      color: 'bg-green-500',
+      onClick: () => {
+        setFabOpen(false);
+        setActiveSection('recetario');
+        setRecetarioTab('calendar');
+      }
+    },
+    {
+      id: 'go-market',
+      icon: <ShoppingCart size={20} />,
+      label: 'Mercado',
+      color: 'bg-blue-500',
+      onClick: () => {
+        setFabOpen(false);
+        setActiveSection('recetario');
+        setRecetarioTab('market');
+      }
+    },
+    {
+      id: 'go-hogar',
+      icon: <HomeIcon size={20} />,
+      label: 'Tareas hogar',
+      color: 'bg-orange-500',
+      onClick: () => {
+        setFabOpen(false);
+        setActiveSection('hogar');
+      }
+    },
+    {
+      id: 'go-ia',
+      icon: <Sparkles size={20} />,
+      label: 'Asistente IA',
+      color: 'bg-purple-500',
+      onClick: () => {
+        setFabOpen(false);
+        setActiveSection('ia');
+      }
+    }
+  ];
+
   const getFABActions = (): FABAction[] => {
     switch (activeSection) {
+      case 'hoy':
+        return getHoyFABActions();
       case 'recetario':
         return getRecetarioFABActions();
       case 'hogar':
@@ -238,6 +288,30 @@ export default function Home() {
     <div className="min-h-screen bg-gray-100">
       {/* Content - pb-32 para dejar espacio para los tabs secundarios */}
       <main className="pb-32">
+        {activeSection === 'hoy' && !showSettings && (
+          <TodayDashboard
+            onNavigateToRecetario={(tab) => {
+              setActiveSection('recetario');
+              if (tab) setRecetarioTab(tab as RecetarioTab);
+            }}
+            onNavigateToHogar={() => setActiveSection('hogar')}
+            onNavigateToIA={() => setActiveSection('ia')}
+            onNavigateToSettings={() => setShowSettings(true)}
+          />
+        )}
+
+        {showSettings && (
+          <div className="relative">
+            <button
+              onClick={() => setShowSettings(false)}
+              className="fixed top-4 right-4 z-50 bg-white rounded-full p-2 shadow-lg hover:bg-gray-100"
+            >
+              <span className="text-gray-600">✕</span>
+            </button>
+            <SettingsView />
+          </div>
+        )}
+
         {activeSection === 'recetario' && (
           <RecetarioSection
             activeTab={recetarioTab}
@@ -254,11 +328,9 @@ export default function Home() {
         )}
 
         {activeSection === 'ia' && (
-          <AIChat />
-        )}
-
-        {activeSection === 'ajustes' && (
-          <SettingsView />
+          <div className="fixed inset-0 top-0 bottom-[140px] bg-gray-50">
+            <AIChat />
+          </div>
         )}
       </main>
 

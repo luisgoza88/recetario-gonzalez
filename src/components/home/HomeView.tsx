@@ -22,6 +22,8 @@ import CleaningHistory from './CleaningHistory';
 import SuppliesInventory from './SuppliesInventory';
 import InspectionMode from './InspectionMode';
 import MonthlyReport from './MonthlyReport';
+import ScheduleDashboard from './ScheduleDashboard';
+import ScheduleTemplateEditor from './ScheduleTemplateEditor';
 
 interface HomeViewProps {
   initialHouseholdId?: string;
@@ -37,6 +39,7 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
   const [showSetup, setShowSetup] = useState(false);
   const [showEmployeesPanel, setShowEmployeesPanel] = useState(false);
   const [showSpacesPanel, setShowSpacesPanel] = useState(false);
+  const [spacesInitialCategory, setSpacesInitialCategory] = useState<'interior' | 'exterior'>('interior');
   const [showScheduleGenerator, setShowScheduleGenerator] = useState(false);
   const [showOptimizer, setShowOptimizer] = useState(false);
   const [showDailyDashboard, setShowDailyDashboard] = useState(false);
@@ -48,6 +51,8 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
   const [showSupplies, setShowSupplies] = useState(false);
   const [showInspection, setShowInspection] = useState<ScheduledTask | null>(null);
   const [showMonthlyReport, setShowMonthlyReport] = useState(false);
+  const [showScheduleDashboard, setShowScheduleDashboard] = useState(false);
+  const [showScheduleEditor, setShowScheduleEditor] = useState(false);
 
   useEffect(() => {
     loadHousehold();
@@ -281,6 +286,23 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
         </div>
       )}
 
+      {/* Schedule Dashboard - Cronograma 4 Semanas */}
+      <button
+        onClick={() => setShowScheduleDashboard(true)}
+        className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl p-4 shadow-sm mb-4 text-left hover:from-indigo-700 hover:to-purple-700 transition-all"
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Clock size={20} />
+              <span className="font-bold">Horarios del Personal</span>
+            </div>
+            <p className="text-xs text-indigo-100">Cronograma rotativo de 4 semanas - Yolima y John</p>
+          </div>
+          <ChevronRight size={24} className="text-white/70" />
+        </div>
+      </button>
+
       {/* Main Action Buttons */}
       <div className="grid grid-cols-2 gap-3 mb-4">
         <button
@@ -387,10 +409,13 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
         </div>
       </div>
 
-      {/* Quick Stats */}
+      {/* Quick Stats - Espacios */}
       <div className="grid grid-cols-2 gap-3 mb-4">
         <button
-          onClick={() => setShowSpacesPanel(true)}
+          onClick={() => {
+            setSpacesInitialCategory('interior');
+            setShowSpacesPanel(true);
+          }}
           className="bg-white rounded-xl p-4 shadow-sm text-left hover:bg-blue-50 transition-colors active:scale-95"
         >
           <div className="flex items-center gap-2 mb-2">
@@ -402,7 +427,10 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
           <p className="text-sm text-gray-500">Espacios interiores</p>
         </button>
         <button
-          onClick={() => setShowSpacesPanel(true)}
+          onClick={() => {
+            setSpacesInitialCategory('exterior');
+            setShowSpacesPanel(true);
+          }}
           className="bg-white rounded-xl p-4 shadow-sm text-left hover:bg-green-50 transition-colors active:scale-95"
         >
           <div className="flex items-center gap-2 mb-2">
@@ -464,45 +492,6 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
         )}
       </div>
 
-      {/* Spaces Overview */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <button
-          onClick={() => setShowSpacesPanel(true)}
-          className="w-full px-4 py-3 border-b flex items-center justify-between hover:bg-gray-50 transition-colors"
-        >
-          <span className="font-semibold flex items-center gap-2">
-            Espacios del Hogar
-            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-              {spaces.length}
-            </span>
-          </span>
-          <div className="flex items-center gap-2">
-            <Plus size={16} className="text-blue-600" />
-            <ChevronRight size={18} className="text-gray-400" />
-          </div>
-        </button>
-        <div className="p-4">
-          <div className="flex flex-wrap gap-2">
-            {spaces.slice(0, 8).map(space => (
-              <div
-                key={space.id}
-                className={`px-3 py-2 rounded-lg text-sm flex items-center gap-1 ${
-                  space.category === 'interior' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'
-                }`}
-              >
-                <span>{space.space_type?.icon}</span>
-                <span>{space.custom_name || space.space_type?.name}</span>
-              </div>
-            ))}
-            {spaces.length > 8 && (
-              <div className="px-3 py-2 rounded-lg text-sm bg-gray-100 text-gray-600">
-                +{spaces.length - 8} más
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Panels */}
       {showEmployeesPanel && household && (
         <EmployeesPanel
@@ -517,6 +506,7 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
         <SpacesPanel
           householdId={household.id}
           spaces={spaces}
+          initialCategory={spacesInitialCategory}
           onClose={() => setShowSpacesPanel(false)}
           onUpdate={() => loadHouseholdData(household.id)}
         />
@@ -627,6 +617,29 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
           spaces={spaces}
           employees={employees}
           onClose={() => setShowMonthlyReport(false)}
+        />
+      )}
+
+      {showScheduleDashboard && household && (
+        <ScheduleDashboard
+          householdId={household.id}
+          employees={employees}
+          onClose={() => setShowScheduleDashboard(false)}
+          onOpenEditor={() => {
+            setShowScheduleDashboard(false);
+            setShowScheduleEditor(true);
+          }}
+        />
+      )}
+
+      {showScheduleEditor && household && (
+        <ScheduleTemplateEditor
+          householdId={household.id}
+          employees={employees}
+          onClose={() => setShowScheduleEditor(false)}
+          onSave={() => {
+            // Recargar datos después de guardar
+          }}
         />
       )}
     </div>
