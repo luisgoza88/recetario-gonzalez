@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, Plus, Edit2, Trash2 } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, ImageIcon } from 'lucide-react';
 import { Recipe, Ingredient } from '@/types';
 import RecipeModal from './RecipeModal';
 import RecipeForm from './forms/RecipeForm';
@@ -128,33 +128,55 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
         {filteredRecipes.map(recipe => (
           <div
             key={recipe.id}
-            className="bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-shadow"
+            className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden"
           >
-            <div className="flex justify-between items-start">
+            <div className="flex">
+              {/* Thumbnail */}
               <div
-                className="flex-1 cursor-pointer"
+                className="w-24 h-24 flex-shrink-0 cursor-pointer"
                 onClick={() => setSelectedRecipe(recipe)}
               >
-                <h3 className="font-semibold mb-2">{recipe.name}</h3>
-                <span className={`text-xs px-3 py-1 rounded-full ${getTypeClass(recipe.type)}`}>
-                  {getTypeLabel(recipe.type)}
-                </span>
+                {recipe.image_url ? (
+                  <img
+                    src={recipe.image_url}
+                    alt={recipe.name}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-orange-100 to-amber-50 flex items-center justify-center">
+                    <ImageIcon className="w-8 h-8 text-gray-300" />
+                  </div>
+                )}
               </div>
-              <div className="flex gap-2 ml-2">
-                <button
-                  onClick={() => handleEdit(recipe)}
-                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                  title="Editar"
+
+              {/* Content */}
+              <div className="flex-1 p-3 flex justify-between items-start">
+                <div
+                  className="flex-1 cursor-pointer"
+                  onClick={() => setSelectedRecipe(recipe)}
                 >
-                  <Edit2 size={18} />
-                </button>
-                <button
-                  onClick={() => handleDelete(recipe)}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                  title="Eliminar"
-                >
-                  <Trash2 size={18} />
-                </button>
+                  <h3 className="font-semibold mb-2 line-clamp-2">{recipe.name}</h3>
+                  <span className={`text-xs px-3 py-1 rounded-full ${getTypeClass(recipe.type)}`}>
+                    {getTypeLabel(recipe.type)}
+                  </span>
+                </div>
+                <div className="flex gap-1 ml-2">
+                  <button
+                    onClick={() => handleEdit(recipe)}
+                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                    title="Editar"
+                  >
+                    <Edit2 size={18} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(recipe)}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                    title="Eliminar"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Check, Star, MessageSquare, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Star, MessageSquare, Sparkles, WifiOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { Recipe, Ingredient, MealType } from '@/types';
 import RecipeModal from './RecipeModal';
 import FeedbackModal from './FeedbackModal';
 import SmartSuggestions from './SmartSuggestions';
+import { useOnlineStatus } from '@/hooks/useOfflineSync';
+import { cacheDayMenus, getCachedDayMenus } from '@/lib/indexedDB';
 
 interface CalendarViewProps {
   recipes: Recipe[];
@@ -36,6 +38,8 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [feedbackRecipe, setFeedbackRecipe] = useState<{ recipe: Recipe; mealType: MealType } | null>(null);
   const [suggestionsRecipe, setSuggestionsRecipe] = useState<{ recipe: Recipe; mealType: MealType } | null>(null);
+  const [isFromCache, setIsFromCache] = useState(false);
+  const isOnline = useOnlineStatus();
 
   // Define getDayOfCycle before useEffect that uses it
   const getDayOfCycle = useCallback((date: Date): number => {
@@ -69,13 +73,37 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
 
   // Load functions defined before useEffect
   const loadMenu = useCallback(async () => {
-    const { data } = await supabase
-      .from('day_menu')
-      .select('*')
-      .order('day_number');
+    try {
+      // Try to fetch from Supabase first
+      const { data, error } = await supabase
+        .from('day_menu')
+        .select('*')
+        .order('day_number');
 
-    if (data) {
-      setDayMenu(data);
+      if (data && !error) {
+        setDayMenu(data);
+        setIsFromCache(false);
+        // Cache for offline use
+        await cacheDayMenus(data.map(m => ({
+          ...m,
+          cachedAt: Date.now()
+        })));
+        return;
+      }
+    } catch {
+      console.log('Network error, trying cache...');
+    }
+
+    // Fallback to cached data
+    try {
+      const cached = await getCachedDayMenus();
+      if (cached.length > 0) {
+        setDayMenu(cached);
+        setIsFromCache(true);
+        console.log('Using cached menu data');
+      }
+    } catch (cacheError) {
+      console.error('Cache error:', cacheError);
     }
   }, []);
 
@@ -285,8 +313,32 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
           />
         ) : (
           <div className="bg-white border-l-4 border-gray-400 p-4 rounded-b-xl">
-            <div className="text-gray-500 text-sm">🌙 CENA</div>
-            <p className="text-gray-400">No hay cena - Salen a comer</p>
+            <div className="flex justify-between items-start">
+              <div>
+                <div className="text-gray-500 text-sm">🌙 CENA</div>
+                <p className="text-gray-400">No hay cena - Salen a comer</p>
+              </div>
+              <button
+                onClick={() => setSuggestionsRecipe({
+                  recipe: {
+                    id: 'generate-dinner',
+                    name: 'Generar cena',
+                    type: 'dinner',
+                    ingredients: [],
+                    steps: []
+                  },
+                  mealType: 'dinner'
+                })}
+                className="bg-purple-100 text-purple-700 p-2 rounded-lg hover:bg-purple-200 flex items-center gap-2"
+                title="Generar receta de cena con IA"
+              >
+                <Sparkles size={18} />
+                <span className="text-sm font-medium">Generar</span>
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-2">
+              ¿Cambio de planes? Genera una receta de cena con IA
+            </p>
           </div>
         )}
 
@@ -333,6 +385,18 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
           <ChevronRight size={24} />
         </button>
       </div>
+
+      {/* Offline Indicator */}
+      {(!isOnline || isFromCache) && (
+        <div className="bg-orange-50 border border-orange-200 text-orange-700 p-3 rounded-lg mb-4 text-sm flex items-center gap-2">
+          <WifiOff size={16} />
+          <span>
+            {!isOnline
+              ? 'Sin conexión - Mostrando datos guardados'
+              : 'Datos cacheados - Actualiza cuando tengas conexión'}
+          </span>
+        </div>
+      )}
 
       {/* Cycle Info */}
       <div className="bg-blue-50 text-blue-700 p-3 rounded-lg mb-4 text-sm">

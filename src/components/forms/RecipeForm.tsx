@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { Recipe, Ingredient, MealType } from '@/types';
+import ImageUpload from '../ImageUpload';
 
 interface RecipeFormProps {
   recipe: Recipe | null;
@@ -16,6 +17,7 @@ export default function RecipeForm({ recipe, onClose, onSuccess }: RecipeFormPro
   const [name, setName] = useState(recipe?.name || '');
   const [type, setType] = useState<MealType>(recipe?.type || 'lunch');
   const [total, setTotal] = useState(recipe?.total || '');
+  const [imageUrl, setImageUrl] = useState<string | null>(recipe?.image_url || null);
   const [portionsLuis, setPortionsLuis] = useState(recipe?.portions?.luis || '');
   const [portionsMariana, setPortionsMariana] = useState(recipe?.portions?.mariana || '');
   const [ingredients, setIngredients] = useState<Ingredient[]>(
@@ -85,7 +87,8 @@ export default function RecipeForm({ recipe, onClose, onSuccess }: RecipeFormPro
           mariana: portionsMariana
         } : null,
         ingredients: ingredients.filter(i => i.name.trim()),
-        steps: steps.filter(s => s.trim())
+        steps: steps.filter(s => s.trim()),
+        image_url: imageUrl
       };
 
       if (recipe) {
@@ -139,6 +142,15 @@ export default function RecipeForm({ recipe, onClose, onSuccess }: RecipeFormPro
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-5 overflow-y-auto flex-1">
+          {/* Image Upload */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">Foto de la receta</label>
+            <ImageUpload
+              currentImageUrl={imageUrl}
+              onImageUploaded={setImageUrl}
+            />
+          </div>
+
           {/* Name */}
           <div className="mb-4">
             <label className="block text-sm font-medium mb-1">Nombre *</label>

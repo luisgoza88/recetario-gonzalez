@@ -25,6 +25,8 @@ interface NavItemProps {
 }
 
 function NavItem({ icon, label, active, onClick, badge, activeColor, activeBg }: NavItemProps) {
+  const showBadge = typeof badge === 'number' && badge > 0;
+
   return (
     <button
       onClick={onClick}
@@ -36,7 +38,7 @@ function NavItem({ icon, label, active, onClick, badge, activeColor, activeBg }:
     >
       <div className="relative">
         {icon}
-        {badge && badge > 0 && (
+        {showBadge && (
           <span className="absolute -top-1 -right-2 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
             {badge > 9 ? '9+' : badge}
           </span>

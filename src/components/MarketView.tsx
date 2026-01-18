@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
-import { RotateCcw, ShoppingCart, Home, Minus, Plus, Edit2, Check, X, AlertTriangle, Search, Sparkles, Trash2 } from 'lucide-react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { RotateCcw, ShoppingCart, Home, Minus, Plus, Edit2, Check, X, AlertTriangle, Search, Sparkles, Trash2, WifiOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { MarketItem, IngredientCategory } from '@/types';
 import { CATEGORY_EMOJIS } from '@/data/market';
 import AddCustomItemModal from './AddCustomItemModal';
+import { useOfflineSync } from '@/hooks/useOfflineSync';
+import { cacheMarketItems, getCachedMarketItems, cacheInventory, getCachedInventory } from '@/lib/indexedDB';
 
 interface MarketViewProps {
   items: MarketItem[];
@@ -22,6 +24,10 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [categoryData, setCategoryData] = useState<Record<string, IngredientCategory>>({});
+  const [isFromCache, setIsFromCache] = useState(false);
+
+  // Offline sync
+  const { isOnline, queueOperation, pendingCount } = useOfflineSync();
 
   // Cargar datos de categorías
   useEffect(() => {
@@ -41,6 +47,38 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
       setCategoryData(catMap);
     }
   };
+
+  // Cache items cuando están online para uso offline posterior
+  useEffect(() => {
+    if (isOnline && items.length > 0) {
+      // Cachear items del mercado
+      const marketItemsToCache = items.map(item => ({
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        category_id: item.category_id,
+        quantity: item.quantity,
+        checked: item.checked,
+        order_index: item.order_index || 0,
+        is_custom: item.is_custom,
+        cachedAt: Date.now()
+      }));
+      cacheMarketItems(marketItemsToCache);
+
+      // Cachear inventario
+      const inventoryToCache = items
+        .filter(item => item.currentNumber !== undefined)
+        .map(item => ({
+          item_id: item.id,
+          current_quantity: item.currentQuantity || '0',
+          current_number: item.currentNumber || 0,
+          cachedAt: Date.now()
+        }));
+      cacheInventory(inventoryToCache);
+
+      setIsFromCache(false);
+    }
+  }, [items, isOnline]);
 
   const checkedCount = items.filter(i => i.checked).length;
   const totalCount = items.length;
@@ -68,6 +106,43 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
     setLoading(item.id);
 
     try {
+      if (!isOnline) {
+        // Offline: encolar operaciones
+        if (item.checked) {
+          await queueOperation({
+            operation: 'delete',
+            table: 'market_checklist',
+            data: { id: item.id }
+          });
+        } else {
+          await queueOperation({
+            operation: 'insert',
+            table: 'market_checklist',
+            data: {
+              item_id: item.id,
+              checked: true,
+              checked_at: new Date().toISOString()
+            }
+          });
+          // También encolar actualización de inventario
+          const required = parseQuantity(item.quantity);
+          await queueOperation({
+            operation: 'update',
+            table: 'inventory',
+            data: {
+              id: item.id,
+              item_id: item.id,
+              current_quantity: item.quantity,
+              current_number: required,
+              last_updated: new Date().toISOString()
+            }
+          });
+        }
+        onUpdate();
+        return;
+      }
+
+      // Online: operaciones normales
       if (item.checked) {
         const { error } = await supabase
           .from('market_checklist')
@@ -118,6 +193,23 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
     setLoading(item.id);
 
     try {
+      if (!isOnline) {
+        // Offline: encolar operación
+        await queueOperation({
+          operation: 'update',
+          table: 'inventory',
+          data: {
+            id: item.id,
+            item_id: item.id,
+            current_quantity: newQuantity,
+            current_number: Math.max(0, newNumber),
+            last_updated: new Date().toISOString()
+          }
+        });
+        onUpdate();
+        return;
+      }
+
       const { error } = await supabase
         .from('inventory')
         .upsert(
@@ -169,6 +261,12 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
     if (!confirm('¿Reiniciar toda la lista de mercado?')) return;
 
     try {
+      if (!isOnline) {
+        // Offline: no permitir reset para evitar inconsistencias
+        alert('Esta acción requiere conexión a internet');
+        return;
+      }
+
       const { error } = await supabase.from('market_checklist').delete().neq('item_id', '');
       if (error) throw error;
       onUpdate();
@@ -179,6 +277,12 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
 
   const deleteCustomItem = async (item: MarketItem) => {
     if (!confirm(`¿Eliminar "${item.name}" de tu lista?`)) return;
+
+    if (!isOnline) {
+      // Offline: no permitir eliminación para evitar inconsistencias
+      alert('Esta acción requiere conexión a internet');
+      return;
+    }
 
     setLoading(item.id);
     try {
@@ -266,6 +370,31 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
           )}
         </button>
       </div>
+
+      {/* Offline Indicator */}
+      {(!isOnline || pendingCount > 0) && (
+        <div className={`mb-4 p-3 rounded-xl flex items-center gap-3 ${
+          !isOnline
+            ? 'bg-orange-50 border border-orange-200'
+            : 'bg-blue-50 border border-blue-200'
+        }`}>
+          <WifiOff className={`w-5 h-5 ${!isOnline ? 'text-orange-600' : 'text-blue-600'}`} />
+          <div className="flex-1">
+            {!isOnline ? (
+              <>
+                <p className="text-sm font-medium text-orange-700">Sin conexión</p>
+                <p className="text-xs text-orange-600">
+                  Los cambios se sincronizarán al reconectar
+                </p>
+              </>
+            ) : (
+              <p className="text-sm font-medium text-blue-700">
+                {pendingCount} cambio{pendingCount !== 1 ? 's' : ''} pendiente{pendingCount !== 1 ? 's' : ''}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative mb-4">

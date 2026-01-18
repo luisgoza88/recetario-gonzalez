@@ -18,62 +18,52 @@ interface DynamicFABProps {
 }
 
 export default function DynamicFAB({ open, onToggle, actions, activeSection }: DynamicFABProps) {
-  // Posiciones para el menú radial (semicírculo arriba)
-  const getItemPosition = (index: number, total: number) => {
-    // Distribuir en semicírculo de -80° a -100° (arriba)
-    const startAngle = -150; // grados
-    const endAngle = -30;
-    const angleRange = endAngle - startAngle;
-    const angle = startAngle + (angleRange / (total - 1)) * index;
-    const radians = (angle * Math.PI) / 180;
-    const radius = 90; // distancia del centro
-
-    return {
-      x: Math.cos(radians) * radius,
-      y: Math.sin(radians) * radius,
-    };
-  };
-
   const gradientClass = activeSection === 'hogar'
     ? 'from-blue-500 to-blue-700'
     : 'from-green-500 to-green-700';
+
+  // Solo mostrar FAB en secciones que tienen acciones
+  const hasActions = actions.length > 0;
 
   return (
     <>
       {/* Backdrop */}
       {open && (
         <div
-          className="fixed inset-0 bg-black/40 z-40"
+          className="fixed inset-0 bg-black/50 z-40"
           onClick={onToggle}
         />
       )}
 
       {/* FAB Container */}
-      <div className="relative">
-        {/* Radial Menu Items */}
-        <div className="absolute bottom-16 left-1/2 -translate-x-1/2">
-          {actions.map((action, index) => {
-            const pos = getItemPosition(index, actions.length);
-            return (
+      <div className="relative z-50">
+        {/* Menu Items - Grid vertical arriba del FAB */}
+        {hasActions && (
+          <div
+            className={`
+              absolute bottom-20 left-1/2 -translate-x-1/2
+              flex flex-col-reverse gap-3 items-center
+              transition-all duration-300
+              ${open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
+            `}
+          >
+            {actions.map((action, index) => (
               <button
                 key={action.id}
                 onClick={() => {
                   action.onClick();
-                  onToggle();
                 }}
                 className={`
-                  absolute flex items-center gap-2 px-3 py-2 rounded-full shadow-lg
+                  flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg
                   ${action.color} text-white font-medium text-sm
                   transition-all duration-300 ease-out whitespace-nowrap
+                  hover:scale-105 active:scale-95
                   ${open
-                    ? 'opacity-100 scale-100'
-                    : 'opacity-0 scale-0 pointer-events-none'
+                    ? 'opacity-100 translate-y-0'
+                    : 'opacity-0 translate-y-4'
                   }
                 `}
                 style={{
-                  transform: open
-                    ? `translate(${pos.x}px, ${pos.y}px)`
-                    : 'translate(0, 0)',
                   transitionDelay: open ? `${index * 50}ms` : '0ms',
                 }}
               >
@@ -82,9 +72,9 @@ export default function DynamicFAB({ open, onToggle, actions, activeSection }: D
                 </span>
                 <span>{action.label}</span>
               </button>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* Main FAB Button */}
         <button
@@ -97,7 +87,6 @@ export default function DynamicFAB({ open, onToggle, actions, activeSection }: D
             transition-all duration-300
             ${open ? 'rotate-45 scale-110' : ''}
             active:scale-95
-            z-50 relative
           `}
         >
           {open ? <X size={28} /> : <Plus size={28} />}

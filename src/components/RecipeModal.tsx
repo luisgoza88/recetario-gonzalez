@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Users, Timer, Play, Pause, RotateCcw, Volume2, Lightbulb } from 'lucide-react';
+import { X, Users, Timer, Play, Pause, RotateCcw, Volume2, Lightbulb, ImageIcon } from 'lucide-react';
 import { Recipe, Ingredient } from '@/types';
 import NutritionDisplay, { DietaryTags, PrepTimeDisplay, DifficultyDisplay } from './NutritionDisplay';
 import SmartSubstitutionPanel from './SmartSubstitutionPanel';
@@ -174,6 +174,25 @@ export default function RecipeModal({ recipe, onClose, missingIngredients = [] }
             <X size={24} />
           </button>
         </div>
+
+        {/* Recipe Image */}
+        {recipe.image_url ? (
+          <div className="relative w-full h-48 bg-gray-100">
+            <img
+              src={recipe.image_url}
+              alt={recipe.name}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+          </div>
+        ) : (
+          <div className="w-full h-32 bg-gradient-to-br from-orange-100 to-amber-50 flex items-center justify-center">
+            <div className="text-center text-gray-400">
+              <ImageIcon className="w-8 h-8 mx-auto mb-1 opacity-50" />
+              <span className="text-xs">Sin foto</span>
+            </div>
+          </div>
+        )}
 
         {/* Content */}
         <div className="p-5 overflow-y-auto flex-1">

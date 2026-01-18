@@ -142,6 +142,9 @@ export default function SmartSuggestions({
   const [selectedStyle, setSelectedStyle] = useState<RecipeStyle>('saludable');
   const [showStyleSelector, setShowStyleSelector] = useState(true);
 
+  // Modo especial: generar receta desde cero (sin receta existente)
+  const isGenerateMode = recipe.id === 'generate-dinner' || recipe.id === 'generate-lunch' || recipe.id === 'generate-breakfast';
+
   useEffect(() => {
     checkInventory();
   }, [recipe]);
@@ -150,6 +153,23 @@ export default function SmartSuggestions({
     setLoading(true);
     try {
       const inventory = await loadCurrentInventory();
+
+      // En modo generar, solo cargar ingredientes disponibles
+      if (isGenerateMode) {
+        const available = getAvailableIngredientsList(inventory);
+        setAvailableIngredients(available);
+        // Crear una disponibilidad "falsa" para que muestre la sección de IA
+        setAvailability({
+          recipe,
+          canMake: false,
+          availablePercent: 0,
+          missingIngredients: [],
+          availableIngredients: []
+        });
+        setLoading(false);
+        return;
+      }
+
       const recipeAvailability = await checkRecipeIngredients(recipe, inventory);
       setAvailability(recipeAvailability);
 
@@ -267,58 +287,76 @@ export default function SmartSuggestions({
         </div>
 
         <div className="p-4 space-y-4">
-          {/* Current Recipe Status */}
-          <div className={`p-4 rounded-xl ${availability.canMake ? 'bg-green-50' : 'bg-orange-50'}`}>
-            <div className="flex items-start gap-3">
-              {availability.canMake ? (
-                <Check className="text-green-600 mt-1" size={20} />
-              ) : (
-                <AlertTriangle className="text-orange-600 mt-1" size={20} />
-              )}
-              <div className="flex-1">
-                <h3 className="font-semibold">{recipe.name}</h3>
-                <p className="text-sm text-gray-600">{mealLabels[mealType]}</p>
-
-                {availability.canMake ? (
-                  <p className="text-green-700 text-sm mt-2">
-                    Tienes todos los ingredientes necesarios
+          {/* Generate Mode Header */}
+          {isGenerateMode ? (
+            <div className="p-4 rounded-xl bg-purple-50">
+              <div className="flex items-start gap-3">
+                <Sparkles className="text-purple-600 mt-1" size={20} />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-purple-800">Generar {mealLabels[mealType]}</h3>
+                  <p className="text-sm text-purple-600 mt-1">
+                    ¿Cambio de planes? Crea una receta con los ingredientes que tienes disponibles
                   </p>
+                  <p className="text-xs text-purple-500 mt-2">
+                    {availableIngredients.length} ingredientes disponibles en tu inventario
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Current Recipe Status */
+            <div className={`p-4 rounded-xl ${availability.canMake ? 'bg-green-50' : 'bg-orange-50'}`}>
+              <div className="flex items-start gap-3">
+                {availability.canMake ? (
+                  <Check className="text-green-600 mt-1" size={20} />
                 ) : (
-                  <div className="mt-2">
-                    <p className="text-orange-700 text-sm font-medium">
-                      Faltan {availability.missingIngredients.length} ingrediente{availability.missingIngredients.length > 1 ? 's' : ''}:
-                    </p>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {availability.missingIngredients.map((ing, i) => (
-                        <span key={i} className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-xs">
-                          {ing.name}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+                  <AlertTriangle className="text-orange-600 mt-1" size={20} />
                 )}
+                <div className="flex-1">
+                  <h3 className="font-semibold">{recipe.name}</h3>
+                  <p className="text-sm text-gray-600">{mealLabels[mealType]}</p>
 
-                {/* Progress bar */}
-                <div className="mt-3">
-                  <div className="flex justify-between text-xs text-gray-500 mb-1">
-                    <span>Disponibilidad</span>
-                    <span>{Math.round(availability.availablePercent)}%</span>
-                  </div>
-                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full transition-all ${
-                        availability.canMake ? 'bg-green-500' : 'bg-orange-500'
-                      }`}
-                      style={{ width: `${availability.availablePercent}%` }}
-                    />
+                  {availability.canMake ? (
+                    <p className="text-green-700 text-sm mt-2">
+                      Tienes todos los ingredientes necesarios
+                    </p>
+                  ) : (
+                    <div className="mt-2">
+                      <p className="text-orange-700 text-sm font-medium">
+                        Faltan {availability.missingIngredients.length} ingrediente{availability.missingIngredients.length > 1 ? 's' : ''}:
+                      </p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {availability.missingIngredients.map((ing, i) => (
+                          <span key={i} className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-xs">
+                            {ing.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Progress bar */}
+                  <div className="mt-3">
+                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                      <span>Disponibilidad</span>
+                      <span>{Math.round(availability.availablePercent)}%</span>
+                    </div>
+                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all ${
+                          availability.canMake ? 'bg-green-500' : 'bg-orange-500'
+                        }`}
+                        style={{ width: `${availability.availablePercent}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Alternatives Section */}
-          {!availability.canMake && alternatives.length > 0 && (
+          {/* Alternatives Section - Solo mostrar si no es modo generar */}
+          {!isGenerateMode && !availability.canMake && alternatives.length > 0 && (
             <div className="border rounded-xl overflow-hidden">
               <div className="bg-blue-50 p-3 border-b">
                 <h4 className="font-semibold text-blue-800 flex items-center gap-2">
@@ -354,8 +392,8 @@ export default function SmartSuggestions({
             </div>
           )}
 
-          {/* AI Recipe Generation */}
-          {!availability.canMake && (
+          {/* AI Recipe Generation - Mostrar en modo generar o si faltan ingredientes */}
+          {(isGenerateMode || !availability.canMake) && (
             <div className="border rounded-xl overflow-hidden">
               <div className="bg-purple-50 p-3 border-b">
                 <h4 className="font-semibold text-purple-800 flex items-center gap-2">
