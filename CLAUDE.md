@@ -130,6 +130,22 @@ Mejoras implementadas:
 - Aliases y preparaciones se cachean en memoria para evitar queries repetidas
 - Función `clearInventoryCache()` para limpiar cache cuando se actualizan datos
 
+### 6. Lógica de Disponibilidad CORREGIDA (Enero 2025)
+**Problema encontrado**: La comparación de cantidades fallaba por unidades incompatibles:
+- Inventario almacena `current_number = 5` (ej: "5 kg")
+- Recetas requieren "280g" que se parseaba como 280
+- La comparación `5 >= 140` fallaba aunque claramente hay suficiente
+
+**Solución implementada**: Lógica simplificada
+```typescript
+// ANTES (fallaba):
+const hasEnough = totalAvailable > 0 && totalAvailable >= requiredNum * 0.5;
+
+// DESPUÉS (correcto):
+const hasEnough = totalAvailable > 0;
+```
+Si el ingrediente se encuentra en inventario con stock > 0, se considera disponible.
+
 ---
 
 ## Tablas de Base de Datos (Actualizado)
