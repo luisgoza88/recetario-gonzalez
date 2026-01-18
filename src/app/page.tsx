@@ -17,10 +17,25 @@ export default function Home() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [marketItems, setMarketItems] = useState<MarketItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingSuggestions, setPendingSuggestions] = useState(0);
 
   useEffect(() => {
     loadData();
+    loadSuggestionsCount();
   }, []);
+
+  const loadSuggestionsCount = async () => {
+    try {
+      const { count } = await supabase
+        .from('adjustment_suggestions')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+
+      setPendingSuggestions(count || 0);
+    } catch (error) {
+      console.error('Error loading suggestions count:', error);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -109,14 +124,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-green-700 text-white px-5 py-4 sticky top-0 z-50 shadow-lg">
-        <h1 className="text-xl font-semibold flex items-center gap-2">
-          <span>🍽️</span> Recetario Familia González
-        </h1>
-        <p className="text-sm opacity-90">Plan de 15 días • Menú rotativo</p>
-      </header>
-
       {/* Content */}
       <main className="pb-24">
         {activeTab === 'calendar' && (
@@ -130,7 +137,7 @@ export default function Home() {
         )}
         {activeTab === 'suggestions' && (
           <div className="p-4 max-w-lg mx-auto">
-            <SuggestionsPanel onUpdate={loadData} />
+            <SuggestionsPanel onUpdate={() => { loadData(); loadSuggestionsCount(); }} />
           </div>
         )}
         {activeTab === 'home' && (
@@ -184,13 +191,20 @@ export default function Home() {
         </button>
         <button
           onClick={() => setActiveTab('suggestions')}
-          className={`flex flex-col items-center px-3 py-2 rounded-lg transition-colors ${
+          className={`flex flex-col items-center px-3 py-2 rounded-lg transition-colors relative ${
             activeTab === 'suggestions'
               ? 'text-yellow-600 bg-yellow-50'
               : 'text-gray-500'
           }`}
         >
-          <Lightbulb size={22} />
+          <div className="relative">
+            <Lightbulb size={22} />
+            {pendingSuggestions > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                {pendingSuggestions > 9 ? '9+' : pendingSuggestions}
+              </span>
+            )}
+          </div>
           <span className="text-[10px] mt-1">Ajustes</span>
         </button>
         <button
