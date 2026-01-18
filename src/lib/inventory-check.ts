@@ -42,7 +42,10 @@ function extractNumber(qty: string): number {
 
 // Cargar aliases desde la base de datos
 async function loadAliases(): Promise<Map<string, string>> {
-  if (aliasesCache) return aliasesCache;
+  if (aliasesCache) {
+    console.log(`[ALIASES-CACHE-HIT] Using cached ${aliasesCache.size} aliases`);
+    return aliasesCache;
+  }
 
   const { data, error } = await supabase
     .from('ingredient_aliases')
@@ -56,20 +59,28 @@ async function loadAliases(): Promise<Map<string, string>> {
   }
 
   if (data) {
+    console.log(`[ALIASES-RAW] Found ${data.length} alias records in DB`);
+
     // También cargar nombres de market_items para mapear
     const { data: items } = await supabase
       .from('market_items')
       .select('id, name');
 
     const itemNames = new Map(items?.map(i => [i.id, i.name]) || []);
+    console.log(`[MARKET-ITEMS] Loaded ${itemNames.size} market items`);
 
     for (const alias of data) {
       const itemName = itemNames.get(alias.market_item_id);
       if (itemName) {
-        aliasesCache.set(normalizeIngredient(alias.alias), itemName);
+        const normalizedAlias = normalizeIngredient(alias.alias);
+        aliasesCache.set(normalizedAlias, itemName);
+        // Log some sample aliases for debugging
+        if (alias.alias.toLowerCase().includes('bistec') || alias.alias.toLowerCase().includes('queso')) {
+          console.log(`[ALIAS-MAPPED] "${alias.alias}" (normalized: "${normalizedAlias}") → "${itemName}"`);
+        }
       }
     }
-    console.log(`[ALIASES-LOADED] ${aliasesCache.size} aliases loaded`);
+    console.log(`[ALIASES-LOADED] ${aliasesCache.size} aliases loaded into cache`);
   }
 
   return aliasesCache;
@@ -157,13 +168,27 @@ async function findInventoryMatch(
       return data;
     } else {
       // Debug: show all inventory keys to find the issue
-      const inventoryKeys = Array.from(inventory.keys()).filter(k =>
+      const inventoryKeys = Array.from(inventory.keys());
+      console.log(`[ALIAS-NO-INV] "${ingredientName}" → alias "${aliasMatch}" not found in inventory`);
+      console.log(`[ALIAS-NO-INV] aliasMatch length: ${aliasMatch.length}, charCodes: ${[...aliasMatch].slice(0, 30).map(c => c.charCodeAt(0)).join(',')}`);
+
+      // Try to find exact key match issue
+      const exactMatch = inventoryKeys.find(k => k === aliasMatch);
+      console.log(`[ALIAS-NO-INV] Exact key match: ${exactMatch ? 'YES' : 'NO'}`);
+
+      // Show similar keys
+      const similarKeys = inventoryKeys.filter(k =>
         k.toLowerCase().includes('bistec') || k.toLowerCase().includes('queso')
       );
-      console.log(`[ALIAS-NO-INV] "${ingredientName}" → alias "${aliasMatch}" not in inventory. Similar keys: ${inventoryKeys.join(', ')}`);
+      console.log(`[ALIAS-NO-INV] Similar inventory keys: ${similarKeys.join(' | ')}`);
     }
   } else {
     console.log(`[NO-ALIAS] "${ingredientName}" (normalized: "${normalizedIngredient}") has no alias`);
+    // Show all alias keys for debugging
+    const allAliasKeys = Array.from(aliases.keys()).filter(k =>
+      k.includes('bistec') || k.includes('queso')
+    );
+    console.log(`[NO-ALIAS] Available alias keys with bistec/queso: ${allAliasKeys.join(' | ')}`);
   }
 
   // 3. Buscar coincidencia parcial (uno contiene al otro)
@@ -248,9 +273,24 @@ export async function loadCurrentInventory(): Promise<Map<string, { quantity: st
       });
     }
 
-    // Log items with stock
+    // Log items with stock - specifically ones related to our problem
     const withStock = Array.from(inventoryMap.entries()).filter(([, v]) => v.number > 0);
-    console.log(`[INVENTORY-LOADED] ${inventoryMap.size} items, ${withStock.length} with stock`);
+    console.log(`[INVENTORY-LOADED] ${inventoryMap.size} items total, ${withStock.length} with stock`);
+
+    // Log specific items we're having trouble with
+    const debugItems = ['Bistec de res (punta anca)', 'Queso costeño', 'Queso cuajada', 'Queso mozzarella'];
+    for (const debugItem of debugItems) {
+      const data = inventoryMap.get(debugItem);
+      if (data) {
+        console.log(`[INVENTORY-DEBUG] "${debugItem}" → qty: ${data.number}`);
+      } else {
+        // Try to find similar keys
+        const similar = Array.from(inventoryMap.keys()).filter(k =>
+          k.toLowerCase().includes('bistec') || k.toLowerCase().includes('queso')
+        );
+        console.log(`[INVENTORY-DEBUG] "${debugItem}" NOT FOUND. Similar keys: ${similar.slice(0, 5).join(', ')}`);
+      }
+    }
   }
 
   return inventoryMap;
