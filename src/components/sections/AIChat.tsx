@@ -184,7 +184,7 @@ export default function AIChat() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-4 flex-shrink-0">
         <div className="flex items-center justify-between">
@@ -209,15 +209,15 @@ export default function AIChat() {
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="p-3 bg-white border-b flex-shrink-0 overflow-x-auto">
-        <div className="flex gap-2">
+      {/* Quick Actions - Scroll horizontal */}
+      <div className="flex-shrink-0 bg-white border-b">
+        <div className="flex gap-2 p-3 overflow-x-auto scrollbar-hide">
           {QUICK_ACTIONS.map(action => (
             <button
               key={action.id}
               onClick={() => handleQuickAction(action)}
               disabled={isLoading}
-              className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${action.color} disabled:opacity-50`}
+              className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${action.color} disabled:opacity-50`}
             >
               {action.icon}
               {action.label}
@@ -227,27 +227,27 @@ export default function AIChat() {
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto min-h-0">
         {showWelcome && messages.length === 0 ? (
-          // Welcome Screen
-          <div className="p-6 flex flex-col items-center justify-center h-full">
-            <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center mb-4 shadow-lg">
-              <Sparkles size={40} className="text-white" />
+          // Welcome Screen - scrollable content
+          <div className="p-4 flex flex-col items-center py-6">
+            <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center mb-3 shadow-lg">
+              <Sparkles size={32} className="text-white" />
             </div>
-            <h2 className="text-xl font-bold text-gray-800 mb-2">
+            <h2 className="text-lg font-bold text-gray-800 mb-1">
               ¿En qué puedo ayudarte?
             </h2>
-            <p className="text-gray-500 text-center mb-6 max-w-xs">
+            <p className="text-gray-500 text-center mb-4 text-sm max-w-xs">
               Puedo consultar el menú, sugerir recetas, gestionar tareas del hogar y mucho más.
             </p>
 
             {/* Suggestion Chips */}
-            <div className="flex flex-wrap justify-center gap-2 max-w-sm">
+            <div className="flex flex-wrap justify-center gap-2 max-w-sm mb-4">
               {SUGGESTION_CHIPS.map((suggestion, index) => (
                 <button
                   key={index}
                   onClick={() => handleSuggestionClick(suggestion)}
-                  className="px-3 py-2 bg-white border border-gray-200 rounded-full text-sm text-gray-700 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-700 transition-colors"
+                  className="px-3 py-1.5 bg-white border border-gray-200 rounded-full text-xs text-gray-700 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-700 transition-colors"
                 >
                   {suggestion}
                 </button>
@@ -255,21 +255,21 @@ export default function AIChat() {
             </div>
 
             {/* Capabilities */}
-            <div className="mt-8 grid grid-cols-2 gap-3 w-full max-w-xs">
-              <div className="bg-white p-3 rounded-xl border text-center">
-                <UtensilsCrossed size={24} className="mx-auto mb-1 text-green-600" />
+            <div className="grid grid-cols-2 gap-2 w-full max-w-xs">
+              <div className="bg-white p-2.5 rounded-xl border text-center">
+                <UtensilsCrossed size={20} className="mx-auto mb-1 text-green-600" />
                 <p className="text-xs text-gray-600">Recetas y Menú</p>
               </div>
-              <div className="bg-white p-3 rounded-xl border text-center">
-                <ShoppingCart size={24} className="mx-auto mb-1 text-purple-600" />
+              <div className="bg-white p-2.5 rounded-xl border text-center">
+                <ShoppingCart size={20} className="mx-auto mb-1 text-purple-600" />
                 <p className="text-xs text-gray-600">Lista de Compras</p>
               </div>
-              <div className="bg-white p-3 rounded-xl border text-center">
-                <ListTodo size={24} className="mx-auto mb-1 text-blue-600" />
+              <div className="bg-white p-2.5 rounded-xl border text-center">
+                <ListTodo size={20} className="mx-auto mb-1 text-blue-600" />
                 <p className="text-xs text-gray-600">Tareas del Hogar</p>
               </div>
-              <div className="bg-white p-3 rounded-xl border text-center">
-                <CheckCircle2 size={24} className="mx-auto mb-1 text-amber-600" />
+              <div className="bg-white p-2.5 rounded-xl border text-center">
+                <CheckCircle2 size={20} className="mx-auto mb-1 text-amber-600" />
                 <p className="text-xs text-gray-600">Progreso Diario</p>
               </div>
             </div>

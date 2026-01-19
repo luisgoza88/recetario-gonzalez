@@ -9,6 +9,12 @@
  */
 
 import { supabase } from '@/lib/supabase/client';
+import {
+  getDefaultTaskDuration,
+  DEFAULT_EMPLOYEE_SCORES,
+  DEFAULT_WORK_MINUTES_PER_DAY,
+  MIN_SAMPLES_FOR_LEARNING,
+} from './defaults';
 
 // Types
 export interface TaskDurationData {
