@@ -439,6 +439,12 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
 
       {viewMode === 'shopping' ? (
         <>
+          {/* Shopping Info Banner */}
+          <div className="bg-green-50 border border-green-200 text-green-700 p-3 rounded-xl mb-4 text-sm flex items-center gap-2">
+            <ShoppingCart size={16} />
+            <span>Marca lo que compraste. Se agregará automáticamente a tu despensa.</span>
+          </div>
+
           {/* Shopping Progress Header */}
           <div className="flex items-center gap-4 p-4 bg-white rounded-xl shadow-sm mb-4">
             <span className="font-semibold text-green-700 whitespace-nowrap">
@@ -459,7 +465,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
             </button>
           </div>
 
-          {/* Shopping List */}
+          {/* Shopping List - Simplified: Only checkboxes */}
           {Object.entries(categories).map(([category, categoryItems]) => (
             <div key={category} className="mb-4">
               <div className="bg-green-700 text-white px-4 py-3 rounded-t-lg font-semibold flex items-center gap-2">
@@ -468,17 +474,15 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
               </div>
               <div className="bg-white rounded-b-lg shadow-sm overflow-hidden">
                 {categoryItems.map(item => {
-                  const currentNum = item.currentNumber || 0;
-                  const unit = extractUnit(item.quantity);
-
                   return (
                     <div
                       key={item.id}
                       className={`
-                        flex items-center p-4 border-b last:border-b-0 transition-colors
+                        flex items-center p-4 border-b last:border-b-0 transition-colors cursor-pointer
                         ${item.checked ? 'bg-green-50' : 'hover:bg-gray-50'}
                         ${item.is_custom ? 'border-l-4 border-l-purple-400' : ''}
                       `}
+                      onClick={() => !loading && toggleItem(item)}
                     >
                       <input
                         type="checkbox"
@@ -486,10 +490,13 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
                         onChange={() => toggleItem(item)}
                         disabled={loading === item.id}
                         className="w-6 h-6 mr-3 accent-green-700 cursor-pointer"
+                        onClick={(e) => e.stopPropagation()}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium truncate">{item.name}</span>
+                          <span className={`font-medium truncate ${item.checked ? 'line-through text-gray-400' : ''}`}>
+                            {item.name}
+                          </span>
                           {item.is_custom && (
                             <span className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
                               <Sparkles size={10} />
@@ -498,34 +505,20 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); adjustQuantity(item, -1); }}
-                          disabled={loading === item.id || currentNum <= 0}
-                          className="w-7 h-7 flex items-center justify-center bg-red-100 text-red-700 rounded-md hover:bg-red-200 disabled:opacity-30 text-sm"
-                        >
-                          <Minus size={14} />
-                        </button>
+                      <div className="flex items-center gap-2">
                         <span className={`
-                          text-sm px-2 py-1 rounded-md font-semibold min-w-[60px] text-center
+                          text-sm px-3 py-1 rounded-full font-medium
                           ${item.checked
                             ? 'bg-green-100 text-green-700'
-                            : 'bg-blue-100 text-blue-700'}
+                            : 'bg-gray-100 text-gray-600'}
                         `}>
-                          {currentNum > 0 ? `${currentNum} ${unit}` : item.quantity}
+                          {item.quantity}
                         </span>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); adjustQuantity(item, 1); }}
-                          disabled={loading === item.id}
-                          className="w-7 h-7 flex items-center justify-center bg-green-100 text-green-700 rounded-md hover:bg-green-200 disabled:opacity-30 text-sm"
-                        >
-                          <Plus size={14} />
-                        </button>
                         {item.is_custom && (
                           <button
                             onClick={(e) => { e.stopPropagation(); deleteCustomItem(item); }}
                             disabled={loading === item.id}
-                            className="w-7 h-7 flex items-center justify-center bg-gray-100 text-gray-500 rounded-md hover:bg-red-100 hover:text-red-600 disabled:opacity-30 text-sm ml-1"
+                            className="w-7 h-7 flex items-center justify-center bg-gray-100 text-gray-500 rounded-md hover:bg-red-100 hover:text-red-600 disabled:opacity-30 text-sm"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -541,9 +534,12 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
       ) : (
         <>
           {/* Pantry View */}
-          <div className="bg-orange-50 text-orange-700 p-3 rounded-xl mb-4 text-sm flex items-center gap-2">
-            <Home size={16} />
-            <span>Ajusta las cantidades conforme uses los productos</span>
+          <div className="bg-orange-50 border border-orange-200 text-orange-700 p-3 rounded-xl mb-4 text-sm">
+            <div className="flex items-center gap-2 mb-1">
+              <Home size={16} />
+              <span className="font-medium">Tu despensa actual</span>
+            </div>
+            <span className="text-xs text-orange-600">Usa los botones +/- para ajustar lo que tienes en casa</span>
           </div>
 
           {Object.entries(categories).map(([category, categoryItems]) => (
