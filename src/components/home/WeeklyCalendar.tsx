@@ -54,31 +54,7 @@ export default function WeeklyCalendar({
 
     const { startDate, endDate } = getDateRange();
 
-    console.log('WeeklyCalendar loadTasks:', { householdId, startDate, endDate, viewMode });
-
     try {
-      // Query simplificada primero - sin JOINs
-      const { data: simpleData, error: simpleError, count: simpleCount } = await supabase
-        .from('scheduled_tasks')
-        .select('*', { count: 'exact' })
-        .eq('household_id', householdId)
-        .gte('scheduled_date', startDate)
-        .lte('scheduled_date', endDate);
-
-      console.log('Simple query result:', {
-        count: simpleCount,
-        dataLength: simpleData?.length,
-        error: simpleError,
-        sampleIds: simpleData?.slice(0, 3).map(t => t.id)
-      });
-
-      if (simpleError) {
-        console.error('Simple query error:', simpleError);
-        setLoading(false);
-        return;
-      }
-
-      // Si la query simple funciona, intentar con JOINs
       // NOTA: Usar !scheduled_tasks_employee_id_fkey para desambiguar la relación
       // ya que hay 2 FKs a home_employees (employee_id y completed_by)
       const { data, error } = await supabase
@@ -94,18 +70,8 @@ export default function WeeklyCalendar({
         .lte('scheduled_date', endDate)
         .order('scheduled_date');
 
-      console.log('Full query result:', {
-        dataLength: data?.length,
-        error,
-        sampleDates: data?.slice(0, 3).map(t => t.scheduled_date)
-      });
-
       if (error) {
-        console.error('Error loading tasks with joins:', error);
-        // Fallback: usar datos simples
-        if (simpleData) {
-          setTasks(simpleData as ScheduledTask[]);
-        }
+        console.error('Error loading tasks:', error);
       } else if (data) {
         setTasks(data);
       }
@@ -360,7 +326,6 @@ export default function WeeklyCalendar({
                 day={day}
                 onClick={() => handleDaySelect(day)}
                 isSelected={selectedDay?.date.toDateString() === day.date.toDateString()}
-                detailed
               />
             ))}
           </div>
@@ -377,7 +342,6 @@ export default function WeeklyCalendar({
                     day={day}
                     onClick={() => handleDaySelect(day)}
                     isSelected={selectedDay?.date.toDateString() === day.date.toDateString()}
-                    compact
                   />
                 ))}
               </div>
@@ -397,24 +361,6 @@ export default function WeeklyCalendar({
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-amber-500" /> Atrasadas
         </span>
-      </div>
-
-      {/* Debug Panel - Temporal */}
-      <div className="mx-4 mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-xl text-xs">
-        <p className="font-bold text-yellow-800 mb-2">Debug Info:</p>
-        <p><strong>householdId:</strong> {householdId?.slice(0, 8)}...</p>
-        <p><strong>Rango semana:</strong> {getDateRange().startDate} a {getDateRange().endDate}</p>
-        <p><strong>Total tareas cargadas:</strong> {tasks.length}</p>
-        <p><strong>Loading:</strong> {loading ? 'Sí' : 'No'}</p>
-        {tasks.length > 0 && (
-          <>
-            <p><strong>Fechas únicas:</strong> {[...new Set(tasks.map(t => t.scheduled_date))].sort().join(', ')}</p>
-            <p><strong>Ejemplo tarea:</strong> {tasks[0]?.task_template?.name || 'Sin nombre'}</p>
-          </>
-        )}
-        {tasks.length === 0 && !loading && (
-          <p className="text-red-600 font-bold">¡No se cargaron tareas!</p>
-        )}
       </div>
 
       {/* Selected Day Detail */}
@@ -503,14 +449,6 @@ export default function WeeklyCalendar({
                     ? 'Puedes programar tareas desde el generador'
                     : 'Este día ya pasó'}
                 </p>
-                {/* Debug info - remove after fixing */}
-                <div className="mt-3 p-2 bg-yellow-50 rounded text-xs text-left">
-                  <p><strong>Debug:</strong></p>
-                  <p>Fecha seleccionada: {formatLocalDate(selectedDay.date)}</p>
-                  <p>Total tasks loaded: {tasks.length}</p>
-                  <p>Tasks para este día: {selectedDayTasks.length}</p>
-                  <p>Sample task dates: {tasks.slice(0, 5).map(t => t.scheduled_date).join(', ')}</p>
-                </div>
               </div>
             )}
           </div>
@@ -536,72 +474,45 @@ export default function WeeklyCalendar({
 interface DayCellProps {
   day: DayData;
   onClick: () => void;
-  detailed?: boolean;
-  compact?: boolean;
   isSelected?: boolean;
 }
 
-function DayCell({ day, onClick, detailed, compact, isSelected }: DayCellProps) {
+function DayCell({ day, onClick, isSelected }: DayCellProps) {
   const hasOverdue = day.date < new Date() && day.completedCount < day.totalCount && !day.isToday;
   const allCompleted = day.totalCount > 0 && day.completedCount === day.totalCount;
+  const hasPending = day.totalCount - day.completedCount > 0;
 
   return (
     <button
       onClick={onClick}
       className={`
-        ${detailed ? 'min-h-[100px]' : 'min-h-[60px]'}
-        p-2 rounded-lg border-2 transition-all
-        ${isSelected ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-200' : ''}
+        min-h-[52px] p-2 rounded-xl border-2 transition-all flex flex-col items-center justify-center
+        ${isSelected ? 'border-purple-500 bg-purple-100 ring-2 ring-purple-200' : ''}
         ${!isSelected && day.isToday ? 'border-blue-500 bg-blue-50' : ''}
-        ${!isSelected && !day.isToday ? 'border-transparent hover:bg-gray-100 hover:border-gray-200' : ''}
+        ${!isSelected && !day.isToday ? 'border-transparent hover:bg-gray-100' : ''}
         ${!day.isCurrentMonth && 'opacity-40'}
         ${!isSelected && hasOverdue ? 'bg-amber-50' : ''}
         ${!isSelected && allCompleted ? 'bg-green-50' : ''}
       `}
     >
       {/* Date Number */}
-      <div className={`text-sm font-semibold mb-1 ${
-        isSelected ? 'text-purple-600' : day.isToday ? 'text-blue-600' : ''
+      <div className={`text-base font-semibold ${
+        isSelected ? 'text-purple-700' : day.isToday ? 'text-blue-600' : 'text-gray-700'
       }`}>
         {day.date.getDate()}
       </div>
 
-      {/* Task Summary */}
+      {/* Task Indicator - simple dots */}
       {day.totalCount > 0 && (
-        <div className="space-y-1">
-          {detailed ? (
-            // Detailed view - show task pills
-            <div className="space-y-1">
-              {day.tasks.slice(0, 3).map((task, i) => (
-                <div
-                  key={i}
-                  className={`text-xs px-1.5 py-0.5 rounded truncate ${
-                    task.status === 'completada'
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-blue-100 text-blue-700'
-                  }`}
-                >
-                  {task.task_template?.name}
-                </div>
-              ))}
-              {day.tasks.length > 3 && (
-                <div className="text-xs text-gray-400">
-                  +{day.tasks.length - 3} más
-                </div>
-              )}
-            </div>
-          ) : (
-            // Compact view - just show dots/count
-            <div className="flex items-center justify-center gap-1">
-              {day.completedCount > 0 && (
-                <span className="w-2 h-2 rounded-full bg-green-500" />
-              )}
-              {day.totalCount - day.completedCount > 0 && (
-                <span className="w-2 h-2 rounded-full bg-blue-500" />
-              )}
-              <span className="text-xs text-gray-500">{day.totalCount}</span>
-            </div>
-          )}
+        <div className="flex items-center gap-0.5 mt-1">
+          {allCompleted ? (
+            <span className="w-2 h-2 rounded-full bg-green-500" />
+          ) : hasOverdue ? (
+            <span className="w-2 h-2 rounded-full bg-amber-500" />
+          ) : hasPending ? (
+            <span className="w-2 h-2 rounded-full bg-blue-500" />
+          ) : null}
+          <span className="text-[10px] text-gray-500 ml-0.5">{day.totalCount}</span>
         </div>
       )}
     </button>
