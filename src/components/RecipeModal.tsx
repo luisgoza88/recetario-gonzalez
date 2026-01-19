@@ -176,29 +176,31 @@ export default function RecipeModal({ recipe, onClose, missingIngredients = [] }
           </button>
         </div>
 
-        {/* Recipe Image */}
-        {recipe.image_url ? (
-          <div className="relative w-full h-64 bg-gray-100 flex-shrink-0">
-            <Image
-              src={recipe.image_url}
-              alt={recipe.name}
-              fill
-              className="object-cover"
-              loading="lazy"
-              sizes="(max-width: 448px) 100vw, 448px"
-            />
-          </div>
-        ) : (
-          <div className="w-full h-40 bg-gradient-to-br from-orange-100 to-amber-50 flex items-center justify-center flex-shrink-0">
-            <div className="text-center text-gray-400">
-              <ImageIcon className="w-10 h-10 mx-auto mb-1 opacity-50" />
-              <span className="text-sm">Sin foto</span>
+        {/* Content - Scrollable area including image */}
+        <div className="overflow-y-auto flex-1">
+          {/* Recipe Image */}
+          {recipe.image_url ? (
+            <div className="relative w-full h-64 bg-gray-100">
+              <Image
+                src={recipe.image_url}
+                alt={recipe.name}
+                fill
+                className="object-cover"
+                loading="lazy"
+                sizes="(max-width: 448px) 100vw, 448px"
+              />
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="w-full h-40 bg-gradient-to-br from-orange-100 to-amber-50 flex items-center justify-center">
+              <div className="text-center text-gray-400">
+                <ImageIcon className="w-10 h-10 mx-auto mb-1 opacity-50" />
+                <span className="text-sm">Sin foto</span>
+              </div>
+            </div>
+          )}
 
-        {/* Content */}
-        <div className="p-5 overflow-y-auto flex-1">
+          {/* Content padding wrapper */}
+          <div className="p-5">
           {/* Type Badge + Difficulty */}
           <div className="mb-4 flex items-center gap-2 flex-wrap">
             <span className={`
@@ -414,6 +416,7 @@ export default function RecipeModal({ recipe, onClose, missingIngredients = [] }
               <NutritionDisplay nutrition={recipe.nutrition} />
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>
