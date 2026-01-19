@@ -1,68 +1,128 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, cleanJsonResponse } from '@/lib/gemini/client';
-import { getProteinIcon } from '@/lib/categoryIcons';
+import {
+  getProteinIcon,
+  getVegetableIcon,
+  getTuberIcon,
+  getFruitIcon,
+  getDairyIcon,
+  getGrainIcon,
+  getPantryIcon,
+  getSpiceIcon,
+  getBeverageIcon,
+  getFrozenIcon,
+  getSnackIcon,
+  getBakeryIcon,
+  getHouseholdIcon,
+  getPetFoodIcon
+} from '@/lib/categoryIcons';
 
 // Categorías disponibles con ejemplos para ayudar a la IA
 const CATEGORIES_INFO = {
   proteins: {
     id: 'proteins',
     name: 'Proteínas',
-    icon: '🥩', // Default, será sobrescrito por getProteinIcon
-    examples: ['pollo', 'res', 'cerdo', 'pescado', 'camarones', 'atún', 'huevos', 'tocineta', 'jamón', 'salchicha', 'carne molida', 'langostinos', 'salmón', 'tilapia']
+    icon: '🥩',
+    getIcon: getProteinIcon,
+    examples: ['pollo', 'res', 'cerdo', 'pescado', 'camarones', 'atún', 'huevos', 'tocineta', 'jamón', 'salchicha', 'carne molida', 'langostinos', 'salmón', 'tilapia', 'sardinas', 'pulpo', 'calamar']
   },
   dairy: {
     id: 'dairy',
     name: 'Lácteos',
     icon: '🧀',
-    examples: ['leche', 'queso', 'yogurt', 'crema', 'mantequilla', 'crema de leche', 'queso crema', 'queso mozzarella', 'queso parmesano', 'leche condensada']
+    getIcon: getDairyIcon,
+    examples: ['leche', 'queso', 'yogurt', 'crema', 'mantequilla', 'crema de leche', 'queso crema', 'queso mozzarella', 'queso parmesano', 'leche condensada', 'kumis', 'kefir']
   },
   vegetables: {
     id: 'vegetables',
     name: 'Vegetales',
     icon: '🥬',
-    examples: ['tomate', 'cebolla', 'ajo', 'pimentón', 'zanahoria', 'papa', 'lechuga', 'espinaca', 'brócoli', 'pepino', 'apio', 'cilantro', 'perejil', 'aguacate', 'champiñones']
+    getIcon: getVegetableIcon,
+    examples: ['tomate', 'cebolla', 'ajo', 'pimentón', 'zanahoria', 'lechuga', 'espinaca', 'brócoli', 'pepino', 'apio', 'cilantro', 'perejil', 'aguacate', 'champiñones', 'coliflor', 'repollo']
+  },
+  tubers: {
+    id: 'tubers',
+    name: 'Tubérculos',
+    icon: '🥔',
+    getIcon: getTuberIcon,
+    examples: ['papa', 'yuca', 'batata', 'camote', 'ñame', 'papa criolla', 'malanga']
   },
   fruits: {
     id: 'fruits',
     name: 'Frutas',
     icon: '🍎',
-    examples: ['manzana', 'banano', 'naranja', 'limón', 'fresa', 'mango', 'piña', 'uvas', 'sandía', 'papaya', 'melón', 'mora', 'arándanos']
+    getIcon: getFruitIcon,
+    examples: ['manzana', 'banano', 'naranja', 'limón', 'fresa', 'mango', 'piña', 'uvas', 'sandía', 'papaya', 'melón', 'mora', 'arándanos', 'kiwi', 'cereza', 'durazno']
   },
   grains: {
     id: 'grains',
     name: 'Granos y Carbohidratos',
     icon: '🍚',
-    examples: ['arroz', 'pasta', 'pan', 'avena', 'quinoa', 'lentejas', 'frijoles', 'garbanzos', 'harina', 'tortillas', 'cereal', 'pan tajado', 'arepa']
+    getIcon: getGrainIcon,
+    examples: ['arroz', 'pasta', 'pan', 'avena', 'quinoa', 'lentejas', 'frijoles', 'garbanzos', 'harina', 'tortillas', 'cereal', 'pan tajado', 'arepa', 'espagueti']
   },
   pantry: {
     id: 'pantry',
     name: 'Despensa',
     icon: '🫙',
-    examples: ['aceite', 'sal', 'azúcar', 'vinagre', 'salsa de tomate', 'mayonesa', 'mostaza', 'galletas', 'chocolate', 'café', 'té', 'miel', 'mermelada', 'atún enlatado', 'sardinas', 'maíz enlatado', 'pasta de tomate']
+    getIcon: getPantryIcon,
+    examples: ['aceite', 'vinagre', 'salsa de tomate', 'mayonesa', 'mostaza', 'chocolate', 'café', 'té', 'miel', 'mermelada', 'atún enlatado', 'maíz enlatado', 'pasta de tomate', 'aceitunas', 'nueces', 'almendras']
   },
   spices: {
     id: 'spices',
-    name: 'Especias y Hierbas',
-    icon: '🌿',
-    examples: ['pimienta', 'comino', 'orégano', 'paprika', 'canela', 'laurel', 'tomillo', 'romero', 'curry', 'cúrcuma', 'adobo', 'sazonador']
+    name: 'Especias y Condimentos',
+    icon: '🧂',
+    getIcon: getSpiceIcon,
+    examples: ['sal', 'pimienta', 'comino', 'orégano', 'paprika', 'canela', 'laurel', 'tomillo', 'romero', 'curry', 'cúrcuma', 'adobo', 'sazonador', 'ajo en polvo']
   },
   beverages: {
     id: 'beverages',
     name: 'Bebidas',
     icon: '🥤',
-    examples: ['agua', 'jugo', 'gaseosa', 'vino', 'cerveza', 'agua con gas', 'leche de almendras', 'leche de coco', 'bebida energética']
+    getIcon: getBeverageIcon,
+    examples: ['agua', 'jugo', 'gaseosa', 'vino', 'cerveza', 'agua con gas', 'leche de almendras', 'leche de coco', 'bebida energética', 'café preparado', 'té preparado']
   },
   frozen: {
     id: 'frozen',
     name: 'Congelados',
     icon: '❄️',
-    examples: ['helado', 'pizza congelada', 'vegetales congelados', 'papas congeladas', 'nuggets', 'empanadas congeladas']
+    getIcon: getFrozenIcon,
+    examples: ['helado', 'pizza congelada', 'vegetales congelados', 'papas congeladas', 'nuggets', 'empanadas congeladas', 'frutas congeladas']
+  },
+  snacks: {
+    id: 'snacks',
+    name: 'Snacks',
+    icon: '🍿',
+    getIcon: getSnackIcon,
+    examples: ['papas fritas', 'galletas', 'chips', 'nachos', 'palomitas', 'gomitas', 'chocolates', 'dulces', 'maní', 'pasas']
+  },
+  bakery: {
+    id: 'bakery',
+    name: 'Panadería',
+    icon: '🥖',
+    getIcon: getBakeryIcon,
+    examples: ['baguette', 'croissant', 'torta', 'pastel', 'dona', 'pan artesanal', 'buñuelos', 'churros', 'levadura', 'polvo de hornear']
+  },
+  household: {
+    id: 'household',
+    name: 'Hogar y Limpieza',
+    icon: '🧹',
+    getIcon: getHouseholdIcon,
+    examples: ['papel higiénico', 'servilletas', 'detergente', 'jabón', 'cloro', 'desinfectante', 'bolsas de basura', 'papel aluminio', 'shampoo']
+  },
+  pet_food: {
+    id: 'pet_food',
+    name: 'Mascotas',
+    icon: '🐾',
+    getIcon: getPetFoodIcon,
+    examples: ['comida para perro', 'comida para gato', 'croquetas', 'alimento mascota']
   },
   other: {
     id: 'other',
     name: 'Otros',
     icon: '📦',
-    examples: ['servilletas', 'papel aluminio', 'bolsas', 'detergente', 'jabón']
+    getIcon: null,
+    examples: ['artículos varios']
   }
 };
 
@@ -113,10 +173,15 @@ Tu tarea es analizar el texto del usuario y extraer:
 
 REGLAS IMPORTANTES:
 - Si mencionan una marca (ej: "Chocolate Luker", "Galletas Saltinas", "Leche Alpina"), extrae el producto genérico y guarda la marca aparte
-- "Galletas Saltinas" → producto: "Galletas", marca: "Saltinas", categoría: pantry
+- "Galletas Saltinas" → producto: "Galletas", marca: "Saltinas", categoría: snacks
 - "Chocolate Luker" → producto: "Chocolate", marca: "Luker", categoría: pantry
 - "Leche Alpina" → producto: "Leche", marca: "Alpina", categoría: dairy
 - Los mariscos (camarones, langostinos, etc.) van en "proteins"
+- Los tubérculos (papa, yuca, batata, ñame) van en "tubers" NO en vegetables
+- Los snacks y galletas van en "snacks" NO en pantry
+- La panadería fresca y repostería van en "bakery"
+- Productos de limpieza y hogar van en "household"
+- Comida para mascotas va en "pet_food"
 - Si no se especifica cantidad, usa 1
 - Unidades comunes: kg, g, lb, unid, bolsa, paquete, botella, lata, tarro, litro, ml
 - Si hay ambigüedad, indica needsClarification con una pregunta breve
@@ -127,7 +192,7 @@ Responde SOLO con JSON válido en este formato:
     {
       "name": "Nombre limpio",
       "originalInput": "lo que escribió el usuario para este item",
-      "categoryId": "proteins|dairy|vegetables|fruits|grains|pantry|spices|beverages|frozen|other",
+      "categoryId": "proteins|dairy|vegetables|tubers|fruits|grains|pantry|spices|beverages|frozen|snacks|bakery|household|pet_food|other",
       "quantity": 1,
       "unit": "kg",
       "brand": "Marca o null",
@@ -182,9 +247,9 @@ Separa múltiples productos si los hay (pueden estar separados por comas, "y", o
     }) => {
       const categoryInfo = CATEGORIES_INFO[item.categoryId as keyof typeof CATEGORIES_INFO] || CATEGORIES_INFO.other;
 
-      // Usar icono específico para subcategorías de proteínas
-      const icon = item.categoryId === 'proteins'
-        ? getProteinIcon(item.name)
+      // Usar función de icono específica si existe, sino usar el icono default de la categoría
+      const icon = categoryInfo.getIcon
+        ? categoryInfo.getIcon(item.name)
         : categoryInfo.icon;
 
       return {

@@ -54,6 +54,7 @@ export default function TodayDashboard({
     tasksTotal: 0
   });
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeTaskSummary | null>(null);
+  const [selectedTask, setSelectedTask] = useState<ScheduledTask | null>(null);
 
   const today = new Date();
   const dayOfWeek = today.toLocaleDateString('es-CO', { weekday: 'long' });
@@ -158,7 +159,7 @@ export default function TodayDashboard({
         .from('scheduled_tasks')
         .select(`
           *,
-          space:spaces(*),
+          space:spaces(*, space_type:space_types(*)),
           task_template:task_templates(*)
         `)
         .eq('scheduled_date', todayStr);
@@ -580,6 +581,163 @@ export default function TodayDashboard({
         </section>
       </div>
 
+      {/* Modal de detalle de tarea */}
+      {selectedTask && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center">
+          <div className="bg-white w-full max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[85vh] overflow-hidden animate-slide-up">
+            {/* Header */}
+            <div className={`px-4 py-4 border-b ${
+              selectedTask.status === 'completada' ? 'bg-green-50' :
+              selectedTask.status === 'en_progreso' ? 'bg-blue-50' :
+              'bg-gray-50'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {selectedTask.status === 'completada' ? (
+                    <div className="w-10 h-10 rounded-full bg-green-200 flex items-center justify-center">
+                      <CheckCircle2 size={24} className="text-green-600" />
+                    </div>
+                  ) : selectedTask.status === 'en_progreso' ? (
+                    <div className="w-10 h-10 rounded-full bg-blue-200 flex items-center justify-center">
+                      <Clock size={24} className="text-blue-600" />
+                    </div>
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                      <Circle size={24} className="text-gray-500" />
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="font-semibold text-gray-800">Detalle de Tarea</h3>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      selectedTask.status === 'completada'
+                        ? 'bg-green-200 text-green-700'
+                        : selectedTask.status === 'en_progreso'
+                        ? 'bg-blue-200 text-blue-700'
+                        : 'bg-gray-200 text-gray-600'
+                    }`}>
+                      {selectedTask.status === 'completada' ? 'Completada' :
+                       selectedTask.status === 'en_progreso' ? 'En progreso' : 'Pendiente'}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedTask(null)}
+                  className="p-2 rounded-full hover:bg-white/50"
+                >
+                  <X size={20} className="text-gray-500" />
+                </button>
+              </div>
+            </div>
+
+            {/* Contenido */}
+            <div className="p-4 space-y-4">
+              {/* Nombre de la tarea */}
+              <div>
+                <h4 className="text-xl font-bold text-gray-800">
+                  {selectedTask.task_template?.name || 'Tarea'}
+                </h4>
+                {selectedTask.task_template?.description && (
+                  <p className="text-gray-500 mt-1">{selectedTask.task_template.description}</p>
+                )}
+              </div>
+
+              {/* Información del espacio */}
+              {selectedTask.space && (
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 uppercase font-medium mb-2">Espacio</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-white border flex items-center justify-center text-2xl">
+                      {selectedTask.space.space_type?.icon || '🏠'}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-800">
+                        {selectedTask.space.custom_name || selectedTask.space.space_type?.name || 'Sin nombre'}
+                      </p>
+                      <p className="text-sm text-gray-500 capitalize">
+                        {selectedTask.space.category || 'interior'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Información adicional */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Fecha programada */}
+                <div className="bg-blue-50 rounded-xl p-3">
+                  <p className="text-xs text-blue-600 font-medium">Fecha</p>
+                  <p className="font-semibold text-blue-800">
+                    {new Date(selectedTask.scheduled_date + 'T12:00:00').toLocaleDateString('es-CO', {
+                      day: 'numeric',
+                      month: 'short'
+                    })}
+                  </p>
+                </div>
+
+                {/* Duración estimada */}
+                <div className="bg-purple-50 rounded-xl p-3">
+                  <p className="text-xs text-purple-600 font-medium">Duración est.</p>
+                  <p className="font-semibold text-purple-800">
+                    {selectedTask.task_template?.estimated_minutes
+                      ? `${selectedTask.task_template.estimated_minutes} min`
+                      : 'No definida'}
+                  </p>
+                </div>
+
+                {/* Frecuencia */}
+                <div className="bg-amber-50 rounded-xl p-3">
+                  <p className="text-xs text-amber-600 font-medium">Frecuencia</p>
+                  <p className="font-semibold text-amber-800 capitalize">
+                    {selectedTask.task_template?.frequency || 'No definida'}
+                  </p>
+                </div>
+
+                {/* Prioridad */}
+                <div className="bg-red-50 rounded-xl p-3">
+                  <p className="text-xs text-red-600 font-medium">Prioridad</p>
+                  <p className="font-semibold text-red-800 capitalize">
+                    {selectedTask.task_template?.priority || 'Normal'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Notas */}
+              {selectedTask.notes && (
+                <div className="bg-yellow-50 rounded-xl p-4">
+                  <p className="text-xs text-yellow-600 uppercase font-medium mb-1">Notas</p>
+                  <p className="text-gray-700">{selectedTask.notes}</p>
+                </div>
+              )}
+
+              {/* Información de completado */}
+              {selectedTask.status === 'completada' && selectedTask.completed_at && (
+                <div className="bg-green-50 rounded-xl p-4">
+                  <p className="text-xs text-green-600 uppercase font-medium mb-1">Completada</p>
+                  <p className="text-green-800 font-medium">
+                    {new Date(selectedTask.completed_at).toLocaleDateString('es-CO', {
+                      day: 'numeric',
+                      month: 'long',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t bg-gray-50">
+              <button
+                onClick={() => setSelectedTask(null)}
+                className="w-full py-3 bg-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-300 transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal de tareas del empleado */}
       {selectedEmployee && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
@@ -645,14 +803,15 @@ export default function TodayDashboard({
               ) : (
                 <div className="space-y-2">
                   {selectedEmployee.tasks.map(task => (
-                    <div
+                    <button
                       key={task.id}
-                      className={`p-3 rounded-xl border flex items-start gap-3 ${
+                      onClick={() => setSelectedTask(task)}
+                      className={`w-full text-left p-3 rounded-xl border flex items-start gap-3 hover:shadow-md transition-all ${
                         task.status === 'completada'
                           ? 'bg-green-50 border-green-200'
                           : task.status === 'en_progreso'
                           ? 'bg-blue-50 border-blue-200'
-                          : 'bg-white border-gray-200'
+                          : 'bg-white border-gray-200 hover:border-blue-300'
                       }`}
                     >
                       {task.status === 'completada' ? (
@@ -670,25 +829,25 @@ export default function TodayDashboard({
                         </p>
                         {task.space && (
                           <p className="text-sm text-gray-500 flex items-center gap-1 mt-0.5">
-                            <Home size={12} />
+                            <span>{task.space.space_type?.icon || '🏠'}</span>
                             {task.space.custom_name || task.space.space_type?.name || 'Espacio'}
                           </p>
                         )}
-                        {task.notes && (
-                          <p className="text-sm text-gray-500 mt-1">{task.notes}</p>
-                        )}
                       </div>
-                      <span className={`text-xs px-2 py-1 rounded-full flex-shrink-0 ${
-                        task.status === 'completada'
-                          ? 'bg-green-200 text-green-700'
-                          : task.status === 'en_progreso'
-                          ? 'bg-blue-200 text-blue-700'
-                          : 'bg-gray-100 text-gray-600'
-                      }`}>
-                        {task.status === 'completada' ? 'Hecho' :
-                         task.status === 'en_progreso' ? 'En curso' : 'Pendiente'}
-                      </span>
-                    </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          task.status === 'completada'
+                            ? 'bg-green-200 text-green-700'
+                            : task.status === 'en_progreso'
+                            ? 'bg-blue-200 text-blue-700'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {task.status === 'completada' ? 'Hecho' :
+                           task.status === 'en_progreso' ? 'En curso' : 'Pendiente'}
+                        </span>
+                        <ChevronRight size={16} className="text-gray-400" />
+                      </div>
+                    </button>
                   ))}
                 </div>
               )}
