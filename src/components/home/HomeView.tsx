@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import {
   Home, Calendar, CheckCircle2, Clock, AlertTriangle,
-  User, Settings, ChevronRight, Plus, Sparkles, BarChart3,
+  User, Settings, ChevronRight, ChevronDown, ChevronUp, Plus, Sparkles, BarChart3,
   History, Package, Zap, Eye, FileText, LogIn
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
@@ -61,6 +61,7 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
   const [employees, setEmployees] = useState<HomeEmployee[]>([]);
   const [todayTasks, setTodayTasks] = useState<ScheduledTask[]>([]);
   const [pendingTasks, setPendingTasks] = useState<number>(0);
+  const [tasksExpanded, setTasksExpanded] = useState(false);
 
   // Estado consolidado para todos los modales (reduce de 17 estados a 1)
   const [activeModal, setActiveModal] = useState<ActiveModal>({ type: 'none' });
@@ -257,47 +258,62 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
         </div>
       )}
 
-      {/* Today's Tasks */}
+      {/* Today's Tasks - Collapsible */}
       {todayTasks.length > 0 ? (
         <div className="bg-white rounded-xl shadow-sm mb-4 overflow-hidden">
-          <div className="bg-blue-50 px-4 py-3 border-b flex items-center gap-2">
-            <Clock size={18} className="text-blue-600" />
-            <span className="font-semibold text-blue-800">Tareas de Hoy</span>
-          </div>
-          <div className="divide-y">
-            {todayTasks.map(task => (
-              <div
-                key={task.id}
-                className={`p-4 flex items-center gap-3 ${
-                  task.status === 'completada' ? 'bg-green-50' : ''
-                }`}
-              >
-                <button
-                  onClick={() => toggleTaskStatus(task)}
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                    task.status === 'completada'
-                      ? 'bg-green-500 border-green-500 text-white'
-                      : 'border-gray-300'
+          <button
+            onClick={() => setTasksExpanded(!tasksExpanded)}
+            className="w-full bg-blue-50 px-4 py-3 border-b flex items-center justify-between hover:bg-blue-100 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Clock size={18} className="text-blue-600" />
+              <span className="font-semibold text-blue-800">Tareas de Hoy</span>
+              <span className="text-xs bg-blue-200 text-blue-700 px-2 py-0.5 rounded-full">
+                {completedToday}/{totalToday}
+              </span>
+            </div>
+            {tasksExpanded ? (
+              <ChevronUp size={20} className="text-blue-600" />
+            ) : (
+              <ChevronDown size={20} className="text-blue-600" />
+            )}
+          </button>
+          {tasksExpanded && (
+            <div className="divide-y max-h-80 overflow-y-auto">
+              {todayTasks.map(task => (
+                <div
+                  key={task.id}
+                  className={`p-4 flex items-center gap-3 ${
+                    task.status === 'completada' ? 'bg-green-50' : ''
                   }`}
                 >
-                  {task.status === 'completada' && <CheckCircle2 size={16} />}
-                </button>
-                <div className="flex-1">
-                  <p className={`font-medium ${task.status === 'completada' ? 'text-gray-400' : ''}`}>
-                    {task.task_template?.name}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {task.space?.space_type?.icon} {task.space?.custom_name || task.space?.space_type?.name}
-                  </p>
+                  <button
+                    onClick={() => toggleTaskStatus(task)}
+                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                      task.status === 'completada'
+                        ? 'bg-green-500 border-green-500 text-white'
+                        : 'border-gray-300'
+                    }`}
+                  >
+                    {task.status === 'completada' && <CheckCircle2 size={16} />}
+                  </button>
+                  <div className="flex-1">
+                    <p className={`font-medium ${task.status === 'completada' ? 'text-gray-400' : ''}`}>
+                      {task.task_template?.name}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {task.space?.space_type?.icon} {task.space?.custom_name || task.space?.space_type?.name}
+                    </p>
+                  </div>
+                  {task.employee && (
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                      {task.employee.name}
+                    </span>
+                  )}
                 </div>
-                {task.employee && (
-                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                    {task.employee.name}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       ) : (
         <div className="bg-white rounded-xl p-6 shadow-sm mb-4 text-center">
