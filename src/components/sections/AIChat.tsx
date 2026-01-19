@@ -840,10 +840,21 @@ export default function AIChat() {
                     : 'bg-white shadow-sm border rounded-bl-md'
                   }
                 `}>
-                  {message.isLoading ? (
+                  {message.isLoading && !message.content ? (
+                    // Still thinking - no content yet
                     <div className="flex items-center gap-2 text-purple-600 p-3">
                       <Loader2 size={16} className="animate-spin" />
                       <span className="text-sm">Pensando...</span>
+                    </div>
+                  ) : message.isLoading && message.content ? (
+                    // Streaming - show partial content with typing indicator
+                    <div className="p-3">
+                      <FormattedMessage content={message.content} />
+                      <div className="flex items-center gap-1 mt-2 text-purple-400">
+                        <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
                     </div>
                   ) : message.role === 'user' ? (
                     // User message - simple text

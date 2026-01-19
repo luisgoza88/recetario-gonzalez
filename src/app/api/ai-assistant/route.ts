@@ -1385,17 +1385,60 @@ export async function POST(request: NextRequest) {
     }
 
     // Si no hay llamadas a funciones
-    // Si streaming está habilitado, hacer streaming de la respuesta directa
+    // Si streaming está habilitado, simular streaming palabra por palabra
     if (stream) {
       const textContent = parts.find(part => part.text)?.text || '';
 
+      // Dividir el texto en chunks para simular streaming
+      // Usamos palabras/frases cortas para un efecto de typing natural
+      const chunks = textContent.split(/(\s+)/).filter(Boolean);
+
       const readableStream = new ReadableStream({
-        start(controller) {
-          // Para respuestas sin function calls, enviar el texto completo como un chunk
-          // ya que ya lo tenemos de la primera llamada
-          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ content: textContent, done: false })}\n\n`));
-          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ content: '', done: true })}\n\n`));
-          controller.close();
+        async start(controller) {
+          try {
+            let sentContent = '';
+            let chunkBuffer = '';
+
+            for (let i = 0; i < chunks.length; i++) {
+              chunkBuffer += chunks[i];
+
+              // Enviar cada 3-5 tokens o en signos de puntuación para un efecto natural
+              const shouldFlush =
+                i % 4 === 3 || // Cada ~4 tokens
+                /[.!?:,\n]$/.test(chunkBuffer) || // Después de puntuación
+                i === chunks.length - 1; // Último chunk
+
+              if (shouldFlush && chunkBuffer.trim()) {
+                sentContent += chunkBuffer;
+                controller.enqueue(
+                  new TextEncoder().encode(
+                    `data: ${JSON.stringify({ content: chunkBuffer, done: false })}\n\n`
+                  )
+                );
+                chunkBuffer = '';
+                // Pequeña pausa para efecto de typing (5-15ms)
+                await new Promise(resolve => setTimeout(resolve, 10));
+              }
+            }
+
+            // Enviar cualquier contenido restante
+            if (chunkBuffer.trim()) {
+              controller.enqueue(
+                new TextEncoder().encode(
+                  `data: ${JSON.stringify({ content: chunkBuffer, done: false })}\n\n`
+                )
+              );
+            }
+
+            controller.enqueue(
+              new TextEncoder().encode(
+                `data: ${JSON.stringify({ content: '', done: true })}\n\n`
+              )
+            );
+            controller.close();
+          } catch (error) {
+            controller.error(error);
+          }
         }
       });
 

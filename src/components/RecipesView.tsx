@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import Image from 'next/image';
 import { Search, Plus, Edit2, Trash2, ImageIcon } from 'lucide-react';
 import { Recipe, Ingredient } from '@/types';
@@ -20,16 +20,19 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState<'all' | 'breakfast' | 'lunch' | 'dinner'>('all');
 
-  const filteredRecipes = recipes.filter(recipe => {
-    const searchLower = search.toLowerCase();
-    const matchesName = recipe.name.toLowerCase().includes(searchLower);
-    const matchesIngredient = (recipe.ingredients as Ingredient[]).some(
-      ing => ing.name.toLowerCase().includes(searchLower)
-    );
-    const matchesSearch = matchesName || matchesIngredient;
-    const matchesFilter = filter === 'all' || recipe.type === filter;
-    return matchesSearch && matchesFilter;
-  });
+  // Memoizar filtrado de recetas para evitar recálculos innecesarios
+  const filteredRecipes = useMemo(() => {
+    return recipes.filter(recipe => {
+      const searchLower = search.toLowerCase();
+      const matchesName = recipe.name.toLowerCase().includes(searchLower);
+      const matchesIngredient = (recipe.ingredients as Ingredient[]).some(
+        ing => ing.name.toLowerCase().includes(searchLower)
+      );
+      const matchesSearch = matchesName || matchesIngredient;
+      const matchesFilter = filter === 'all' || recipe.type === filter;
+      return matchesSearch && matchesFilter;
+    });
+  }, [recipes, search, filter]);
 
   const getTypeLabel = (type: string) => {
     switch (type) {
@@ -49,7 +52,8 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
     }
   };
 
-  const handleDelete = async (recipe: Recipe) => {
+  // Memoizar handlers para evitar re-renders de componentes hijos
+  const handleDelete = useCallback(async (recipe: Recipe) => {
     if (!confirm(`¿Eliminar la receta "${recipe.name}"? Esta acción no se puede deshacer.`)) {
       return;
     }
@@ -66,22 +70,23 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
       console.error('Error deleting recipe:', error);
       alert('Error al eliminar la receta');
     }
-  };
+  }, [onUpdate]);
 
-  const handleEdit = (recipe: Recipe) => {
+  const handleEdit = useCallback((recipe: Recipe) => {
     setEditingRecipe(recipe);
     setShowForm(true);
-  };
+  }, []);
 
-  const handleFormClose = () => {
+  const handleFormClose = useCallback(() => {
     setShowForm(false);
     setEditingRecipe(null);
-  };
+  }, []);
 
-  const handleFormSuccess = () => {
-    handleFormClose();
+  const handleFormSuccess = useCallback(() => {
+    setShowForm(false);
+    setEditingRecipe(null);
     onUpdate();
-  };
+  }, [onUpdate]);
 
   return (
     <div className="p-4 max-w-lg mx-auto">
