@@ -216,7 +216,10 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
   const [todayStats, setTodayStats] = useState({ total: 0, successful: 0, failed: 0 });
 
   const fetchData = useCallback(async () => {
-    if (!householdId) return;
+    if (!householdId) {
+      setLoading(false);
+      return;
+    }
 
     try {
       // Fetch trust stats
@@ -330,6 +333,40 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
         <div className="text-center">
           <Brain size={48} className="text-purple-500 mx-auto mb-4 animate-pulse" />
           <p className="text-gray-500">Cargando Centro de Comando IA...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // No household ID - show setup message
+  if (!householdId) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-4 pb-6">
+          <div className="flex items-center gap-3">
+            {onClose && (
+              <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                <ArrowLeft size={24} />
+              </button>
+            )}
+            <div className="flex-1">
+              <h1 className="text-xl font-bold flex items-center gap-2">
+                <Brain size={24} />
+                Centro de Comando IA
+              </h1>
+            </div>
+          </div>
+        </div>
+        <div className="p-4 flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Brain size={40} className="text-purple-500" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-800 mb-2">Configura tu hogar</h2>
+            <p className="text-gray-500 max-w-xs mx-auto">
+              Para usar el Centro de Comando IA necesitas tener un hogar configurado primero.
+            </p>
+          </div>
         </div>
       </div>
     );
