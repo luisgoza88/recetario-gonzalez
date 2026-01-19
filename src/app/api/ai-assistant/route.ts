@@ -352,12 +352,59 @@ async function getWeekMenu() {
 }
 
 async function searchRecipes(query: string) {
-  const { data: recipes } = await supabase
+  // Buscar con ilike primero
+  let { data: recipes } = await supabase
     .from('recipes')
     .select('name, prep_time, category, portions, ingredients')
     .or(`name.ilike.%${query}%,ingredients.cs.{${query}}`);
 
-  return recipes?.slice(0, 5).map(r => ({
+  // Si no hay resultados, hacer búsqueda más amplia
+  if (!recipes || recipes.length === 0) {
+    const { data: allRecipes } = await supabase
+      .from('recipes')
+      .select('name, prep_time, category, portions, ingredients');
+
+    const searchTerms = query.toLowerCase().split(/\s+/).filter(t => t.length > 2);
+
+    // Variantes comunes de ingredientes/platos
+    const variants: Record<string, string[]> = {
+      'pasta': ['espagueti', 'spaghetti', 'fettuccine', 'penne', 'macarrones', 'tallarines'],
+      'bolognesa': ['boloñesa', 'bolonesa', 'carne molida', 'ragu', 'ragú'],
+      'pollo': ['chicken', 'gallina', 'pechuga'],
+      'carne': ['res', 'beef', 'ternera', 'bistec'],
+      'arroz': ['rice', 'risotto'],
+      'ensalada': ['salad', 'verde'],
+      'sopa': ['crema', 'caldo'],
+      'pescado': ['fish', 'salmon', 'atún', 'tilapia'],
+    };
+
+    recipes = allRecipes?.filter(r => {
+      const nameLower = r.name.toLowerCase();
+      const ingredientsStr = JSON.stringify(r.ingredients).toLowerCase();
+
+      for (const term of searchTerms) {
+        // Coincidencia directa
+        if (nameLower.includes(term) || ingredientsStr.includes(term)) return true;
+
+        // Buscar variantes
+        for (const [key, alts] of Object.entries(variants)) {
+          if (term.includes(key) || key.includes(term)) {
+            if (alts.some(alt => nameLower.includes(alt) || ingredientsStr.includes(alt))) {
+              return true;
+            }
+          }
+          if (alts.some(alt => term.includes(alt))) {
+            if (nameLower.includes(key) || ingredientsStr.includes(key)) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    }) || [];
+  }
+
+  return recipes?.slice(0, 8).map(r => ({
     name: r.name,
     prep_time: r.prep_time,
     category: r.category,
@@ -366,14 +413,73 @@ async function searchRecipes(query: string) {
 }
 
 async function getRecipeDetails(recipeName: string) {
-  const { data: recipe } = await supabase
+  // Primero intentar búsqueda exacta/parcial
+  let { data: recipe } = await supabase
     .from('recipes')
     .select('*')
     .ilike('name', `%${recipeName}%`)
     .single();
 
+  // Si no encuentra, buscar con términos individuales (fuzzy)
   if (!recipe) {
-    return { error: `No se encontró la receta "${recipeName}"` };
+    const searchTerms = recipeName.toLowerCase().split(/\s+/).filter(t => t.length > 2);
+
+    // Buscar recetas que contengan alguno de los términos
+    const { data: recipes } = await supabase
+      .from('recipes')
+      .select('*');
+
+    if (recipes && recipes.length > 0) {
+      // Calcular score de coincidencia para cada receta
+      const scored = recipes.map(r => {
+        const nameLower = r.name.toLowerCase();
+        let score = 0;
+
+        for (const term of searchTerms) {
+          if (nameLower.includes(term)) score += 2;
+          // También buscar variantes comunes
+          const variants: Record<string, string[]> = {
+            'pasta': ['espagueti', 'spaghetti', 'fettuccine', 'penne', 'macarrones'],
+            'bolognesa': ['boloñesa', 'bolonesa', 'carne molida', 'ragu'],
+            'pollo': ['chicken', 'gallina'],
+            'carne': ['res', 'beef', 'ternera'],
+            'arroz': ['rice'],
+          };
+
+          for (const [key, alts] of Object.entries(variants)) {
+            if (term.includes(key) || key.includes(term)) {
+              for (const alt of alts) {
+                if (nameLower.includes(alt)) score += 1;
+              }
+            }
+          }
+        }
+
+        return { recipe: r, score };
+      });
+
+      // Ordenar por score y tomar el mejor
+      scored.sort((a, b) => b.score - a.score);
+      if (scored[0]?.score > 0) {
+        recipe = scored[0].recipe;
+      }
+    }
+  }
+
+  if (!recipe) {
+    // Sugerir recetas similares
+    const { data: allRecipes } = await supabase
+      .from('recipes')
+      .select('name')
+      .limit(50);
+
+    const suggestions = allRecipes?.map(r => r.name).slice(0, 5) || [];
+
+    return {
+      error: `No se encontró la receta "${recipeName}"`,
+      suggestion: `Recetas disponibles similares: ${suggestions.join(', ')}`,
+      available_recipes: suggestions
+    };
   }
 
   const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
@@ -1643,6 +1749,31 @@ const SYSTEM_PROMPT = `Eres el Asistente Inteligente del Hogar - un ayudante pro
 - **Amigable**: Usas emojis con moderación (1-2 por respuesta máximo)
 - **Eficiente**: Respuestas concisas pero completas
 
+## ⚡ REGLA CRÍTICA: USAR AGENTE MULTI-PASO
+
+Cuando el usuario pida ayuda con tareas complejas, SIEMPRE usa execute_multi_step_task. Detecta estas frases:
+
+**ACTIVAR prepare_recipe cuando escuches:**
+- "Ayúdame con todo para [receta]"
+- "Quiero cocinar [receta], ayúdame"
+- "Prepárame todo para [receta]"
+- "Voy a hacer [receta], qué necesito"
+- Cualquier solicitud de cocinar + "ayuda/todo/completo"
+
+**ACTIVAR weekly_planning cuando escuches:**
+- "Planifica mi semana"
+- "Organiza el menú semanal"
+- "Qué necesito para toda la semana"
+
+**ACTIVAR full_report cuando escuches:**
+- "Dame un reporte completo"
+- "Cómo está todo en casa"
+- "Resumen del día/hogar"
+
+**ACTIVAR menu_from_inventory cuando escuches:**
+- "Qué puedo cocinar con lo que tengo"
+- "Sugiere recetas con mi inventario"
+
 ## COMPORTAMIENTOS CLAVE
 
 ### 1. Siempre verifica el contexto
@@ -1668,6 +1799,11 @@ Cuando hagas algo, usa este formato:
 - Usa listas con bullets para múltiples items
 - Mantén respuestas de máximo 3-4 párrafos cortos
 - Si hay mucha información, organízala en secciones claras
+
+### 5. Búsqueda inteligente de recetas
+Si no encuentras una receta exacta, la función buscará variantes automáticamente.
+Por ejemplo: "pasta bolognesa" encontrará "espaguetis a la boloñesa" o "pasta con carne".
+Si aún así no encuentra, te dará sugerencias de recetas disponibles.
 
 ## DATOS DEL HOGAR
 
