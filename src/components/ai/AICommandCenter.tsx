@@ -364,10 +364,11 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
   };
 
   // Chat functionality
-  const handleSendMessage = async () => {
-    if (!chatInput.trim() || isProcessingChat) return;
+  const handleSendMessage = async (directMessage?: string) => {
+    const messageToSend = directMessage || chatInput.trim();
+    if (!messageToSend || isProcessingChat) return;
 
-    const userMessage = chatInput.trim();
+    const userMessage = messageToSend;
     setChatInput('');
     setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsProcessingChat(true);
@@ -483,7 +484,7 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
   }
 
   return (
-    <div className="h-dvh bg-gray-50 overflow-hidden flex flex-col">
+    <div className="h-dvh bg-gray-50 overflow-hidden flex flex-col pb-24">
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-4 pb-6">
         <div className="flex items-center gap-3 mb-4">
@@ -575,7 +576,7 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
                   <p className="text-gray-500 text-sm max-w-xs mx-auto">
                     Puedo ayudarte con recetas, planificación de menús, lista de compras, tareas del hogar y más.
                   </p>
-                  <div className="mt-6 flex flex-wrap gap-2 justify-center">
+                  <div className="mt-6 flex flex-wrap gap-2 justify-center relative z-10">
                     {[
                       '¿Qué puedo cocinar hoy?',
                       'Sugiéreme una receta saludable',
@@ -584,10 +585,9 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
                     ].map((suggestion, idx) => (
                       <button
                         key={idx}
-                        onClick={() => {
-                          setChatInput(suggestion);
-                        }}
-                        className="px-3 py-2 bg-purple-50 text-purple-700 rounded-full text-sm hover:bg-purple-100 transition-colors"
+                        type="button"
+                        onClick={() => handleSendMessage(suggestion)}
+                        className="px-4 py-2.5 bg-purple-50 text-purple-700 rounded-full text-sm font-medium hover:bg-purple-100 active:bg-purple-200 transition-colors cursor-pointer touch-manipulation"
                       >
                         {suggestion}
                       </button>
@@ -643,7 +643,7 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
                   className="flex-1 px-4 py-3 bg-gray-100 border-0 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
                 />
                 <button
-                  onClick={handleSendMessage}
+                  onClick={() => handleSendMessage()}
                   disabled={!chatInput.trim() || isProcessingChat}
                   className={`w-12 h-12 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
                     chatInput.trim() && !isProcessingChat
