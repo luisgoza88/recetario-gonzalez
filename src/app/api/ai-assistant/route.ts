@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG } from '@/lib/gemini/client';
+import { FunctionDeclaration, Type } from '@google/genai';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,174 +9,132 @@ const supabase = createClient(
 );
 
 // ============================================
-// DEFINICIÓN DE FUNCIONES PARA OPENAI
+// DEFINICIÓN DE FUNCIONES PARA GEMINI
 // ============================================
 
-const functions: OpenAI.Chat.Completions.ChatCompletionTool[] = [
+const functionDeclarations: FunctionDeclaration[] = [
   // CONSULTAS - Recetario
   {
-    type: 'function',
-    function: {
-      name: 'get_today_menu',
-      description: 'Obtiene el menú programado para hoy (desayuno, almuerzo, cena)',
-      parameters: { type: 'object', properties: {}, required: [] }
+    name: 'get_today_menu',
+    description: 'Obtiene el menú programado para hoy (desayuno, almuerzo, cena)',
+    parameters: { type: Type.OBJECT, properties: {}, required: [] }
+  },
+  {
+    name: 'get_week_menu',
+    description: 'Obtiene el menú completo de la semana',
+    parameters: { type: Type.OBJECT, properties: {}, required: [] }
+  },
+  {
+    name: 'search_recipes',
+    description: 'Busca recetas por nombre o ingrediente',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        query: { type: Type.STRING, description: 'Término de búsqueda (nombre de receta o ingrediente)' }
+      },
+      required: ['query']
     }
   },
   {
-    type: 'function',
-    function: {
-      name: 'get_week_menu',
-      description: 'Obtiene el menú completo de la semana',
-      parameters: { type: 'object', properties: {}, required: [] }
-    }
+    name: 'get_inventory',
+    description: 'Obtiene el inventario actual de ingredientes disponibles',
+    parameters: { type: Type.OBJECT, properties: {}, required: [] }
   },
   {
-    type: 'function',
-    function: {
-      name: 'search_recipes',
-      description: 'Busca recetas por nombre o ingrediente',
-      parameters: {
-        type: 'object',
-        properties: {
-          query: { type: 'string', description: 'Término de búsqueda (nombre de receta o ingrediente)' }
-        },
-        required: ['query']
-      }
-    }
+    name: 'get_shopping_list',
+    description: 'Obtiene la lista de compras pendientes (items no marcados)',
+    parameters: { type: Type.OBJECT, properties: {}, required: [] }
   },
   {
-    type: 'function',
-    function: {
-      name: 'get_inventory',
-      description: 'Obtiene el inventario actual de ingredientes disponibles',
-      parameters: { type: 'object', properties: {}, required: [] }
-    }
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'get_shopping_list',
-      description: 'Obtiene la lista de compras pendientes (items no marcados)',
-      parameters: { type: 'object', properties: {}, required: [] }
-    }
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'suggest_recipe',
-      description: 'Sugiere una receta basada en los ingredientes disponibles en el inventario',
-      parameters: {
-        type: 'object',
-        properties: {
-          preferences: { type: 'string', description: 'Preferencias opcionales (ej: "algo ligero", "con pollo")' }
-        },
-        required: []
-      }
+    name: 'suggest_recipe',
+    description: 'Sugiere una receta basada en los ingredientes disponibles en el inventario',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        preferences: { type: Type.STRING, description: 'Preferencias opcionales (ej: "algo ligero", "con pollo")' }
+      },
+      required: []
     }
   },
   // CONSULTAS - Hogar
   {
-    type: 'function',
-    function: {
-      name: 'get_today_tasks',
-      description: 'Obtiene las tareas programadas para hoy de todos los empleados',
-      parameters: { type: 'object', properties: {}, required: [] }
+    name: 'get_today_tasks',
+    description: 'Obtiene las tareas programadas para hoy de todos los empleados',
+    parameters: { type: Type.OBJECT, properties: {}, required: [] }
+  },
+  {
+    name: 'get_employee_schedule',
+    description: 'Obtiene el horario de un empleado específico para hoy o esta semana',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        employee_name: { type: Type.STRING, description: 'Nombre del empleado (ej: Yolima, John)' },
+        period: { type: Type.STRING, description: 'Período a consultar (today o week)' }
+      },
+      required: ['employee_name']
     }
   },
   {
-    type: 'function',
-    function: {
-      name: 'get_employee_schedule',
-      description: 'Obtiene el horario de un empleado específico para hoy o esta semana',
-      parameters: {
-        type: 'object',
-        properties: {
-          employee_name: { type: 'string', description: 'Nombre del empleado (ej: Yolima, John)' },
-          period: { type: 'string', enum: ['today', 'week'], description: 'Período a consultar' }
-        },
-        required: ['employee_name']
-      }
-    }
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'get_tasks_summary',
-      description: 'Obtiene un resumen del progreso de tareas (completadas, pendientes, porcentaje)',
-      parameters: { type: 'object', properties: {}, required: [] }
-    }
+    name: 'get_tasks_summary',
+    description: 'Obtiene un resumen del progreso de tareas (completadas, pendientes, porcentaje)',
+    parameters: { type: Type.OBJECT, properties: {}, required: [] }
   },
   // ACCIONES - Recetario
   {
-    type: 'function',
-    function: {
-      name: 'add_to_shopping_list',
-      description: 'Agrega un item a la lista de compras',
-      parameters: {
-        type: 'object',
-        properties: {
-          item_name: { type: 'string', description: 'Nombre del item a agregar' },
-          quantity: { type: 'string', description: 'Cantidad (ej: "2 kg", "500g", "3 unidades")' }
-        },
-        required: ['item_name']
-      }
+    name: 'add_to_shopping_list',
+    description: 'Agrega un item a la lista de compras',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        item_name: { type: Type.STRING, description: 'Nombre del item a agregar' },
+        quantity: { type: Type.STRING, description: 'Cantidad (ej: "2 kg", "500g", "3 unidades")' }
+      },
+      required: ['item_name']
     }
   },
   {
-    type: 'function',
-    function: {
-      name: 'mark_shopping_item',
-      description: 'Marca o desmarca un item de la lista de compras',
-      parameters: {
-        type: 'object',
-        properties: {
-          item_name: { type: 'string', description: 'Nombre del item' },
-          checked: { type: 'boolean', description: 'true para marcar como comprado, false para desmarcar' }
-        },
-        required: ['item_name', 'checked']
-      }
+    name: 'mark_shopping_item',
+    description: 'Marca o desmarca un item de la lista de compras',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        item_name: { type: Type.STRING, description: 'Nombre del item' },
+        checked: { type: Type.BOOLEAN, description: 'true para marcar como comprado, false para desmarcar' }
+      },
+      required: ['item_name', 'checked']
     }
   },
   // ACCIONES - Hogar
   {
-    type: 'function',
-    function: {
-      name: 'complete_task',
-      description: 'Marca una tarea como completada',
-      parameters: {
-        type: 'object',
-        properties: {
-          task_name: { type: 'string', description: 'Nombre o descripción de la tarea' },
-          employee_name: { type: 'string', description: 'Nombre del empleado (opcional)' }
-        },
-        required: ['task_name']
-      }
+    name: 'complete_task',
+    description: 'Marca una tarea como completada',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        task_name: { type: Type.STRING, description: 'Nombre o descripción de la tarea' },
+        employee_name: { type: Type.STRING, description: 'Nombre del empleado (opcional)' }
+      },
+      required: ['task_name']
     }
   },
   {
-    type: 'function',
-    function: {
-      name: 'add_quick_task',
-      description: 'Agrega una tarea rápida para hoy',
-      parameters: {
-        type: 'object',
-        properties: {
-          task_name: { type: 'string', description: 'Nombre de la tarea' },
-          employee_name: { type: 'string', description: 'Nombre del empleado asignado' },
-          category: { type: 'string', description: 'Categoría (limpieza, cocina, lavandería, etc.)' }
-        },
-        required: ['task_name']
-      }
+    name: 'add_quick_task',
+    description: 'Agrega una tarea rápida para hoy',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        task_name: { type: Type.STRING, description: 'Nombre de la tarea' },
+        employee_name: { type: Type.STRING, description: 'Nombre del empleado asignado' },
+        category: { type: Type.STRING, description: 'Categoría (limpieza, cocina, lavandería, etc.)' }
+      },
+      required: ['task_name']
     }
   },
   // UTILIDADES
   {
-    type: 'function',
-    function: {
-      name: 'get_current_date_info',
-      description: 'Obtiene información de la fecha actual (día, semana del ciclo, etc.)',
-      parameters: { type: 'object', properties: {}, required: [] }
-    }
+    name: 'get_current_date_info',
+    description: 'Obtiene información de la fecha actual (día, semana del ciclo, etc.)',
+    parameters: { type: Type.OBJECT, properties: {}, required: [] }
   }
 ];
 
@@ -650,58 +605,80 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Messages required' }, { status: 400 });
     }
 
-    // Primera llamada a OpenAI
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        ...messages
-      ],
-      tools: functions,
-      tool_choice: 'auto',
-      max_tokens: 1000,
-      temperature: 0.7
+    const gemini = getGeminiClient();
+
+    // Convertir mensajes al formato de Gemini
+    const geminiMessages: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = messages.map((msg: { role: string; content: string }) => ({
+      role: msg.role === 'assistant' ? 'model' as const : 'user' as const,
+      parts: [{ text: msg.content }]
+    }));
+
+    // Primera llamada a Gemini con las funciones
+    const response = await gemini.models.generateContent({
+      model: GEMINI_MODELS.FLASH,
+      contents: geminiMessages,
+      config: {
+        temperature: GEMINI_CONFIG.assistant.temperature,
+        maxOutputTokens: GEMINI_CONFIG.assistant.maxOutputTokens,
+        systemInstruction: SYSTEM_PROMPT,
+        tools: [{
+          functionDeclarations
+        }]
+      }
     });
 
-    let assistantMessage = response.choices[0].message;
+    const candidate = response.candidates?.[0];
+    const parts = candidate?.content?.parts || [];
 
-    // Si hay llamadas a funciones, ejecutarlas
-    if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
-      const toolResults = [];
+    // Buscar si hay llamadas a funciones
+    const functionCalls = parts.filter(part => part.functionCall);
 
-      for (const toolCall of assistantMessage.tool_calls) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const tc = toolCall as any;
-        const functionName = tc.function.name;
-        const functionArgs = JSON.parse(tc.function.arguments || '{}');
+    if (functionCalls.length > 0) {
+      // Ejecutar todas las funciones
+      const functionResponses = [];
 
-        const result = await executeFunction(functionName, functionArgs);
+      for (const part of functionCalls) {
+        const fc = part.functionCall!;
+        if (!fc.name) continue;
+        const result = await executeFunction(fc.name, fc.args as Record<string, unknown> || {});
 
-        toolResults.push({
-          tool_call_id: tc.id,
-          role: 'tool' as const,
-          content: JSON.stringify(result)
+        functionResponses.push({
+          functionResponse: {
+            name: fc.name,
+            response: result
+          }
         });
       }
 
       // Segunda llamada con los resultados de las funciones
-      const finalResponse = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          ...messages,
-          assistantMessage,
-          ...toolResults
-        ],
-        max_tokens: 1000,
-        temperature: 0.7
+      const finalResponse = await gemini.models.generateContent({
+        model: GEMINI_MODELS.FLASH,
+        contents: [
+          ...geminiMessages,
+          { role: 'model' as const, parts: parts },
+          { role: 'user' as const, parts: functionResponses }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ] as any,
+        config: {
+          temperature: GEMINI_CONFIG.assistant.temperature,
+          maxOutputTokens: GEMINI_CONFIG.assistant.maxOutputTokens,
+          systemInstruction: SYSTEM_PROMPT,
+        }
       });
 
-      assistantMessage = finalResponse.choices[0].message;
+      const finalContent = finalResponse.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+      return NextResponse.json({
+        content: finalContent,
+        role: 'assistant'
+      });
     }
 
+    // Si no hay llamadas a funciones, devolver la respuesta directa
+    const textContent = parts.find(part => part.text)?.text || '';
+
     return NextResponse.json({
-      content: assistantMessage.content,
+      content: textContent,
       role: 'assistant'
     });
 

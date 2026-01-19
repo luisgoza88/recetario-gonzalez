@@ -60,11 +60,11 @@ export default function SettingsView() {
         <div className="space-y-2">
           <div className="bg-white rounded-xl p-4 flex items-center gap-4">
             <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-              FG
+              MH
             </div>
             <div className="flex-1">
-              <p className="font-semibold text-lg">Familia González</p>
-              <p className="text-gray-500 text-sm">2 miembros · Luis & Mariana</p>
+              <p className="font-semibold text-lg">Mi Hogar</p>
+              <p className="text-gray-500 text-sm">2 miembros</p>
             </div>
             <ChevronRight size={20} className="text-gray-400" />
           </div>
@@ -79,11 +79,11 @@ export default function SettingsView() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-lg">👨</span>
+                  <span className="text-lg">🍽️</span>
                 </div>
                 <div>
-                  <p className="font-medium">Luis</p>
-                  <p className="text-sm text-gray-500">Porciones grandes</p>
+                  <p className="font-medium">Porción grande</p>
+                  <p className="text-sm text-gray-500">Plato principal</p>
                 </div>
               </div>
               <span className="text-2xl font-bold text-blue-600">3</span>
@@ -92,15 +92,15 @@ export default function SettingsView() {
           <div className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center">
-                  <span className="text-lg">👩</span>
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                  <span className="text-lg">🥗</span>
                 </div>
                 <div>
-                  <p className="font-medium">Mariana</p>
-                  <p className="text-sm text-gray-500">Porciones normales</p>
+                  <p className="font-medium">Porción pequeña</p>
+                  <p className="text-sm text-gray-500">Plato ligero</p>
                 </div>
               </div>
-              <span className="text-2xl font-bold text-pink-600">2</span>
+              <span className="text-2xl font-bold text-green-600">2</span>
             </div>
           </div>
         </div>

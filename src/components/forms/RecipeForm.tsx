@@ -406,7 +406,7 @@ export default function RecipeForm({ recipe, onClose, onSuccess }: RecipeFormPro
             <label className="block text-sm font-medium mb-2">Porciones resumidas</label>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Luis</label>
+                <label className="block text-xs text-gray-500 mb-1">Porción grande</label>
                 <input
                   type="text"
                   value={portionsLuis}
@@ -416,7 +416,7 @@ export default function RecipeForm({ recipe, onClose, onSuccess }: RecipeFormPro
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Mariana</label>
+                <label className="block text-xs text-gray-500 mb-1">Porción pequeña</label>
                 <input
                   type="text"
                   value={portionsMariana}
@@ -432,43 +432,58 @@ export default function RecipeForm({ recipe, onClose, onSuccess }: RecipeFormPro
           <div className="mb-4">
             <label className="block text-sm font-medium mb-2">Ingredientes *</label>
             {ingredients.map((ing, index) => (
-              <div key={index} className="flex gap-2 mb-2">
-                <input
-                  type="text"
-                  value={ing.name}
-                  onChange={e => updateIngredient(index, 'name', e.target.value)}
-                  className="flex-1 p-2 border rounded-lg text-sm"
-                  placeholder="Ingrediente"
-                />
-                <input
-                  type="text"
-                  value={ing.total || ''}
-                  onChange={e => updateIngredient(index, 'total', e.target.value)}
-                  className="w-20 p-2 border rounded-lg text-sm"
-                  placeholder="Total"
-                />
-                <input
-                  type="text"
-                  value={ing.luis}
-                  onChange={e => updateIngredient(index, 'luis', e.target.value)}
-                  className="w-20 p-2 border rounded-lg text-sm"
-                  placeholder="Luis"
-                />
-                <input
-                  type="text"
-                  value={ing.mariana}
-                  onChange={e => updateIngredient(index, 'mariana', e.target.value)}
-                  className="w-20 p-2 border rounded-lg text-sm"
-                  placeholder="Mariana"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeIngredient(index)}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                  disabled={ingredients.length === 1}
-                >
-                  <Trash2 size={16} />
-                </button>
+              <div key={index} className="mb-3 p-3 bg-gray-50 rounded-lg">
+                {/* Row 1: Name + Delete */}
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={ing.name}
+                    onChange={e => updateIngredient(index, 'name', e.target.value)}
+                    className="flex-1 p-2 border rounded-lg text-sm bg-white"
+                    placeholder="Nombre del ingrediente"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeIngredient(index)}
+                    className="p-2 text-red-600 hover:bg-red-100 rounded-lg shrink-0"
+                    disabled={ingredients.length === 1}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+                {/* Row 2: Total, Porción grande, Porción pequeña */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Total</label>
+                    <input
+                      type="text"
+                      value={ing.total || ''}
+                      onChange={e => updateIngredient(index, 'total', e.target.value)}
+                      className="w-full p-2 border rounded-lg text-sm bg-white"
+                      placeholder="500g"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">P. grande</label>
+                    <input
+                      type="text"
+                      value={ing.luis}
+                      onChange={e => updateIngredient(index, 'luis', e.target.value)}
+                      className="w-full p-2 border rounded-lg text-sm bg-white"
+                      placeholder="300g"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">P. pequeña</label>
+                    <input
+                      type="text"
+                      value={ing.mariana}
+                      onChange={e => updateIngredient(index, 'mariana', e.target.value)}
+                      className="w-full p-2 border rounded-lg text-sm bg-white"
+                      placeholder="200g"
+                    />
+                  </div>
+                </div>
               </div>
             ))}
             <button

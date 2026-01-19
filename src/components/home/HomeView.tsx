@@ -14,6 +14,7 @@ type ActiveModal =
   | { type: 'none' }
   | { type: 'setup' }
   | { type: 'employees' }
+  | { type: 'employeeDetail'; employee: HomeEmployee }
   | { type: 'spaces'; initialCategory: 'interior' | 'exterior' }
   | { type: 'scheduleGenerator' }
   | { type: 'optimizer' }
@@ -30,6 +31,7 @@ type ActiveModal =
   | { type: 'scheduleEditor' };
 import HomeSetupWizard from './HomeSetupWizard';
 import EmployeesPanel from './EmployeesPanel';
+import EmployeeDetailModal from './EmployeeDetailModal';
 import SpacesPanel from './SpacesPanel';
 import ScheduleGenerator from './ScheduleGenerator';
 import ScheduleOptimizer from './ScheduleOptimizer';
@@ -485,7 +487,11 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
         {employees.length > 0 && (
           <div className="divide-y">
             {employees.map(emp => (
-              <div key={emp.id} className="p-4 flex items-center gap-3">
+              <button
+                key={emp.id}
+                onClick={() => openModal({ type: 'employeeDetail', employee: emp })}
+                className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left"
+              >
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                   emp.zone === 'interior' ? 'bg-blue-100' :
                   emp.zone === 'exterior' ? 'bg-green-100' : 'bg-purple-100'
@@ -502,10 +508,13 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
                      emp.zone === 'exterior' ? '🌳 Exterior' : '🏡 Ambos'}
                   </p>
                 </div>
-                <span className="text-xs text-gray-400">
-                  {emp.work_days?.length || 0} días/sem
-                </span>
-              </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400">
+                    {emp.work_days?.length || 0} días/sem
+                  </span>
+                  <ChevronRight size={16} className="text-gray-400" />
+                </div>
+              </button>
             ))}
           </div>
         )}
@@ -518,6 +527,17 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
           employees={employees}
           onClose={closeModal}
           onUpdate={() => loadHouseholdData(household.id)}
+        />
+      )}
+
+      {activeModal.type === 'employeeDetail' && household && (
+        <EmployeeDetailModal
+          employee={activeModal.employee}
+          householdId={household.id}
+          spaces={spaces}
+          onClose={closeModal}
+          onUpdate={() => loadHouseholdData(household.id)}
+          onDelete={() => loadHouseholdData(household.id)}
         />
       )}
 

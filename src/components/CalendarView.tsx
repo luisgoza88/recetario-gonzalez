@@ -151,6 +151,13 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
   const selectDate = (date: Date) => {
     setSelectedDate(date);
     setExpandedRecipe(null);
+    // Auto-scroll to show day detail after selection
+    setTimeout(() => {
+      const dayDetail = document.getElementById('day-detail');
+      if (dayDetail) {
+        dayDetail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
   };
 
   const toggleDayComplete = async () => {
@@ -242,8 +249,125 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
     return days;
   };
 
+  // Render para domingos (día libre - generar con IA)
+  const renderSundayDetail = () => {
+    if (!selectedDate || selectedDate.getDay() !== 0) return null;
+
+    const dayName = WEEKDAYS[selectedDate.getDay()];
+
+    return (
+      <div className="mt-4">
+        {/* Day Header */}
+        <div className="bg-gradient-to-r from-purple-600 to-purple-500 text-white p-4 rounded-t-xl flex justify-between items-center">
+          <h3 className="font-semibold">
+            📅 {dayName} {selectedDate.getDate()} {MONTHS[selectedDate.getMonth()]}
+          </h3>
+          <span className="bg-white/20 px-3 py-1 rounded-full text-sm flex items-center gap-1">
+            <Sparkles size={14} />
+            Día Libre
+          </span>
+        </div>
+
+        {/* Domingo Info */}
+        <div className="bg-purple-50 border-l-4 border-purple-500 p-4">
+          <div className="flex items-center gap-2 text-purple-700 text-sm font-medium">
+            <Sparkles size={16} />
+            DÍA SIN MENÚ PROGRAMADO
+          </div>
+          <p className="text-purple-800 mt-1">
+            ¿Quieres cocinar hoy? Genera recetas con IA basadas en tus ingredientes disponibles.
+          </p>
+        </div>
+
+        {/* Generate Meals with AI */}
+        <div className="bg-white p-4 space-y-3">
+          {/* Breakfast */}
+          <div className="flex justify-between items-center p-3 bg-orange-50 rounded-xl border border-orange-100">
+            <div>
+              <span className="text-orange-600 text-sm font-medium">🍳 DESAYUNO</span>
+              <p className="text-gray-600 text-sm">Sin planificar</p>
+            </div>
+            <button
+              onClick={() => setSuggestionsRecipe({
+                recipe: {
+                  id: 'generate-breakfast',
+                  name: 'Generar desayuno',
+                  type: 'breakfast',
+                  ingredients: [],
+                  steps: []
+                },
+                mealType: 'breakfast'
+              })}
+              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center gap-2 text-sm font-medium"
+            >
+              <Sparkles size={16} />
+              Generar con IA
+            </button>
+          </div>
+
+          {/* Lunch */}
+          <div className="flex justify-between items-center p-3 bg-green-50 rounded-xl border border-green-100">
+            <div>
+              <span className="text-green-600 text-sm font-medium">🍗 ALMUERZO</span>
+              <p className="text-gray-600 text-sm">Sin planificar</p>
+            </div>
+            <button
+              onClick={() => setSuggestionsRecipe({
+                recipe: {
+                  id: 'generate-lunch',
+                  name: 'Generar almuerzo',
+                  type: 'lunch',
+                  ingredients: [],
+                  steps: []
+                },
+                mealType: 'lunch'
+              })}
+              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center gap-2 text-sm font-medium"
+            >
+              <Sparkles size={16} />
+              Generar con IA
+            </button>
+          </div>
+
+          {/* Dinner */}
+          <div className="flex justify-between items-center p-3 bg-blue-50 rounded-xl border border-blue-100">
+            <div>
+              <span className="text-blue-600 text-sm font-medium">🌙 CENA</span>
+              <p className="text-gray-600 text-sm">Sin planificar</p>
+            </div>
+            <button
+              onClick={() => setSuggestionsRecipe({
+                recipe: {
+                  id: 'generate-dinner',
+                  name: 'Generar cena',
+                  type: 'dinner',
+                  ingredients: [],
+                  steps: []
+                },
+                mealType: 'dinner'
+              })}
+              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center gap-2 text-sm font-medium"
+            >
+              <Sparkles size={16} />
+              Generar con IA
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-gray-100 p-3 rounded-b-xl text-center text-sm text-gray-500">
+          💡 La IA generará recetas usando los ingredientes de tu inventario
+        </div>
+      </div>
+    );
+  };
+
   const renderDayDetail = () => {
     if (!selectedDate) return null;
+
+    // Si es domingo, mostrar UI especial
+    if (selectedDate.getDay() === 0) {
+      return renderSundayDetail();
+    }
 
     const menu = getMenuForDate(selectedDate);
     if (!menu) return null;
@@ -439,13 +563,15 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
           <span>Seleccionado</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-gray-100 border rounded" />
-          <span>Domingo</span>
+          <div className="w-3 h-3 bg-purple-50 border border-purple-300 rounded" />
+          <span>Domingo (IA)</span>
         </div>
       </div>
 
       {/* Day Detail */}
-      {renderDayDetail()}
+      <div id="day-detail">
+        {renderDayDetail()}
+      </div>
 
       {/* Recipe Modal */}
       {selectedRecipe && (
@@ -557,27 +683,25 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
 
   return (
     <>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50">
-              <th className="p-2 text-left">Ingrediente</th>
-              {hasTotal && <th className="p-2 text-left">Total</th>}
-              <th className="p-2 text-left">Luis</th>
-              <th className="p-2 text-left">Mariana</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ingredients.map((ing, i) => (
-              <tr key={i} className="border-b">
-                <td className="p-2">{ing.name}</td>
-                {hasTotal && <td className="p-2">{ing.total || ''}</td>}
-                <td className="p-2">{ing.luis}</td>
-                <td className="p-2">{ing.mariana}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="space-y-2">
+        {ingredients.map((ing, i) => (
+          <div key={i} className="p-3 bg-gray-50 rounded-lg">
+            <div className="font-medium text-sm mb-1">{ing.name}</div>
+            <div className="grid grid-cols-3 gap-2 text-xs text-gray-600">
+              {hasTotal && (
+                <div>
+                  <span className="text-gray-400">Total:</span> {ing.total || ''}
+                </div>
+              )}
+              <div>
+                <span className="text-gray-400">Grande:</span> {ing.luis}
+              </div>
+              <div>
+                <span className="text-gray-400">Pequeña:</span> {ing.mariana}
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       <ol className="mt-4 list-decimal pl-5 space-y-1 text-sm">

@@ -142,6 +142,7 @@ export default function SmartSuggestions({
   const [savingRecipe, setSavingRecipe] = useState(false);
   const [selectedStyle, setSelectedStyle] = useState<RecipeStyle>('saludable');
   const [showStyleSelector, setShowStyleSelector] = useState(true);
+  const [userPreferences, setUserPreferences] = useState<string>('');
 
   // Modo especial: generar receta desde cero (sin receta existente)
   const isGenerateMode = recipe.id === 'generate-dinner' || recipe.id === 'generate-lunch' || recipe.id === 'generate-breakfast';
@@ -195,6 +196,12 @@ export default function SmartSuggestions({
     setAiError(null);
     setShowStyleSelector(false); // Ocultar selector mientras genera
 
+    // Construir array de preferencias
+    const preferences = ['Fácil de preparar'];
+    if (userPreferences.trim()) {
+      preferences.push(userPreferences.trim());
+    }
+
     try {
       const response = await fetch('/api/generate-recipe', {
         method: 'POST',
@@ -204,7 +211,8 @@ export default function SmartSuggestions({
           mealType,
           servings: 5,
           recipeStyle: selectedStyle,
-          preferences: ['Fácil de preparar']
+          preferences,
+          userRequest: userPreferences.trim() || undefined
         })
       });
 
@@ -487,6 +495,25 @@ export default function SmartSuggestions({
                         </button>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {/* User Preferences Input */}
+                {showStyleSelector && !aiRecipe && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      ¿Alguna preferencia específica? <span className="text-gray-400 font-normal">(opcional)</span>
+                    </label>
+                    <textarea
+                      value={userPreferences}
+                      onChange={(e) => setUserPreferences(e.target.value)}
+                      placeholder="Ej: Quiero algo con atún, una sopa caliente, usar el pollo que tengo, algo con pasta..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none"
+                      rows={2}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      💡 Escribe ingredientes específicos, tipo de plato, o cualquier preferencia
+                    </p>
                   </div>
                 )}
 

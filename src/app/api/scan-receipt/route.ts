@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, cleanJsonResponse } from '@/lib/gemini/client';
 
 // Categorías disponibles para mapear
 const CATEGORIES_MAP: Record<string, { id: string; name: string; icon: string }> = {
@@ -52,15 +48,9 @@ export async function POST(request: NextRequest) {
     const base64 = Buffer.from(bytes).toString('base64');
     const mimeType = image.type || 'image/jpeg';
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `Analiza esta imagen de un recibo de supermercado y extrae todos los productos comprados.
+    const gemini = getGeminiClient();
+
+    const prompt = `Analiza esta imagen de un recibo de supermercado y extrae todos los productos comprados.
 
 Para cada producto, identifica:
 - name: nombre del producto (limpio, sin códigos)
@@ -86,43 +76,37 @@ Responde ÚNICAMENTE con JSON válido en este formato exacto:
   "total": "total de la compra si es visible"
 }
 
-Si no puedes leer claramente el recibo, devuelve: {"items": [], "error": "No se pudo leer el recibo"}
+Si no puedes leer claramente el recibo, devuelve: {"items": [], "error": "No se pudo leer el recibo"}`;
 
-IMPORTANTE: Solo devuelve el JSON, sin texto adicional ni markdown.`
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:${mimeType};base64,${base64}`,
-                detail: 'high'
-              }
+    const response = await gemini.models.generateContent({
+      model: GEMINI_MODELS.FLASH,
+      contents: [{
+        role: 'user',
+        parts: [
+          { text: prompt },
+          {
+            inlineData: {
+              data: base64,
+              mimeType: mimeType
             }
-          ]
-        }
-      ],
-      max_tokens: 2000,
-      temperature: 0.3,
+          }
+        ]
+      }],
+      config: {
+        temperature: GEMINI_CONFIG.parsing.temperature,
+        maxOutputTokens: GEMINI_CONFIG.parsing.maxOutputTokens,
+        responseMimeType: 'application/json',
+      },
     });
 
-    const content = response.choices[0]?.message?.content;
+    const content = response.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!content) {
       return NextResponse.json({ items: [], error: 'No hubo respuesta de la IA' });
     }
 
     // Clean and parse response
-    let jsonContent = content;
-    jsonContent = jsonContent.replace(/```json\s*/gi, '');
-    jsonContent = jsonContent.replace(/```\s*/g, '');
-    const firstBrace = jsonContent.indexOf('{');
-    if (firstBrace > 0) {
-      jsonContent = jsonContent.slice(firstBrace);
-    }
-    const lastBrace = jsonContent.lastIndexOf('}');
-    if (lastBrace !== -1 && lastBrace < jsonContent.length - 1) {
-      jsonContent = jsonContent.slice(0, lastBrace + 1);
-    }
-
+    const jsonContent = cleanJsonResponse(content);
     const parsed = JSON.parse(jsonContent);
 
     if (parsed.error) {

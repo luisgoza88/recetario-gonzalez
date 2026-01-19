@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, cleanJsonResponse } from '@/lib/gemini/client';
+import { getProteinIcon } from '@/lib/categoryIcons';
 
 // Categorías disponibles con ejemplos para ayudar a la IA
 const CATEGORIES_INFO = {
   proteins: {
     id: 'proteins',
     name: 'Proteínas',
-    icon: '🥩',
+    icon: '🥩', // Default, será sobrescrito por getProteinIcon
     examples: ['pollo', 'res', 'cerdo', 'pescado', 'camarones', 'atún', 'huevos', 'tocineta', 'jamón', 'salchicha', 'carne molida', 'langostinos', 'salmón', 'tilapia']
   },
   dairy: {
@@ -144,35 +141,32 @@ Responde SOLO con JSON válido en este formato:
 
 Separa múltiples productos si los hay (pueden estar separados por comas, "y", o saltos de línea).`;
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      temperature: 0.3,
-      max_tokens: 1500,
+    const gemini = getGeminiClient();
+
+    const response = await gemini.models.generateContent({
+      model: GEMINI_MODELS.FLASH,
+      contents: [{
+        role: 'user',
+        parts: [
+          { text: systemPrompt },
+          { text: userPrompt }
+        ]
+      }],
+      config: {
+        temperature: GEMINI_CONFIG.parsing.temperature,
+        maxOutputTokens: GEMINI_CONFIG.parsing.maxOutputTokens,
+        responseMimeType: 'application/json',
+      },
     });
 
-    const content = completion.choices[0]?.message?.content;
+    const content = response.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!content) {
       return NextResponse.json({ error: 'No response from AI' }, { status: 500 });
     }
 
     // Limpiar y parsear la respuesta
-    let jsonContent = content;
-    jsonContent = jsonContent.replace(/```json\s*/gi, '');
-    jsonContent = jsonContent.replace(/```\s*/g, '');
-    const firstBrace = jsonContent.indexOf('{');
-    if (firstBrace > 0) {
-      jsonContent = jsonContent.slice(firstBrace);
-    }
-    const lastBrace = jsonContent.lastIndexOf('}');
-    if (lastBrace !== -1 && lastBrace < jsonContent.length - 1) {
-      jsonContent = jsonContent.slice(0, lastBrace + 1);
-    }
-
+    const jsonContent = cleanJsonResponse(content);
     const parsed = JSON.parse(jsonContent);
 
     // Mapear la respuesta al formato esperado
@@ -188,13 +182,18 @@ Separa múltiples productos si los hay (pueden estar separados por comas, "y", o
     }) => {
       const categoryInfo = CATEGORIES_INFO[item.categoryId as keyof typeof CATEGORIES_INFO] || CATEGORIES_INFO.other;
 
+      // Usar icono específico para subcategorías de proteínas
+      const icon = item.categoryId === 'proteins'
+        ? getProteinIcon(item.name)
+        : categoryInfo.icon;
+
       return {
         name: item.name,
         originalInput: item.originalInput || item.name,
         category: {
           id: categoryInfo.id,
           name: categoryInfo.name,
-          icon: categoryInfo.icon
+          icon: icon
         },
         quantity: item.quantity || 1,
         unit: item.unit || 'unid',

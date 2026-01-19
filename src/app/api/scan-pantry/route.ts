@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, cleanJsonResponse, base64ToGeminiFormat } from '@/lib/gemini/client';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -38,11 +34,16 @@ interface ScanResult {
 
 export async function POST(request: NextRequest) {
   try {
-    const { image } = await request.json();
+    const body = await request.json();
 
-    if (!image) {
-      return NextResponse.json({ error: 'No se proporcionó imagen' }, { status: 400 });
+    // Soportar tanto 'image' (single) como 'images' (array) para compatibilidad
+    const images: string[] = body.images || (body.image ? [body.image] : []);
+
+    if (images.length === 0) {
+      return NextResponse.json({ error: 'No se proporcionaron imágenes' }, { status: 400 });
     }
+
+    const gemini = getGeminiClient();
 
     // 1. Obtener lista actual de items del mercado para matching
     const { data: marketItems } = await supabase
@@ -51,13 +52,7 @@ export async function POST(request: NextRequest) {
 
     const marketItemsList = marketItems?.map(i => `- ${i.name} (${i.category})`).join('\n') || '';
 
-    // 2. Usar GPT-4o Vision para identificar productos
-    const visionResponse = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: `Eres un asistente experto en identificar productos de despensa y nevera en fotos.
+    const systemPrompt = `Eres un asistente experto en identificar productos de despensa y nevera en fotos.
 
 Tu tarea es:
 1. Identificar TODOS los productos visibles en la imagen
@@ -97,49 +92,95 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura:
     }
   ],
   "summary": "Resumen breve de lo que se encontró"
-}`
-        },
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: 'Identifica todos los productos en esta imagen de mi despensa/nevera. Convierte las marcas a nombres genéricos.'
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: image,
-                detail: 'high'
-              }
-            }
-          ]
+}`;
+
+    // 2. Procesar todas las imágenes en paralelo con Gemini Vision
+    const allProducts: IdentifiedProduct[] = [];
+    const summaries: string[] = [];
+
+    const imagePromises = images.map(async (imageUrl, index) => {
+      try {
+        const imageData = base64ToGeminiFormat(imageUrl);
+
+        const response = await gemini.models.generateContent({
+          model: GEMINI_MODELS.FLASH,
+          contents: [{
+            role: 'user',
+            parts: [
+              { text: systemPrompt },
+              imageData,
+              { text: `Identifica todos los productos en esta imagen ${index + 1} de mi despensa/nevera. Convierte las marcas a nombres genéricos.` }
+            ]
+          }],
+          config: {
+            temperature: GEMINI_CONFIG.parsing.temperature,
+            maxOutputTokens: GEMINI_CONFIG.parsing.maxOutputTokens,
+            responseMimeType: 'application/json',
+          },
+        });
+
+        const content = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+        try {
+          const jsonContent = cleanJsonResponse(content);
+          const productsData = JSON.parse(jsonContent);
+          return {
+            products: productsData.products || [],
+            summary: productsData.summary || ''
+          };
+        } catch {
+          return { products: [], summary: '' };
         }
-      ],
-      max_tokens: 2000,
-      temperature: 0.3,
+      } catch (err) {
+        console.error(`Error processing image ${index + 1}:`, err);
+        return { products: [], summary: '' };
+      }
     });
 
-    const content = visionResponse.choices[0]?.message?.content || '';
+    const results = await Promise.all(imagePromises);
 
-    // Extraer JSON de la respuesta
-    let productsData;
-    try {
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        productsData = JSON.parse(jsonMatch[0]);
+    // Combinar resultados de todas las imágenes
+    for (const result of results) {
+      allProducts.push(...result.products);
+      if (result.summary) summaries.push(result.summary);
+    }
+
+    // 3. Deduplicar productos por nombre genérico (sumar cantidades si se repiten)
+    const productMap = new Map<string, IdentifiedProduct>();
+
+    for (const product of allProducts) {
+      const key = product.genericName.toLowerCase();
+      const existing = productMap.get(key);
+
+      if (existing) {
+        // Sumar cantidades si el producto ya existe
+        existing.quantity += product.quantity;
+        // Mantener la mayor confianza
+        existing.confidence = Math.max(existing.confidence, product.confidence);
       } else {
-        throw new Error('No JSON found');
+        productMap.set(key, { ...product });
       }
-    } catch {
-      console.error('Error parsing vision response:', content);
+    }
+
+    const deduplicatedProducts = Array.from(productMap.values());
+
+    // Crear resumen combinado
+    const combinedSummary = images.length > 1
+      ? `Se analizaron ${images.length} imágenes. ${summaries.join(' ')}`
+      : summaries[0] || 'Análisis completado';
+
+    const productsData = {
+      products: deduplicatedProducts,
+      summary: combinedSummary
+    };
+
+    if (deduplicatedProducts.length === 0) {
       return NextResponse.json({
-        error: 'No se pudieron identificar productos en la imagen',
-        rawResponse: content
+        error: 'No se pudieron identificar productos en las imágenes',
       }, { status: 400 });
     }
 
-    // 3. Procesar productos identificados
+    // 4. Procesar productos identificados
     const result: ScanResult = {
       identified: productsData.products || [],
       matched: [],

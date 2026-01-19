@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, cleanJsonResponse } from '@/lib/gemini/client';
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
@@ -30,10 +30,11 @@ interface GenerateRecipeRequest {
   mealType: 'breakfast' | 'lunch' | 'dinner';
   servings?: number;
   preferences?: string[];
-  recipeStyle?: RecipeStyle; // Nuevo: tipo de receta deseada
-  recentRecipes?: string[]; // Nombres de recetas recientes a evitar
-  ingredientsByCategory?: Record<string, string[]>; // Ingredientes agrupados por categoría
-  customItems?: string[]; // Items personalizados/nuevos en despensa
+  recipeStyle?: RecipeStyle;
+  recentRecipes?: string[];
+  ingredientsByCategory?: Record<string, string[]>;
+  customItems?: string[];
+  generateImage?: boolean; // Nueva opción para generar imagen junto con la receta
 }
 
 interface Preparation {
@@ -100,12 +101,7 @@ async function getRecentRecipeNames(): Promise<string[]> {
 
 export async function POST(request: NextRequest) {
   try {
-    if (!OPENAI_API_KEY) {
-      return NextResponse.json(
-        { error: 'OpenAI API key not configured' },
-        { status: 500 }
-      );
-    }
+    const gemini = getGeminiClient();
 
     const body: GenerateRecipeRequest = await request.json();
     const {
@@ -116,7 +112,8 @@ export async function POST(request: NextRequest) {
       recipeStyle = 'saludable',
       recentRecipes = [],
       ingredientsByCategory,
-      customItems = []
+      customItems = [],
+      generateImage = false
     } = body;
 
     // Instrucciones específicas según el estilo de receta
@@ -186,7 +183,7 @@ Por favor NO sugieras estas recetas ni variaciones muy similares.
     let ingredientsSection = '';
     if (ingredientsByCategory && Object.keys(ingredientsByCategory).length > 0) {
       ingredientsSection = Object.entries(ingredientsByCategory)
-        .map(([category, items]) => `📦 ${category}:\n${items.map(i => `  - ${i}`).join('\n')}`)
+        .map(([category, items]) => `${category}:\n${items.map(i => `  - ${i}`).join('\n')}`)
         .join('\n\n');
     } else {
       ingredientsSection = ingredientsList.join('\n');
@@ -196,10 +193,10 @@ Por favor NO sugieras estas recetas ni variaciones muy similares.
     let customSection = '';
     if (customItems.length > 0) {
       customSection = `
-⭐ INGREDIENTES ESPECIALES (Compras recientes/regalos que queremos usar):
+INGREDIENTES ESPECIALES (Compras recientes/regalos que queremos usar):
 ${customItems.map(c => `- ${c}`).join('\n')}
 
-¡PRIORIZA usar estos ingredientes especiales! La familia los tiene disponibles y quiere aprovecharlos.
+PRIORIZA usar estos ingredientes especiales! La familia los tiene disponibles y quiere aprovecharlos.
 `;
     }
 
@@ -257,40 +254,21 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura exacta:
   "usedPreparations": ["lista de preparaciones caseras usadas (si aplica)"]
 }`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
+    // Llamar a Gemini
+    const response = await gemini.models.generateContent({
+      model: GEMINI_MODELS.FLASH,
+      contents: [{
+        role: 'user',
+        parts: [{ text: prompt }]
+      }],
+      config: {
+        temperature: GEMINI_CONFIG.recipe.temperature,
+        maxOutputTokens: GEMINI_CONFIG.recipe.maxOutputTokens,
+        responseMimeType: 'application/json',
       },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'Eres un asistente de cocina experto. Siempre respondes en JSON válido sin texto adicional.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 2000
-      })
     });
 
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error('OpenAI API error:', errorData);
-      return NextResponse.json(
-        { error: 'Error generating recipe' },
-        { status: 500 }
-      );
-    }
-
-    const data = await response.json();
-    const content = data.choices[0]?.message?.content;
+    const content = response.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!content) {
       return NextResponse.json(
@@ -301,31 +279,7 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura exacta:
 
     // Parse JSON response with robust cleaning
     try {
-      let jsonContent = content;
-
-      // Remove markdown code blocks (various formats)
-      jsonContent = jsonContent.replace(/```json\s*/gi, '');
-      jsonContent = jsonContent.replace(/```\s*/g, '');
-
-      // Remove any text before the first {
-      const firstBrace = jsonContent.indexOf('{');
-      if (firstBrace > 0) {
-        jsonContent = jsonContent.slice(firstBrace);
-      }
-
-      // Remove any text after the last }
-      const lastBrace = jsonContent.lastIndexOf('}');
-      if (lastBrace !== -1 && lastBrace < jsonContent.length - 1) {
-        jsonContent = jsonContent.slice(0, lastBrace + 1);
-      }
-
-      // Clean common JSON issues
-      jsonContent = jsonContent
-        .replace(/[\x00-\x1F\x7F]/g, ' ') // Remove control characters
-        .replace(/,\s*}/g, '}')           // Remove trailing commas before }
-        .replace(/,\s*]/g, ']')           // Remove trailing commas before ]
-        .trim();
-
+      const jsonContent = cleanJsonResponse(content);
       const recipe = JSON.parse(jsonContent);
 
       // Validate essential fields
@@ -333,15 +287,56 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura exacta:
         throw new Error('Missing required recipe fields');
       }
 
+      // Si se solicitó generar imagen, hacerlo de forma asíncrona
+      let recipeImage = null;
+      if (generateImage) {
+        try {
+          // Generar imagen con Gemini
+          const ingredientNames = recipe.ingredients
+            .map((ing: { name: string }) => ing.name)
+            .slice(0, 5);
+
+          const imagePrompt = `Genera una fotografía profesional de comida del plato "${recipe.name}".
+${recipe.description ? `Descripción: ${recipe.description}` : ''}
+Ingredientes principales: ${ingredientNames.join(', ')}.
+Estilo: Fotografía gastronómica profesional, luz natural, plato emplatado elegantemente, fondo desenfocado.`;
+
+          const imageResponse = await gemini.models.generateContent({
+            model: GEMINI_MODELS.FLASH_IMAGE,
+            contents: [{
+              role: 'user',
+              parts: [{ text: imagePrompt }]
+            }],
+            config: {
+              responseModalities: ['image', 'text'],
+              responseMimeType: 'image/png',
+            },
+          });
+
+          const imageParts = imageResponse.candidates?.[0]?.content?.parts;
+          if (imageParts) {
+            for (const part of imageParts) {
+              if (part.inlineData) {
+                recipeImage = `data:image/png;base64,${part.inlineData.data}`;
+                break;
+              }
+            }
+          }
+        } catch (imageError) {
+          console.error('Error generating recipe image:', imageError);
+          // No fallar si la imagen no se genera
+        }
+      }
+
       return NextResponse.json({
         success: true,
-        recipe
+        recipe,
+        image: recipeImage
       });
     } catch (parseError) {
       console.error('JSON parse error:', parseError);
       console.error('Raw content:', content.slice(0, 500));
 
-      // Return a more helpful error
       return NextResponse.json(
         {
           error: 'Error al procesar la receta generada. Por favor intenta de nuevo.',

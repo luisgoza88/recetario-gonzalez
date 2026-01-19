@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { RotateCcw, ShoppingCart, Home, Minus, Plus, Edit2, Check, X, AlertTriangle, Search, Sparkles, Trash2, WifiOff, Camera } from 'lucide-react';
+import { RotateCcw, ShoppingCart, Home, Minus, Plus, Edit2, Check, X, AlertTriangle, Search, Sparkles, Trash2, WifiOff, Camera, PlusIcon } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { MarketItem, IngredientCategory } from '@/types';
 import { CATEGORY_EMOJIS } from '@/data/market';
+import { getItemIcon, isProteinCategory } from '@/lib/categoryIcons';
 import AddCustomItemModal from './AddCustomItemModal';
 import ScanPantryModal from './ScanPantryModal';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
@@ -25,6 +26,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showScanModal, setShowScanModal] = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
   const [categoryData, setCategoryData] = useState<Record<string, IngredientCategory>>({});
   const [isFromCache, setIsFromCache] = useState(false);
 
@@ -317,10 +319,16 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
 
   // Obtener emoji de categoría (usando category_id o category legacy)
   const getCategoryEmoji = (item: MarketItem) => {
+    // Obtener icono base de la categoría
+    let baseIcon = '📦';
     if (item.category_id && categoryData[item.category_id]) {
-      return categoryData[item.category_id].icon;
+      baseIcon = categoryData[item.category_id].icon;
+    } else if (CATEGORY_EMOJIS[item.category]) {
+      baseIcon = CATEGORY_EMOJIS[item.category];
     }
-    return CATEGORY_EMOJIS[item.category] || '📦';
+
+    // Para proteínas, usar subcategoría basada en el nombre del item
+    return getItemIcon(item.name, item.category_id, item.category, baseIcon);
   };
 
   // Contar items personalizados
@@ -666,26 +674,67 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
         </>
       )}
 
-      {/* Floating Buttons */}
-      <div className="fixed bottom-40 left-5 flex flex-col gap-3 z-40">
-        {/* Scan Pantry Button */}
-        <button
-          onClick={() => setShowScanModal(true)}
-          className="bg-green-600 text-white p-4 rounded-full font-semibold shadow-lg flex items-center gap-2 hover:bg-green-700 transition-colors"
-          aria-label="Escanear despensa con IA"
-        >
-          <Camera size={22} />
-        </button>
+      {/* Speed Dial FAB */}
+      <>
+        {/* Backdrop overlay */}
+        {fabOpen && (
+          <div
+            className="fixed inset-0 bg-black/30 z-40 transition-opacity duration-200"
+            onClick={() => setFabOpen(false)}
+          />
+        )}
 
-        {/* Add Custom Item Button */}
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="bg-purple-600 text-white p-4 rounded-full font-semibold shadow-lg flex items-center gap-2 hover:bg-purple-700 transition-colors"
-          aria-label="Agregar item personalizado"
-        >
-          <Sparkles size={22} />
-        </button>
-      </div>
+        {/* FAB Container */}
+        <div className="fixed bottom-36 right-5 z-50 flex flex-col-reverse items-end gap-3">
+          {/* Speed Dial Options */}
+          <div className={`flex flex-col-reverse items-end gap-3 transition-all duration-300 ${
+            fabOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+          }`}>
+            {/* Scan Pantry Option */}
+            <button
+              onClick={() => {
+                setShowScanModal(true);
+                setFabOpen(false);
+              }}
+              className="flex items-center gap-3 group"
+            >
+              <span className="bg-white text-gray-700 px-3 py-2 rounded-lg shadow-lg text-sm font-medium whitespace-nowrap transform transition-all duration-200 group-hover:scale-105">
+                Escanear despensa
+              </span>
+              <div className="bg-green-500 text-white p-3.5 rounded-full shadow-lg transition-all duration-200 hover:bg-green-600 hover:scale-110">
+                <Camera size={22} />
+              </div>
+            </button>
+
+            {/* Add Custom Item Option */}
+            <button
+              onClick={() => {
+                setShowAddModal(true);
+                setFabOpen(false);
+              }}
+              className="flex items-center gap-3 group"
+            >
+              <span className="bg-white text-gray-700 px-3 py-2 rounded-lg shadow-lg text-sm font-medium whitespace-nowrap transform transition-all duration-200 group-hover:scale-105">
+                Agregar con IA
+              </span>
+              <div className="bg-purple-500 text-white p-3.5 rounded-full shadow-lg transition-all duration-200 hover:bg-purple-600 hover:scale-110">
+                <Sparkles size={22} />
+              </div>
+            </button>
+          </div>
+
+          {/* Main FAB Button */}
+          <button
+            onClick={() => setFabOpen(!fabOpen)}
+            className={`bg-gradient-to-br from-green-500 to-emerald-600 text-white p-4 rounded-full shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-105 ${
+              fabOpen ? 'rotate-45' : 'rotate-0'
+            }`}
+            aria-label={fabOpen ? 'Cerrar opciones' : 'Abrir opciones'}
+          >
+            <PlusIcon size={26} strokeWidth={2.5} />
+          </button>
+        </div>
+      </>
 
       {/* Add Custom Item Modal */}
       {showAddModal && (

@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, cleanJsonResponse, base64ToGeminiFormat } from '@/lib/gemini/client';
 
 interface GeneratedRecipe {
   name: string;
@@ -37,6 +33,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const gemini = getGeminiClient();
+
     const systemPrompt = `Eres un chef experto colombiano que ayuda a la Familia González a crear recetas.
 
 CONTEXTO FAMILIAR:
@@ -63,7 +61,7 @@ IMPORTANTE para ingredientes:
 Responde ÚNICAMENTE en formato JSON válido con esta estructura:
 {
   "name": "Nombre del plato",
-  "type": "lunch", // breakfast, lunch, o dinner
+  "type": "lunch",
   "description": "Breve descripción del plato",
   "total": "Cantidad total a preparar (ej: 800g de pollo + 400ml de salsa)",
   "portions": {
@@ -87,61 +85,54 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura:
   "cook_time": 30
 }`;
 
-    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-      { role: 'system', content: systemPrompt }
-    ];
+    // Build content parts
+    const contentParts: Array<{ text: string } | { inlineData: { data: string; mimeType: string } }> = [];
 
-    // Build user message based on input
+    // Add system prompt
+    contentParts.push({ text: systemPrompt });
+
+    // Add image if provided
     if (image) {
-      const userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
-        {
-          type: 'image_url',
-          image_url: {
-            url: image,
-            detail: 'high'
-          }
-        }
-      ];
+      const imageData = base64ToGeminiFormat(image);
+      contentParts.push(imageData);
 
       if (description) {
-        userContent.push({
-          type: 'text',
+        contentParts.push({
           text: `Genera una receta basada en esta imagen. Información adicional del usuario: "${description}". ${type ? `Tipo de comida: ${type}` : ''}`
         });
       } else {
-        userContent.push({
-          type: 'text',
+        contentParts.push({
           text: `Genera una receta completa basada en esta imagen del plato. ${type ? `Tipo de comida: ${type}` : 'Determina si es desayuno, almuerzo o cena.'}`
         });
       }
-
-      messages.push({ role: 'user', content: userContent });
     } else {
       // Text only
-      messages.push({
-        role: 'user',
-        content: `Genera una receta completa para: "${description}". ${type ? `Tipo de comida: ${type}` : 'Determina si es desayuno, almuerzo o cena basándote en el tipo de plato.'}`
+      contentParts.push({
+        text: `Genera una receta completa para: "${description}". ${type ? `Tipo de comida: ${type}` : 'Determina si es desayuno, almuerzo o cena basándote en el tipo de plato.'}`
       });
     }
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages,
-      max_tokens: 2500,
-      temperature: 0.7,
+    // Call Gemini
+    const response = await gemini.models.generateContent({
+      model: GEMINI_MODELS.FLASH,
+      contents: [{
+        role: 'user',
+        parts: contentParts
+      }],
+      config: {
+        temperature: GEMINI_CONFIG.vision.temperature,
+        maxOutputTokens: GEMINI_CONFIG.vision.maxOutputTokens,
+        responseMimeType: 'application/json',
+      },
     });
 
-    const content = response.choices[0]?.message?.content || '';
+    const content = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
     // Extract JSON from response
     let recipeData: GeneratedRecipe;
     try {
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        recipeData = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error('No JSON found in response');
-      }
+      const jsonContent = cleanJsonResponse(content);
+      recipeData = JSON.parse(jsonContent);
     } catch {
       console.error('Error parsing recipe response:', content);
       return NextResponse.json(

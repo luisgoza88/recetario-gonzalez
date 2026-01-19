@@ -287,8 +287,8 @@ export default function RecipeModal({ recipe, onClose, missingIngredients = [] }
           {recipe.portions && (
             <div className="mb-4 p-3 bg-gray-50 rounded-lg text-sm">
               <div className="font-semibold mb-1">Porciones {scale !== 1 && `(×${scale})`}:</div>
-              <div><strong>Luis:</strong> {recipe.portions.luis}</div>
-              <div><strong>Mariana:</strong> {recipe.portions.mariana}</div>
+              <div><strong>Porción grande:</strong> {recipe.portions.luis}</div>
+              <div><strong>Porción pequeña:</strong> {recipe.portions.mariana}</div>
             </div>
           )}
 
@@ -299,7 +299,7 @@ export default function RecipeModal({ recipe, onClose, missingIngredients = [] }
             </div>
           )}
 
-          {/* Ingredients Table */}
+          {/* Ingredients */}
           <h4 className="font-semibold mb-2 flex items-center gap-2">
             Ingredientes
             {scale !== 1 && (
@@ -308,37 +308,35 @@ export default function RecipeModal({ recipe, onClose, missingIngredients = [] }
               </span>
             )}
           </h4>
-          <div className="overflow-x-auto mb-4">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="p-2 text-left border">Ingrediente</th>
-                  {hasTotal && <th className="p-2 text-left border">Total</th>}
-                  <th className="p-2 text-left border">Luis</th>
-                  <th className="p-2 text-left border">Mariana</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ingredients.map((ing, i) => {
-                  const isMissing = missingIngredients.some(m =>
-                    ing.name.toLowerCase().includes(m.toLowerCase()) ||
-                    m.toLowerCase().includes(ing.name.toLowerCase())
-                  );
+          <div className="space-y-2 mb-4">
+            {ingredients.map((ing, i) => {
+              const isMissing = missingIngredients.some(m =>
+                ing.name.toLowerCase().includes(m.toLowerCase()) ||
+                m.toLowerCase().includes(ing.name.toLowerCase())
+              );
 
-                  return (
-                    <tr key={i} className={isMissing ? 'bg-orange-50' : ''}>
-                      <td className="p-2 border">
-                        {ing.name}
-                        {isMissing && <span className="ml-1 text-orange-500">⚠</span>}
-                      </td>
-                      {hasTotal && <td className="p-2 border">{scaleQuantity(ing.total || '')}</td>}
-                      <td className="p-2 border">{scaleQuantity(ing.luis)}</td>
-                      <td className="p-2 border">{scaleQuantity(ing.mariana)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+              return (
+                <div key={i} className={`p-3 rounded-lg border ${isMissing ? 'bg-orange-50 border-orange-200' : 'bg-gray-50 border-gray-200'}`}>
+                  <div className="font-medium text-sm mb-1">
+                    {ing.name}
+                    {isMissing && <span className="ml-1 text-orange-500">⚠</span>}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs text-gray-600">
+                    {hasTotal && (
+                      <div>
+                        <span className="text-gray-400">Total:</span> {scaleQuantity(ing.total || '')}
+                      </div>
+                    )}
+                    <div>
+                      <span className="text-gray-400">Grande:</span> {scaleQuantity(ing.luis)}
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Pequeña:</span> {scaleQuantity(ing.mariana)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Steps with Timers */}

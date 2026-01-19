@@ -287,6 +287,12 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
                       >
                         Listo, analizar {images.length} foto{images.length > 1 ? 's' : ''}
                       </button>
+                      <button
+                        onClick={onClose}
+                        className="w-full py-2 text-gray-500 text-sm hover:text-gray-700 transition-colors"
+                      >
+                        Cancelar y salir
+                      </button>
                     </div>
                   </div>
                 </div>

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, cleanJsonResponse, base64ToGeminiFormat } from '@/lib/gemini/client';
 
 interface RoomAnalysis {
   roomType: string;
@@ -56,27 +55,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!OPENAI_API_KEY) {
-      return NextResponse.json(
-        { error: 'API key no configurada' },
-        { status: 500 }
-      );
-    }
+    const gemini = getGeminiClient();
 
     // Obtener información de referencia
     const reference = REFERENCE_DIMENSIONS[referenceObject] || REFERENCE_DIMENSIONS.none;
     const hasCapturedSteps = capturedSteps && Array.isArray(capturedSteps) && capturedSteps.length > 0;
 
-    // Construir el contenido con las imágenes para GPT-4 Vision
-    const imageContent = images.map((imageBase64: string) => ({
-      type: 'image_url',
-      image_url: {
-        url: imageBase64.startsWith('data:')
-          ? imageBase64
-          : `data:image/jpeg;base64,${imageBase64}`,
-        detail: 'high'
-      }
-    }));
+    // Construir el contenido con las imágenes para Gemini Vision
+    const imageParts = images.map((imageBase64: string) => base64ToGeminiFormat(imageBase64));
 
     // Construir contexto de referencia para el prompt
     const referenceContext = reference.meters > 0
@@ -183,43 +169,27 @@ Sé PRÁCTICO y ÚTIL. Un ama de llaves profesional no limpia "el lapicero", lim
 
     const userPrompt = `Analiza estas ${images.length} imagen(es) del espacio y extrae toda la información posible para configurar tareas de limpieza. Si hay múltiples imágenes, son diferentes ángulos del mismo espacio.`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
+    // Build content parts: system prompt + user prompt + images
+    const contentParts: Array<{ text: string } | { inlineData: { data: string; mimeType: string } }> = [
+      { text: systemPrompt },
+      { text: userPrompt },
+      ...imageParts
+    ];
+
+    const response = await gemini.models.generateContent({
+      model: GEMINI_MODELS.FLASH,
+      contents: [{
+        role: 'user',
+        parts: contentParts
+      }],
+      config: {
+        temperature: GEMINI_CONFIG.vision.temperature,
+        maxOutputTokens: GEMINI_CONFIG.vision.maxOutputTokens,
+        responseMimeType: 'application/json',
       },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt
-          },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: userPrompt },
-              ...imageContent
-            ]
-          }
-        ],
-        max_tokens: 2000,
-        temperature: 0.3
-      })
     });
 
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error('OpenAI API error:', errorData);
-      return NextResponse.json(
-        { error: 'Error al analizar con IA' },
-        { status: 500 }
-      );
-    }
-
-    const data = await response.json();
-    const content = data.choices[0]?.message?.content;
+    const content = response.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!content) {
       return NextResponse.json(
@@ -231,12 +201,7 @@ Sé PRÁCTICO y ÚTIL. Un ama de llaves profesional no limpia "el lapicero", lim
     // Parsear el JSON de respuesta
     let analysis: RoomAnalysis;
     try {
-      // Limpiar posibles backticks o markdown
-      const cleanContent = content
-        .replace(/```json\n?/g, '')
-        .replace(/```\n?/g, '')
-        .trim();
-
+      const cleanContent = cleanJsonResponse(content);
       analysis = JSON.parse(cleanContent);
     } catch (parseError) {
       console.error('Error parsing AI response:', content);

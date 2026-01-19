@@ -44,7 +44,9 @@ export default function WeeklyCalendar({
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
 
   useEffect(() => {
-    loadTasks();
+    if (householdId) {
+      loadTasks();
+    }
   }, [currentDate, viewMode, householdId]);
 
   const loadTasks = async () => {
@@ -52,7 +54,15 @@ export default function WeeklyCalendar({
 
     const { startDate, endDate } = getDateRange();
 
-    console.log('WeeklyCalendar loadTasks:', { householdId, startDate, endDate });
+    console.log('WeeklyCalendar loadTasks:', { householdId, startDate, endDate, viewMode });
+
+    // Primero verificar si hay tareas sin filtro de fecha
+    const { count: totalCount } = await supabase
+      .from('scheduled_tasks')
+      .select('*', { count: 'exact', head: true })
+      .eq('household_id', householdId);
+
+    console.log('Total tasks for household (no date filter):', totalCount);
 
     const { data, error } = await supabase
       .from('scheduled_tasks')
@@ -67,7 +77,11 @@ export default function WeeklyCalendar({
       .lte('scheduled_date', endDate)
       .order('scheduled_date');
 
-    console.log('WeeklyCalendar query result:', { dataLength: data?.length, error });
+    console.log('WeeklyCalendar query result:', {
+      dataLength: data?.length,
+      error,
+      sampleDates: data?.slice(0, 3).map(t => t.scheduled_date)
+    });
 
     if (error) {
       console.error('Error loading tasks:', error);
@@ -214,6 +228,17 @@ export default function WeeklyCalendar({
     }
   };
 
+  // Función para obtener las tareas del día seleccionado en tiempo real
+  const getSelectedDayTasks = () => {
+    if (!selectedDay) return [];
+    const dateStr = formatLocalDate(selectedDay.date);
+    return tasks.filter(t => t.scheduled_date === dateStr);
+  };
+
+  // Contar tareas del día seleccionado
+  const selectedDayTasks = getSelectedDayTasks();
+  const selectedDayCompletedCount = selectedDayTasks.filter(t => t.status === 'completada').length;
+
   const formatMonthYear = (date: Date) => {
     return date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
   };
@@ -284,6 +309,14 @@ export default function WeeklyCalendar({
 
       {/* Calendar Grid */}
       <div className="p-2">
+        {/* Loading indicator */}
+        {loading && (
+          <div className="text-center py-4">
+            <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+            <p className="text-sm text-gray-500 mt-2">Cargando tareas...</p>
+          </div>
+        )}
+
         {/* Day Headers */}
         <div className="grid grid-cols-7 gap-1 mb-1">
           {dayNames.map(day => (
@@ -341,6 +374,24 @@ export default function WeeklyCalendar({
         </span>
       </div>
 
+      {/* Debug Panel - Temporal */}
+      <div className="mx-4 mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-xl text-xs">
+        <p className="font-bold text-yellow-800 mb-2">Debug Info:</p>
+        <p><strong>householdId:</strong> {householdId?.slice(0, 8)}...</p>
+        <p><strong>Rango semana:</strong> {getDateRange().startDate} a {getDateRange().endDate}</p>
+        <p><strong>Total tareas cargadas:</strong> {tasks.length}</p>
+        <p><strong>Loading:</strong> {loading ? 'Sí' : 'No'}</p>
+        {tasks.length > 0 && (
+          <>
+            <p><strong>Fechas únicas:</strong> {[...new Set(tasks.map(t => t.scheduled_date))].sort().join(', ')}</p>
+            <p><strong>Ejemplo tarea:</strong> {tasks[0]?.task_template?.name || 'Sin nombre'}</p>
+          </>
+        )}
+        {tasks.length === 0 && !loading && (
+          <p className="text-red-600 font-bold">¡No se cargaron tareas!</p>
+        )}
+      </div>
+
       {/* Selected Day Detail */}
       {selectedDay && (
         <div className="border-t bg-gray-50">
@@ -350,8 +401,8 @@ export default function WeeklyCalendar({
                 {selectedDay.date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
               </h3>
               <p className="text-sm text-gray-500">
-                {selectedDay.totalCount > 0
-                  ? `${selectedDay.completedCount}/${selectedDay.totalCount} tareas completadas`
+                {selectedDayTasks.length > 0
+                  ? `${selectedDayCompletedCount}/${selectedDayTasks.length} tareas completadas`
                   : 'Sin tareas programadas'}
               </p>
             </div>
@@ -364,9 +415,9 @@ export default function WeeklyCalendar({
           </div>
 
           <div className="p-4">
-            {selectedDay.tasks.length > 0 ? (
+            {selectedDayTasks.length > 0 ? (
               <div className="space-y-2 max-h-48 overflow-y-auto">
-                {selectedDay.tasks.map((task) => (
+                {selectedDayTasks.map((task) => (
                   <div
                     key={task.id}
                     className={`p-3 rounded-xl border ${
@@ -427,6 +478,14 @@ export default function WeeklyCalendar({
                     ? 'Puedes programar tareas desde el generador'
                     : 'Este día ya pasó'}
                 </p>
+                {/* Debug info - remove after fixing */}
+                <div className="mt-3 p-2 bg-yellow-50 rounded text-xs text-left">
+                  <p><strong>Debug:</strong></p>
+                  <p>Fecha seleccionada: {formatLocalDate(selectedDay.date)}</p>
+                  <p>Total tasks loaded: {tasks.length}</p>
+                  <p>Tasks para este día: {selectedDayTasks.length}</p>
+                  <p>Sample task dates: {tasks.slice(0, 5).map(t => t.scheduled_date).join(', ')}</p>
+                </div>
               </div>
             )}
           </div>

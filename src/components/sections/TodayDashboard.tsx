@@ -5,7 +5,8 @@ import {
   Sun, Moon, Coffee, UtensilsCrossed, Sparkles,
   CheckCircle2, Circle, Clock, Users, Home,
   ShoppingCart, Plus, Bot, AlertCircle, TrendingUp,
-  ChefHat, Briefcase, ArrowRight, Calendar, Settings
+  ChefHat, Briefcase, ArrowRight, Calendar, Settings,
+  X, ChevronRight
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { Recipe, DayMenu, ScheduledTask, HomeEmployee } from '@/types';
@@ -52,6 +53,7 @@ export default function TodayDashboard({
     tasksCompleted: 0,
     tasksTotal: 0
   });
+  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeTaskSummary | null>(null);
 
   const today = new Date();
   const dayOfWeek = today.toLocaleDateString('es-CO', { weekday: 'long' });
@@ -447,7 +449,11 @@ export default function TodayDashboard({
           ) : (
             <div className="divide-y">
               {employeeSummaries.map(summary => (
-                <div key={summary.employee.id} className="p-4">
+                <button
+                  key={summary.employee.id}
+                  className="p-4 w-full text-left hover:bg-gray-50 transition-colors cursor-pointer"
+                  onClick={() => setSelectedEmployee(summary)}
+                >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
@@ -462,15 +468,18 @@ export default function TodayDashboard({
                         <p className="text-xs text-gray-500 capitalize">{summary.employee.zone}</p>
                       </div>
                     </div>
-                    {summary.isCheckedIn ? (
-                      <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full flex items-center gap-1">
-                        <CheckCircle2 size={12} /> Presente
-                      </span>
-                    ) : (
-                      <span className="bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded-full">
-                        Sin registrar
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {summary.isCheckedIn ? (
+                        <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                          <CheckCircle2 size={12} /> Presente
+                        </span>
+                      ) : (
+                        <span className="bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded-full">
+                          Sin registrar
+                        </span>
+                      )}
+                      <ChevronRight size={18} className="text-gray-400" />
+                    </div>
                   </div>
 
                   {summary.totalCount > 0 ? (
@@ -498,7 +507,7 @@ export default function TodayDashboard({
                   ) : (
                     <p className="text-sm text-gray-400 italic">Sin tareas hoy</p>
                   )}
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -570,6 +579,136 @@ export default function TodayDashboard({
           </div>
         </section>
       </div>
+
+      {/* Modal de tareas del empleado */}
+      {selectedEmployee && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
+          <div className="bg-white w-full max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[85vh] overflow-hidden animate-slide-up">
+            {/* Header del modal */}
+            <div className={`px-4 py-4 border-b flex items-center justify-between ${
+              selectedEmployee.employee.zone === 'interior' ? 'bg-purple-50' :
+              selectedEmployee.employee.zone === 'exterior' ? 'bg-green-50' :
+              'bg-blue-50'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-semibold ${
+                  selectedEmployee.employee.zone === 'interior' ? 'bg-purple-200 text-purple-700' :
+                  selectedEmployee.employee.zone === 'exterior' ? 'bg-green-200 text-green-700' :
+                  'bg-blue-200 text-blue-700'
+                }`}>
+                  {selectedEmployee.employee.name.charAt(0)}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-800">{selectedEmployee.employee.name}</h3>
+                  <p className="text-sm text-gray-500 capitalize">
+                    {selectedEmployee.employee.zone} • {selectedEmployee.isCheckedIn ? 'Presente' : 'Sin registrar'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedEmployee(null)}
+                className="p-2 rounded-full hover:bg-white/50"
+              >
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+
+            {/* Contenido del modal */}
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              {/* Resumen */}
+              <div className="flex items-center gap-4 mb-4 p-3 bg-gray-50 rounded-xl">
+                <div className="text-center flex-1">
+                  <p className="text-2xl font-bold text-blue-600">{selectedEmployee.completedCount}</p>
+                  <p className="text-xs text-gray-500">Completadas</p>
+                </div>
+                <div className="w-px h-10 bg-gray-200" />
+                <div className="text-center flex-1">
+                  <p className="text-2xl font-bold text-orange-600">
+                    {selectedEmployee.totalCount - selectedEmployee.completedCount}
+                  </p>
+                  <p className="text-xs text-gray-500">Pendientes</p>
+                </div>
+                <div className="w-px h-10 bg-gray-200" />
+                <div className="text-center flex-1">
+                  <p className="text-2xl font-bold text-gray-600">{selectedEmployee.totalCount}</p>
+                  <p className="text-xs text-gray-500">Total</p>
+                </div>
+              </div>
+
+              {/* Lista de tareas */}
+              <h4 className="font-medium text-gray-700 mb-3">Tareas de Hoy</h4>
+              {selectedEmployee.tasks.length === 0 ? (
+                <div className="text-center py-8">
+                  <CheckCircle2 size={40} className="mx-auto text-gray-300 mb-2" />
+                  <p className="text-gray-500">No hay tareas programadas para hoy</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {selectedEmployee.tasks.map(task => (
+                    <div
+                      key={task.id}
+                      className={`p-3 rounded-xl border flex items-start gap-3 ${
+                        task.status === 'completada'
+                          ? 'bg-green-50 border-green-200'
+                          : task.status === 'en_progreso'
+                          ? 'bg-blue-50 border-blue-200'
+                          : 'bg-white border-gray-200'
+                      }`}
+                    >
+                      {task.status === 'completada' ? (
+                        <CheckCircle2 size={20} className="text-green-600 mt-0.5 flex-shrink-0" />
+                      ) : task.status === 'en_progreso' ? (
+                        <Clock size={20} className="text-blue-600 mt-0.5 flex-shrink-0" />
+                      ) : (
+                        <Circle size={20} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className={`font-medium ${
+                          task.status === 'completada' ? 'text-green-800 line-through' : 'text-gray-800'
+                        }`}>
+                          {task.task_template?.name || 'Tarea'}
+                        </p>
+                        {task.space && (
+                          <p className="text-sm text-gray-500 flex items-center gap-1 mt-0.5">
+                            <Home size={12} />
+                            {task.space.custom_name || task.space.space_type?.name || 'Espacio'}
+                          </p>
+                        )}
+                        {task.notes && (
+                          <p className="text-sm text-gray-500 mt-1">{task.notes}</p>
+                        )}
+                      </div>
+                      <span className={`text-xs px-2 py-1 rounded-full flex-shrink-0 ${
+                        task.status === 'completada'
+                          ? 'bg-green-200 text-green-700'
+                          : task.status === 'en_progreso'
+                          ? 'bg-blue-200 text-blue-700'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {task.status === 'completada' ? 'Hecho' :
+                         task.status === 'en_progreso' ? 'En curso' : 'Pendiente'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t bg-gray-50">
+              <button
+                onClick={() => {
+                  setSelectedEmployee(null);
+                  onNavigateToHogar();
+                }}
+                className="w-full py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
+              >
+                Ir a Hogar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
