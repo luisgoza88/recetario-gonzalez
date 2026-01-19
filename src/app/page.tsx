@@ -53,58 +53,46 @@ export default function Home() {
 
   const loadData = async () => {
     try {
-      // Cargar recetas
-      const { data: recipesData, error: recipesError } = await supabase
-        .from('recipes')
-        .select('*')
-        .order('name');
+      // Ejecutar todas las queries en paralelo para mejor rendimiento
+      const [recipesResult, itemsResult, checklistResult, inventoryResult] = await Promise.all([
+        supabase.from('recipes').select('*').order('name'),
+        supabase.from('market_items').select('*').order('order_index'),
+        supabase.from('market_checklist').select('item_id, checked'),
+        supabase.from('inventory').select('item_id, current_quantity, current_number'),
+      ]);
 
-      if (recipesError) {
-        console.error('Error loading recipes:', recipesError);
-      } else if (recipesData) {
-        setRecipes(recipesData);
+      // Procesar recetas
+      if (recipesResult.error) {
+        console.error('Error loading recipes:', recipesResult.error);
+      } else if (recipesResult.data) {
+        setRecipes(recipesResult.data);
       }
 
-      // Cargar items del mercado
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('market_items')
-        .select('*')
-        .order('order_index');
-
-      if (itemsError) {
-        console.error('Error loading items:', itemsError);
+      // Procesar items del mercado
+      if (itemsResult.error) {
+        console.error('Error loading items:', itemsResult.error);
         return;
       }
 
-      // Cargar checklist separadamente
-      const { data: checklistData, error: checklistError } = await supabase
-        .from('market_checklist')
-        .select('item_id, checked');
-
-      if (checklistError) {
-        console.error('Error loading checklist:', checklistError);
+      if (checklistResult.error) {
+        console.error('Error loading checklist:', checklistResult.error);
       }
 
-      // Cargar inventario separadamente
-      const { data: inventoryData, error: inventoryError } = await supabase
-        .from('inventory')
-        .select('item_id, current_quantity, current_number');
-
-      if (inventoryError) {
-        console.error('Error loading inventory:', inventoryError);
+      if (inventoryResult.error) {
+        console.error('Error loading inventory:', inventoryResult.error);
       }
 
       // Crear mapas para búsqueda rápida
       const checklistMap = new Map(
-        (checklistData || []).map(c => [c.item_id, c.checked])
+        (checklistResult.data || []).map(c => [c.item_id, c.checked])
       );
       const inventoryMap = new Map(
-        (inventoryData || []).map(i => [i.item_id, { qty: i.current_quantity, num: i.current_number }])
+        (inventoryResult.data || []).map(i => [i.item_id, { qty: i.current_quantity, num: i.current_number }])
       );
 
       // Combinar datos
-      if (itemsData) {
-        const items = itemsData.map(item => ({
+      if (itemsResult.data) {
+        const items = itemsResult.data.map(item => ({
           ...item,
           checked: checklistMap.get(item.id) || false,
           currentQuantity: inventoryMap.get(item.id)?.qty || '0',

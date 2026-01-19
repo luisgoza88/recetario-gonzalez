@@ -8,9 +8,27 @@ const withSerwist = withSerwistInit({
 });
 
 const nextConfig: NextConfig = {
-  // Usar webpack en lugar de turbopack para el build de producción
-  // para compatibilidad con serwist
+  // Configuración de Turbopack
   turbopack: {},
+
+  // Optimizaciones de rendimiento
+  experimental: {
+    // Optimizar imports de paquetes grandes
+    optimizePackageImports: [
+      'lucide-react',
+      '@supabase/supabase-js',
+    ],
+  },
+
+  // Mejor detección de errores en desarrollo
+  reactStrictMode: true,
+
+  // Optimización de imágenes
+  images: {
+    formats: ['image/avif', 'image/webp'],
+    deviceSizes: [640, 750, 828, 1080, 1200],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256],
+  },
 };
 
 export default withSerwist(nextConfig);

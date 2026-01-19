@@ -13,7 +13,9 @@ const supabase = createClient(
 // ============================================
 
 const functionDeclarations: FunctionDeclaration[] = [
+  // ============================================
   // CONSULTAS - Recetario
+  // ============================================
   {
     name: 'get_today_menu',
     description: 'Obtiene el menú programado para hoy (desayuno, almuerzo, cena)',
@@ -23,6 +25,17 @@ const functionDeclarations: FunctionDeclaration[] = [
     name: 'get_week_menu',
     description: 'Obtiene el menú completo de la semana',
     parameters: { type: Type.OBJECT, properties: {}, required: [] }
+  },
+  {
+    name: 'get_recipe_details',
+    description: 'Obtiene los detalles completos de una receta específica incluyendo ingredientes, pasos de preparación y tiempo',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        recipe_name: { type: Type.STRING, description: 'Nombre de la receta a consultar' }
+      },
+      required: ['recipe_name']
+    }
   },
   {
     name: 'search_recipes',
@@ -46,12 +59,24 @@ const functionDeclarations: FunctionDeclaration[] = [
     parameters: { type: Type.OBJECT, properties: {}, required: [] }
   },
   {
+    name: 'get_missing_ingredients',
+    description: 'Obtiene los ingredientes que faltan para preparar una receta específica comparando con el inventario actual',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        recipe_name: { type: Type.STRING, description: 'Nombre de la receta para verificar ingredientes' }
+      },
+      required: ['recipe_name']
+    }
+  },
+  {
     name: 'suggest_recipe',
     description: 'Sugiere una receta basada en los ingredientes disponibles en el inventario',
     parameters: {
       type: Type.OBJECT,
       properties: {
-        preferences: { type: Type.STRING, description: 'Preferencias opcionales (ej: "algo ligero", "con pollo")' }
+        preferences: { type: Type.STRING, description: 'Preferencias opcionales (ej: "algo ligero", "con pollo")' },
+        meal_type: { type: Type.STRING, description: 'Tipo de comida (desayuno, almuerzo, cena)' }
       },
       required: []
     }
@@ -79,7 +104,9 @@ const functionDeclarations: FunctionDeclaration[] = [
     description: 'Obtiene un resumen del progreso de tareas (completadas, pendientes, porcentaje)',
     parameters: { type: Type.OBJECT, properties: {}, required: [] }
   },
+  // ============================================
   // ACCIONES - Recetario
+  // ============================================
   {
     name: 'add_to_shopping_list',
     description: 'Agrega un item a la lista de compras',
@@ -93,6 +120,17 @@ const functionDeclarations: FunctionDeclaration[] = [
     }
   },
   {
+    name: 'add_missing_to_shopping',
+    description: 'Agrega todos los ingredientes faltantes de una receta a la lista de compras',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        recipe_name: { type: Type.STRING, description: 'Nombre de la receta' }
+      },
+      required: ['recipe_name']
+    }
+  },
+  {
     name: 'mark_shopping_item',
     description: 'Marca o desmarca un item de la lista de compras',
     parameters: {
@@ -102,6 +140,32 @@ const functionDeclarations: FunctionDeclaration[] = [
         checked: { type: Type.BOOLEAN, description: 'true para marcar como comprado, false para desmarcar' }
       },
       required: ['item_name', 'checked']
+    }
+  },
+  {
+    name: 'swap_menu_recipe',
+    description: 'Cambia la receta de un día específico del menú por otra receta',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        day_number: { type: Type.NUMBER, description: 'Número del día del ciclo (1-12)' },
+        meal_type: { type: Type.STRING, description: 'Tipo de comida: breakfast, lunch o dinner' },
+        new_recipe_name: { type: Type.STRING, description: 'Nombre de la nueva receta' }
+      },
+      required: ['day_number', 'meal_type', 'new_recipe_name']
+    }
+  },
+  {
+    name: 'update_inventory',
+    description: 'Actualiza la cantidad de un ingrediente en el inventario',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        item_name: { type: Type.STRING, description: 'Nombre del ingrediente' },
+        quantity: { type: Type.NUMBER, description: 'Nueva cantidad' },
+        action: { type: Type.STRING, description: 'Acción: "set" para establecer valor, "add" para sumar, "subtract" para restar' }
+      },
+      required: ['item_name', 'quantity']
     }
   },
   // ACCIONES - Hogar
@@ -130,10 +194,59 @@ const functionDeclarations: FunctionDeclaration[] = [
       required: ['task_name']
     }
   },
+  // ============================================
+  // REPORTES Y ANÁLISIS
+  // ============================================
+  {
+    name: 'get_weekly_report',
+    description: 'Genera un reporte semanal con resumen de tareas completadas, comidas preparadas y estado del inventario',
+    parameters: { type: Type.OBJECT, properties: {}, required: [] }
+  },
+  {
+    name: 'get_low_inventory_alerts',
+    description: 'Obtiene alertas de ingredientes con bajo inventario que necesitan reponerse',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        threshold: { type: Type.NUMBER, description: 'Cantidad mínima para considerar bajo (default: 2)' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'get_upcoming_meals',
+    description: 'Obtiene las próximas comidas programadas para los siguientes días',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        days: { type: Type.NUMBER, description: 'Número de días a consultar (default: 3)' }
+      },
+      required: []
+    }
+  },
+  // ============================================
   // UTILIDADES
+  // ============================================
   {
     name: 'get_current_date_info',
     description: 'Obtiene información de la fecha actual (día, semana del ciclo, etc.)',
+    parameters: { type: Type.OBJECT, properties: {}, required: [] }
+  },
+  {
+    name: 'calculate_portions',
+    description: 'Calcula las cantidades de ingredientes ajustadas para un número específico de porciones',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        recipe_name: { type: Type.STRING, description: 'Nombre de la receta' },
+        portions: { type: Type.NUMBER, description: 'Número de porciones deseadas' }
+      },
+      required: ['recipe_name', 'portions']
+    }
+  },
+  {
+    name: 'get_preparation_tips',
+    description: 'Obtiene consejos y preparaciones previas necesarias para las comidas del día',
     parameters: { type: Type.OBJECT, properties: {}, required: [] }
   }
 ];
@@ -206,6 +319,85 @@ async function searchRecipes(query: string) {
     category: r.category,
     ingredient_count: Array.isArray(r.ingredients) ? r.ingredients.length : 0
   })) || [];
+}
+
+async function getRecipeDetails(recipeName: string) {
+  const { data: recipe } = await supabase
+    .from('recipes')
+    .select('*')
+    .ilike('name', `%${recipeName}%`)
+    .single();
+
+  if (!recipe) {
+    return { error: `No se encontró la receta "${recipeName}"` };
+  }
+
+  const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
+  const steps = Array.isArray(recipe.steps) ? recipe.steps : [];
+
+  return {
+    name: recipe.name,
+    category: recipe.category,
+    prep_time: recipe.prep_time,
+    portions: recipe.portions || 5,
+    description: recipe.description || '',
+    ingredients: ingredients.map((ing: { name?: string; amount?: string } | string) =>
+      typeof ing === 'string' ? ing : `${ing.amount || ''} ${ing.name || ing}`.trim()
+    ),
+    steps: steps.length > 0 ? steps : ['No hay pasos detallados disponibles'],
+    tips: recipe.tips || null
+  };
+}
+
+async function getMissingIngredients(recipeName: string) {
+  // Obtener receta
+  const { data: recipe } = await supabase
+    .from('recipes')
+    .select('name, ingredients')
+    .ilike('name', `%${recipeName}%`)
+    .single();
+
+  if (!recipe) {
+    return { error: `No se encontró la receta "${recipeName}"` };
+  }
+
+  // Obtener inventario
+  const { data: inventory } = await supabase
+    .from('inventory')
+    .select('*, market_item:market_items(name)')
+    .gt('current_number', 0);
+
+  const availableItems = inventory?.map(i => i.market_item?.name?.toLowerCase()) || [];
+  const recipeIngredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
+
+  const missing: string[] = [];
+  const available: string[] = [];
+
+  for (const ing of recipeIngredients) {
+    const ingName = typeof ing === 'string' ? ing : ing.name || '';
+    const normalized = ingName.toLowerCase();
+
+    const found = availableItems.some(item =>
+      item?.includes(normalized) || normalized.includes(item || '')
+    );
+
+    if (found) {
+      available.push(ingName);
+    } else {
+      missing.push(ingName);
+    }
+  }
+
+  return {
+    recipe: recipe.name,
+    total_ingredients: recipeIngredients.length,
+    available_count: available.length,
+    missing_count: missing.length,
+    missing_ingredients: missing,
+    available_ingredients: available,
+    can_prepare: missing.length === 0,
+    coverage_percent: Math.round((available.length / recipeIngredients.length) * 100)
+  };
 }
 
 async function getInventory() {
@@ -455,6 +647,133 @@ async function markShoppingItem(itemName: string, checked: boolean) {
   };
 }
 
+async function addMissingToShopping(recipeName: string) {
+  const missingResult = await getMissingIngredients(recipeName);
+
+  if ('error' in missingResult) {
+    return missingResult;
+  }
+
+  if (missingResult.missing_count === 0) {
+    return {
+      success: true,
+      message: `¡Tienes todos los ingredientes para ${missingResult.recipe}!`,
+      added: []
+    };
+  }
+
+  const added: string[] = [];
+  for (const ingredient of missingResult.missing_ingredients) {
+    const result = await addToShoppingList(ingredient);
+    if (result.success) {
+      added.push(ingredient);
+    }
+  }
+
+  return {
+    success: true,
+    message: `Se agregaron ${added.length} ingredientes a la lista de compras`,
+    added,
+    recipe: missingResult.recipe
+  };
+}
+
+async function swapMenuRecipe(dayNumber: number, mealType: string, newRecipeName: string) {
+  // Validar día
+  if (dayNumber < 1 || dayNumber > 12) {
+    return { success: false, message: 'El día debe estar entre 1 y 12' };
+  }
+
+  // Validar tipo de comida
+  const validMealTypes = ['breakfast', 'lunch', 'dinner'];
+  if (!validMealTypes.includes(mealType)) {
+    return { success: false, message: 'Tipo de comida debe ser: breakfast, lunch o dinner' };
+  }
+
+  // Buscar la receta nueva
+  const { data: recipe } = await supabase
+    .from('recipes')
+    .select('id, name')
+    .ilike('name', `%${newRecipeName}%`)
+    .single();
+
+  if (!recipe) {
+    return { success: false, message: `No se encontró la receta "${newRecipeName}"` };
+  }
+
+  // Actualizar el menú
+  const updateField = `${mealType}_id`;
+  const { error } = await supabase
+    .from('day_menu')
+    .update({ [updateField]: recipe.id })
+    .eq('day_number', dayNumber);
+
+  if (error) {
+    return { success: false, message: 'Error al actualizar el menú' };
+  }
+
+  const mealTypeSpanish: Record<string, string> = {
+    breakfast: 'desayuno',
+    lunch: 'almuerzo',
+    dinner: 'cena'
+  };
+
+  return {
+    success: true,
+    message: `✅ ${mealTypeSpanish[mealType]} del día ${dayNumber} cambiado a "${recipe.name}"`
+  };
+}
+
+async function updateInventory(itemName: string, quantity: number, action: string = 'set') {
+  // Buscar el item
+  const { data: item } = await supabase
+    .from('market_items')
+    .select('id, name')
+    .ilike('name', `%${itemName}%`)
+    .single();
+
+  if (!item) {
+    return { success: false, message: `No se encontró "${itemName}" en el inventario` };
+  }
+
+  // Obtener cantidad actual
+  const { data: currentInv } = await supabase
+    .from('inventory')
+    .select('current_number')
+    .eq('item_id', item.id)
+    .single();
+
+  let newQuantity = quantity;
+  const currentQty = currentInv?.current_number || 0;
+
+  if (action === 'add') {
+    newQuantity = currentQty + quantity;
+  } else if (action === 'subtract') {
+    newQuantity = Math.max(0, currentQty - quantity);
+  }
+
+  // Actualizar o insertar
+  const { error } = await supabase
+    .from('inventory')
+    .upsert({
+      item_id: item.id,
+      current_number: newQuantity,
+      current_quantity: `${newQuantity}`
+    }, { onConflict: 'item_id' });
+
+  if (error) {
+    return { success: false, message: 'Error al actualizar el inventario' };
+  }
+
+  return {
+    success: true,
+    message: `✅ ${item.name}: ${currentQty} → ${newQuantity}`,
+    item: item.name,
+    previous: currentQty,
+    current: newQuantity
+  };
+}
+
 async function completeTask(taskName: string, employeeName?: string) {
   const today = new Date().toISOString().split('T')[0];
 
@@ -522,12 +841,249 @@ async function addQuickTask(taskName: string, employeeName?: string, category?: 
 function getCurrentDateInfo() {
   const now = new Date();
   const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+  const dayOfWeek = now.getDay();
+  const cycleDay = ((dayOfWeek === 0 ? 7 : dayOfWeek) - 1) % 12 + 1;
 
   return {
     date: now.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }),
-    day_name: dayNames[now.getDay()],
+    day_name: dayNames[dayOfWeek],
     time: now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-    week_number: Math.ceil((now.getDate() - now.getDay() + 1) / 7)
+    week_number: Math.ceil((now.getDate() - now.getDay() + 1) / 7),
+    cycle_day: cycleDay,
+    is_weekend: dayOfWeek === 0 || dayOfWeek === 6,
+    has_dinner: dayOfWeek !== 5 && dayOfWeek !== 6 // No cena viernes/sábado
+  };
+}
+
+async function getWeeklyReport() {
+  const today = new Date();
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - today.getDay());
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+
+  // Tareas de la semana
+  const { data: tasks } = await supabase
+    .from('scheduled_tasks')
+    .select('status')
+    .gte('scheduled_date', weekStart.toISOString().split('T')[0])
+    .lte('scheduled_date', weekEnd.toISOString().split('T')[0]);
+
+  const total = tasks?.length || 0;
+  const completed = tasks?.filter(t => t.status === 'completada').length || 0;
+  const pending = tasks?.filter(t => t.status === 'pendiente').length || 0;
+  const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+  // Inventario bajo
+  const { data: lowInventory } = await supabase
+    .from('inventory')
+    .select('*, market_item:market_items(name)')
+    .lte('current_number', 2)
+    .gt('current_number', 0);
+
+  // Items sin stock
+  const { data: outOfStock } = await supabase
+    .from('inventory')
+    .select('*, market_item:market_items(name)')
+    .eq('current_number', 0);
+
+  return {
+    period: `${weekStart.toLocaleDateString('es-ES')} - ${weekEnd.toLocaleDateString('es-ES')}`,
+    tasks: {
+      total,
+      completed,
+      pending,
+      completion_rate: completionRate
+    },
+    inventory: {
+      low_stock_count: lowInventory?.length || 0,
+      low_stock_items: lowInventory?.slice(0, 5).map(i => i.market_item?.name) || [],
+      out_of_stock_count: outOfStock?.length || 0,
+      out_of_stock_items: outOfStock?.slice(0, 5).map(i => i.market_item?.name) || []
+    },
+    summary: `Semana con ${completionRate}% de tareas completadas. ${
+      (lowInventory?.length || 0) > 0 ? `Hay ${lowInventory?.length} items con bajo inventario.` : 'Inventario en buen estado.'
+    }`
+  };
+}
+
+async function getLowInventoryAlerts(threshold: number = 2) {
+  const { data } = await supabase
+    .from('inventory')
+    .select('*, market_item:market_items(name, category)')
+    .lte('current_number', threshold)
+    .order('current_number');
+
+  const grouped: Record<string, Array<{ name: string; quantity: number }>> = {};
+
+  data?.forEach(item => {
+    const cat = item.market_item?.category || 'Otros';
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push({
+      name: item.market_item?.name || 'Item',
+      quantity: item.current_number
+    });
+  });
+
+  const totalAlerts = data?.length || 0;
+  const criticalCount = data?.filter(i => i.current_number === 0).length || 0;
+
+  return {
+    total_alerts: totalAlerts,
+    critical_count: criticalCount,
+    low_count: totalAlerts - criticalCount,
+    by_category: grouped,
+    message: totalAlerts === 0
+      ? '✅ No hay alertas de inventario'
+      : `⚠️ ${criticalCount} items agotados, ${totalAlerts - criticalCount} items bajos`
+  };
+}
+
+async function getUpcomingMeals(days: number = 3) {
+  const today = new Date();
+  const meals: Array<{
+    date: string;
+    day_name: string;
+    breakfast: string;
+    lunch: string;
+    dinner: string;
+  }> = [];
+
+  const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+  for (let i = 0; i < days; i++) {
+    const date = new Date(today);
+    date.setDate(today.getDate() + i);
+    const dayOfWeek = date.getDay();
+    const cycleDay = ((dayOfWeek === 0 ? 7 : dayOfWeek) - 1) % 12 + 1;
+
+    const { data: menu } = await supabase
+      .from('day_menu')
+      .select(`
+        breakfast:recipes!day_menu_breakfast_id_fkey(name),
+        lunch:recipes!day_menu_lunch_id_fkey(name),
+        dinner:recipes!day_menu_dinner_id_fkey(name)
+      `)
+      .eq('day_number', cycleDay)
+      .single();
+
+    meals.push({
+      date: date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }),
+      day_name: dayNames[dayOfWeek],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      breakfast: (menu?.breakfast as any)?.name || 'No programado',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      lunch: (menu?.lunch as any)?.name || 'No programado',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dinner: (dayOfWeek === 5 || dayOfWeek === 6) ? 'Sin cena (sale a comer)' : ((menu?.dinner as any)?.name || 'No programado')
+    });
+  }
+
+  return {
+    days: meals,
+    tip: meals.length > 0 ? `Próximas ${meals.length} días de menú` : 'No hay menú disponible'
+  };
+}
+
+async function calculatePortions(recipeName: string, portions: number) {
+  const { data: recipe } = await supabase
+    .from('recipes')
+    .select('name, portions, ingredients')
+    .ilike('name', `%${recipeName}%`)
+    .single();
+
+  if (!recipe) {
+    return { error: `No se encontró la receta "${recipeName}"` };
+  }
+
+  const originalPortions = recipe.portions || 5;
+  const multiplier = portions / originalPortions;
+  const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
+
+  const adjustedIngredients = ingredients.map((ing: { name?: string; amount?: string } | string) => {
+    if (typeof ing === 'string') {
+      // Intentar extraer número del string
+      const match = ing.match(/^([\d.]+)\s*(.+)$/);
+      if (match) {
+        const newAmount = (parseFloat(match[1]) * multiplier).toFixed(1);
+        return `${newAmount} ${match[2]}`;
+      }
+      return ing;
+    }
+    // Es objeto con amount y name
+    const amount = ing.amount || '';
+    const numMatch = amount.match(/([\d.]+)/);
+    if (numMatch) {
+      const newAmount = (parseFloat(numMatch[1]) * multiplier).toFixed(1);
+      return `${newAmount}${amount.replace(numMatch[1], '')} ${ing.name}`;
+    }
+    return `${amount} ${ing.name}`;
+  });
+
+  return {
+    recipe: recipe.name,
+    original_portions: originalPortions,
+    requested_portions: portions,
+    multiplier: multiplier.toFixed(2),
+    adjusted_ingredients: adjustedIngredients
+  };
+}
+
+async function getPreparationTips() {
+  // Obtener menú de hoy
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const cycleDay = ((dayOfWeek === 0 ? 7 : dayOfWeek) - 1) % 12 + 1;
+
+  const { data: menu } = await supabase
+    .from('day_menu')
+    .select(`
+      breakfast:recipes!day_menu_breakfast_id_fkey(name, prep_time, ingredients),
+      lunch:recipes!day_menu_lunch_id_fkey(name, prep_time, ingredients),
+      dinner:recipes!day_menu_dinner_id_fkey(name, prep_time, ingredients)
+    `)
+    .eq('day_number', cycleDay)
+    .single();
+
+  const tips: string[] = [];
+  const meals = [
+    { name: 'Desayuno', data: menu?.breakfast, time: '7:00 AM' },
+    { name: 'Almuerzo', data: menu?.lunch, time: '12:00 PM' },
+    { name: 'Cena', data: menu?.dinner, time: '7:00 PM' }
+  ];
+
+  meals.forEach(meal => {
+    if (meal.data && typeof meal.data === 'object' && 'name' in meal.data) {
+      const prepTime = (meal.data as { prep_time?: number }).prep_time || 30;
+      const ingredients = (meal.data as { ingredients?: unknown[] }).ingredients || [];
+
+      // Buscar ingredientes que requieren descongelar
+      const needsDefrost = Array.isArray(ingredients) && ingredients.some((ing: unknown) => {
+        const ingStr = typeof ing === 'string' ? ing : (ing as { name?: string })?.name || '';
+        return /pollo|carne|pescado|cerdo|res/i.test(ingStr);
+      });
+
+      if (needsDefrost) {
+        tips.push(`🧊 Descongelar proteína para ${meal.name} (${(meal.data as { name?: string }).name})`);
+      }
+
+      if (prepTime > 45) {
+        tips.push(`⏰ ${meal.name} requiere ${prepTime} min de preparación - planifica con tiempo`);
+      }
+    }
+  });
+
+  if (tips.length === 0) {
+    tips.push('✅ No hay preparaciones especiales necesarias para hoy');
+  }
+
+  return {
+    date: today.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }),
+    tips,
+    menu_summary: meals.map(m => ({
+      meal: m.name,
+      recipe: m.data && typeof m.data === 'object' && 'name' in m.data ? (m.data as { name: string }).name : 'No programado'
+    }))
   };
 }
 
@@ -537,34 +1093,66 @@ function getCurrentDateInfo() {
 
 async function executeFunction(name: string, args: Record<string, unknown>) {
   switch (name) {
+    // Consultas - Recetario
     case 'get_today_menu':
       return await getTodayMenu();
     case 'get_week_menu':
       return await getWeekMenu();
+    case 'get_recipe_details':
+      return await getRecipeDetails(args.recipe_name as string);
     case 'search_recipes':
       return await searchRecipes(args.query as string);
     case 'get_inventory':
       return await getInventory();
     case 'get_shopping_list':
       return await getShoppingList();
+    case 'get_missing_ingredients':
+      return await getMissingIngredients(args.recipe_name as string);
     case 'suggest_recipe':
       return await suggestRecipe(args.preferences as string);
+
+    // Consultas - Hogar
     case 'get_today_tasks':
       return await getTodayTasks();
     case 'get_employee_schedule':
       return await getEmployeeSchedule(args.employee_name as string, args.period as string);
     case 'get_tasks_summary':
       return await getTasksSummary();
+
+    // Acciones - Recetario
     case 'add_to_shopping_list':
       return await addToShoppingList(args.item_name as string, args.quantity as string);
+    case 'add_missing_to_shopping':
+      return await addMissingToShopping(args.recipe_name as string);
     case 'mark_shopping_item':
       return await markShoppingItem(args.item_name as string, args.checked as boolean);
+    case 'swap_menu_recipe':
+      return await swapMenuRecipe(args.day_number as number, args.meal_type as string, args.new_recipe_name as string);
+    case 'update_inventory':
+      return await updateInventory(args.item_name as string, args.quantity as number, args.action as string);
+
+    // Acciones - Hogar
     case 'complete_task':
       return await completeTask(args.task_name as string, args.employee_name as string);
     case 'add_quick_task':
       return await addQuickTask(args.task_name as string, args.employee_name as string, args.category as string);
+
+    // Reportes y análisis
+    case 'get_weekly_report':
+      return await getWeeklyReport();
+    case 'get_low_inventory_alerts':
+      return await getLowInventoryAlerts(args.threshold as number);
+    case 'get_upcoming_meals':
+      return await getUpcomingMeals(args.days as number);
+
+    // Utilidades
     case 'get_current_date_info':
       return getCurrentDateInfo();
+    case 'calculate_portions':
+      return await calculatePortions(args.recipe_name as string, args.portions as number);
+    case 'get_preparation_tips':
+      return await getPreparationTips();
+
     default:
       return { error: `Función desconocida: ${name}` };
   }
