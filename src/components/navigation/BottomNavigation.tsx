@@ -1,7 +1,7 @@
 'use client';
 
 import { UtensilsCrossed, Home, Settings, Calendar, ShoppingCart, BookOpen, Lightbulb, Sun } from 'lucide-react';
-import DynamicFAB, { FABAction } from './DynamicFAB';
+import SmartFAB, { FABAction } from './SmartFAB';
 
 type MainSection = 'hoy' | 'recetario' | 'hogar' | 'ajustes';
 type RecetarioTab = 'calendar' | 'market' | 'recipes' | 'suggestions';
@@ -135,7 +135,7 @@ export default function BottomNavigation({
 
           {/* FAB - Center elevated button */}
           <div className="relative -top-4">
-            <DynamicFAB
+            <SmartFAB
               open={fabOpen}
               onToggle={onFabToggle}
               actions={fabActions}
