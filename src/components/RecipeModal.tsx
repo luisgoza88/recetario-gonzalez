@@ -178,7 +178,7 @@ export default function RecipeModal({ recipe, onClose, missingIngredients = [] }
 
         {/* Recipe Image */}
         {recipe.image_url ? (
-          <div className="relative w-full h-48 bg-gray-100">
+          <div className="relative w-full h-64 bg-gray-100 flex-shrink-0">
             <Image
               src={recipe.image_url}
               alt={recipe.name}
@@ -189,10 +189,10 @@ export default function RecipeModal({ recipe, onClose, missingIngredients = [] }
             />
           </div>
         ) : (
-          <div className="w-full h-32 bg-gradient-to-br from-orange-100 to-amber-50 flex items-center justify-center">
+          <div className="w-full h-40 bg-gradient-to-br from-orange-100 to-amber-50 flex items-center justify-center flex-shrink-0">
             <div className="text-center text-gray-400">
-              <ImageIcon className="w-8 h-8 mx-auto mb-1 opacity-50" />
-              <span className="text-xs">Sin foto</span>
+              <ImageIcon className="w-10 h-10 mx-auto mb-1 opacity-50" />
+              <span className="text-sm">Sin foto</span>
             </div>
           </div>
         )}
