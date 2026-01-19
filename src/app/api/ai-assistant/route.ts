@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG } from '@/lib/gemini/client';
+import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, base64ToGeminiFormat } from '@/lib/gemini/client';
 import { FunctionDeclaration, Type } from '@google/genai';
+
+// Types for messages with images
+interface MessageWithImage {
+  role: string;
+  content: string;
+  image?: string; // Base64 image data
+}
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -1217,6 +1224,40 @@ Cuando hagas algo, usa este formato:
 - **get_low_inventory_alerts**: Alertas de items bajos/agotados
 - **update_inventory**: Actualizar cantidades del inventario
 
+## CAPACIDADES DE VISIÓN (Análisis de Imágenes)
+Puedes analizar imágenes que te envíen. Cuando recibas una imagen:
+
+### Tipos de análisis que puedes hacer:
+1. **Escaneo de despensa/nevera**: Identifica productos y ofrece actualizar inventario
+2. **Tickets de compra**: Extrae items y ofrece agregarlos a la lista
+3. **Platos de comida**: Identifica el plato, sugiere recetas similares
+4. **Ingredientes sueltos**: Identifica qué son y sugiere recetas
+5. **Espacios del hogar**: Identifica el tipo de espacio y estado de limpieza
+
+### Cómo responder a imágenes:
+1. Describe brevemente lo que ves
+2. Ofrece acciones relevantes según el contexto
+3. Pregunta si quiere que hagas algo con la información
+
+### Ejemplos con imágenes:
+**Usuario envía foto de nevera**
+📷 Veo tu nevera con varios productos:
+- Leche (casi vacía)
+- Huevos (~6)
+- Queso mozzarella
+- Tomates (4)
+- Pollo (bandeja)
+
+💡 ¿Quieres que actualice el inventario con estos productos?
+
+**Usuario envía foto de ticket**
+🧾 Veo un ticket de compra con:
+- Pan tajado $3,500
+- Leche x2 $8,000
+- Huevos $12,000
+
+💡 ¿Los agrego a la lista de compras como comprados?
+
 ## EJEMPLOS DE RESPUESTAS IDEALES
 
 **Usuario**: "¿Qué hay de almuerzo?"
@@ -1272,11 +1313,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Convertir mensajes al formato de Gemini
-    const geminiMessages: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = messages.map((msg: { role: string; content: string }) => ({
-      role: msg.role === 'assistant' ? 'model' as const : 'user' as const,
-      parts: [{ text: msg.content }]
-    }));
+    // Convertir mensajes al formato de Gemini (con soporte para imágenes)
+    const geminiMessages = messages.map((msg: MessageWithImage) => {
+      const parts: Array<{ text: string } | { inlineData: { data: string; mimeType: string } }> = [];
+
+      // Add text content
+      if (msg.content) {
+        parts.push({ text: msg.content });
+      }
+
+      // Add image if present
+      if (msg.image) {
+        const imageData = base64ToGeminiFormat(msg.image);
+        parts.push(imageData);
+      }
+
+      return {
+        role: msg.role === 'assistant' ? 'model' as const : 'user' as const,
+        parts
+      };
+    });
 
     // Primera llamada a Gemini con las funciones
     const response = await gemini.models.generateContent({

@@ -5,8 +5,9 @@ import {
   Send, Bot, User, Sparkles, Loader2,
   Calendar, ShoppingCart, Home, UtensilsCrossed,
   CheckCircle2, ListTodo, ChefHat, RefreshCw,
-  Clock, AlertTriangle, Check, Plus, ChevronRight,
-  AlertCircle, TrendingUp, Trash2, Mic, MicOff, Volume2, VolumeX
+  Clock, AlertTriangle, ChevronRight,
+  AlertCircle, TrendingUp, Mic, MicOff, Volume2, VolumeX,
+  Camera, Image as ImageIcon, X
 } from 'lucide-react';
 import {
   saveMessage,
@@ -49,6 +50,7 @@ interface Message {
   timestamp: Date;
   isLoading?: boolean;
   actions?: MessageAction[];
+  image?: string; // Base64 image for display
 }
 
 interface QuickAction {
@@ -244,6 +246,11 @@ export default function AIChat() {
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
+  // Image state
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [showImageOptions, setShowImageOptions] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const voiceManagerRef = useRef<VoiceManager | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
