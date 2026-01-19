@@ -18,7 +18,6 @@ interface TodayDashboardProps {
   onNavigateToRecetario: (tab?: string) => void;
   onNavigateToHogar: () => void;
   onNavigateToIA: () => void;
-  onNavigateToSettings?: () => void;
 }
 
 interface TodayMenu {
@@ -40,7 +39,6 @@ export default function TodayDashboard({
   onNavigateToRecetario,
   onNavigateToHogar,
   onNavigateToIA,
-  onNavigateToSettings
 }: TodayDashboardProps) {
   const [loading, setLoading] = useState(true);
   const [todayMenu, setTodayMenu] = useState<TodayMenu | null>(null);
@@ -297,24 +295,14 @@ export default function TodayDashboard({
                 {dayOfWeek}, {formattedDate}
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              {(pendingSuggestions > 0 || lowSupplies > 0) && (
-                <div className="relative">
-                  <AlertCircle size={24} className="text-orange-500" />
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center">
-                    {pendingSuggestions + lowSupplies}
-                  </span>
-                </div>
-              )}
-              {onNavigateToSettings && (
-                <button
-                  onClick={onNavigateToSettings}
-                  className="p-2 rounded-full hover:bg-gray-100 text-gray-500"
-                >
-                  <Settings size={22} />
-                </button>
-              )}
-            </div>
+            {(pendingSuggestions > 0 || lowSupplies > 0) && (
+              <div className="relative">
+                <AlertCircle size={24} className="text-orange-500" />
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center">
+                  {pendingSuggestions + lowSupplies}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>

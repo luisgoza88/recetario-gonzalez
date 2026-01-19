@@ -1,9 +1,9 @@
 'use client';
 
-import { UtensilsCrossed, Home, Bot, Settings, Calendar, ShoppingCart, BookOpen, Lightbulb, Sun } from 'lucide-react';
+import { UtensilsCrossed, Home, Settings, Calendar, ShoppingCart, BookOpen, Lightbulb, Sun } from 'lucide-react';
 import DynamicFAB, { FABAction } from './DynamicFAB';
 
-type MainSection = 'hoy' | 'recetario' | 'hogar' | 'ia' | 'ajustes';
+type MainSection = 'hoy' | 'recetario' | 'hogar' | 'ajustes';
 type RecetarioTab = 'calendar' | 'market' | 'recipes' | 'suggestions';
 
 interface BottomNavigationProps {
@@ -12,7 +12,6 @@ interface BottomNavigationProps {
   fabOpen: boolean;
   onFabToggle: () => void;
   fabActions: FABAction[];
-  pendingAlerts?: number;
   // Props para tabs secundarios de recetario
   recetarioTab?: RecetarioTab;
   onRecetarioTabChange?: (tab: RecetarioTab) => void;
@@ -68,7 +67,6 @@ export default function BottomNavigation({
   fabOpen,
   onFabToggle,
   fabActions,
-  pendingAlerts = 0,
   recetarioTab = 'calendar',
   onRecetarioTabChange,
   pendingSuggestions = 0
@@ -155,15 +153,14 @@ export default function BottomNavigation({
             activeBg="bg-blue-50"
           />
 
-          {/* IA */}
+          {/* Ajustes */}
           <NavItem
-            icon={<Bot size={22} />}
-            label="IA"
-            active={activeSection === 'ia'}
-            onClick={() => onSectionChange('ia')}
-            badge={pendingAlerts}
-            activeColor="text-purple-700"
-            activeBg="bg-purple-50"
+            icon={<Settings size={22} />}
+            label="Ajustes"
+            active={activeSection === 'ajustes'}
+            onClick={() => onSectionChange('ajustes')}
+            activeColor="text-gray-700"
+            activeBg="bg-gray-100"
           />
         </div>
       </div>

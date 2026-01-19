@@ -4,9 +4,9 @@ import { BookOpen, ShoppingCart, UtensilsCrossed, Sparkles, Home as HomeIcon, Us
 import BottomNavigation from '@/components/navigation/BottomNavigation';
 import RecetarioSection from '@/components/sections/RecetarioSection';
 import HomeView from '@/components/home/HomeView';
-import AIChat from '@/components/sections/AIChat';
 import TodayDashboard from '@/components/sections/TodayDashboard';
 import SettingsView from '@/components/sections/SettingsView';
+import FloatingAIAssistant from '@/components/FloatingAIAssistant';
 import { FABAction } from '@/components/navigation/DynamicFAB';
 import { useRecipes, useMarketItems, useSuggestionsCount, useRefreshAppData } from '@/lib/hooks/useAppData';
 import { useAppStore } from '@/lib/stores/useAppStore';
@@ -25,7 +25,6 @@ export default function Home() {
     toggleFab,
     navigateToRecetario,
     navigateToHogar,
-    navigateToIA,
   } = useAppStore();
 
   // Datos con TanStack Query (cache automático, refetch inteligente)
@@ -154,11 +153,11 @@ export default function Home() {
       onClick: () => navigateToHogar()
     },
     {
-      id: 'go-ia',
+      id: 'go-suggestions',
       icon: <Sparkles size={20} />,
-      label: 'Asistente IA',
+      label: 'Sugerencias',
       color: 'bg-purple-500',
-      onClick: () => navigateToIA()
+      onClick: () => navigateToRecetario('suggestions')
     }
   ];
 
@@ -190,25 +189,12 @@ export default function Home() {
     <div className="min-h-screen bg-gray-100">
       {/* Content - pb-32 para dejar espacio para los tabs secundarios */}
       <main className="pb-32">
-        {activeSection === 'hoy' && !showSettings && (
+        {activeSection === 'hoy' && (
           <TodayDashboard
             onNavigateToRecetario={(tab) => navigateToRecetario(tab as 'calendar' | 'market' | 'recipes' | 'suggestions' | undefined)}
             onNavigateToHogar={navigateToHogar}
-            onNavigateToIA={navigateToIA}
-            onNavigateToSettings={() => setShowSettings(true)}
+            onNavigateToIA={() => navigateToRecetario('suggestions')}
           />
-        )}
-
-        {showSettings && (
-          <div className="relative">
-            <button
-              onClick={() => setShowSettings(false)}
-              className="fixed top-4 right-4 z-50 bg-white rounded-full p-2 shadow-lg hover:bg-gray-100"
-            >
-              <span className="text-gray-600">✕</span>
-            </button>
-            <SettingsView />
-          </div>
         )}
 
         {activeSection === 'recetario' && (
@@ -226,12 +212,13 @@ export default function Home() {
           <HomeView />
         )}
 
-        {activeSection === 'ia' && (
-          <div className="fixed inset-0 top-0 bottom-[72px] pb-safe bg-gray-50">
-            <AIChat />
-          </div>
+        {activeSection === 'ajustes' && (
+          <SettingsView />
         )}
       </main>
+
+      {/* Floating AI Assistant - Contextual */}
+      <FloatingAIAssistant activeSection={activeSection} />
 
       {/* Bottom Navigation with Dynamic FAB */}
       <BottomNavigation
@@ -240,7 +227,6 @@ export default function Home() {
         fabOpen={fabOpen}
         onFabToggle={toggleFab}
         fabActions={getFABActions()}
-        pendingAlerts={pendingSuggestions}
         recetarioTab={recetarioTab}
         onRecetarioTabChange={setRecetarioTab}
         pendingSuggestions={pendingSuggestions}

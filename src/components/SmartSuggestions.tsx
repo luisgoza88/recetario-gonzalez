@@ -263,8 +263,12 @@ export default function SmartSuggestions({
         mariana: i.mariana
       }));
 
+      // Generar ID único para la receta
+      const recipeId = `ai-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
       // Preparar la receta para Supabase
       const recipeToSave = {
+        id: recipeId,
         name: aiRecipe.name,
         type: mealType,
         description: aiRecipe.description,
@@ -313,9 +317,12 @@ export default function SmartSuggestions({
       };
 
       onSelectAlternative(savedRecipe);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error saving recipe:', error);
-      setAiError('Error al guardar la receta. Intenta de nuevo.');
+      const errorMessage = error instanceof Error
+        ? error.message
+        : (error as { message?: string })?.message || 'Error desconocido';
+      setAiError(`Error al guardar: ${errorMessage}`);
     } finally {
       setSavingRecipe(false);
     }

@@ -439,7 +439,7 @@ export interface BudgetSummary {
 // TIPOS PARA NAVEGACIÓN PRINCIPAL
 // =====================================================
 
-export type MainSection = 'hoy' | 'recetario' | 'hogar' | 'ia' | 'ajustes';
+export type MainSection = 'hoy' | 'recetario' | 'hogar' | 'ajustes';
 export type RecetarioTab = 'calendar' | 'market' | 'recipes' | 'suggestions';
 
 export interface FABAction {

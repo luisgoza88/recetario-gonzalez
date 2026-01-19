@@ -27,7 +27,7 @@ interface AppActions {
   // Navegación combinada (helper)
   navigateToRecetario: (tab?: RecetarioTab) => void;
   navigateToHogar: () => void;
-  navigateToIA: () => void;
+  navigateToAjustes: () => void;
 }
 
 type AppStore = AppState & AppActions;
@@ -71,8 +71,8 @@ export const useAppStore = create<AppStore>((set) => ({
     showSettings: false
   }),
 
-  navigateToIA: () => set({
-    activeSection: 'ia',
+  navigateToAjustes: () => set({
+    activeSection: 'ajustes',
     fabOpen: false,
     showSettings: false
   }),
@@ -93,7 +93,7 @@ export const useNavigationActions = () => useAppStore((state) => ({
   setShowSettings: state.setShowSettings,
   navigateToRecetario: state.navigateToRecetario,
   navigateToHogar: state.navigateToHogar,
-  navigateToIA: state.navigateToIA,
+  navigateToAjustes: state.navigateToAjustes,
 }));
 
 export const useFabActions = () => useAppStore((state) => ({
