@@ -7,10 +7,6 @@
 // Types
 // ==========================================
 
-// Use 'any' for SpeechRecognition to avoid DOM type conflicts
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type SpeechRecognitionAny = any;
-
 export interface VoiceState {
   isListening: boolean;
   isSupported: boolean;
@@ -23,6 +19,10 @@ export interface VoiceCommand {
   action: string;
   description: string;
 }
+
+// Use 'any' to avoid conflicts with DOM's SpeechRecognition types
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SpeechRecognitionInstance = any;
 
 // Common voice commands that map to quick actions
 export const VOICE_COMMANDS: VoiceCommand[] = [
@@ -76,10 +76,12 @@ export function isSpeechSynthesisSupported(): boolean {
 }
 
 // Create speech recognition instance
-export function createSpeechRecognition(): SpeechRecognitionAny | null {
+export function createSpeechRecognition(): SpeechRecognitionInstance | null {
   if (typeof window === 'undefined') return null;
 
-  const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const win = window as any;
+  const SpeechRecognitionClass = win.SpeechRecognition || win.webkitSpeechRecognition;
   if (!SpeechRecognitionClass) return null;
 
   const recognition = new SpeechRecognitionClass();
@@ -172,7 +174,7 @@ export function formatForSpeech(text: string): string {
 
 // Voice Hook State Manager
 export class VoiceManager {
-  private recognition: SpeechRecognitionAny | null = null;
+  private recognition: SpeechRecognitionInstance | null = null;
   private onResultCallback: ((transcript: string, isFinal: boolean) => void) | null = null;
   private onErrorCallback: ((error: string) => void) | null = null;
   private onEndCallback: (() => void) | null = null;
