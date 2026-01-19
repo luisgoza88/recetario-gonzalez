@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, X, Loader2, Mic, Sparkles } from 'lucide-react';
+import { Plus, X, Loader2, Mic, Sparkles, Send } from 'lucide-react';
 import { useSmartFABContext, SmartAction } from '@/lib/hooks/useSmartFABContext';
 import { getVoiceManager, isSpeechRecognitionSupported } from '@/lib/voice-commands';
 import { getAIContext } from '@/lib/ai-memory';
@@ -34,6 +34,8 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
   const [isProcessingAI, setIsProcessingAI] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [showVoicePanel, setShowVoicePanel] = useState(false);
+  const [textInput, setTextInput] = useState('');
+  const textInputRef = useRef<HTMLInputElement>(null);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const isLongPress = useRef(false);
   const LONG_PRESS_DURATION = 400; // ms
@@ -72,15 +74,16 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
     setVoiceSupported(isSpeechRecognitionSupported());
   }, []);
 
-  // Process voice command - send to AI (defined first since startListening uses it)
-  const processVoiceCommand = useCallback(async (text: string) => {
+  // Process voice command or text input - send to AI
+  const processAIMessage = useCallback(async (text: string) => {
     if (!text.trim()) {
-      setShowVoicePanel(false);
       return;
     }
 
+    setTranscript(text);
     setIsProcessingAI(true);
     setAiResponse(null);
+    setTextInput('');
 
     try {
       // Get AI context for better responses
@@ -90,11 +93,12 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: text,
-          context: {
+          messages: [{ role: 'user', content: text }],
+          conversationContext: {
             activeSection,
             ...context
-          }
+          },
+          stream: true
         })
       });
 
@@ -140,6 +144,20 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
     }
   }, [activeSection]);
 
+  // Handle text input submit
+  const handleTextSubmit = useCallback(() => {
+    if (!textInput.trim() || isProcessingAI) return;
+    processAIMessage(textInput);
+  }, [textInput, isProcessingAI, processAIMessage]);
+
+  // Handle Enter key
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleTextSubmit();
+    }
+  }, [handleTextSubmit]);
+
   // Start voice recognition
   const startListening = useCallback(() => {
     if (!voiceSupported) return;
@@ -160,7 +178,7 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
         setTranscript(text);
         if (isFinal) {
           // Send to AI when done
-          processVoiceCommand(text);
+          processAIMessage(text);
         }
       },
       onError: (error) => {
@@ -173,7 +191,7 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
         setIsListening(false);
       }
     });
-  }, [voiceSupported, processVoiceCommand]);
+  }, [voiceSupported, processAIMessage]);
 
   // Stop voice recognition
   const stopListening = useCallback(() => {
@@ -232,6 +250,16 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
     setTranscript('');
     setAiResponse(null);
     setIsProcessingAI(false);
+    setTextInput('');
+  }, []);
+
+  // Open AI panel for text input (simple click, not long press)
+  const openAIPanel = useCallback(() => {
+    setShowVoicePanel(true);
+    setTranscript('');
+    setAiResponse(null);
+    // Focus the input after a short delay
+    setTimeout(() => textInputRef.current?.focus(), 100);
   }, []);
 
   // Get FAB button style based on context
@@ -371,7 +399,7 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
           <div className="fixed inset-x-4 bottom-24 z-[60] animate-slide-up">
             <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
               {/* Header */}
-              <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-500">
+              <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600">
                 <div className="flex items-center gap-2 text-white">
                   {isListening ? (
                     <>
@@ -399,8 +427,8 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
               </div>
 
               {/* Content */}
-              <div className="p-4 max-h-[50vh] overflow-y-auto">
-                {/* User's transcript */}
+              <div className="p-4 max-h-[40vh] overflow-y-auto">
+                {/* User's transcript/message */}
                 {transcript && (
                   <div className="mb-3">
                     <p className="text-xs text-gray-400 mb-1">Tu mensaje:</p>
@@ -420,7 +448,7 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
 
                 {aiResponse && (
                   <div>
-                    <p className="text-xs text-emerald-600 mb-1">Respuesta:</p>
+                    <p className="text-xs text-purple-600 mb-1">Respuesta:</p>
                     <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
                       {aiResponse}
                     </div>
@@ -437,6 +465,70 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
                     <p className="text-gray-400 text-xs mt-1">Suelta el botón para enviar</p>
                   </div>
                 )}
+
+                {/* Welcome state - show when no transcript and not listening */}
+                {!transcript && !isListening && !aiResponse && !isProcessingAI && (
+                  <div className="text-center py-4">
+                    <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-purple-50 flex items-center justify-center">
+                      <Sparkles size={24} className="text-purple-500" />
+                    </div>
+                    <p className="text-gray-600 text-sm font-medium">¿En qué puedo ayudarte?</p>
+                    <p className="text-gray-400 text-xs mt-1">Escribe tu mensaje abajo o mantén presionado para hablar</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Text Input Area */}
+              <div className="p-3 border-t bg-gray-50">
+                <div className="flex gap-2 items-center">
+                  {/* Voice button */}
+                  {voiceSupported && (
+                    <button
+                      onMouseDown={startListening}
+                      onMouseUp={stopListening}
+                      onMouseLeave={stopListening}
+                      onTouchStart={startListening}
+                      onTouchEnd={stopListening}
+                      disabled={isProcessingAI}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
+                        isListening
+                          ? 'bg-red-500 text-white animate-pulse'
+                          : 'bg-gray-200 text-gray-600 hover:bg-purple-100 hover:text-purple-600'
+                      } disabled:opacity-50`}
+                    >
+                      <Mic size={18} />
+                    </button>
+                  )}
+
+                  {/* Text input */}
+                  <input
+                    ref={textInputRef}
+                    type="text"
+                    value={textInput}
+                    onChange={(e) => setTextInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Escribe tu pregunta..."
+                    disabled={isProcessingAI || isListening}
+                    className="flex-1 px-4 py-2.5 bg-white border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:bg-gray-100"
+                  />
+
+                  {/* Send button */}
+                  <button
+                    onClick={handleTextSubmit}
+                    disabled={!textInput.trim() || isProcessingAI || isListening}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
+                      textInput.trim() && !isProcessingAI && !isListening
+                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg'
+                        : 'bg-gray-200 text-gray-400'
+                    }`}
+                  >
+                    {isProcessingAI ? (
+                      <Loader2 size={18} className="animate-spin" />
+                    ) : (
+                      <Send size={18} />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
