@@ -92,16 +92,27 @@ export default function DailyDashboard({
 
   const toggleTaskStatus = async (task: ScheduledTask) => {
     const newStatus = task.status === 'completada' ? 'pendiente' : 'completada';
+    const now = new Date();
+
+    // Calculate actual minutes from started_at if available
+    let actualMinutes: number | null = null;
+    if (newStatus === 'completada' && task.started_at) {
+      const startedAt = new Date(task.started_at);
+      actualMinutes = Math.round((now.getTime() - startedAt.getTime()) / (1000 * 60));
+    }
 
     await supabase
       .from('scheduled_tasks')
       .update({
         status: newStatus,
-        completed_at: newStatus === 'completada' ? new Date().toISOString() : null
+        completed_at: newStatus === 'completada' ? now.toISOString() : null,
+        actual_minutes: actualMinutes,
+        // Reset started_at if going back to pending
+        ...(newStatus === 'pendiente' ? { started_at: null } : {})
       })
       .eq('id', task.id);
 
-    // Si se completa, registrar en historial
+    // Si se completa, registrar en historial con tiempo REAL
     if (newStatus === 'completada') {
       await supabase.from('cleaning_history').insert({
         household_id: householdId,
@@ -109,8 +120,9 @@ export default function DailyDashboard({
         task_id: task.id,
         task_name: task.task_template?.name,
         employee_id: task.employee_id,
-        completed_at: new Date().toISOString(),
-        actual_minutes: task.task_template?.estimated_minutes
+        completed_at: now.toISOString(),
+        // Use actual measured time, or fallback to estimate
+        actual_minutes: actualMinutes || task.task_template?.estimated_minutes
       });
     }
 

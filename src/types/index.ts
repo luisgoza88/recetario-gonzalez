@@ -304,10 +304,12 @@ export interface ScheduledTask {
   employee?: HomeEmployee;
   scheduled_date: string;
   status: TaskStatus;
+  started_at?: string;  // When the task was started (Play button)
   completed_at?: string;
   completed_by?: string;
   notes?: string;
-  actual_minutes?: number;
+  actual_minutes?: number;  // Calculated from completed_at - started_at
+  rating?: number;  // 1-5 quality rating
   created_at?: string;
 }
 

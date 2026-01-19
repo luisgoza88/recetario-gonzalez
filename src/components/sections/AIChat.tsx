@@ -2,10 +2,20 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  Send, Bot, User, Sparkles, Loader2, Mic, MicOff,
+  Send, Bot, User, Sparkles, Loader2,
   Calendar, ShoppingCart, Home, UtensilsCrossed,
-  CheckCircle2, ListTodo, ChefHat, RefreshCw
+  CheckCircle2, ListTodo, ChefHat, RefreshCw,
+  Clock, AlertTriangle, Check, Plus, ChevronRight,
+  AlertCircle, TrendingUp
 } from 'lucide-react';
+
+// Types for rich messages
+interface MessageAction {
+  id: string;
+  label: string;
+  action: string;
+  variant?: 'primary' | 'secondary' | 'danger';
+}
 
 interface Message {
   id: string;
@@ -13,6 +23,7 @@ interface Message {
   content: string;
   timestamp: Date;
   isLoading?: boolean;
+  actions?: MessageAction[];
 }
 
 interface QuickAction {
@@ -56,11 +67,144 @@ const QUICK_ACTIONS: QuickAction[] = [
 
 const SUGGESTION_CHIPS = [
   '¿Qué hay para almorzar hoy?',
-  '¿Qué tareas tiene Yolima hoy?',
-  'Agrega leche a la lista de compras',
-  '¿Qué ingredientes tengo disponibles?',
-  'Marca la tarea de barrer como completada',
+  '¿Qué ingredientes me faltan para hoy?',
+  'Dame el reporte semanal',
+  '¿Qué ingredientes tengo bajos?',
+  'Consejos de preparación para hoy',
 ];
+
+// Action Button Component
+interface ActionButtonProps {
+  action: MessageAction;
+  onAction: (action: string) => void;
+  disabled?: boolean;
+}
+
+function ActionButton({ action, onAction, disabled }: ActionButtonProps) {
+  const variants = {
+    primary: 'bg-purple-600 text-white hover:bg-purple-700',
+    secondary: 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+    danger: 'bg-red-100 text-red-700 hover:bg-red-200',
+  };
+
+  return (
+    <button
+      onClick={() => onAction(action.action)}
+      disabled={disabled}
+      className={`
+        px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
+        flex items-center gap-1.5 disabled:opacity-50
+        ${variants[action.variant || 'secondary']}
+      `}
+    >
+      {action.label}
+      <ChevronRight size={14} />
+    </button>
+  );
+}
+
+// Parse message content for special formatting
+function parseMessageContent(content: string): { text: string; actions: MessageAction[] } {
+  const actions: MessageAction[] = [];
+
+  // Detect patterns for suggested actions
+  if (content.includes('¿Quieres que') || content.includes('¿Los agrego')) {
+    actions.push({
+      id: 'confirm-yes',
+      label: 'Sí, agregar',
+      action: 'confirm:yes',
+      variant: 'primary'
+    });
+    actions.push({
+      id: 'confirm-no',
+      label: 'No, gracias',
+      action: 'confirm:no',
+      variant: 'secondary'
+    });
+  }
+
+  // Detect recipe mentions for "ver receta" action
+  const recipeMatch = content.match(/(?:preparar|cocinar|receta[s]?[:]?\s*)[""]?([^"".\n]+)[""]?/i);
+  if (recipeMatch) {
+    actions.push({
+      id: 'view-recipe',
+      label: 'Ver receta completa',
+      action: `view_recipe:${recipeMatch[1].trim()}`,
+      variant: 'secondary'
+    });
+  }
+
+  // Detect low inventory alerts
+  if (content.includes('bajo') && content.includes('inventario')) {
+    actions.push({
+      id: 'add-to-list',
+      label: 'Agregar todos a lista',
+      action: 'add_low_to_shopping',
+      variant: 'primary'
+    });
+  }
+
+  // Detect missing ingredients
+  if (content.includes('faltan') || content.includes('faltantes')) {
+    actions.push({
+      id: 'add-missing',
+      label: 'Agregar faltantes a compras',
+      action: 'add_missing_to_shopping',
+      variant: 'primary'
+    });
+  }
+
+  return { text: content, actions };
+}
+
+// Format message with markdown-like styling
+function FormattedMessage({ content }: { content: string }) {
+  // Split by lines and format
+  const lines = content.split('\n');
+
+  return (
+    <div className="text-sm space-y-1">
+      {lines.map((line, i) => {
+        // Bold text **text**
+        let formatted = line.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+        // Emoji indicators at start
+        if (line.match(/^[✅❌⚠️📝💡🍽️⏱️🧊📊]/)) {
+          return (
+            <p
+              key={i}
+              className="flex items-start gap-1"
+              dangerouslySetInnerHTML={{ __html: formatted }}
+            />
+          );
+        }
+
+        // Bullet points
+        if (line.startsWith('- ') || line.startsWith('• ')) {
+          return (
+            <p
+              key={i}
+              className="pl-3 flex items-start gap-1"
+              dangerouslySetInnerHTML={{ __html: '• ' + formatted.slice(2) }}
+            />
+          );
+        }
+
+        // Regular line
+        if (line.trim()) {
+          return (
+            <p
+              key={i}
+              dangerouslySetInnerHTML={{ __html: formatted }}
+            />
+          );
+        }
+
+        return <br key={i} />;
+      })}
+    </div>
+  );
+}
 
 export default function AIChat() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -183,6 +327,41 @@ export default function AIChat() {
     return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Handle action button clicks
+  const handleAction = async (action: string) => {
+    const [actionType, ...params] = action.split(':');
+    const param = params.join(':');
+
+    switch (actionType) {
+      case 'confirm':
+        if (param === 'yes') {
+          // Find the last assistant message mentioning items
+          const lastMsg = messages.filter(m => m.role === 'assistant').pop();
+          if (lastMsg?.content.includes('Huevos')) {
+            sendMessage('Sí, agrega los huevos a la lista');
+          } else {
+            sendMessage('Sí, agrégalo');
+          }
+        }
+        break;
+
+      case 'view_recipe':
+        sendMessage(`Muéstrame los detalles de la receta ${param}`);
+        break;
+
+      case 'add_low_to_shopping':
+        sendMessage('Agrega todos los ingredientes bajos a la lista de compras');
+        break;
+
+      case 'add_missing_to_shopping':
+        sendMessage('Agrega los ingredientes faltantes a la lista de compras');
+        break;
+
+      default:
+        console.log('Unknown action:', action);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
       {/* Header */}
@@ -295,26 +474,53 @@ export default function AIChat() {
 
                 {/* Message Bubble */}
                 <div className={`
-                  max-w-[80%] p-3 rounded-2xl
+                  max-w-[85%] rounded-2xl
                   ${message.role === 'user'
-                    ? 'bg-green-600 text-white rounded-br-md'
+                    ? 'bg-green-600 text-white rounded-br-md p-3'
                     : 'bg-white shadow-sm border rounded-bl-md'
                   }
                 `}>
                   {message.isLoading ? (
-                    <div className="flex items-center gap-2 text-purple-600">
+                    <div className="flex items-center gap-2 text-purple-600 p-3">
                       <Loader2 size={16} className="animate-spin" />
                       <span className="text-sm">Pensando...</span>
                     </div>
-                  ) : (
+                  ) : message.role === 'user' ? (
+                    // User message - simple text
                     <>
                       <p className="text-sm whitespace-pre-line">{message.content}</p>
-                      <p className={`text-xs mt-1 ${
-                        message.role === 'user' ? 'text-green-200' : 'text-gray-400'
-                      }`}>
+                      <p className="text-xs mt-1 text-green-200">
                         {formatTime(message.timestamp)}
                       </p>
                     </>
+                  ) : (
+                    // Assistant message - formatted with potential actions
+                    (() => {
+                      const { text, actions } = parseMessageContent(message.content);
+                      return (
+                        <div className="p-3">
+                          <FormattedMessage content={text} />
+
+                          {/* Action Buttons */}
+                          {actions.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100">
+                              {actions.map(action => (
+                                <ActionButton
+                                  key={action.id}
+                                  action={action}
+                                  onAction={handleAction}
+                                  disabled={isLoading}
+                                />
+                              ))}
+                            </div>
+                          )}
+
+                          <p className="text-xs mt-2 text-gray-400">
+                            {formatTime(message.timestamp)}
+                          </p>
+                        </div>
+                      );
+                    })()
                   )}
                 </div>
               </div>
