@@ -18,6 +18,17 @@ import {
   ProposalExecutionResult,
   RollbackResult,
 } from '@/types';
+import {
+  checkAutoApproval,
+  checkRateLimit,
+  checkBulkLimit,
+  recordSuccessfulAction,
+  recordFailedAction,
+  recordRollback,
+  getTrustStats,
+  TrustDecision,
+  RateLimitCheck,
+} from './trust-service';
 
 // Cliente Supabase con service role para operaciones privilegiadas
 const supabase = createClient(
@@ -112,20 +123,75 @@ export async function getHouseholdTrust(householdId: string): Promise<HouseholdA
 
 /**
  * Verifica si una acción debe auto-aprobarse basado en el trust level
+ * Ahora incluye rate limiting y guardrails
  */
 export async function shouldAutoApprove(
   householdId: string,
-  riskLevel: AIRiskLevel
+  riskLevel: AIRiskLevel,
+  actionCount: number = 1
 ): Promise<boolean> {
-  const trust = await getHouseholdTrust(householdId);
-  if (!trust) return riskLevel <= AI_RISK_LEVELS.LOW;
-
-  // Si require_confirmation_always está activo, nunca auto-aprobar
-  if (trust.require_confirmation_always) return false;
-
-  // Auto-aprobar si el nivel de riesgo está dentro del umbral
-  return riskLevel <= trust.auto_approve_level;
+  // Use the enhanced trust service for decision making
+  const decision = await checkAutoApproval(householdId, riskLevel, actionCount);
+  return decision.canAutoApprove;
 }
+
+/**
+ * Extended version that returns the full trust decision
+ */
+export async function checkAutoApprovalWithDetails(
+  householdId: string,
+  riskLevel: AIRiskLevel,
+  actionCount: number = 1
+): Promise<TrustDecision> {
+  return await checkAutoApproval(householdId, riskLevel, actionCount);
+}
+
+/**
+ * Check rate limits before executing actions
+ */
+export async function checkActionRateLimit(
+  householdId: string,
+  riskLevel: AIRiskLevel,
+  actionCount: number = 1
+): Promise<RateLimitCheck> {
+  return await checkRateLimit(householdId, riskLevel, actionCount);
+}
+
+/**
+ * Check bulk operation limits
+ */
+export async function checkBulkOperationLimit(
+  householdId: string,
+  itemCount: number
+): Promise<{ allowed: boolean; reason?: string; limit?: number }> {
+  return await checkBulkLimit(householdId, itemCount);
+}
+
+/**
+ * Record action outcome for trust scoring
+ */
+export async function recordActionOutcome(
+  householdId: string,
+  success: boolean
+): Promise<void> {
+  if (success) {
+    await recordSuccessfulAction(householdId);
+  } else {
+    await recordFailedAction(householdId);
+  }
+}
+
+/**
+ * Record rollback for trust scoring
+ */
+export async function recordActionRollback(householdId: string): Promise<void> {
+  await recordRollback(householdId);
+}
+
+/**
+ * Get trust statistics for dashboard
+ */
+export { getTrustStats };
 
 // ============================================
 // AUDIT LOGGING

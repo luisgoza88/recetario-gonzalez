@@ -12,6 +12,10 @@ import {
   generateSessionId,
   generateProposalSummary,
   AI_RISK_LEVELS,
+  checkActionRateLimit,
+  checkBulkOperationLimit,
+  recordActionOutcome,
+  checkAutoApprovalWithDetails,
 } from '@/lib/ai/ai-command-service';
 import { AIProposedAction, AIRiskLevel } from '@/types';
 
@@ -3586,6 +3590,9 @@ async function executeFunctionWithLogging(
       });
     }
 
+    // Record successful action for trust scoring
+    await recordActionOutcome(context.householdId, true).catch(console.error);
+
     return {
       result,
       auditLogId: auditLogId || undefined,
@@ -3593,6 +3600,9 @@ async function executeFunctionWithLogging(
       riskLevel,
     };
   } catch (error) {
+    // Record failed action for trust scoring
+    await recordActionOutcome(context.householdId, false).catch(console.error);
+
     // Log error en audit
     if (auditLogId) {
       await completeAuditLog({
@@ -4222,6 +4232,55 @@ export async function POST(request: NextRequest) {
         !fc.name.startsWith('suggest_') &&
         fc.name !== 'calculate_portions'
       );
+
+      // ============================================
+      // GUARDRAILS: Rate Limiting & Bulk Operation Checks
+      // ============================================
+      if (writeOperations.length > 0 && householdId) {
+        // Get max risk level of all operations
+        let maxRiskLevel: AIRiskLevel = AI_RISK_LEVELS.LOW as AIRiskLevel;
+        for (const fc of writeOperations) {
+          const riskLevel = await getFunctionRiskLevel(fc.name);
+          if (riskLevel > maxRiskLevel) {
+            maxRiskLevel = riskLevel;
+          }
+        }
+
+        // Check rate limits
+        const rateLimitCheck = await checkActionRateLimit(
+          householdId,
+          maxRiskLevel,
+          writeOperations.length
+        );
+
+        if (!rateLimitCheck.allowed) {
+          return NextResponse.json({
+            type: 'error',
+            content: `⚠️ ${rateLimitCheck.reason}\n\nPor favor, espera un momento antes de realizar más acciones.`,
+            role: 'assistant',
+            rateLimited: true,
+            sessionId,
+          });
+        }
+
+        // Check bulk operation limits for multi-item operations
+        for (const fc of writeOperations) {
+          if (fc.name === 'bulk_update_inventory' && fc.args.items) {
+            const itemCount = (fc.args.items as unknown[]).length;
+            const bulkCheck = await checkBulkOperationLimit(householdId, itemCount);
+
+            if (!bulkCheck.allowed) {
+              return NextResponse.json({
+                type: 'error',
+                content: `⚠️ ${bulkCheck.reason}\n\nEl límite actual es de ${bulkCheck.limit} items por operación. Intenta dividir la operación en partes más pequeñas.`,
+                role: 'assistant',
+                bulkLimited: true,
+                sessionId,
+              });
+            }
+          }
+        }
+      }
 
       // If there are high-risk write operations and we're not in executeDirectly mode
       if (writeOperations.length > 0 && !executeDirectly && householdId) {
