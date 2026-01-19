@@ -404,7 +404,7 @@ export default function DailyDashboard({
   );
 }
 
-// Task Card Component
+// Task Card Component with Live Timer
 interface TaskCardProps {
   task: ScheduledTask;
   onToggle: () => void;
@@ -414,9 +414,46 @@ interface TaskCardProps {
 }
 
 function TaskCard({ task, onToggle, onStart, onInspect, onRate }: TaskCardProps) {
-  const [showMenu, setShowMenu] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState(0);
   const isCompleted = task.status === 'completada';
   const isInProgress = task.status === 'en_progreso';
+
+  // Live timer for in-progress tasks
+  useEffect(() => {
+    if (!isInProgress || !task.started_at) {
+      setElapsedTime(0);
+      return;
+    }
+
+    const startedAt = new Date(task.started_at).getTime();
+
+    const updateElapsed = () => {
+      const now = Date.now();
+      setElapsedTime(Math.floor((now - startedAt) / 1000));
+    };
+
+    updateElapsed();
+    const interval = setInterval(updateElapsed, 1000);
+
+    return () => clearInterval(interval);
+  }, [isInProgress, task.started_at]);
+
+  // Format seconds to mm:ss or hh:mm:ss
+  const formatTime = (seconds: number) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    if (hrs > 0) {
+      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Calculate progress percentage vs estimated time
+  const estimatedSeconds = (task.task_template?.estimated_minutes || 30) * 60;
+  const progressPercent = Math.min(100, (elapsedTime / estimatedSeconds) * 100);
+  const isOverTime = elapsedTime > estimatedSeconds;
 
   return (
     <div className={`p-4 ${isCompleted ? 'bg-green-50' : isInProgress ? 'bg-blue-50' : ''}`}>
@@ -450,11 +487,57 @@ function TaskCard({ task, onToggle, onStart, onInspect, onRate }: TaskCardProps)
             </span>
           </div>
 
-          {/* Progress indicator */}
+          {/* Live Timer with Progress Bar */}
           {isInProgress && (
-            <div className="mt-2 flex items-center gap-2 text-blue-600 text-sm">
-              <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse" />
-              En progreso...
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full animate-pulse ${isOverTime ? 'bg-red-500' : 'bg-blue-600'}`} />
+                  <span className={`text-lg font-mono font-bold ${isOverTime ? 'text-red-600' : 'text-blue-600'}`}>
+                    {formatTime(elapsedTime)}
+                  </span>
+                </div>
+                <span className="text-xs text-gray-500">
+                  / {task.task_template?.estimated_minutes} min
+                </span>
+              </div>
+              {/* Progress bar */}
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-500 ${
+                    isOverTime ? 'bg-red-500' : progressPercent > 80 ? 'bg-yellow-500' : 'bg-blue-500'
+                  }`}
+                  style={{ width: `${Math.min(100, progressPercent)}%` }}
+                />
+              </div>
+              {isOverTime && (
+                <p className="text-xs text-red-600 flex items-center gap-1">
+                  <AlertTriangle size={12} />
+                  Excedido por {formatTime(elapsedTime - estimatedSeconds)}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Show actual time after completion */}
+          {isCompleted && task.actual_minutes !== undefined && task.actual_minutes !== null && (
+            <div className="mt-2 flex items-center gap-2 text-sm">
+              <span className={`font-medium ${
+                task.actual_minutes <= (task.task_template?.estimated_minutes || 30)
+                  ? 'text-green-600'
+                  : 'text-orange-600'
+              }`}>
+                Tiempo real: {task.actual_minutes} min
+              </span>
+              {task.actual_minutes <= (task.task_template?.estimated_minutes || 30) ? (
+                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                  Eficiente
+                </span>
+              ) : (
+                <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
+                  +{task.actual_minutes - (task.task_template?.estimated_minutes || 30)} min
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -468,6 +551,16 @@ function TaskCard({ task, onToggle, onStart, onInspect, onRate }: TaskCardProps)
               title="Iniciar tarea"
             >
               <Play size={18} />
+            </button>
+          )}
+
+          {isInProgress && (
+            <button
+              onClick={onToggle}
+              className="p-2 hover:bg-blue-100 rounded-lg text-blue-600 bg-blue-50"
+              title="Completar tarea"
+            >
+              <Pause size={18} />
             </button>
           )}
 
