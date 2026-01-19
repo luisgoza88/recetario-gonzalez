@@ -467,18 +467,21 @@ async function getRecipeDetails(recipeName: string) {
   }
 
   if (!recipe) {
-    // Sugerir recetas similares
-    const { data: allRecipes } = await supabase
-      .from('recipes')
-      .select('name')
-      .limit(50);
+    // No encontramos la receta - indicar al modelo que use conocimiento general
+    // También obtener el inventario para que pueda verificar ingredientes
+    const { data: inventory } = await supabase
+      .from('inventory')
+      .select('*, market_item:market_items(name)')
+      .gt('current_number', 0);
 
-    const suggestions = allRecipes?.map(r => r.name).slice(0, 5) || [];
+    const availableIngredients = inventory?.map(i => (i.market_item as { name?: string })?.name).filter(Boolean) || [];
 
     return {
-      error: `No se encontró la receta "${recipeName}"`,
-      suggestion: `Recetas disponibles similares: ${suggestions.join(', ')}`,
-      available_recipes: suggestions
+      recipe_not_found: true,
+      requested_recipe: recipeName,
+      instruction: `La receta "${recipeName}" no está en la base de datos. DEBES usar tu conocimiento culinario general para ayudar al usuario. Proporciona los ingredientes típicos de esta receta y los pasos de preparación. Verifica qué ingredientes tiene el usuario usando la lista de inventario disponible.`,
+      user_inventory: availableIngredients,
+      action_required: 'Usa tu conocimiento general de cocina para dar la receta completa. Indica qué ingredientes de la lista tiene el usuario (✅) y cuáles le faltan (❌). Ofrece agregar los faltantes a la lista de compras.'
     };
   }
 
@@ -1247,6 +1250,8 @@ interface MultiStepResult {
   results: Record<string, unknown>;
   summary: string;
   next_suggestions?: string[];
+  use_general_knowledge?: boolean;
+  instruction?: string;
 }
 
 async function executeMultiStepTask(
@@ -1270,10 +1275,34 @@ async function executeMultiStepTask(
       }
 
       const recipeDetails = await getRecipeDetails(recipeName);
-      stepsCompleted.push('✅ Obtener detalles de receta');
+      stepsCompleted.push('✅ Buscar receta en base de datos');
       results.recipe = recipeDetails;
 
-      // Paso 2: Verificar ingredientes
+      // Si la receta no existe, indicar que use conocimiento general
+      if ('recipe_not_found' in recipeDetails && recipeDetails.recipe_not_found) {
+        stepsCompleted.push('📚 Receta no encontrada - usar conocimiento culinario general');
+
+        // Obtener inventario para comparar
+        const inventory = await getInventory();
+        stepsCompleted.push('✅ Obtener inventario disponible');
+        results.inventory = inventory;
+
+        return {
+          task_type: taskType,
+          steps_completed: stepsCompleted,
+          results,
+          summary: `La receta "${recipeName}" no está en la base de datos, pero puedo ayudarte usando mi conocimiento culinario.`,
+          use_general_knowledge: true,
+          instruction: `IMPORTANTE: Debes usar tu conocimiento general de cocina para dar los ingredientes y pasos de "${recipeName}". Compara con el inventario del usuario y marca ✅ lo que tiene y ❌ lo que le falta. Ofrece agregar faltantes a la lista de compras.`,
+          next_suggestions: [
+            'Dame los ingredientes y pasos',
+            'Agrega lo que me falta a la lista',
+            'Buscar una receta similar en el sistema'
+          ]
+        };
+      }
+
+      // Paso 2: Verificar ingredientes (solo si la receta existe)
       const missingCheck = await getMissingIngredients(recipeName);
       stepsCompleted.push('✅ Verificar ingredientes en inventario');
       results.ingredients_check = missingCheck;
@@ -1747,7 +1776,44 @@ const SYSTEM_PROMPT = `Eres el Asistente Inteligente del Hogar - un ayudante pro
 - **Proactivo**: No solo respondes, también sugieres y anticipas necesidades
 - **Práctico**: Vas al grano pero das contexto útil
 - **Amigable**: Usas emojis con moderación (1-2 por respuesta máximo)
-- **Eficiente**: Respuestas concisas pero completas
+- **Colaborativo**: SIEMPRE buscas la manera de ayudar, nunca dices "no puedo"
+
+## ⚠️ REGLA MÁS IMPORTANTE: SER COLABORATIVO
+
+**NUNCA rechaces una solicitud de ayuda para cocinar.** Si el usuario quiere hacer una receta:
+
+1. **Si la receta EXISTE en la base de datos**: Usa las funciones para obtener detalles, verificar ingredientes, etc.
+
+2. **Si la receta NO EXISTE en la base de datos**:
+   - NO sugieras una receta diferente como si fuera lo mismo
+   - USA TU CONOCIMIENTO GENERAL para ayudar
+   - Explica los ingredientes típicos de esa receta
+   - Verifica con get_inventory() qué ingredientes tiene el usuario
+   - Indica cuáles tiene ✅ y cuáles le faltan ❌
+   - Ofrece agregar los faltantes a la lista de compras
+   - Da los pasos de preparación usando tu conocimiento
+
+**Ejemplo de respuesta ideal cuando NO existe la receta:**
+"No tengo la receta de pasta bolognesa guardada en el sistema, pero **te ayudo a prepararla**.
+
+Para una bolognesa tradicional necesitas:
+- Carne molida ✅ (tienes en inventario)
+- Pasta/espaguetis ❌ (no tienes)
+- Tomate triturado ✅ (tienes)
+- Cebolla ✅ (tienes)
+- Ajo ✅ (tienes)
+- Zanahoria ❌ (no tienes)
+
+Te faltan 2 ingredientes. ¿Quieres que los agregue a la lista de compras?
+
+**Preparación básica:**
+1. Sofríe cebolla y ajo picados
+2. Agrega la carne molida y dora bien
+3. Añade el tomate y cocina 20-30 min
+4. Sazona con sal, pimienta, orégano
+5. Sirve sobre la pasta cocida
+
+💡 ¿Te doy más detalles de algún paso?"
 
 ## ⚡ REGLA CRÍTICA: USAR AGENTE MULTI-PASO
 
@@ -1800,10 +1866,12 @@ Cuando hagas algo, usa este formato:
 - Mantén respuestas de máximo 3-4 párrafos cortos
 - Si hay mucha información, organízala en secciones claras
 
-### 5. Búsqueda inteligente de recetas
-Si no encuentras una receta exacta, la función buscará variantes automáticamente.
-Por ejemplo: "pasta bolognesa" encontrará "espaguetis a la boloñesa" o "pasta con carne".
-Si aún así no encuentra, te dará sugerencias de recetas disponibles.
+### 5. Conocimiento culinario general
+Tienes conocimiento de cocina general. Si una receta no está en la base de datos:
+- Usa tu conocimiento para dar ingredientes y pasos
+- Verifica el inventario del usuario con get_inventory()
+- Ayuda igual que si la receta existiera en el sistema
+- NUNCA digas "no tengo esa receta" y te quedes ahí - SIEMPRE ofrece ayudar
 
 ## DATOS DEL HOGAR
 
