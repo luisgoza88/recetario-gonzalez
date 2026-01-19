@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Plus, X, Loader2 } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Plus, X, Loader2, Mic } from 'lucide-react';
 import { useSmartFABContext, SmartAction } from '@/lib/hooks/useSmartFABContext';
+import { getVoiceManager, isSpeechRecognitionSupported } from '@/lib/voice-commands';
 
 // Re-export for backwards compatibility
 export interface FABAction {
@@ -24,6 +25,14 @@ interface SmartFABProps {
 export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProps) {
   const { actions, contextInfo, isLoading } = useSmartFABContext(activeSection);
   const [showSuccess, setShowSuccess] = useState<string | null>(null);
+
+  // Voice command state
+  const [isListening, setIsListening] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const isLongPress = useRef(false);
+  const LONG_PRESS_DURATION = 400; // ms
 
   // Listen for success events
   useEffect(() => {
@@ -53,6 +62,108 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
     window.addEventListener('navigateToSection' as keyof WindowEventMap, handleNavigate as EventListener);
     return () => window.removeEventListener('navigateToSection' as keyof WindowEventMap, handleNavigate as EventListener);
   }, [open, onToggle]);
+
+  // Check voice support on mount
+  useEffect(() => {
+    setVoiceSupported(isSpeechRecognitionSupported());
+  }, []);
+
+  // Start voice recognition
+  const startListening = useCallback(() => {
+    if (!voiceSupported) return;
+
+    const voiceManager = getVoiceManager();
+    setTranscript('');
+    setIsListening(true);
+
+    // Haptic feedback if available
+    if (navigator.vibrate) {
+      navigator.vibrate(50);
+    }
+
+    voiceManager.start({
+      onResult: (text, isFinal) => {
+        setTranscript(text);
+        if (isFinal) {
+          // Send to AI when done
+          processVoiceCommand(text);
+        }
+      },
+      onError: (error) => {
+        console.error('Voice error:', error);
+        setIsListening(false);
+        setTranscript('');
+      },
+      onEnd: () => {
+        setIsListening(false);
+      }
+    });
+  }, [voiceSupported]);
+
+  // Stop voice recognition
+  const stopListening = useCallback(() => {
+    const voiceManager = getVoiceManager();
+    voiceManager.stop();
+    setIsListening(false);
+  }, []);
+
+  // Process voice command - send to AI
+  const processVoiceCommand = useCallback((text: string) => {
+    if (!text.trim()) return;
+
+    // Dispatch event to open AI chat with the voice command
+    window.dispatchEvent(new CustomEvent('openAIChat', {
+      detail: { initialMessage: text }
+    }));
+
+    // Show feedback
+    setShowSuccess(`"${text.length > 30 ? text.substring(0, 30) + '...' : text}"`);
+    setTimeout(() => setShowSuccess(null), 2500);
+  }, []);
+
+  // Long press handlers
+  const handlePressStart = useCallback(() => {
+    if (!voiceSupported || open) return;
+
+    isLongPress.current = false;
+    longPressTimer.current = setTimeout(() => {
+      isLongPress.current = true;
+      startListening();
+    }, LONG_PRESS_DURATION);
+  }, [voiceSupported, open, startListening]);
+
+  const handlePressEnd = useCallback(() => {
+    // Clear the timer
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+
+    // If was listening, stop
+    if (isListening) {
+      stopListening();
+      return;
+    }
+
+    // If it wasn't a long press, do normal toggle
+    if (!isLongPress.current) {
+      onToggle();
+    }
+
+    isLongPress.current = false;
+  }, [isListening, stopListening, onToggle]);
+
+  // Cancel on mouse/touch leave
+  const handlePressCancel = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    if (isListening) {
+      stopListening();
+    }
+    isLongPress.current = false;
+  }, [isListening, stopListening]);
 
   // Get FAB button style based on context
   const getFABStyle = () => {
@@ -186,44 +297,74 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
           )}
         </div>
 
+        {/* Voice Transcript Bubble */}
+        {isListening && transcript && (
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-white rounded-2xl px-4 py-2 shadow-xl max-w-[250px] animate-fade-in">
+            <p className="text-sm text-gray-700 text-center">{transcript}</p>
+          </div>
+        )}
+
         {/* Main FAB Button */}
         <button
-          onClick={onToggle}
+          onMouseDown={handlePressStart}
+          onMouseUp={handlePressEnd}
+          onMouseLeave={handlePressCancel}
+          onTouchStart={handlePressStart}
+          onTouchEnd={handlePressEnd}
+          onTouchCancel={handlePressCancel}
           className={`
             w-14 h-14 rounded-full shadow-xl
             flex items-center justify-center
-            bg-gradient-to-br ${getFABStyle()}
-            text-white
+            text-white select-none
             transition-all duration-300 ease-out
+            ${isListening
+              ? 'bg-gradient-to-br from-red-500 to-rose-600 scale-110 shadow-2xl'
+              : `bg-gradient-to-br ${getFABStyle()}`}
             ${open ? 'rotate-45 scale-110 shadow-2xl' : 'hover:scale-105 hover:shadow-2xl'}
-            active:scale-95
+            ${!isListening && 'active:scale-95'}
           `}
         >
-          {open ? (
+          {isListening ? (
+            <Mic size={26} strokeWidth={2.5} className="animate-pulse" />
+          ) : open ? (
             <X size={26} strokeWidth={2.5} />
           ) : (
             <Plus size={26} strokeWidth={2.5} />
           )}
 
+          {/* Recording indicator ring */}
+          {isListening && (
+            <span className="absolute inset-0 rounded-full border-4 border-red-400 animate-ping" />
+          )}
+
           {/* Alert/AI badge on FAB when closed */}
-          {!open && alertCount > 0 && (
+          {!open && !isListening && alertCount > 0 && (
             <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold animate-pulse shadow-lg">
               {alertCount > 9 ? '9+' : alertCount}
             </span>
           )}
 
           {/* AI indicator ring when has smart suggestions */}
-          {!open && actions.some(a => a.variant === 'ai') && alertCount === 0 && (
+          {!open && !isListening && actions.some(a => a.variant === 'ai') && alertCount === 0 && (
             <span className="absolute inset-0 rounded-full border-2 border-white/30 animate-ping" />
           )}
         </button>
 
         {/* Context indicator - subtle text below FAB */}
-        {!open && (
+        {!open && !isListening && (
           <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap">
             <span className="text-[10px] text-gray-400 font-medium">
               {contextInfo.timeOfDay === 'morning' ? 'Buenos días' :
                contextInfo.timeOfDay === 'afternoon' ? 'Buenas tardes' : 'Buenas noches'}
+            </span>
+          </div>
+        )}
+
+        {/* Voice hint when listening */}
+        {isListening && (
+          <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap">
+            <span className="text-[10px] text-red-500 font-medium animate-pulse">
+              Escuchando... suelta para enviar
             </span>
           </div>
         )}
