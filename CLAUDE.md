@@ -183,3 +183,113 @@ FROM market_items mi
 LEFT JOIN inventory i ON mi.id = i.item_id
 WHERE i.current_number > 0;
 ```
+
+---
+
+## SISTEMA MULTI-TENANT DE USUARIOS (Enero 2025)
+
+### Arquitectura Multi-Tenant
+
+La aplicacion usa un sistema Multi-Tenant donde:
+- **Usuarios** tienen cuentas independientes de los hogares
+- **Hogares** son entidades separadas (como "tenants")
+- **Membresías** vinculan usuarios a hogares con roles específicos
+- Un usuario puede pertenecer a múltiples hogares (ej: empleada que trabaja para varias familias)
+
+### Roles del Sistema
+
+| Rol | Descripción | Permisos |
+|-----|-------------|----------|
+| `admin` | Dueño/administrador del hogar | Control total: usuarios, empleados, espacios, configuración |
+| `empleado` | Empleado doméstico | Ver tareas asignadas, marcar completadas, check-in/out |
+| `familia` | Miembros de la familia | Ver menú, lista de compras, editar recetas |
+
+### Tablas de Base de Datos (Multi-Tenant)
+
+| Tabla | Propósito |
+|-------|-----------|
+| `user_profiles` | Extiende auth.users con datos de la app |
+| `household_memberships` | Vincula usuarios a hogares con roles |
+| `household_invitations` | Códigos de invitación para unirse |
+
+### Flujo de Invitaciones
+
+1. Admin crea invitación con rol específico
+2. Se genera código único de 8 caracteres (ej: `ABCD-1234`)
+3. Admin comparte código o link con el invitado
+4. Invitado ingresa código en `/join` o usa link directo
+5. Si no tiene cuenta, se registra primero
+6. Se crea membresía automáticamente con el rol asignado
+
+### Archivos Clave
+
+```
+src/
+├── contexts/
+│   └── AuthContext.tsx              # Contexto de autenticación global
+├── lib/
+│   └── invitation-service.ts        # Funciones para invitaciones
+├── components/
+│   ├── auth/
+│   │   └── RoleGate.tsx             # Componentes de control de acceso
+│   └── settings/
+│       └── MembersPanel.tsx         # Panel de gestión de miembros
+├── app/
+│   ├── auth/
+│   │   ├── login/page.tsx           # Página de login
+│   │   └── register/page.tsx        # Página de registro
+│   └── join/page.tsx                # Página para usar código de invitación
+└── types/index.ts                   # Tipos (UserRole, Permission, etc.)
+```
+
+### Uso del Sistema de Roles en Componentes
+
+```tsx
+import { RoleGate, AdminOnly, CanEdit, useRoleCheck } from '@/components/auth/RoleGate';
+
+// Solo admin puede ver
+<AdminOnly>
+  <button>Eliminar</button>
+</AdminOnly>
+
+// Solo quienes pueden editar recetas
+<CanEdit what="recipes">
+  <button>Editar receta</button>
+</CanEdit>
+
+// Contenido diferente por rol
+<ShowByRole
+  admin={<AdminDashboard />}
+  empleado={<EmployeeTasks />}
+  familia={<FamilyMenu />}
+/>
+
+// Hook para verificar permisos
+const { can, isAdmin } = useRoleCheck();
+if (can.manageEmployees) { /* mostrar botón */ }
+```
+
+### Permisos Disponibles
+
+**Lectura:**
+- `view_menu`, `view_shopping_list`, `view_tasks`, `view_inventory`
+
+**Empleado:**
+- `complete_tasks`, `update_inventory`, `check_in`
+
+**Edición (admin + familia):**
+- `edit_menu`, `edit_recipes`, `edit_shopping_list`
+
+**Gestión (solo admin):**
+- `manage_employees`, `manage_spaces`, `manage_tasks`
+- `manage_members`, `manage_invitations`, `delete_data`
+
+### Migración SQL
+
+Archivo: `supabase/migrations/20260119000000_multi_tenant_users.sql`
+
+Funciones RPC importantes:
+- `create_invitation()` - Crear nueva invitación
+- `use_invitation_code()` - Usar código para unirse
+- `get_my_memberships()` - Obtener hogares del usuario
+- `check_user_permission()` - Verificar permisos

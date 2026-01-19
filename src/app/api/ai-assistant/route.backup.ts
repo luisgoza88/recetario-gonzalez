@@ -1236,7 +1236,7 @@ Cuando hagas algo, usa este formato:
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, conversationContext, stream = false } = await request.json();
+    const { messages, conversationContext } = await request.json();
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: 'Messages required' }, { status: 400 });
@@ -1316,51 +1316,6 @@ export async function POST(request: NextRequest) {
       }
 
       // Segunda llamada con los resultados de las funciones
-      // Si streaming está habilitado, usar generateContentStream
-      if (stream) {
-        const streamResponse = await gemini.models.generateContentStream({
-          model: GEMINI_MODELS.FLASH,
-          contents: [
-            ...geminiMessages,
-            { role: 'model' as const, parts: parts },
-            { role: 'user' as const, parts: functionResponses }
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ] as any,
-          config: {
-            temperature: GEMINI_CONFIG.assistant.temperature,
-            maxOutputTokens: GEMINI_CONFIG.assistant.maxOutputTokens,
-            systemInstruction: enhancedSystemPrompt,
-          }
-        });
-
-        // Crear un ReadableStream para enviar chunks al cliente
-        const readableStream = new ReadableStream({
-          async start(controller) {
-            try {
-              for await (const chunk of streamResponse) {
-                const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                if (text) {
-                  controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ content: text, done: false })}\n\n`));
-                }
-              }
-              controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ content: '', done: true })}\n\n`));
-              controller.close();
-            } catch (error) {
-              controller.error(error);
-            }
-          }
-        });
-
-        return new Response(readableStream, {
-          headers: {
-            'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive',
-          },
-        });
-      }
-
-      // Sin streaming - comportamiento original
       const finalResponse = await gemini.models.generateContent({
         model: GEMINI_MODELS.FLASH,
         contents: [
@@ -1384,31 +1339,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Si no hay llamadas a funciones
-    // Si streaming está habilitado, hacer streaming de la respuesta directa
-    if (stream) {
-      const textContent = parts.find(part => part.text)?.text || '';
-
-      const readableStream = new ReadableStream({
-        start(controller) {
-          // Para respuestas sin function calls, enviar el texto completo como un chunk
-          // ya que ya lo tenemos de la primera llamada
-          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ content: textContent, done: false })}\n\n`));
-          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ content: '', done: true })}\n\n`));
-          controller.close();
-        }
-      });
-
-      return new Response(readableStream, {
-        headers: {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive',
-        },
-      });
-    }
-
-    // Sin streaming - comportamiento original
+    // Si no hay llamadas a funciones, devolver la respuesta directa
     const textContent = parts.find(part => part.text)?.text || '';
 
     return NextResponse.json({

@@ -449,3 +449,130 @@ export interface FABAction {
   color: string;
   onClick: () => void;
 }
+
+// =====================================================
+// TIPOS PARA SISTEMA MULTI-TENANT DE USUARIOS
+// =====================================================
+
+export type UserRole = 'admin' | 'empleado' | 'familia';
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  avatar_url?: string;
+  phone?: string;
+  preferred_language: string;
+  notification_preferences: {
+    email: boolean;
+    push: boolean;
+  };
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface HouseholdMembership {
+  id: string;
+  user_id: string;
+  household_id: string;
+  role: UserRole;
+  permissions: Record<string, boolean>;
+  display_name?: string;
+  is_active: boolean;
+  joined_at: string;
+  invited_by?: string;
+  created_at?: string;
+  updated_at?: string;
+  // Relaciones expandidas
+  user?: UserProfile;
+  household?: Household;
+}
+
+export interface HouseholdInvitation {
+  id: string;
+  household_id: string;
+  code: string;
+  role: UserRole;
+  email?: string;
+  suggested_name?: string;
+  max_uses: number;
+  current_uses: number;
+  expires_at: string;
+  is_active: boolean;
+  used_at?: string;
+  used_by?: string;
+  created_by: string;
+  created_at: string;
+  // Relaciones expandidas
+  household?: Household;
+}
+
+// Permisos disponibles en el sistema
+export type Permission =
+  // Lectura
+  | 'view_menu'
+  | 'view_shopping_list'
+  | 'view_tasks'
+  | 'view_inventory'
+  // Empleado
+  | 'complete_tasks'
+  | 'update_inventory'
+  | 'check_in'
+  // Escritura (admin + familia)
+  | 'edit_menu'
+  | 'edit_recipes'
+  | 'edit_shopping_list'
+  // Gestión (solo admin)
+  | 'manage_employees'
+  | 'manage_spaces'
+  | 'manage_tasks'
+  | 'manage_members'
+  | 'manage_invitations'
+  | 'delete_data';
+
+// Permisos por defecto según rol
+export const DEFAULT_PERMISSIONS: Record<UserRole, Permission[]> = {
+  admin: [
+    'view_menu', 'view_shopping_list', 'view_tasks', 'view_inventory',
+    'complete_tasks', 'update_inventory', 'check_in',
+    'edit_menu', 'edit_recipes', 'edit_shopping_list',
+    'manage_employees', 'manage_spaces', 'manage_tasks',
+    'manage_members', 'manage_invitations', 'delete_data'
+  ],
+  familia: [
+    'view_menu', 'view_shopping_list', 'view_tasks', 'view_inventory',
+    'edit_menu', 'edit_recipes', 'edit_shopping_list'
+  ],
+  empleado: [
+    'view_menu', 'view_shopping_list', 'view_tasks', 'view_inventory',
+    'complete_tasks', 'update_inventory', 'check_in'
+  ]
+};
+
+// Contexto de autenticación
+export interface AuthContextType {
+  user: UserProfile | null;
+  memberships: HouseholdMembership[];
+  currentHousehold: Household | null;
+  currentMembership: HouseholdMembership | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  // Acciones
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, fullName: string) => Promise<void>;
+  signOut: () => Promise<void>;
+  switchHousehold: (householdId: string) => void;
+  // Permisos
+  hasPermission: (permission: Permission) => boolean;
+  isAdmin: () => boolean;
+  isEmployee: () => boolean;
+  isFamily: () => boolean;
+}
+
+// Estado de sesión
+export interface SessionState {
+  user: UserProfile | null;
+  memberships: HouseholdMembership[];
+  currentHouseholdId: string | null;
+  lastActivity: string;
+}

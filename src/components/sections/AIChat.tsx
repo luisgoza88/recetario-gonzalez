@@ -428,38 +428,105 @@ export default function AIChat() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: history,
-          conversationContext
+          conversationContext,
+          stream: true  // Habilitar streaming
         }),
       });
 
-      const data = await response.json();
+      // Verificar si es streaming (text/event-stream) o JSON normal
+      const contentType = response.headers.get('content-type') || '';
 
-      if (data.error) {
-        throw new Error(data.error);
-      }
+      if (contentType.includes('text/event-stream')) {
+        // Procesar respuesta en streaming
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let fullContent = '';
 
-      const assistantContent = data.content || 'No pude procesar tu solicitud.';
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-      // Save assistant message to database (don't await)
-      saveMessage('assistant', assistantContent).catch(console.error);
-      updateContextFromMessage(assistantContent, 'assistant').catch(console.error);
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
 
-      // Speak the response if TTS is enabled
-      speakResponse(assistantContent);
-
-      // Reemplazar mensaje de loading con respuesta real
-      setMessages(prev =>
-        prev.map(m =>
-          m.isLoading
-            ? {
-                id: m.id,
-                role: 'assistant',
-                content: assistantContent,
-                timestamp: new Date(),
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(line.slice(6));
+                  if (data.content && !data.done) {
+                    fullContent += data.content;
+                    // Actualizar mensaje en tiempo real
+                    setMessages(prev =>
+                      prev.map(m =>
+                        m.isLoading
+                          ? { ...m, content: fullContent, isLoading: true }
+                          : m
+                      )
+                    );
+                  }
+                } catch {
+                  // Ignorar líneas que no son JSON válido
+                }
               }
-            : m
-        )
-      );
+            }
+          }
+        }
+
+        // Finalizar el mensaje
+        const assistantContent = fullContent || 'No pude procesar tu solicitud.';
+
+        // Save assistant message to database (don't await)
+        saveMessage('assistant', assistantContent).catch(console.error);
+        updateContextFromMessage(assistantContent, 'assistant').catch(console.error);
+
+        // Speak the response if TTS is enabled
+        speakResponse(assistantContent);
+
+        // Marcar mensaje como completado (quitar isLoading)
+        setMessages(prev =>
+          prev.map(m =>
+            m.isLoading
+              ? {
+                  id: m.id,
+                  role: 'assistant',
+                  content: assistantContent,
+                  timestamp: new Date(),
+                }
+              : m
+          )
+        );
+      } else {
+        // Fallback: respuesta JSON normal (sin streaming)
+        const data = await response.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        const assistantContent = data.content || 'No pude procesar tu solicitud.';
+
+        // Save assistant message to database (don't await)
+        saveMessage('assistant', assistantContent).catch(console.error);
+        updateContextFromMessage(assistantContent, 'assistant').catch(console.error);
+
+        // Speak the response if TTS is enabled
+        speakResponse(assistantContent);
+
+        // Reemplazar mensaje de loading con respuesta real
+        setMessages(prev =>
+          prev.map(m =>
+            m.isLoading
+              ? {
+                  id: m.id,
+                  role: 'assistant',
+                  content: assistantContent,
+                  timestamp: new Date(),
+                }
+              : m
+          )
+        );
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       // Reemplazar loading con mensaje de error
