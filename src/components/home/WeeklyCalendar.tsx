@@ -56,38 +56,61 @@ export default function WeeklyCalendar({
 
     console.log('WeeklyCalendar loadTasks:', { householdId, startDate, endDate, viewMode });
 
-    // Primero verificar si hay tareas sin filtro de fecha
-    const { count: totalCount } = await supabase
-      .from('scheduled_tasks')
-      .select('*', { count: 'exact', head: true })
-      .eq('household_id', householdId);
+    try {
+      // Query simplificada primero - sin JOINs
+      const { data: simpleData, error: simpleError, count: simpleCount } = await supabase
+        .from('scheduled_tasks')
+        .select('*', { count: 'exact' })
+        .eq('household_id', householdId)
+        .gte('scheduled_date', startDate)
+        .lte('scheduled_date', endDate);
 
-    console.log('Total tasks for household (no date filter):', totalCount);
+      console.log('Simple query result:', {
+        count: simpleCount,
+        dataLength: simpleData?.length,
+        error: simpleError,
+        sampleIds: simpleData?.slice(0, 3).map(t => t.id)
+      });
 
-    const { data, error } = await supabase
-      .from('scheduled_tasks')
-      .select(`
-        *,
-        task_template:task_templates(*),
-        space:spaces(*, space_type:space_types(*)),
-        employee:home_employees(*)
-      `)
-      .eq('household_id', householdId)
-      .gte('scheduled_date', startDate)
-      .lte('scheduled_date', endDate)
-      .order('scheduled_date');
+      if (simpleError) {
+        console.error('Simple query error:', simpleError);
+        setLoading(false);
+        return;
+      }
 
-    console.log('WeeklyCalendar query result:', {
-      dataLength: data?.length,
-      error,
-      sampleDates: data?.slice(0, 3).map(t => t.scheduled_date)
-    });
+      // Si la query simple funciona, intentar con JOINs
+      const { data, error } = await supabase
+        .from('scheduled_tasks')
+        .select(`
+          *,
+          task_template:task_templates(*),
+          space:spaces(*, space_type:space_types(*)),
+          employee:home_employees(*)
+        `)
+        .eq('household_id', householdId)
+        .gte('scheduled_date', startDate)
+        .lte('scheduled_date', endDate)
+        .order('scheduled_date');
 
-    if (error) {
-      console.error('Error loading tasks:', error);
+      console.log('Full query result:', {
+        dataLength: data?.length,
+        error,
+        sampleDates: data?.slice(0, 3).map(t => t.scheduled_date)
+      });
+
+      if (error) {
+        console.error('Error loading tasks with joins:', error);
+        // Fallback: usar datos simples
+        if (simpleData) {
+          setTasks(simpleData as ScheduledTask[]);
+        }
+      } else if (data) {
+        setTasks(data);
+      }
+    } catch (err) {
+      console.error('Unexpected error in loadTasks:', err);
     }
 
-    if (data) setTasks(data);
     setLoading(false);
   };
 
