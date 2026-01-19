@@ -411,6 +411,86 @@ export async function cancelInvitation(invitationId: string): Promise<boolean> {
 // ============================================
 
 /**
+ * Create a default household for demo/first-time use
+ */
+async function createDefaultHousehold(): Promise<{ household: Household; user: User } | null> {
+  console.log('[Household] Creating default household...');
+
+  // Generate a unique slug
+  const slug = 'familia-gonzalez-' + Date.now().toString(36);
+
+  // Create the household
+  const { data: household, error: householdError } = await supabase
+    .from('households')
+    .insert({
+      name: 'Familia González',
+      slug,
+      owner_name: 'Familia González',
+      plan: 'premium', // Give full access for demo
+      setup_completed: true,
+      features: {
+        ai_assistant: true,
+        meal_planning: true,
+        shopping_list: true,
+        home_management: true,
+        employee_management: true,
+        analytics: true,
+      }
+    })
+    .select()
+    .single();
+
+  if (householdError) {
+    console.error('[Household] Error creating default household:', householdError);
+    return null;
+  }
+
+  console.log('[Household] Created household:', household.id);
+
+  // Create the default owner user
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .insert({
+      household_id: household.id,
+      email: 'familia@gonzalez.com',
+      name: 'Familia González',
+      role: 'owner',
+    })
+    .select()
+    .single();
+
+  if (userError) {
+    console.error('[Household] Error creating default user:', userError);
+    // Try to clean up the household
+    await supabase.from('households').delete().eq('id', household.id);
+    return null;
+  }
+
+  console.log('[Household] Created user:', user.id);
+
+  // Also create the AI trust record for this household
+  const { error: trustError } = await supabase
+    .from('household_ai_trust')
+    .insert({
+      household_id: household.id,
+      trust_level: 3, // Start at "Confiable" level
+      auto_approve_level: 2, // Auto-approve low and medium risk
+      max_actions_per_minute: 20,
+      max_critical_actions_per_day: 10,
+      max_items_per_bulk_operation: 50,
+      allow_bulk_operations: true,
+      allow_destructive_actions: false,
+    });
+
+  if (trustError) {
+    console.warn('[Household] Could not create AI trust record:', trustError);
+    // Not critical - continue anyway
+  }
+
+  return { household: household as Household, user: user as User };
+}
+
+/**
  * Initialize household context
  * Called on app load to set up the current household and user
  */
@@ -418,18 +498,33 @@ export async function initializeHouseholdContext(): Promise<{
   household: Household | null;
   user: User | null;
 }> {
+  console.log('[Household] Initializing context...');
+
   // For now, get the first/default household (no auth yet)
   // In Phase B, this will use Supabase Auth
-  const { data: households } = await supabase
+  const { data: households, error: fetchError } = await supabase
     .from('households')
     .select('*')
     .limit(1);
 
+  if (fetchError) {
+    console.error('[Household] Error fetching households:', fetchError);
+  }
+
+  // If no households exist, create a default one
   if (!households || households.length === 0) {
+    console.log('[Household] No households found, creating default...');
+    const result = await createDefaultHousehold();
+    if (result) {
+      console.log('[Household] Default household created successfully');
+      return result;
+    }
+    console.error('[Household] Failed to create default household');
     return { household: null, user: null };
   }
 
   const household = households[0] as Household;
+  console.log('[Household] Found household:', household.id, household.name);
 
   // Get first user in household (temporary until auth)
   const { data: users } = await supabase
@@ -439,6 +534,7 @@ export async function initializeHouseholdContext(): Promise<{
     .limit(1);
 
   const user = users?.[0] as User | null;
+  console.log('[Household] Found user:', user?.id, user?.name);
 
   return { household, user };
 }
