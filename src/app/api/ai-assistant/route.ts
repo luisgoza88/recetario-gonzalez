@@ -1770,186 +1770,91 @@ async function executeFunction(name: string, args: Record<string, unknown>) {
 // API ROUTE
 // ============================================
 
-const SYSTEM_PROMPT = `Eres el Asistente Inteligente del Hogar - un ayudante proactivo, eficiente y amigable para la gestión del hogar y cocina.
+const SYSTEM_PROMPT = `Eres el Asistente del Hogar González. Ayudas con recetas, menú, inventario y tareas del hogar.
 
-## TU PERSONALIDAD
-- **Proactivo**: No solo respondes, también sugieres y anticipas necesidades
-- **Práctico**: Vas al grano pero das contexto útil
-- **Amigable**: Usas emojis con moderación (1-2 por respuesta máximo)
-- **Colaborativo**: SIEMPRE buscas la manera de ayudar, nunca dices "no puedo"
+## REGLAS IMPORTANTES
 
-## ⚠️ REGLA MÁS IMPORTANTE: SER COLABORATIVO
+1. **USA LAS FUNCIONES** para obtener datos reales. NUNCA escribas código ni llames funciones con texto.
 
-**NUNCA rechaces una solicitud de ayuda para cocinar.** Si el usuario quiere hacer una receta:
+2. **SIEMPRE AYUDA con recetas**: Si una receta no está en la base de datos, usa tu conocimiento culinario para dar ingredientes y pasos. Verifica el inventario y marca ✅ lo que tiene y ❌ lo que falta.
 
-1. **Si la receta EXISTE en la base de datos**: Usa las funciones para obtener detalles, verificar ingredientes, etc.
-
-2. **Si la receta NO EXISTE en la base de datos**:
-   - NO sugieras una receta diferente como si fuera lo mismo
-   - USA TU CONOCIMIENTO GENERAL para ayudar
-   - Explica los ingredientes típicos de esa receta
-   - Verifica con get_inventory() qué ingredientes tiene el usuario
-   - Indica cuáles tiene ✅ y cuáles le faltan ❌
-   - Ofrece agregar los faltantes a la lista de compras
-   - Da los pasos de preparación usando tu conocimiento
-
-**Ejemplo de respuesta ideal cuando NO existe la receta:**
-"No tengo la receta de pasta bolognesa guardada en el sistema, pero **te ayudo a prepararla**.
-
-Para una bolognesa tradicional necesitas:
-- Carne molida ✅ (tienes en inventario)
-- Pasta/espaguetis ❌ (no tienes)
-- Tomate triturado ✅ (tienes)
-- Cebolla ✅ (tienes)
-- Ajo ✅ (tienes)
-- Zanahoria ❌ (no tienes)
-
-Te faltan 2 ingredientes. ¿Quieres que los agregue a la lista de compras?
-
-**Preparación básica:**
-1. Sofríe cebolla y ajo picados
-2. Agrega la carne molida y dora bien
-3. Añade el tomate y cocina 20-30 min
-4. Sazona con sal, pimienta, orégano
-5. Sirve sobre la pasta cocida
-
-💡 ¿Te doy más detalles de algún paso?"
-
-## ⚡ REGLA CRÍTICA: USAR AGENTE MULTI-PASO
-
-Cuando el usuario pida ayuda con tareas complejas, SIEMPRE usa execute_multi_step_task. Detecta estas frases:
-
-**ACTIVAR prepare_recipe cuando escuches:**
-- "Ayúdame con todo para [receta]"
-- "Quiero cocinar [receta], ayúdame"
-- "Prepárame todo para [receta]"
-- "Voy a hacer [receta], qué necesito"
-- Cualquier solicitud de cocinar + "ayuda/todo/completo"
-
-**ACTIVAR weekly_planning cuando escuches:**
-- "Planifica mi semana"
-- "Organiza el menú semanal"
-- "Qué necesito para toda la semana"
-
-**ACTIVAR full_report cuando escuches:**
-- "Dame un reporte completo"
-- "Cómo está todo en casa"
-- "Resumen del día/hogar"
-
-**ACTIVAR menu_from_inventory cuando escuches:**
-- "Qué puedo cocinar con lo que tengo"
-- "Sugiere recetas con mi inventario"
-
-## COMPORTAMIENTOS CLAVE
-
-### 1. Siempre verifica el contexto
-ANTES de responder sobre comidas o inventario, usa las funciones para obtener datos REALES:
-- get_current_date_info() → Para saber qué día es y si hay cena
-- get_today_menu() → Para comidas de hoy
-- get_inventory() → Para ingredientes disponibles
-
-### 2. Sé proactivo en tus respuestas
-Cuando muestres información, agrega valor:
-- Si muestras el menú → menciona si hay ingredientes faltantes
-- Si muestras inventario bajo → sugiere agregarlo a la lista de compras
-- Si una receta requiere descongelar algo → recuérdalo
-
-### 3. Confirma acciones con claridad
-Cuando hagas algo, usa este formato:
-✅ [Acción realizada]
-📝 [Detalle si es necesario]
-💡 [Sugerencia relacionada si aplica]
-
-### 4. Formato de respuestas
-- Usa **negritas** para destacar lo importante
-- Usa listas con bullets para múltiples items
-- Mantén respuestas de máximo 3-4 párrafos cortos
-- Si hay mucha información, organízala en secciones claras
-
-### 5. Conocimiento culinario general
-Tienes conocimiento de cocina general. Si una receta no está en la base de datos:
-- Usa tu conocimiento para dar ingredientes y pasos
-- Verifica el inventario del usuario con get_inventory()
-- Ayuda igual que si la receta existiera en el sistema
-- NUNCA digas "no tengo esa receta" y te quedes ahí - SIEMPRE ofrece ayudar
+3. **Usa execute_multi_step_task** para tareas complejas:
+   - "Ayúdame a hacer X" → task_type: "prepare_recipe"
+   - "Planifica la semana" → task_type: "weekly_planning"
+   - "Reporte del hogar" → task_type: "full_report"
+   - "Qué puedo cocinar" → task_type: "menu_from_inventory"
 
 ## DATOS DEL HOGAR
+- Ciclo de menú: 12 días
+- Porciones: Grande (3) + Pequeña (2) = 5 total
+- Viernes/Sábado: Sin cena (salen a comer)
 
-### Configuración de Comidas
-- **Ciclo del menú**: 12 días que se repiten
-- **Porciones estándar**: Porción grande (3) + Porción pequeña (2) = 5 total
-- **Viernes y Sábado**: Sin cena programada (salen a comer fuera)
+## FORMATO DE RESPUESTAS
+- Usa **negritas** para destacar
+- Usa listas con bullets
+- Máximo 3-4 párrafos
+- Emojis con moderación (1-2 por respuesta)
 
-### Empleados del Hogar
-- Los empleados tienen horarios rotativos en ciclos de 4 semanas
-- Cada uno tiene espacios y tareas específicas asignadas
+## CUANDO LA RECETA NO EXISTE
+Si get_recipe_details devuelve recipe_not_found=true:
+1. Llama get_inventory() para ver qué tiene el usuario
+2. Da los ingredientes típicos de la receta
+3. Marca ✅ los que tiene y ❌ los que faltan
+4. Ofrece agregar faltantes a la lista de compras
+5. Da los pasos de preparación
 
-## FUNCIONES AVANZADAS DISPONIBLES
-- **get_recipe_details**: Ver receta completa con ingredientes y pasos
-- **get_missing_ingredients**: Verificar qué falta para una receta
-- **swap_menu_recipe**: Cambiar una receta del menú por otra
-- **calculate_portions**: Ajustar cantidades para X porciones
-- **get_weekly_report**: Resumen semanal de tareas e inventario
-- **get_preparation_tips**: Consejos de preparación para hoy
-- **get_low_inventory_alerts**: Alertas de items bajos/agotados
-- **update_inventory**: Actualizar cantidades del inventario
+NUNCA digas solo "no tengo esa receta" - SIEMPRE ayuda con tu conocimiento culinario.`;
 
-## CAPACIDADES DE VISIÓN (Análisis de Imágenes)
-Puedes analizar imágenes que te envíen. Cuando recibas una imagen:
+// Detectar si una respuesta contiene código o errores que no deberían mostrarse
+function isInvalidResponse(text: string): boolean {
+  const invalidPatterns = [
+    /^print\s*\(/i,           // Código Python
+    /^console\.(log|error)/i, // Código JS
+    /default_api\./i,         // Referencias a API internas
+    /^import\s+/i,            // Imports de código
+    /^function\s+/i,          // Declaraciones de funciones
+    /^class\s+/i,             // Declaraciones de clases
+    /^\s*\{\s*"error"/i,      // JSON de error
+    /^```(python|javascript|typescript)/i, // Bloques de código ejecutables
+  ];
 
-### Tipos de análisis que puedes hacer:
-1. **Escaneo de despensa/nevera**: Identifica productos y ofrece actualizar inventario
-2. **Tickets de compra**: Extrae items y ofrece agregarlos a la lista
-3. **Platos de comida**: Identifica el plato, sugiere recetas similares
-4. **Ingredientes sueltos**: Identifica qué son y sugiere recetas
-5. **Espacios del hogar**: Identifica el tipo de espacio y estado de limpieza
+  for (const pattern of invalidPatterns) {
+    if (pattern.test(text.trim())) {
+      return true;
+    }
+  }
+  return false;
+}
 
-### Cómo responder a imágenes:
-1. Describe brevemente lo que ves
-2. Ofrece acciones relevantes según el contexto
-3. Pregunta si quiere que hagas algo con la información
+// Generar una respuesta de fallback cuando hay errores
+function getFallbackResponse(userMessage: string): string {
+  const msg = userMessage.toLowerCase();
 
-### Ejemplos con imágenes:
-**Usuario envía foto de nevera**
-📷 Veo tu nevera con varios productos:
-- Leche (casi vacía)
-- Huevos (~6)
-- Queso mozzarella
-- Tomates (4)
-- Pollo (bandeja)
+  if (msg.includes('menú') || msg.includes('menu') || msg.includes('almuerzo') || msg.includes('cena') || msg.includes('desayuno')) {
+    return '🍽️ Déjame revisar el menú de hoy. ¿Qué comida te interesa: desayuno, almuerzo o cena?';
+  }
 
-💡 ¿Quieres que actualice el inventario con estos productos?
+  if (msg.includes('receta') || msg.includes('cocinar') || msg.includes('preparar') || msg.includes('hacer')) {
+    return '👨‍🍳 ¡Con gusto te ayudo! ¿Qué receta te gustaría preparar?';
+  }
 
-**Usuario envía foto de ticket**
-🧾 Veo un ticket de compra con:
-- Pan tajado $3,500
-- Leche x2 $8,000
-- Huevos $12,000
+  if (msg.includes('inventario') || msg.includes('ingredientes') || msg.includes('tengo')) {
+    return '📦 Déjame revisar qué ingredientes tienes disponibles. Un momento...';
+  }
 
-💡 ¿Los agrego a la lista de compras como comprados?
+  if (msg.includes('compra') || msg.includes('lista') || msg.includes('mercado')) {
+    return '🛒 Te ayudo con la lista de compras. ¿Qué necesitas agregar o revisar?';
+  }
 
-## EJEMPLOS DE RESPUESTAS IDEALES
-
-**Usuario**: "¿Qué hay de almuerzo?"
-**Tú**: 🍽️ **Hoy (Lunes 20)**: Arroz con pollo
-⏱️ Tiempo: 45 min de preparación
-✅ Tienes todos los ingredientes disponibles
-
-**Usuario**: "Agrega leche a la lista"
-**Tú**: ✅ **Leche** agregada a la lista de compras
-📝 También noté que tienes bajo: Huevos (2)
-💡 ¿Quieres que los agregue también?
-
-## RESTRICCIONES
-- Nunca inventes datos - siempre usa las funciones disponibles
-- Si no encuentras información, dilo claramente
-- No hagas suposiciones sobre preferencias sin preguntar primero`;
+  return '¡Hola! Soy tu asistente del hogar. ¿En qué puedo ayudarte hoy? Puedo ayudarte con recetas, el menú, inventario o la lista de compras.';
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, conversationContext, stream = false } = await request.json();
+    const body = await request.json();
+    const { messages, conversationContext, stream = false } = body;
 
-    if (!messages || !Array.isArray(messages)) {
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: 'Messages required' }, { status: 400 });
     }
 
@@ -1961,24 +1866,23 @@ export async function POST(request: NextRequest) {
     if (conversationContext) {
       const { history, lastTopic, preferences } = conversationContext;
 
-      if (history && history.trim()) {
-        enhancedSystemPrompt += `\n\n## CONTEXTO DE CONVERSACIÓN ANTERIOR\n${history}`;
+      if (history && typeof history === 'string' && history.trim()) {
+        enhancedSystemPrompt += `\n\n## CONTEXTO ANTERIOR\n${history}`;
       }
 
       if (lastTopic) {
-        enhancedSystemPrompt += `\n\n## TEMA ACTUAL DE CONVERSACIÓN\nEl usuario estaba hablando sobre: ${lastTopic}. Continúa con este contexto si es relevante.`;
+        enhancedSystemPrompt += `\n\nTema actual: ${lastTopic}`;
       }
 
       if (preferences && Object.keys(preferences).length > 0) {
-        enhancedSystemPrompt += `\n\n## PREFERENCIAS DEL USUARIO CONOCIDAS`;
         if (preferences.favoriteRecipes?.length) {
-          enhancedSystemPrompt += `\n- Recetas favoritas: ${preferences.favoriteRecipes.join(', ')}`;
+          enhancedSystemPrompt += `\nRecetas favoritas: ${preferences.favoriteRecipes.join(', ')}`;
         }
         if (preferences.dislikedIngredients?.length) {
-          enhancedSystemPrompt += `\n- Ingredientes que no le gustan: ${preferences.dislikedIngredients.join(', ')}`;
+          enhancedSystemPrompt += `\nNo le gusta: ${preferences.dislikedIngredients.join(', ')}`;
         }
         if (preferences.dietaryRestrictions?.length) {
-          enhancedSystemPrompt += `\n- Restricciones alimentarias: ${preferences.dietaryRestrictions.join(', ')}`;
+          enhancedSystemPrompt += `\nRestricciones: ${preferences.dietaryRestrictions.join(', ')}`;
         }
       }
     }
@@ -2102,7 +2006,14 @@ export async function POST(request: NextRequest) {
         }
       });
 
-      const finalContent = finalResponse.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      let finalContent = finalResponse.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+      // Validar que la respuesta no contenga código o errores
+      if (!finalContent || isInvalidResponse(finalContent)) {
+        const lastUserMessage = messages[messages.length - 1]?.content || '';
+        finalContent = getFallbackResponse(lastUserMessage);
+        console.warn('Invalid response detected, using fallback');
+      }
 
       return NextResponse.json({
         content: finalContent,
@@ -2178,7 +2089,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Sin streaming - comportamiento original
-    const textContent = parts.find(part => part.text)?.text || '';
+    let textContent = parts.find(part => part.text)?.text || '';
+
+    // Validar que la respuesta no contenga código o errores
+    if (!textContent || isInvalidResponse(textContent)) {
+      const lastUserMessage = messages[messages.length - 1]?.content || '';
+      textContent = getFallbackResponse(lastUserMessage);
+      console.warn('Invalid response detected (no function calls), using fallback');
+    }
 
     return NextResponse.json({
       content: textContent,
@@ -2187,8 +2105,28 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('AI Assistant error:', error);
+
+    // Intenta dar una respuesta útil incluso con error
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Si es un error de red/timeout, dar respuesta amigable
+    if (errorMessage.includes('timeout') || errorMessage.includes('network') || errorMessage.includes('fetch')) {
+      return NextResponse.json({
+        content: '⚠️ Tuve un problema de conexión. Por favor intenta de nuevo en unos segundos.',
+        role: 'assistant'
+      });
+    }
+
+    // Si es un error de la API de Gemini
+    if (errorMessage.includes('SAFETY') || errorMessage.includes('blocked')) {
+      return NextResponse.json({
+        content: 'Lo siento, no puedo procesar esa solicitud. ¿En qué más puedo ayudarte?',
+        role: 'assistant'
+      });
+    }
+
     return NextResponse.json(
-      { error: 'Error processing request', details: String(error) },
+      { error: 'Error processing request', details: errorMessage },
       { status: 500 }
     );
   }
