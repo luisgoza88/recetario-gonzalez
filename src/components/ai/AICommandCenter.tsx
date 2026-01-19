@@ -228,11 +228,42 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
 
     try {
       // Fetch trust stats
-      const { data: trust } = await supabase
+      let { data: trust } = await supabase
         .from('household_ai_trust')
         .select('*')
         .eq('household_id', householdId)
         .single();
+
+      // Si no existe, crear registro de trust por defecto
+      if (!trust) {
+        const defaultTrust = {
+          household_id: householdId,
+          trust_level: 3,
+          successful_actions: 0,
+          failed_actions: 0,
+          rolled_back_actions: 0,
+          auto_approve_level: 2,
+          max_actions_per_minute: 20,
+          max_critical_actions_per_day: 10,
+          max_items_per_bulk_operation: 50,
+          require_confirmation_always: false,
+          allow_bulk_operations: true,
+          allow_destructive_actions: false,
+        };
+
+        const { data: newTrust, error: insertError } = await supabase
+          .from('household_ai_trust')
+          .upsert(defaultTrust)
+          .select()
+          .single();
+
+        if (!insertError && newTrust) {
+          trust = newTrust;
+        } else {
+          // Si falla crear en DB, usar valores por defecto locales
+          trust = defaultTrust as TrustStats;
+        }
+      }
 
       if (trust) setTrustStats(trust);
 
@@ -775,8 +806,15 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
         )}
 
         {/* Settings Tab */}
-        {activeTab === 'settings' && trustStats && (
+        {activeTab === 'settings' && (
           <div className="space-y-4">
+            {!trustStats ? (
+              <div className="bg-white rounded-xl p-8 text-center">
+                <Loader2 size={32} className="text-purple-500 mx-auto mb-4 animate-spin" />
+                <p className="text-gray-500">Cargando configuración...</p>
+              </div>
+            ) : (
+              <>
             {/* Auto-Approve Level */}
             <div className="bg-white rounded-xl p-4 shadow-sm">
               <div className="flex items-center justify-between mb-3">
@@ -925,6 +963,8 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
                 })}
               </div>
             </div>
+              </>
+            )}
           </div>
         )}
       </div>

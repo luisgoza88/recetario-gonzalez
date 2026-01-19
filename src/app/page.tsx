@@ -107,16 +107,6 @@ export default function Home() {
     );
   }
 
-  // Show AI Command Center as full screen overlay
-  if (showAICommandCenter) {
-    return (
-      <AICommandCenter
-        onClose={() => setShowAICommandCenter(false)}
-        householdId={householdId || undefined}
-      />
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Content - pb-32 para dejar espacio para los tabs secundarios */}
@@ -147,6 +137,16 @@ export default function Home() {
           <SettingsView />
         )}
       </main>
+
+      {/* AI Command Center Overlay - mantiene la barra de navegación visible */}
+      {showAICommandCenter && (
+        <div className="fixed inset-0 z-40">
+          <AICommandCenter
+            onClose={() => setShowAICommandCenter(false)}
+            householdId={householdId || undefined}
+          />
+        </div>
+      )}
 
       {/* Bottom Navigation with AI FAB */}
       <BottomNavigation
