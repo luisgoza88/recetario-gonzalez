@@ -29,7 +29,7 @@ export async function GET(request: Request) {
       *,
       task_template:task_templates(*),
       space:spaces(*, space_type:space_types(*)),
-      employee:home_employees(*)
+      employee:home_employees!scheduled_tasks_employee_id_fkey(*)
     `)
     .eq('household_id', householdId)
     .gte('scheduled_date', startDate)

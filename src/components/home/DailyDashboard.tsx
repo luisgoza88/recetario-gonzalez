@@ -59,7 +59,7 @@ export default function DailyDashboard({
         *,
         task_template:task_templates(*),
         space:spaces(*, space_type:space_types(*)),
-        employee:home_employees(*)
+        employee:home_employees!scheduled_tasks_employee_id_fkey(*)
       `)
       .eq('household_id', householdId)
       .eq('scheduled_date', dateStr)

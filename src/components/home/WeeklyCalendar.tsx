@@ -79,13 +79,15 @@ export default function WeeklyCalendar({
       }
 
       // Si la query simple funciona, intentar con JOINs
+      // NOTA: Usar !scheduled_tasks_employee_id_fkey para desambiguar la relación
+      // ya que hay 2 FKs a home_employees (employee_id y completed_by)
       const { data, error } = await supabase
         .from('scheduled_tasks')
         .select(`
           *,
           task_template:task_templates(*),
           space:spaces(*, space_type:space_types(*)),
-          employee:home_employees(*)
+          employee:home_employees!scheduled_tasks_employee_id_fkey(*)
         `)
         .eq('household_id', householdId)
         .gte('scheduled_date', startDate)

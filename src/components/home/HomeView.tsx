@@ -122,7 +122,7 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
     const today = new Date().toISOString().split('T')[0];
     const { data: tasksData } = await supabase
       .from('scheduled_tasks')
-      .select('*, task_template:task_templates(*), space:spaces(*, space_type:space_types(*)), employee:home_employees(*)')
+      .select('*, task_template:task_templates(*), space:spaces(*, space_type:space_types(*)), employee:home_employees!scheduled_tasks_employee_id_fkey(*)')
       .eq('household_id', householdId)
       .eq('scheduled_date', today);
 
