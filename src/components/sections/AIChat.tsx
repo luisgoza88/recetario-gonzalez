@@ -6,7 +6,7 @@ import {
   Calendar, ShoppingCart, Home, UtensilsCrossed,
   CheckCircle2, ListTodo, ChefHat, RefreshCw,
   Clock, AlertTriangle, Check, Plus, ChevronRight,
-  AlertCircle, TrendingUp, Trash2
+  AlertCircle, TrendingUp, Trash2, Mic, MicOff, Volume2, VolumeX
 } from 'lucide-react';
 import {
   saveMessage,
@@ -24,6 +24,15 @@ import {
   requestNotificationPermission,
   type ProactiveAlert
 } from '@/lib/ai-notifications';
+import {
+  getVoiceManager,
+  isSpeechRecognitionSupported,
+  isSpeechSynthesisSupported,
+  speak,
+  stopSpeaking,
+  formatForSpeech,
+  type VoiceManager
+} from '@/lib/voice-commands';
 
 // Types for rich messages
 interface MessageAction {
@@ -230,6 +239,12 @@ export default function AIChat() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [alerts, setAlerts] = useState<ProactiveAlert[]>([]);
   const [showAlerts, setShowAlerts] = useState(false);
+  // Voice state
+  const [isListening, setIsListening] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState('');
+  const voiceManagerRef = useRef<VoiceManager | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -279,11 +294,93 @@ export default function AIChat() {
     return () => clearInterval(interval);
   }, []);
 
+  // Initialize voice recognition
+  useEffect(() => {
+    const supported = isSpeechRecognitionSupported();
+    setVoiceSupported(supported);
+
+    if (supported) {
+      voiceManagerRef.current = getVoiceManager();
+    }
+
+    // Check TTS support
+    if (isSpeechSynthesisSupported()) {
+      // Load voices (sometimes needs a delay)
+      setTimeout(() => {
+        window.speechSynthesis.getVoices();
+      }, 100);
+    }
+  }, []);
+
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
   const generateId = () => crypto.randomUUID();
+
+  // Voice recognition handlers
+  const startListening = () => {
+    if (!voiceManagerRef.current) return;
+
+    const started = voiceManagerRef.current.start({
+      onResult: (transcript, isFinal) => {
+        if (isFinal) {
+          setInput(transcript);
+          setInterimTranscript('');
+          setIsListening(false);
+          // Auto-send after brief delay
+          setTimeout(() => {
+            if (transcript.trim()) {
+              sendMessage(transcript);
+            }
+          }, 500);
+        } else {
+          setInterimTranscript(transcript);
+        }
+      },
+      onError: (error) => {
+        console.error('Voice error:', error);
+        setIsListening(false);
+        setInterimTranscript('');
+      },
+      onEnd: () => {
+        setIsListening(false);
+      }
+    });
+
+    if (started) {
+      setIsListening(true);
+      setInterimTranscript('');
+    }
+  };
+
+  const stopListening = () => {
+    voiceManagerRef.current?.stop();
+    setIsListening(false);
+    setInterimTranscript('');
+  };
+
+  const toggleListening = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  };
+
+  // Text-to-speech for assistant responses
+  const speakResponse = (text: string) => {
+    if (!ttsEnabled) return;
+    const cleanText = formatForSpeech(text);
+    speak(cleanText).catch(console.error);
+  };
+
+  const toggleTTS = () => {
+    if (ttsEnabled) {
+      stopSpeaking();
+    }
+    setTtsEnabled(!ttsEnabled);
+  };
 
   const sendMessage = async (content: string) => {
     if (!content.trim() || isLoading) return;
@@ -346,6 +443,9 @@ export default function AIChat() {
       // Save assistant message to database (don't await)
       saveMessage('assistant', assistantContent).catch(console.error);
       updateContextFromMessage(assistantContent, 'assistant').catch(console.error);
+
+      // Speak the response if TTS is enabled
+      speakResponse(assistantContent);
 
       // Reemplazar mensaje de loading con respuesta real
       setMessages(prev =>
@@ -723,25 +823,76 @@ export default function AIChat() {
         )}
       </div>
 
+      {/* Voice Listening Indicator */}
+      {isListening && (
+        <div className="px-4 py-2 bg-purple-50 border-t flex items-center gap-2">
+          <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+          <span className="text-sm text-purple-700">
+            {interimTranscript || 'Escuchando...'}
+          </span>
+          <button
+            onClick={stopListening}
+            className="ml-auto text-xs text-purple-600 hover:text-purple-800"
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
+
       {/* Input Area */}
       <div className="p-4 bg-white border-t flex-shrink-0">
         <div className="flex gap-2 items-center">
+          {/* TTS Toggle */}
+          {isSpeechSynthesisSupported() && (
+            <button
+              onClick={toggleTTS}
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                ttsEnabled
+                  ? 'bg-purple-100 text-purple-600'
+                  : 'bg-gray-100 text-gray-400'
+              }`}
+              title={ttsEnabled ? 'Desactivar voz' : 'Activar voz'}
+            >
+              {ttsEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+            </button>
+          )}
+
           <input
             ref={inputRef}
             type="text"
-            value={input}
+            value={isListening ? interimTranscript : input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Escribe tu pregunta..."
-            disabled={isLoading}
+            placeholder={isListening ? 'Escuchando...' : 'Escribe tu pregunta...'}
+            disabled={isLoading || isListening}
             className="flex-1 px-4 py-3 bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
           />
+
+          {/* Voice Button */}
+          {voiceSupported && (
+            <button
+              onClick={toggleListening}
+              disabled={isLoading}
+              className={`
+                w-12 h-12 rounded-full flex items-center justify-center transition-all
+                ${isListening
+                  ? 'bg-red-500 text-white animate-pulse shadow-lg'
+                  : 'bg-gray-100 text-gray-600 hover:bg-purple-100 hover:text-purple-600'
+                }
+              `}
+              title={isListening ? 'Detener' : 'Hablar'}
+            >
+              {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+            </button>
+          )}
+
+          {/* Send Button */}
           <button
             onClick={() => sendMessage(input)}
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isLoading || isListening}
             className={`
               w-12 h-12 rounded-full flex items-center justify-center transition-all
-              ${input.trim() && !isLoading
+              ${input.trim() && !isLoading && !isListening
                 ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg hover:shadow-xl'
                 : 'bg-gray-200 text-gray-400'
               }

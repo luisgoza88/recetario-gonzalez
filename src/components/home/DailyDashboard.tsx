@@ -404,7 +404,7 @@ export default function DailyDashboard({
   );
 }
 
-// Task Card Component with Live Timer
+// Task Card Component with Gamified Timer
 interface TaskCardProps {
   task: ScheduledTask;
   onToggle: () => void;
@@ -453,10 +453,29 @@ function TaskCard({ task, onToggle, onStart, onInspect, onRate }: TaskCardProps)
   // Calculate progress percentage vs estimated time
   const estimatedSeconds = (task.task_template?.estimated_minutes || 30) * 60;
   const progressPercent = Math.min(100, (elapsedTime / estimatedSeconds) * 100);
-  const isOverTime = elapsedTime > estimatedSeconds;
+
+  // Get encouraging message based on progress
+  const getEncouragingMessage = () => {
+    if (progressPercent < 50) return { emoji: '🚀', text: '¡Buen ritmo!' };
+    if (progressPercent < 80) return { emoji: '💪', text: '¡Vas muy bien!' };
+    if (progressPercent < 100) return { emoji: '🏁', text: '¡Ya casi!' };
+    return { emoji: '⏰', text: '¡Tómate tu tiempo!' };
+  };
+
+  // Get achievement for completed task
+  const getAchievement = (actualMinutes: number, estimatedMinutes: number) => {
+    const ratio = actualMinutes / estimatedMinutes;
+    if (ratio <= 0.7) return { emoji: '⚡', text: '¡Súper rápido!', color: 'bg-purple-100 text-purple-700' };
+    if (ratio <= 0.9) return { emoji: '🌟', text: '¡Excelente!', color: 'bg-yellow-100 text-yellow-700' };
+    if (ratio <= 1.0) return { emoji: '✨', text: '¡Perfecto!', color: 'bg-green-100 text-green-700' };
+    if (ratio <= 1.2) return { emoji: '👍', text: '¡Bien hecho!', color: 'bg-blue-100 text-blue-700' };
+    return { emoji: '💪', text: '¡Completado!', color: 'bg-gray-100 text-gray-700' };
+  };
+
+  const encouragement = getEncouragingMessage();
 
   return (
-    <div className={`p-4 ${isCompleted ? 'bg-green-50' : isInProgress ? 'bg-blue-50' : ''}`}>
+    <div className={`p-4 ${isCompleted ? 'bg-green-50' : isInProgress ? 'bg-gradient-to-r from-blue-50 to-indigo-50' : ''}`}>
       <div className="flex items-start gap-3">
         {/* Checkbox */}
         <button
@@ -483,61 +502,48 @@ function TaskCard({ task, onToggle, onStart, onInspect, onRate }: TaskCardProps)
             <span className="text-xs text-gray-400">•</span>
             <span className="text-sm text-gray-400 flex items-center gap-1">
               <Clock size={12} />
-              {task.task_template?.estimated_minutes} min
+              ~{task.task_template?.estimated_minutes} min
             </span>
           </div>
 
-          {/* Live Timer with Progress Bar */}
+          {/* Gamified Timer - Friendly & Encouraging */}
           {isInProgress && (
             <div className="mt-3 space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full animate-pulse ${isOverTime ? 'bg-red-500' : 'bg-blue-600'}`} />
-                  <span className={`text-lg font-mono font-bold ${isOverTime ? 'text-red-600' : 'text-blue-600'}`}>
+                  <span className="text-xl">{encouragement.emoji}</span>
+                  <span className="text-lg font-mono font-bold text-indigo-600">
                     {formatTime(elapsedTime)}
                   </span>
                 </div>
-                <span className="text-xs text-gray-500">
-                  / {task.task_template?.estimated_minutes} min
+                <span className="text-xs text-indigo-500 font-medium">
+                  {encouragement.text}
                 </span>
               </div>
-              {/* Progress bar */}
-              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+              {/* Friendly progress bar - always encouraging colors */}
+              <div className="h-2 bg-indigo-100 rounded-full overflow-hidden">
                 <div
-                  className={`h-full transition-all duration-500 ${
-                    isOverTime ? 'bg-red-500' : progressPercent > 80 ? 'bg-yellow-500' : 'bg-blue-500'
-                  }`}
+                  className="h-full bg-gradient-to-r from-indigo-400 to-purple-500 transition-all duration-500 rounded-full"
                   style={{ width: `${Math.min(100, progressPercent)}%` }}
                 />
               </div>
-              {isOverTime && (
-                <p className="text-xs text-red-600 flex items-center gap-1">
-                  <AlertTriangle size={12} />
-                  Excedido por {formatTime(elapsedTime - estimatedSeconds)}
-                </p>
-              )}
             </div>
           )}
 
-          {/* Show actual time after completion */}
+          {/* Achievement Badge after completion */}
           {isCompleted && task.actual_minutes !== undefined && task.actual_minutes !== null && (
-            <div className="mt-2 flex items-center gap-2 text-sm">
-              <span className={`font-medium ${
-                task.actual_minutes <= (task.task_template?.estimated_minutes || 30)
-                  ? 'text-green-600'
-                  : 'text-orange-600'
-              }`}>
-                Tiempo real: {task.actual_minutes} min
-              </span>
-              {task.actual_minutes <= (task.task_template?.estimated_minutes || 30) ? (
-                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                  Eficiente
-                </span>
-              ) : (
-                <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
-                  +{task.actual_minutes - (task.task_template?.estimated_minutes || 30)} min
-                </span>
-              )}
+            <div className="mt-2 flex items-center gap-2">
+              {(() => {
+                const achievement = getAchievement(
+                  task.actual_minutes,
+                  task.task_template?.estimated_minutes || 30
+                );
+                return (
+                  <span className={`text-sm px-3 py-1 rounded-full font-medium ${achievement.color}`}>
+                    {achievement.emoji} {achievement.text} • {task.actual_minutes} min
+                  </span>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -547,8 +553,8 @@ function TaskCard({ task, onToggle, onStart, onInspect, onRate }: TaskCardProps)
           {!isCompleted && !isInProgress && (
             <button
               onClick={onStart}
-              className="p-2 hover:bg-gray-100 rounded-lg text-blue-600"
-              title="Iniciar tarea"
+              className="p-2.5 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 rounded-xl text-white shadow-sm"
+              title="¡Empezar!"
             >
               <Play size={18} />
             </button>
@@ -557,10 +563,10 @@ function TaskCard({ task, onToggle, onStart, onInspect, onRate }: TaskCardProps)
           {isInProgress && (
             <button
               onClick={onToggle}
-              className="p-2 hover:bg-blue-100 rounded-lg text-blue-600 bg-blue-50"
-              title="Completar tarea"
+              className="p-2.5 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 rounded-xl text-white shadow-sm"
+              title="¡Listo!"
             >
-              <Pause size={18} />
+              <CheckCircle2 size={18} />
             </button>
           )}
 
@@ -568,14 +574,14 @@ function TaskCard({ task, onToggle, onStart, onInspect, onRate }: TaskCardProps)
             <>
               <button
                 onClick={onRate}
-                className="p-2 hover:bg-gray-100 rounded-lg text-amber-500"
+                className="p-2 hover:bg-amber-100 rounded-lg text-amber-500"
                 title="Calificar"
               >
                 <Star size={18} />
               </button>
               <button
                 onClick={onInspect}
-                className="p-2 hover:bg-gray-100 rounded-lg text-purple-600"
+                className="p-2 hover:bg-purple-100 rounded-lg text-purple-600"
                 title="Inspeccionar"
               >
                 <Eye size={18} />
