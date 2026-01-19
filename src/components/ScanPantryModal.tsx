@@ -3,8 +3,11 @@
 import { useState, useRef } from 'react';
 import {
   X, Camera, Upload, Loader2, Check, Plus, Package,
-  AlertCircle, Sparkles, RefreshCw, ChevronDown, ChevronUp
+  AlertCircle, Sparkles, RefreshCw, ChevronDown, ChevronUp,
+  Trash2, ImagePlus
 } from 'lucide-react';
+
+const MAX_PHOTOS = 5;
 
 interface IdentifiedProduct {
   name: string;
@@ -45,37 +48,79 @@ type ScanStep = 'capture' | 'analyzing' | 'results' | 'applying' | 'done';
 
 export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModalProps) {
   const [step, setStep] = useState<ScanStep>('capture');
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [images, setImages] = useState<string[]>([]);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedSection, setExpandedSection] = useState<'matched' | 'new' | null>('matched');
+  const [analyzingProgress, setAnalyzingProgress] = useState(0);
+  const [continuousMode, setContinuousMode] = useState(true);
+  const [showContinuePrompt, setShowContinuePrompt] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const handleImageCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    // Convertir a base64
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64 = reader.result as string;
-      setImagePreview(base64);
-      await analyzeImage(base64);
-    };
-    reader.readAsDataURL(file);
+    // Process each file
+    const newImages: string[] = [];
+
+    for (let i = 0; i < files.length && images.length + newImages.length < MAX_PHOTOS; i++) {
+      const file = files[i];
+      const base64 = await fileToBase64(file);
+      newImages.push(base64);
+    }
+
+    const updatedImages = [...images, ...newImages].slice(0, MAX_PHOTOS);
+    setImages(updatedImages);
+
+    // Reset input to allow selecting the same file again
+    e.target.value = '';
+
+    // If continuous mode is on and we haven't reached max, show prompt to continue
+    if (continuousMode && updatedImages.length < MAX_PHOTOS) {
+      setShowContinuePrompt(true);
+    }
   };
 
-  const analyzeImage = async (imageBase64: string) => {
+  const handleContinueCapture = () => {
+    setShowContinuePrompt(false);
+    // Small delay to ensure state is updated before opening camera
+    setTimeout(() => {
+      cameraInputRef.current?.click();
+    }, 100);
+  };
+
+  const handleStopCapture = () => {
+    setShowContinuePrompt(false);
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeImage = (index: number) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const analyzeImages = async () => {
+    if (images.length === 0) return;
+
     setStep('analyzing');
     setError(null);
+    setAnalyzingProgress(0);
 
     try {
       const response = await fetch('/api/scan-pantry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: imageBase64 }),
+        body: JSON.stringify({ images }),
       });
 
       const data = await response.json();
@@ -94,8 +139,8 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
       setScanResult(result);
       setStep('results');
     } catch (err) {
-      console.error('Error analyzing image:', err);
-      setError(err instanceof Error ? err.message : 'Error al analizar la imagen');
+      console.error('Error analyzing images:', err);
+      setError(err instanceof Error ? err.message : 'Error al analizar las imágenes');
       setStep('capture');
     }
   };
@@ -156,7 +201,7 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
   };
 
   const resetScan = () => {
-    setImagePreview(null);
+    setImages([]);
     setScanResult(null);
     setError(null);
     setStep('capture');
@@ -180,7 +225,7 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
             <div>
               <h2 className="font-semibold text-gray-900">Escanear Despensa</h2>
               <p className="text-xs text-gray-500">
-                {step === 'capture' && 'Toma una foto de tu nevera o despensa'}
+                {step === 'capture' && `${images.length}/${MAX_PHOTOS} fotos`}
                 {step === 'analyzing' && 'Analizando productos...'}
                 {step === 'results' && 'Revisa los productos identificados'}
                 {step === 'applying' && 'Aplicando cambios...'}
@@ -212,20 +257,89 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
           {/* Step: Capture */}
           {step === 'capture' && (
             <div className="space-y-4">
-              {/* Image Preview */}
-              {imagePreview ? (
-                <div className="relative">
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="w-full h-64 object-cover rounded-xl"
-                  />
-                  <button
-                    onClick={resetScan}
-                    className="absolute top-2 right-2 p-2 bg-white/90 rounded-full shadow"
-                  >
-                    <RefreshCw size={18} />
-                  </button>
+              {/* Continue Prompt Modal */}
+              {showContinuePrompt && (
+                <div className="fixed inset-0 bg-black/60 z-60 flex items-center justify-center p-4">
+                  <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+                    <div className="text-center mb-4">
+                      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <Check className="text-green-600" size={32} />
+                      </div>
+                      <h3 className="font-semibold text-lg text-gray-900">
+                        ¡Foto {images.length} agregada!
+                      </h3>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Puedes agregar {MAX_PHOTOS - images.length} foto{MAX_PHOTOS - images.length > 1 ? 's' : ''} más
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <button
+                        onClick={handleContinueCapture}
+                        className="w-full py-3 bg-purple-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-purple-700 transition-colors"
+                      >
+                        <Camera size={20} />
+                        Tomar otra foto
+                      </button>
+                      <button
+                        onClick={handleStopCapture}
+                        className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                      >
+                        Listo, analizar {images.length} foto{images.length > 1 ? 's' : ''}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Image Grid Preview */}
+              {images.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-2">
+                    {images.map((img, index) => (
+                      <div key={index} className="relative aspect-square">
+                        <img
+                          src={img}
+                          alt={`Foto ${index + 1}`}
+                          className="w-full h-full object-cover rounded-xl"
+                        />
+                        <button
+                          onClick={() => removeImage(index)}
+                          className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                        <span className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">
+                          {index + 1}
+                        </span>
+                      </div>
+                    ))}
+
+                    {/* Add more button */}
+                    {images.length < MAX_PHOTOS && (
+                      <button
+                        onClick={() => cameraInputRef.current?.click()}
+                        className="aspect-square border-2 border-dashed border-purple-300 rounded-xl flex flex-col items-center justify-center gap-1 text-purple-500 hover:bg-purple-50 hover:border-purple-400 transition-colors"
+                      >
+                        <ImagePlus size={24} />
+                        <span className="text-xs">Agregar</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Photo counter */}
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-500">
+                      {images.length} de {MAX_PHOTOS} fotos máximo
+                    </span>
+                    <button
+                      onClick={resetScan}
+                      className="text-red-500 hover:text-red-600 font-medium flex items-center gap-1"
+                    >
+                      <RefreshCw size={14} />
+                      Reiniciar
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="bg-gray-100 rounded-xl p-8 text-center">
@@ -233,10 +347,10 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
                     <Camera className="text-purple-600" size={32} />
                   </div>
                   <p className="text-gray-600 mb-2">
-                    Toma una foto de tu nevera, despensa o alacena
+                    Toma fotos de tu nevera, despensa o alacena
                   </p>
                   <p className="text-sm text-gray-400">
-                    La IA identificará los productos y actualizará tu inventario
+                    Puedes agregar hasta {MAX_PHOTOS} fotos para mejor precisión
                   </p>
                 </div>
               )}
@@ -245,19 +359,32 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => cameraInputRef.current?.click()}
-                  className="flex flex-col items-center gap-2 p-4 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors"
+                  disabled={images.length >= MAX_PHOTOS}
+                  className="flex flex-col items-center gap-2 p-4 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Camera size={24} />
                   <span className="font-medium">Tomar foto</span>
                 </button>
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex flex-col items-center gap-2 p-4 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
+                  disabled={images.length >= MAX_PHOTOS}
+                  className="flex flex-col items-center gap-2 p-4 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Upload size={24} />
-                  <span className="font-medium">Subir imagen</span>
+                  <span className="font-medium">Subir imágenes</span>
                 </button>
               </div>
+
+              {/* Analyze Button */}
+              {images.length > 0 && !showContinuePrompt && (
+                <button
+                  onClick={analyzeImages}
+                  className="w-full py-4 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 hover:from-purple-700 hover:to-purple-800 transition-all shadow-lg"
+                >
+                  <Sparkles size={20} />
+                  Analizar {images.length} foto{images.length > 1 ? 's' : ''}
+                </button>
+              )}
 
               {/* Hidden inputs */}
               <input
@@ -272,6 +399,7 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
+                multiple
                 onChange={handleImageCapture}
                 className="hidden"
               />
@@ -281,8 +409,9 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
                 <p className="text-sm text-blue-700 font-medium mb-1">Tips para mejores resultados:</p>
                 <ul className="text-xs text-blue-600 space-y-1">
                   <li>• Asegúrate de que haya buena iluminación</li>
-                  <li>• Incluye varios productos en una sola foto</li>
+                  <li>• Incluye varios productos en cada foto</li>
                   <li>• Las etiquetas deben ser visibles</li>
+                  <li>• Toma fotos desde diferentes ángulos</li>
                 </ul>
               </div>
             </div>
@@ -290,21 +419,26 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
 
           {/* Step: Analyzing */}
           {step === 'analyzing' && (
-            <div className="py-12 text-center">
+            <div className="py-8 text-center">
               <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Loader2 className="text-purple-600 animate-spin" size={32} />
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Analizando imagen...</h3>
-              <p className="text-sm text-gray-500">
+              <h3 className="font-semibold text-gray-900 mb-2">Analizando {images.length} foto{images.length > 1 ? 's' : ''}...</h3>
+              <p className="text-sm text-gray-500 mb-4">
                 Identificando productos y cantidades
               </p>
-              {imagePreview && (
-                <img
-                  src={imagePreview}
-                  alt="Analyzing"
-                  className="w-32 h-32 object-cover rounded-xl mx-auto mt-4 opacity-50"
-                />
-              )}
+
+              {/* Thumbnails while analyzing */}
+              <div className="flex justify-center gap-2 flex-wrap">
+                {images.map((img, index) => (
+                  <img
+                    key={index}
+                    src={img}
+                    alt={`Foto ${index + 1}`}
+                    className="w-16 h-16 object-cover rounded-lg opacity-50"
+                  />
+                ))}
+              </div>
             </div>
           )}
 
@@ -324,12 +458,22 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-green-50 p-3 rounded-xl text-center">
                   <p className="text-2xl font-bold text-green-700">{scanResult.matched.length}</p>
-                  <p className="text-xs text-green-600">Productos existentes</p>
+                  <p className="text-xs text-green-600">Ya en tu lista</p>
                 </div>
                 <div className="bg-blue-50 p-3 rounded-xl text-center">
                   <p className="text-2xl font-bold text-blue-700">{scanResult.newItems.length}</p>
-                  <p className="text-xs text-blue-600">Productos nuevos</p>
+                  <p className="text-xs text-blue-600">Nuevos productos</p>
                 </div>
+              </div>
+
+              {/* Selection info */}
+              <div className="bg-amber-50 p-3 rounded-xl text-sm text-amber-700">
+                <p className="font-medium">Selecciona los productos correctos:</p>
+                <p className="text-xs mt-1">
+                  ✓ Seleccionados existentes → actualizan inventario<br/>
+                  ✓ Seleccionados nuevos → se agregan a tu lista<br/>
+                  ✗ No seleccionados → se ignoran
+                </p>
               </div>
 
               {/* Matched Products */}
@@ -341,7 +485,7 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
                   >
                     <span className="font-medium text-green-700 flex items-center gap-2">
                       <Check size={16} />
-                      Actualizar inventario ({scanResult.matched.filter(m => m.selected).length})
+                      Actualizar inventario ({scanResult.matched.filter(m => m.selected).length}/{scanResult.matched.length})
                     </span>
                     {expandedSection === 'matched' ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                   </button>
@@ -350,7 +494,9 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
                       {scanResult.matched.map((match, index) => (
                         <label
                           key={index}
-                          className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer"
+                          className={`flex items-center gap-3 p-3 cursor-pointer transition-colors ${
+                            match.selected ? 'bg-green-50/50' : 'bg-gray-50 opacity-60'
+                          }`}
                         >
                           <input
                             type="checkbox"
@@ -360,7 +506,9 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="font-medium truncate">{match.marketItemName}</span>
+                              <span className={`font-medium truncate ${!match.selected && 'line-through text-gray-400'}`}>
+                                {match.marketItemName}
+                              </span>
                               <span className={`text-xs px-1.5 py-0.5 rounded ${getConfidenceColor(match.product.confidence)}`}>
                                 {Math.round(match.product.confidence * 100)}%
                               </span>
@@ -385,7 +533,7 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
                   >
                     <span className="font-medium text-blue-700 flex items-center gap-2">
                       <Plus size={16} />
-                      Agregar nuevos ({scanResult.newItems.filter(n => n.selected).length})
+                      Agregar a lista ({scanResult.newItems.filter(n => n.selected).length}/{scanResult.newItems.length})
                     </span>
                     {expandedSection === 'new' ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                   </button>
@@ -394,7 +542,9 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
                       {scanResult.newItems.map((newItem, index) => (
                         <label
                           key={index}
-                          className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer"
+                          className={`flex items-center gap-3 p-3 cursor-pointer transition-colors ${
+                            newItem.selected ? 'bg-blue-50/50' : 'bg-gray-50 opacity-60'
+                          }`}
                         >
                           <input
                             type="checkbox"
@@ -405,7 +555,9 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <Package size={14} className="text-blue-500" />
-                              <span className="font-medium">{newItem.product.genericName}</span>
+                              <span className={`font-medium ${!newItem.selected && 'line-through text-gray-400'}`}>
+                                {newItem.product.genericName}
+                              </span>
                               <span className={`text-xs px-1.5 py-0.5 rounded ${getConfidenceColor(newItem.product.confidence)}`}>
                                 {Math.round(newItem.product.confidence * 100)}%
                               </span>
@@ -415,7 +567,7 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
                             </p>
                             {newItem.product.name !== newItem.product.genericName && (
                               <p className="text-xs text-purple-500">
-                                Marca detectada: {newItem.product.name}
+                                Marca: {newItem.product.name}
                               </p>
                             )}
                           </div>
@@ -435,7 +587,7 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
                     onClick={resetScan}
                     className="mt-4 text-purple-600 font-medium"
                   >
-                    Intentar con otra foto
+                    Intentar con otras fotos
                   </button>
                 </div>
               )}
