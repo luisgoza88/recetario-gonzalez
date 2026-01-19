@@ -293,3 +293,98 @@ Funciones RPC importantes:
 - `use_invitation_code()` - Usar código para unirse
 - `get_my_memberships()` - Obtener hogares del usuario
 - `check_user_permission()` - Verificar permisos
+
+---
+
+## SISTEMA DE ANALYTICS (Enero 2025)
+
+### Arquitectura
+
+Sistema de analytics centralizado usando PostHog para tracking de eventos, identificación de usuarios y métricas de uso.
+
+**Proveedor:** PostHog (plan gratuito: 1M eventos/mes)
+- Dashboard: https://us.posthog.com
+- Documentación: https://posthog.com/docs
+
+### Archivos Clave
+
+```
+src/lib/analytics/
+├── index.ts              # Servicio principal con todos los eventos
+├── useAnalytics.ts       # Hook React para usar en componentes
+└── AnalyticsProvider.tsx # Provider que inicializa analytics
+```
+
+### Configuración
+
+Variables de entorno (`.env.local`):
+```
+NEXT_PUBLIC_POSTHOG_KEY=phc_xxxxx
+NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
+```
+
+**Sin API key:** El sistema funciona en modo "log only" (solo console.log)
+
+### Eventos Trackeados
+
+| Categoría | Eventos |
+|-----------|---------|
+| **Auth** | `signup_started`, `signup_completed`, `login_completed`, `logout` |
+| **Onboarding** | `onboarding_started`, `onboarding_step_completed`, `onboarding_completed`, `onboarding_skipped` |
+| **Recetas** | `recipe_viewed`, `recipe_created`, `recipe_edited`, `recipe_deleted`, `recipe_shared` |
+| **Menú** | `menu_viewed`, `meal_assigned`, `meal_completed`, `meal_feedback_submitted` |
+| **Shopping** | `shopping_list_viewed`, `shopping_list_generated`, `shopping_item_checked` |
+| **Inventario** | `inventory_viewed`, `inventory_updated`, `scan_pantry_used`, `scan_receipt_used` |
+| **IA** | `ai_recipe_generated`, `ai_recipe_saved`, `ai_chat_started`, `ai_suggestion_accepted` |
+| **Hogar** | `task_created`, `task_completed`, `employee_added`, `space_created` |
+| **Suscripciones** | `subscription_viewed`, `subscription_started`, `trial_started` |
+
+### Uso en Componentes
+
+```tsx
+import { useAnalytics } from '@/lib/analytics/useAnalytics';
+
+function MyComponent() {
+  const { recipe, ai, startTimer, getElapsedMs } = useAnalytics();
+
+  const handleSaveRecipe = () => {
+    recipe.created('recipe-123', 'Pasta', 'lunch', 5, 'manual');
+  };
+
+  const handleGenerateAI = async () => {
+    const start = startTimer();
+    const result = await generateRecipe();
+    ai.recipeGenerated('saludable', 'dinner', getElapsedMs(start), true);
+  };
+}
+```
+
+### Módulos Disponibles
+
+- `analytics.auth` - Login, signup, logout
+- `analytics.onboarding` - Pasos de onboarding
+- `analytics.recipe` - CRUD de recetas
+- `analytics.menu` - Menú y calendario
+- `analytics.shopping` - Lista de compras
+- `analytics.inventory` - Inventario y escaneo
+- `analytics.ai` - Generación IA
+- `analytics.home` - Tareas y espacios
+- `analytics.subscription` - Suscripciones
+- `analytics.engagement` - Feature discovery
+
+### Métricas Clave para Monitorear
+
+**Retención:**
+- DAU/MAU (Daily/Monthly Active Users)
+- Stickiness ratio (DAU/MAU)
+- Feature adoption rate
+
+**Conversión:**
+- Signup → Onboarding completed
+- Trial → Paid conversion
+- Free → Premium upgrade
+
+**Engagement:**
+- Recetas generadas por IA / semana
+- Escaneos de despensa / usuario
+- Tareas completadas / día

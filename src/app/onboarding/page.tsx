@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase/client';
+import { useAnalytics } from '@/lib/analytics/useAnalytics';
 
 // ==================== TYPES ====================
 
@@ -192,6 +193,7 @@ const WORK_DAYS = [
 export default function OnboardingPage() {
   const router = useRouter();
   const { currentHousehold, refreshMemberships, user } = useAuth();
+  const { onboarding: onboardingAnalytics } = useAnalytics();
 
   // Step management
   const [step, setStep] = useState<OnboardingStep>('welcome');
@@ -281,6 +283,8 @@ export default function OnboardingPage() {
   const nextStep = () => {
     const nextIndex = currentStepIndex + 1;
     if (nextIndex < steps.length) {
+      // Track step completion
+      onboardingAnalytics.stepCompleted(step, currentStepIndex + 1, steps.length);
       navigateTo(steps[nextIndex].id);
     }
   };
@@ -294,9 +298,15 @@ export default function OnboardingPage() {
 
   // Skip onboarding (go to demo mode)
   const skipOnboarding = () => {
+    onboardingAnalytics.skipped(step);
     localStorage.setItem('onboarding_skipped', 'true');
     router.push('/');
   };
+
+  // Track onboarding started
+  useEffect(() => {
+    onboardingAnalytics.started();
+  }, []);
 
   // Dietary preferences toggle
   const toggleDietary = (id: string) => {
@@ -425,15 +435,12 @@ export default function OnboardingPage() {
       }
 
       // 4. Track onboarding completion for analytics
-      if (typeof window !== 'undefined') {
-        // Future: Send to analytics
-        console.log('Onboarding completed:', {
-          profileType,
-          cuisine: selectedCuisine,
-          goals: selectedGoals,
-          hasEmployees: employees.length > 0
-        });
-      }
+      onboardingAnalytics.completed(
+        profileType || 'admin',
+        membersCount,
+        dietaryPreferences,
+        [selectedCuisine]
+      );
 
       // Refresh data
       await refreshMemberships();

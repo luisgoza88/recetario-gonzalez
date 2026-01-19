@@ -28,6 +28,7 @@ import {
   findAlternativeRecipes,
   getAvailableIngredientsList
 } from '@/lib/inventory-check';
+import { useAnalytics } from '@/lib/analytics/useAnalytics';
 
 // Tipos de estilo de receta
 type RecipeStyle =
@@ -144,6 +145,9 @@ export default function SmartSuggestions({
   const [showStyleSelector, setShowStyleSelector] = useState(true);
   const [userPreferences, setUserPreferences] = useState<string>('');
 
+  // Analytics
+  const { ai: aiAnalytics, startTimer, getElapsedMs } = useAnalytics();
+
   // Modo especial: generar receta desde cero (sin receta existente)
   const isGenerateMode = recipe.id === 'generate-dinner' || recipe.id === 'generate-lunch' || recipe.id === 'generate-breakfast';
 
@@ -195,6 +199,7 @@ export default function SmartSuggestions({
     setGeneratingAI(true);
     setAiError(null);
     setShowStyleSelector(false); // Ocultar selector mientras genera
+    const aiStartTime = startTimer(); // Track tiempo de respuesta
 
     // Construir array de preferencias
     const preferences = ['Fácil de preparar'];
@@ -223,10 +228,16 @@ export default function SmartSuggestions({
       }
 
       setAiRecipe(data.recipe);
+
+      // Track successful AI recipe generation
+      aiAnalytics.recipeGenerated(selectedStyle, mealType, getElapsedMs(aiStartTime), true);
     } catch (error) {
       console.error('AI recipe error:', error);
       setAiError(error instanceof Error ? error.message : 'Error al generar receta');
       setShowStyleSelector(true); // Mostrar selector si hay error
+
+      // Track failed AI recipe generation
+      aiAnalytics.recipeGenerated(selectedStyle, mealType, getElapsedMs(aiStartTime), false);
     } finally {
       setGeneratingAI(false);
     }
@@ -315,6 +326,9 @@ export default function SmartSuggestions({
         nutrition: data.nutrition,
         created_at: data.created_at
       };
+
+      // Track AI recipe saved
+      aiAnalytics.recipeSaved(data.id, data.name, selectedStyle);
 
       onSelectAlternative(savedRecipe);
     } catch (error: unknown) {

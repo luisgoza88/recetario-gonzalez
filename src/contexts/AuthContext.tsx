@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
+import analytics from '@/lib/analytics';
 import type {
   UserProfile,
   HouseholdMembership,
@@ -264,7 +265,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setError(null);
       setIsLoading(true);
 
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password
       });
@@ -272,6 +273,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (signInError) {
         setError(signInError.message);
         return { error: signInError.message };
+      }
+
+      // Track successful login
+      if (data.user) {
+        analytics.auth.loginCompleted(data.user.id, email);
       }
 
       return {};
@@ -293,7 +299,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setError(null);
       setIsLoading(true);
 
-      const { error: signUpError } = await supabase.auth.signUp({
+      // Track signup started
+      analytics.auth.signupStarted();
+
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -306,6 +315,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (signUpError) {
         setError(signUpError.message);
         return { error: signUpError.message };
+      }
+
+      // Track successful signup
+      if (data.user) {
+        analytics.auth.signupCompleted(data.user.id, email);
       }
 
       return {};
@@ -321,6 +335,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signOut = async () => {
     try {
       setIsLoading(true);
+      // Track logout
+      analytics.auth.logout();
       await supabase.auth.signOut();
       localStorage.removeItem('currentHouseholdId');
     } catch (err) {
