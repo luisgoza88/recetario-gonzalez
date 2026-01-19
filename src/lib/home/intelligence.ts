@@ -26,6 +26,7 @@ export interface TaskDurationData {
   learnedMinutes: number;
   sampleCount: number;
   confidence: 'low' | 'medium' | 'high';
+  dataSource: 'history' | 'estimate' | 'default'; // Where the duration came from
 }
 
 export interface EmployeeScore {
@@ -40,6 +41,7 @@ export interface EmployeeScore {
   };
   totalTasksCompleted: number;
   totalMinutesWorked: number;
+  isNewEmployee?: boolean; // True if using default scores (no history)
 }
 
 export interface WorkloadBalance {
@@ -68,16 +70,9 @@ export interface WorkloadPrediction {
   suggestedAction: string;
 }
 
-// Constants
-const MIN_SAMPLES_FOR_CONFIDENCE = {
-  low: 1,
-  medium: 5,
-  high: 15
-};
-
-const DEFAULT_TASK_MINUTES = 30;
-const WORK_HOURS_PER_DAY = 8;
-const WORK_MINUTES_PER_DAY = WORK_HOURS_PER_DAY * 60;
+// Constants (using imported defaults)
+const MIN_SAMPLES_FOR_CONFIDENCE = MIN_SAMPLES_FOR_LEARNING;
+const WORK_MINUTES_PER_DAY = DEFAULT_WORK_MINUTES_PER_DAY;
 
 /**
  * Calculate learned duration for a task based on historical completion data
@@ -115,10 +110,24 @@ export async function calculateLearnedDuration(
     .limit(50); // Use last 50 completions
 
   const sampleCount = history?.length || 0;
-  const estimatedMinutes = task.estimated_minutes || DEFAULT_TASK_MINUTES;
+
+  // Get space type for intelligent defaults
+  const { data: spaceDetails } = await supabase
+    .from('spaces')
+    .select('space_type:space_types(name)')
+    .eq('id', spaceId)
+    .single();
+
+  const spaceTypeName = (spaceDetails?.space_type as { name?: string } | null)?.name || '';
+
+  // Use intelligent default based on task name and space type if no estimate exists
+  const intelligentDefault = getDefaultTaskDuration(task.name, spaceTypeName);
+  const estimatedMinutes = task.estimated_minutes || intelligentDefault;
 
   // Calculate learned duration
   let learnedMinutes = estimatedMinutes;
+  let dataSource: 'history' | 'estimate' | 'default' = 'default';
+
   if (history && history.length > 0) {
     // Use weighted average: more recent completions have more weight
     let totalWeight = 0;
@@ -131,6 +140,14 @@ export async function calculateLearnedDuration(
     });
 
     learnedMinutes = Math.round(weightedSum / totalWeight);
+    dataSource = 'history';
+  } else if (task.estimated_minutes) {
+    // Use the stored estimate
+    dataSource = 'estimate';
+  } else {
+    // Using intelligent default
+    learnedMinutes = intelligentDefault;
+    dataSource = 'default';
   }
 
   // Determine confidence level
@@ -149,7 +166,8 @@ export async function calculateLearnedDuration(
     estimatedMinutes,
     learnedMinutes,
     sampleCount,
-    confidence
+    confidence,
+    dataSource
   };
 }
 
@@ -207,18 +225,20 @@ export async function calculateEmployeeScore(
     .limit(100);
 
   if (!tasks || tasks.length === 0) {
+    // Use intelligent defaults for new employees (start positive, not neutral)
     return {
       employeeId,
       employeeName: employee.name,
-      overallScore: 50, // Neutral score for new employees
+      overallScore: DEFAULT_EMPLOYEE_SCORES.overallScore,
       metrics: {
-        avgRating: 0,
-        speedScore: 50,
-        reliabilityScore: 0,
-        consistencyScore: 50
+        avgRating: DEFAULT_EMPLOYEE_SCORES.avgRating,
+        speedScore: DEFAULT_EMPLOYEE_SCORES.speedScore,
+        reliabilityScore: DEFAULT_EMPLOYEE_SCORES.reliabilityScore,
+        consistencyScore: DEFAULT_EMPLOYEE_SCORES.consistencyScore
       },
       totalTasksCompleted: 0,
-      totalMinutesWorked: 0
+      totalMinutesWorked: 0,
+      isNewEmployee: true // Flag to indicate using defaults
     };
   }
 
@@ -236,7 +256,7 @@ export async function calculateEmployeeScore(
   let speedScore = 50;
   if (tasksWithActualTime.length > 0) {
     const speedRatios = tasksWithActualTime.map(t => {
-      const estimated = (t.space_tasks as { estimated_minutes?: number })?.estimated_minutes || DEFAULT_TASK_MINUTES;
+      const estimated = (t.space_tasks as { estimated_minutes?: number })?.estimated_minutes || 30;
       const actual = t.actual_minutes || estimated;
       return estimated / actual; // > 1 means faster than expected
     });
@@ -338,7 +358,7 @@ export async function calculateWorkloadBalance(
       if (taskData) {
         // Try to get learned duration
         const learned = await calculateLearnedDuration(taskData.id, taskData.id);
-        taskDurations[taskData.id] = learned?.learnedMinutes || taskData.estimated_minutes || DEFAULT_TASK_MINUTES;
+        taskDurations[taskData.id] = learned?.learnedMinutes || taskData.estimated_minutes || 30;
       }
     }
   }
@@ -355,7 +375,7 @@ export async function calculateWorkloadBalance(
       return {
         taskId: taskData?.id || '',
         taskName: taskData?.name || 'Unknown',
-        minutes: taskDurations[taskData?.id || ''] || taskData?.estimated_minutes || DEFAULT_TASK_MINUTES
+        minutes: taskDurations[taskData?.id || ''] || taskData?.estimated_minutes || 30
       };
     });
 
@@ -417,7 +437,7 @@ export async function suggestOptimalAssignment(
   for (const task of unassignedTasks) {
     // Get learned duration for this task
     const duration = await calculateLearnedDuration(task.taskId, task.spaceId);
-    const taskMinutes = duration?.learnedMinutes || DEFAULT_TASK_MINUTES;
+    const taskMinutes = duration?.learnedMinutes || 30;
 
     // Find eligible employees
     const eligibleEmployees = workloads.filter(w => {

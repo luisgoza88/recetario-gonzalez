@@ -303,7 +303,14 @@ export default function SmartAlerts({ householdId, onNavigateToDate }: SmartAler
                 {employeeScores.map(score => (
                   <div key={score.employeeId} className="bg-gray-50 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium">{score.employeeName}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{score.employeeName}</span>
+                        {score.isNewEmployee && (
+                          <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">
+                            Nuevo
+                          </span>
+                        )}
+                      </div>
                       <span className={`text-lg font-bold ${
                         score.overallScore >= 70 ? 'text-green-600' :
                         score.overallScore >= 50 ? 'text-yellow-600' :
@@ -332,11 +339,15 @@ export default function SmartAlerts({ householdId, onNavigateToDate }: SmartAler
                         <div className="font-medium">{score.metrics.consistencyScore}%</div>
                       </div>
                     </div>
-                    {score.totalTasksCompleted > 0 && (
+                    {score.totalTasksCompleted > 0 ? (
                       <div className="text-xs text-gray-500 mt-2 text-center">
                         {score.totalTasksCompleted} tareas completadas • {Math.round(score.totalMinutesWorked / 60)}h trabajadas
                       </div>
-                    )}
+                    ) : score.isNewEmployee ? (
+                      <div className="text-xs text-blue-500 mt-2 text-center italic">
+                        📊 Puntuación inicial - se ajustará con el historial
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>

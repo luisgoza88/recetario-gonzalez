@@ -13,6 +13,7 @@ import {
   suggestOptimalAssignment,
   EmployeeScore
 } from '@/lib/home/intelligence';
+import { getDefaultTaskDuration } from '@/lib/home/defaults';
 
 interface ScheduleGeneratorProps {
   householdId: string;
@@ -243,19 +244,13 @@ export default function ScheduleGenerator({
                 estimatedMinutes = existingTask.estimated_minutes || 30;
               }
             } catch {
-              estimatedMinutes = existingTask.estimated_minutes || 30;
+              const spaceTypeName = space.space_type?.name || '';
+              estimatedMinutes = existingTask.estimated_minutes || getDefaultTaskDuration(taskName, spaceTypeName);
             }
           } else {
-            // Estimate based on task type
-            if (taskName.toLowerCase().includes('trapear') || taskName.toLowerCase().includes('aspirar')) {
-              estimatedMinutes = 40;
-            } else if (taskName.toLowerCase().includes('limpiar')) {
-              estimatedMinutes = 25;
-            } else if (taskName.toLowerCase().includes('organizar')) {
-              estimatedMinutes = 35;
-            } else {
-              estimatedMinutes = 30;
-            }
+            // Use intelligent defaults based on task name and space type
+            const spaceTypeName = space.space_type?.name || '';
+            estimatedMinutes = getDefaultTaskDuration(taskName, spaceTypeName);
           }
           learnedDurations.set(durationKey, estimatedMinutes);
         } else if (learnedDurations.has(durationKey)) {
