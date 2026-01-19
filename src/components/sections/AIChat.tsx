@@ -389,15 +389,46 @@ export default function AIChat() {
     setTtsEnabled(!ttsEnabled);
   };
 
+  // Image handlers
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('La imagen es muy grande. Máximo 5MB.');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedImage(reader.result as string);
+        setShowImageOptions(false);
+      };
+      reader.readAsDataURL(file);
+    }
+    // Reset input
+    e.target.value = '';
+  };
+
+  const removeSelectedImage = () => {
+    setSelectedImage(null);
+  };
+
   const sendMessage = async (content: string) => {
-    if (!content.trim() || isLoading) return;
+    // Allow sending if there's text OR an image
+    if ((!content.trim() && !selectedImage) || isLoading) return;
 
     setShowWelcome(false);
+
+    // Capture image before clearing state
+    const imageToSend = selectedImage;
+
     const userMessage: Message = {
       id: generateId(),
       role: 'user',
-      content: content.trim(),
+      content: content.trim() || (imageToSend ? '📷 Imagen enviada' : ''),
       timestamp: new Date(),
+      image: imageToSend || undefined,
     };
 
     // Agregar mensaje del usuario y placeholder de loading
@@ -411,6 +442,7 @@ export default function AIChat() {
 
     setMessages(prev => [...prev, userMessage, loadingMessage]);
     setInput('');
+    setSelectedImage(null); // Clear image after capturing
     setIsLoading(true);
 
     // Save user message to database (don't await)
@@ -419,13 +451,24 @@ export default function AIChat() {
 
     try {
       // Preparar historial para la API (últimos 10 mensajes)
-      const history = [...messages, userMessage]
+      // Note: Images are only sent for the current message, not history
+      const historyMessages = [...messages]
         .filter(m => !m.isLoading)
-        .slice(-10)
+        .slice(-9) // -9 to leave room for current message with image
         .map(m => ({
           role: m.role,
           content: m.content
+          // Don't include images from history to save bandwidth
         }));
+
+      // Current message with image
+      const currentMessage = {
+        role: userMessage.role,
+        content: userMessage.content,
+        image: imageToSend || undefined
+      };
+
+      const history = [...historyMessages, currentMessage];
 
       // Get conversation context for enhanced prompt
       const conversationContext = await getAIContext();
