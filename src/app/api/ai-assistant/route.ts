@@ -255,6 +255,43 @@ const functionDeclarations: FunctionDeclaration[] = [
     name: 'get_preparation_tips',
     description: 'Obtiene consejos y preparaciones previas necesarias para las comidas del día',
     parameters: { type: Type.OBJECT, properties: {}, required: [] }
+  },
+  // ============================================
+  // AGENTE MULTI-PASO
+  // ============================================
+  {
+    name: 'execute_multi_step_task',
+    description: `Ejecuta una tarea compleja que requiere múltiples pasos. Usa esto para:
+- Planificar el menú semanal basado en inventario
+- Preparar todo para una receta (verificar ingredientes, agregar faltantes, ajustar porciones)
+- Generar reporte completo del hogar (inventario, tareas, menú)
+- Organizar la lista de compras basada en el menú de la semana
+La función ejecutará automáticamente todos los pasos necesarios y reportará el progreso.`,
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        task_type: {
+          type: Type.STRING,
+          description: 'Tipo de tarea: "prepare_recipe", "weekly_planning", "shopping_optimization", "full_report", "menu_from_inventory"'
+        },
+        params: {
+          type: Type.OBJECT,
+          description: 'Parámetros específicos de la tarea (ej: {recipe_name: "Arroz con pollo"} para prepare_recipe)'
+        }
+      },
+      required: ['task_type']
+    }
+  },
+  {
+    name: 'smart_shopping_list',
+    description: 'Genera una lista de compras inteligente basada en el menú de los próximos días y el inventario actual',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        days_ahead: { type: Type.NUMBER, description: 'Número de días a planificar (default: 7)' }
+      },
+      required: []
+    }
   }
 ];
 
@@ -1095,6 +1132,426 @@ async function getPreparationTips() {
 }
 
 // ============================================
+// AGENTE MULTI-PASO
+// ============================================
+
+interface MultiStepResult {
+  task_type: string;
+  steps_completed: string[];
+  results: Record<string, unknown>;
+  summary: string;
+  next_suggestions?: string[];
+}
+
+async function executeMultiStepTask(
+  taskType: string,
+  params: Record<string, unknown> = {}
+): Promise<MultiStepResult> {
+  const stepsCompleted: string[] = [];
+  const results: Record<string, unknown> = {};
+
+  switch (taskType) {
+    case 'prepare_recipe': {
+      // Paso 1: Obtener detalles de la receta
+      const recipeName = params.recipe_name as string;
+      if (!recipeName) {
+        return {
+          task_type: taskType,
+          steps_completed: [],
+          results: { error: 'Se requiere el nombre de la receta' },
+          summary: 'Error: falta el nombre de la receta'
+        };
+      }
+
+      const recipeDetails = await getRecipeDetails(recipeName);
+      stepsCompleted.push('✅ Obtener detalles de receta');
+      results.recipe = recipeDetails;
+
+      // Paso 2: Verificar ingredientes
+      const missingCheck = await getMissingIngredients(recipeName);
+      stepsCompleted.push('✅ Verificar ingredientes en inventario');
+      results.ingredients_check = missingCheck;
+
+      // Paso 3: Si hay faltantes, agregarlos a la lista
+      const missingCount = ('missing_count' in missingCheck ? missingCheck.missing_count : 0) || 0;
+      if (missingCount && missingCount > 0) {
+        const addResult = await addMissingToShopping(recipeName);
+        stepsCompleted.push('✅ Agregar faltantes a lista de compras');
+        results.shopping_added = addResult;
+      }
+
+      // Paso 4: Obtener tips de preparación
+      const tips = await getPreparationTips();
+      stepsCompleted.push('✅ Generar consejos de preparación');
+      results.tips = tips;
+
+      return {
+        task_type: taskType,
+        steps_completed: stepsCompleted,
+        results,
+        summary: `Receta "${recipeName}" preparada. ${
+          missingCount > 0
+            ? `Se agregaron ${missingCount} ingredientes a la lista de compras.`
+            : 'Tienes todos los ingredientes.'
+        }`,
+        next_suggestions: [
+          'Ver pasos de preparación detallados',
+          'Ajustar porciones',
+          'Ver sustituciones disponibles'
+        ]
+      };
+    }
+
+    case 'weekly_planning': {
+      // Paso 1: Obtener menú de la semana
+      const weekMenu = await getWeekMenu();
+      stepsCompleted.push('✅ Obtener menú de la semana');
+      results.menu = weekMenu;
+
+      // Paso 2: Obtener inventario actual
+      const inventory = await getInventory();
+      stepsCompleted.push('✅ Revisar inventario actual');
+      results.inventory = inventory;
+
+      // Paso 3: Generar lista de compras inteligente
+      const shoppingList = await smartShoppingList(7);
+      stepsCompleted.push('✅ Generar lista de compras para la semana');
+      results.shopping_list = shoppingList;
+
+      // Paso 4: Alertas de inventario bajo
+      const alerts = await getLowInventoryAlerts(2);
+      stepsCompleted.push('✅ Verificar alertas de inventario');
+      results.alerts = alerts;
+
+      return {
+        task_type: taskType,
+        steps_completed: stepsCompleted,
+        results,
+        summary: `Planificación semanal completada. ${
+          'total_items' in shoppingList ? `${shoppingList.total_items} items necesarios para comprar.` : ''
+        } ${
+          'critical_count' in alerts && alerts.critical_count > 0
+            ? `⚠️ ${alerts.critical_count} items agotados.`
+            : ''
+        }`,
+        next_suggestions: [
+          'Ver menú detallado por día',
+          'Ajustar recetas del menú',
+          'Exportar lista de compras'
+        ]
+      };
+    }
+
+    case 'shopping_optimization': {
+      // Paso 1: Obtener lista de compras actual
+      const currentList = await getShoppingList();
+      stepsCompleted.push('✅ Obtener lista de compras actual');
+      results.current_list = currentList;
+
+      // Paso 2: Obtener alertas de bajo inventario
+      const alerts = await getLowInventoryAlerts(3);
+      stepsCompleted.push('✅ Identificar items con bajo stock');
+      results.low_stock = alerts;
+
+      // Paso 3: Analizar próximas comidas
+      const upcomingMeals = await getUpcomingMeals(5);
+      stepsCompleted.push('✅ Analizar comidas de los próximos 5 días');
+      results.upcoming = upcomingMeals;
+
+      // Paso 4: Generar lista optimizada
+      const smartList = await smartShoppingList(5);
+      stepsCompleted.push('✅ Generar lista optimizada');
+      results.optimized_list = smartList;
+
+      return {
+        task_type: taskType,
+        steps_completed: stepsCompleted,
+        results,
+        summary: `Lista de compras optimizada. ${currentList.length} items actuales, ${
+          'total_items' in smartList ? smartList.total_items : 0
+        } items recomendados para los próximos 5 días.`,
+        next_suggestions: [
+          'Ver items por categoría',
+          'Agregar items adicionales',
+          'Ver tiendas recomendadas por categoría'
+        ]
+      };
+    }
+
+    case 'full_report': {
+      // Paso 1: Info de fecha actual
+      const dateInfo = getCurrentDateInfo();
+      stepsCompleted.push('✅ Obtener información del día');
+      results.date = dateInfo;
+
+      // Paso 2: Menú de hoy
+      const todayMenu = await getTodayMenu();
+      stepsCompleted.push('✅ Obtener menú de hoy');
+      results.today_menu = todayMenu;
+
+      // Paso 3: Tareas del día
+      const tasks = await getTodayTasks();
+      stepsCompleted.push('✅ Obtener tareas del día');
+      results.tasks = tasks;
+
+      // Paso 4: Resumen de tareas
+      const tasksSummary = await getTasksSummary();
+      stepsCompleted.push('✅ Calcular progreso de tareas');
+      results.tasks_summary = tasksSummary;
+
+      // Paso 5: Alertas de inventario
+      const inventoryAlerts = await getLowInventoryAlerts(2);
+      stepsCompleted.push('✅ Revisar alertas de inventario');
+      results.inventory_alerts = inventoryAlerts;
+
+      // Paso 6: Tips de preparación
+      const prepTips = await getPreparationTips();
+      stepsCompleted.push('✅ Generar consejos del día');
+      results.tips = prepTips;
+
+      return {
+        task_type: taskType,
+        steps_completed: stepsCompleted,
+        results,
+        summary: `Reporte completo del hogar para ${dateInfo.day_name} ${dateInfo.date}. ${
+          'progress_percent' in tasksSummary ? `Tareas: ${tasksSummary.progress_percent}% completadas.` : ''
+        } ${
+          'critical_count' in inventoryAlerts && inventoryAlerts.critical_count > 0
+            ? `⚠️ ${inventoryAlerts.critical_count} items de inventario agotados.`
+            : '✅ Inventario en buen estado.'
+        }`,
+        next_suggestions: [
+          'Ver detalle de tareas pendientes',
+          'Ver recetas de hoy',
+          'Actualizar inventario'
+        ]
+      };
+    }
+
+    case 'menu_from_inventory': {
+      // Paso 1: Obtener inventario completo
+      const inventory = await getInventory();
+      stepsCompleted.push('✅ Analizar inventario disponible');
+      results.inventory = inventory;
+
+      // Paso 2: Sugerir recetas basadas en inventario
+      const suggestions: Array<{ name: string; prep_time?: string; category?: string; match_percent: number }> = [];
+
+      // Obtener todas las recetas
+      const { data: recipes } = await supabase
+        .from('recipes')
+        .select('name, ingredients, prep_time, category')
+        .limit(30);
+
+      // Obtener items del inventario
+      const { data: invItems } = await supabase
+        .from('inventory')
+        .select('market_item:market_items(name)')
+        .gt('current_number', 0);
+
+      const availableItems = invItems?.map(i => (i.market_item as { name?: string })?.name?.toLowerCase()) || [];
+
+      // Calcular match para cada receta
+      for (const recipe of recipes || []) {
+        const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
+        let matchCount = 0;
+
+        for (const ing of ingredients) {
+          const ingName = typeof ing === 'string' ? ing : (ing as { name?: string }).name || '';
+          if (availableItems.some(ai =>
+            ai?.includes(ingName.toLowerCase()) ||
+            ingName.toLowerCase().includes(ai || '')
+          )) {
+            matchCount++;
+          }
+        }
+
+        const matchPercent = ingredients.length > 0
+          ? Math.round((matchCount / ingredients.length) * 100)
+          : 0;
+
+        if (matchPercent >= 60) {
+          suggestions.push({
+            name: recipe.name,
+            prep_time: recipe.prep_time,
+            category: recipe.category,
+            match_percent: matchPercent
+          });
+        }
+      }
+
+      // Ordenar por match_percent
+      suggestions.sort((a, b) => b.match_percent - a.match_percent);
+      stepsCompleted.push('✅ Calcular compatibilidad de recetas');
+      results.suggestions = suggestions.slice(0, 10);
+
+      return {
+        task_type: taskType,
+        steps_completed: stepsCompleted,
+        results,
+        summary: `Encontradas ${suggestions.length} recetas compatibles con tu inventario actual. Las mejores opciones tienen ${suggestions[0]?.match_percent || 0}% de ingredientes disponibles.`,
+        next_suggestions: [
+          'Ver detalles de la receta recomendada',
+          'Agregar ingredientes faltantes a la lista',
+          'Ver otras opciones'
+        ]
+      };
+    }
+
+    default:
+      return {
+        task_type: taskType,
+        steps_completed: [],
+        results: { error: `Tipo de tarea no reconocido: ${taskType}` },
+        summary: `Error: tipo de tarea "${taskType}" no válido. Usa: prepare_recipe, weekly_planning, shopping_optimization, full_report, menu_from_inventory`
+      };
+  }
+}
+
+async function smartShoppingList(daysAhead: number = 7): Promise<{
+  total_items: number;
+  by_category: Record<string, Array<{ item: string; for_recipes: string[]; urgency: string }>>;
+  priority_items: string[];
+  estimated_meals: number;
+  summary: string;
+}> {
+  // Paso 1: Obtener menú para los próximos días
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recipesNeeded: Map<string, any> = new Map();
+
+  for (let i = 0; i < daysAhead; i++) {
+    const date = new Date(today);
+    date.setDate(today.getDate() + i);
+    const dow = date.getDay();
+    const cycleDay = ((dow === 0 ? 7 : dow) - 1) % 12 + 1;
+
+    const { data: menu } = await supabase
+      .from('day_menu')
+      .select(`
+        breakfast:recipes!day_menu_breakfast_id_fkey(name, ingredients),
+        lunch:recipes!day_menu_lunch_id_fkey(name, ingredients),
+        dinner:recipes!day_menu_dinner_id_fkey(name, ingredients)
+      `)
+      .eq('day_number', cycleDay)
+      .single();
+
+    if (menu) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      [menu.breakfast, menu.lunch, menu.dinner].forEach((recipe: any) => {
+        if (recipe && recipe.name) {
+          if (!recipesNeeded.has(recipe.name)) {
+            recipesNeeded.set(recipe.name, {
+              ...recipe,
+              count: 1
+            });
+          } else {
+            const existing = recipesNeeded.get(recipe.name);
+            existing.count++;
+          }
+        }
+      });
+    }
+  }
+
+  // Paso 2: Extraer todos los ingredientes necesarios
+  const ingredientsNeeded: Map<string, { forRecipes: string[]; totalNeeded: number }> = new Map();
+
+  for (const [recipeName, recipe] of recipesNeeded) {
+    const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
+    for (const ing of ingredients) {
+      const ingName = typeof ing === 'string' ? ing : (ing as { name?: string }).name || '';
+      const normalized = ingName.toLowerCase().trim();
+
+      if (!ingredientsNeeded.has(normalized)) {
+        ingredientsNeeded.set(normalized, { forRecipes: [], totalNeeded: 0 });
+      }
+      const data = ingredientsNeeded.get(normalized)!;
+      if (!data.forRecipes.includes(recipeName)) {
+        data.forRecipes.push(recipeName);
+      }
+      data.totalNeeded += recipe.count;
+    }
+  }
+
+  // Paso 3: Comparar con inventario
+  const { data: inventory } = await supabase
+    .from('inventory')
+    .select('*, market_item:market_items(name, category)')
+    .gt('current_number', 0);
+
+  const availableMap: Map<string, { quantity: number; category: string }> = new Map();
+  inventory?.forEach(item => {
+    const name = (item.market_item as { name?: string })?.name?.toLowerCase() || '';
+    const category = (item.market_item as { category?: string })?.category || 'Otros';
+    availableMap.set(name, { quantity: item.current_number, category });
+  });
+
+  // Paso 4: Identificar faltantes
+  const byCategory: Record<string, Array<{ item: string; for_recipes: string[]; urgency: string }>> = {};
+  const priorityItems: string[] = [];
+
+  for (const [ingredient, data] of ingredientsNeeded) {
+    // Buscar si está disponible
+    let found = false;
+    let category = 'Otros';
+
+    for (const [invName, invData] of availableMap) {
+      if (invName.includes(ingredient) || ingredient.includes(invName)) {
+        found = true;
+        category = invData.category;
+        break;
+      }
+    }
+
+    if (!found) {
+      // Determinar categoría del item faltante
+      const { data: marketItem } = await supabase
+        .from('market_items')
+        .select('category')
+        .ilike('name', `%${ingredient}%`)
+        .single();
+
+      category = marketItem?.category || 'Otros';
+
+      if (!byCategory[category]) {
+        byCategory[category] = [];
+      }
+
+      const urgency = data.totalNeeded >= 3 ? 'alta' : data.totalNeeded >= 2 ? 'media' : 'baja';
+
+      byCategory[category].push({
+        item: ingredient,
+        for_recipes: data.forRecipes,
+        urgency
+      });
+
+      if (urgency === 'alta') {
+        priorityItems.push(ingredient);
+      }
+    }
+  }
+
+  // Contar total
+  let totalItems = 0;
+  for (const items of Object.values(byCategory)) {
+    totalItems += items.length;
+  }
+
+  return {
+    total_items: totalItems,
+    by_category: byCategory,
+    priority_items: priorityItems,
+    estimated_meals: recipesNeeded.size,
+    summary: totalItems === 0
+      ? `¡Excelente! Tienes todos los ingredientes para las próximas ${daysAhead} días.`
+      : `Necesitas ${totalItems} items para ${recipesNeeded.size} comidas en los próximos ${daysAhead} días. ${priorityItems.length > 0 ? `Prioridad alta: ${priorityItems.slice(0, 3).join(', ')}.` : ''}`
+  };
+}
+
+// ============================================
 // EJECUTOR DE FUNCIONES
 // ============================================
 
@@ -1159,6 +1616,15 @@ async function executeFunction(name: string, args: Record<string, unknown>) {
       return await calculatePortions(args.recipe_name as string, args.portions as number);
     case 'get_preparation_tips':
       return await getPreparationTips();
+
+    // Agente Multi-paso
+    case 'execute_multi_step_task':
+      return await executeMultiStepTask(
+        args.task_type as string,
+        (args.params as Record<string, unknown>) || {}
+      );
+    case 'smart_shopping_list':
+      return await smartShoppingList(args.days_ahead as number);
 
     default:
       return { error: `Función desconocida: ${name}` };
