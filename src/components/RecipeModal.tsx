@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { X, Users, Timer, Play, Pause, RotateCcw, Volume2, Lightbulb, ImageIcon } from 'lucide-react';
 import { Recipe, Ingredient } from '@/types';
 import NutritionDisplay, { DietaryTags, PrepTimeDisplay, DifficultyDisplay } from './NutritionDisplay';
@@ -178,11 +179,13 @@ export default function RecipeModal({ recipe, onClose, missingIngredients = [] }
         {/* Recipe Image */}
         {recipe.image_url ? (
           <div className="relative w-full h-48 bg-gray-100">
-            <img
+            <Image
               src={recipe.image_url}
               alt={recipe.name}
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
               loading="lazy"
+              sizes="(max-width: 448px) 100vw, 448px"
             />
           </div>
         ) : (

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { Search, Plus, Edit2, Trash2, ImageIcon } from 'lucide-react';
 import { Recipe, Ingredient } from '@/types';
 import RecipeModal from './RecipeModal';
@@ -137,9 +138,11 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
                 onClick={() => setSelectedRecipe(recipe)}
               >
                 {recipe.image_url ? (
-                  <img
+                  <Image
                     src={recipe.image_url}
                     alt={recipe.name}
+                    width={96}
+                    height={96}
                     className="w-full h-full object-cover"
                     loading="lazy"
                   />
