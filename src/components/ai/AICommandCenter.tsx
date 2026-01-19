@@ -6,7 +6,7 @@ import {
   Activity, TrendingUp, Settings, ChevronRight, RefreshCw,
   Zap, Lock, Unlock, BarChart3, History, ListChecks,
   ChevronDown, Eye, RotateCcw, ThumbsUp, ThumbsDown,
-  ArrowLeft
+  ArrowLeft, MessageCircle, Send, Loader2, Mic, Sparkles
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 
@@ -204,9 +204,14 @@ interface AICommandCenterProps {
 }
 
 export default function AICommandCenter({ onClose, householdId }: AICommandCenterProps) {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'proposals' | 'history' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'chat' | 'dashboard' | 'proposals' | 'history' | 'settings'>('chat');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Chat state
+  const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isProcessingChat, setIsProcessingChat] = useState(false);
 
   // Data states
   const [trustStats, setTrustStats] = useState<TrustStats | null>(null);
@@ -327,6 +332,80 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
     }
   };
 
+  // Chat functionality
+  const handleSendMessage = async () => {
+    if (!chatInput.trim() || isProcessingChat) return;
+
+    const userMessage = chatInput.trim();
+    setChatInput('');
+    setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setIsProcessingChat(true);
+
+    try {
+      const response = await fetch('/api/ai-assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [...chatMessages, { role: 'user', content: userMessage }],
+          conversationContext: {
+            householdId,
+            activeSection: 'ai-command-center'
+          },
+          stream: true
+        })
+      });
+
+      if (!response.ok) throw new Error('AI request failed');
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullResponse = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.content) {
+                  fullResponse += data.content;
+                  // Update the last assistant message
+                  setChatMessages(prev => {
+                    const newMessages = [...prev];
+                    const lastMsg = newMessages[newMessages.length - 1];
+                    if (lastMsg?.role === 'assistant') {
+                      lastMsg.content = fullResponse;
+                    } else {
+                      newMessages.push({ role: 'assistant', content: fullResponse });
+                    }
+                    return newMessages;
+                  });
+                }
+              } catch {
+                // Ignore parse errors
+              }
+            }
+          }
+        }
+      }
+
+      if (!fullResponse) {
+        setChatMessages(prev => [...prev, { role: 'assistant', content: 'Lo siento, no pude procesar tu solicitud.' }]);
+      }
+    } catch (error) {
+      console.error('Chat error:', error);
+      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Error al conectar con la IA. Intenta de nuevo.' }]);
+    } finally {
+      setIsProcessingChat(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -419,6 +498,7 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="flex">
           {[
+            { id: 'chat', label: 'Chat', icon: <MessageCircle size={18} /> },
             { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 size={18} /> },
             { id: 'proposals', label: 'Propuestas', icon: <ListChecks size={18} />, badge: pendingProposals.length },
             { id: 'history', label: 'Historial', icon: <History size={18} /> },
@@ -446,7 +526,107 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
       </div>
 
       {/* Content */}
-      <div className="p-4 max-w-lg mx-auto">
+      <div className={`${activeTab === 'chat' ? 'p-0' : 'p-4'} max-w-lg mx-auto`}>
+        {/* Chat Tab */}
+        {activeTab === 'chat' && (
+          <div className="flex flex-col h-[calc(100vh-220px)]">
+            {/* Chat Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {chatMessages.length === 0 && (
+                <div className="text-center py-12">
+                  <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Sparkles size={40} className="text-purple-500" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                    ¿En qué puedo ayudarte?
+                  </h3>
+                  <p className="text-gray-500 text-sm max-w-xs mx-auto">
+                    Puedo ayudarte con recetas, planificación de menús, lista de compras, tareas del hogar y más.
+                  </p>
+                  <div className="mt-6 flex flex-wrap gap-2 justify-center">
+                    {[
+                      '¿Qué puedo cocinar hoy?',
+                      'Sugiéreme una receta saludable',
+                      '¿Qué falta en el mercado?',
+                      'Planifica el menú de la semana'
+                    ].map((suggestion, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          setChatInput(suggestion);
+                        }}
+                        className="px-3 py-2 bg-purple-50 text-purple-700 rounded-full text-sm hover:bg-purple-100 transition-colors"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {chatMessages.map((msg, idx) => (
+                <div
+                  key={idx}
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+                      msg.role === 'user'
+                        ? 'bg-purple-600 text-white rounded-br-md'
+                        : 'bg-white text-gray-800 shadow-sm border border-gray-100 rounded-bl-md'
+                    }`}
+                  >
+                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                  </div>
+                </div>
+              ))}
+
+              {isProcessingChat && chatMessages[chatMessages.length - 1]?.role === 'user' && (
+                <div className="flex justify-start">
+                  <div className="bg-white text-gray-500 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm border border-gray-100">
+                    <Loader2 size={18} className="animate-spin" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Chat Input */}
+            <div className="border-t bg-white p-4">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
+                  placeholder="Escribe tu mensaje..."
+                  disabled={isProcessingChat}
+                  className="flex-1 px-4 py-3 bg-gray-100 border-0 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
+                />
+                <button
+                  onClick={handleSendMessage}
+                  disabled={!chatInput.trim() || isProcessingChat}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                    chatInput.trim() && !isProcessingChat
+                      ? 'bg-purple-600 text-white shadow-lg'
+                      : 'bg-gray-200 text-gray-400'
+                  }`}
+                >
+                  {isProcessingChat ? (
+                    <Loader2 size={20} className="animate-spin" />
+                  ) : (
+                    <Send size={20} />
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
           <div className="space-y-4">
