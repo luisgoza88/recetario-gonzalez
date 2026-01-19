@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, X, Loader2, Mic, Sparkles, Send } from 'lucide-react';
+import { Brain, X, Loader2, Mic, Sparkles, Send, Settings, MessageCircle, Zap } from 'lucide-react';
 import { useSmartFABContext, SmartAction } from '@/lib/hooks/useSmartFABContext';
 import { getVoiceManager, isSpeechRecognitionSupported } from '@/lib/voice-commands';
 import { getAIContext } from '@/lib/ai-memory';
@@ -21,11 +21,14 @@ interface SmartFABProps {
   onToggle: () => void;
   actions?: FABAction[]; // Optional legacy actions
   activeSection: 'hoy' | 'recetario' | 'hogar' | 'ajustes';
+  onOpenAICommandCenter?: () => void;
+  pendingProposals?: number;
 }
 
-export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProps) {
+export default function SmartFAB({ open, onToggle, activeSection, onOpenAICommandCenter, pendingProposals = 0 }: SmartFABProps) {
   const { actions, contextInfo, isLoading } = useSmartFABContext(activeSection);
   const [showSuccess, setShowSuccess] = useState<string | null>(null);
+  const [aiMode, setAiMode] = useState<'menu' | 'chat'>('menu'); // 'menu' shows options, 'chat' shows chat panel
 
   // Voice command state
   const [isListening, setIsListening] = useState(false);
@@ -262,25 +265,9 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
     setTimeout(() => textInputRef.current?.focus(), 100);
   }, []);
 
-  // Get FAB button style based on context
+  // AI FAB is always vibrant green
   const getFABStyle = () => {
-    if (contextInfo.hasUrgentItems) {
-      return 'from-amber-500 to-orange-500';
-    }
-
-    switch (activeSection) {
-      case 'hoy':
-        return contextInfo.timeOfDay === 'morning'
-          ? 'from-amber-500 to-orange-500'
-          : contextInfo.timeOfDay === 'evening'
-            ? 'from-indigo-500 to-purple-500'
-            : 'from-emerald-500 to-teal-500';
-      case 'hogar':
-        return 'from-teal-500 to-cyan-500';
-      case 'recetario':
-      default:
-        return 'from-green-500 to-emerald-600';
-    }
+    return 'from-emerald-500 to-green-600';
   };
 
   // Get action button style based on variant
@@ -300,8 +287,8 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
   // Get the top alert count for badge
   const alertCount = actions.filter(a => a.variant === 'alert').length;
 
-  // Don't show FAB in ajustes
-  if (activeSection === 'ajustes') return null;
+  // Total badge count includes pending proposals
+  const totalBadge = alertCount + pendingProposals;
 
   const handleActionClick = (action: SmartAction) => {
     action.onClick();
@@ -330,10 +317,10 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
 
       {/* FAB Container */}
       <div className="relative z-50">
-        {/* Smart Actions Menu */}
+        {/* AI Menu */}
         <div
           className={`
-            absolute bottom-16 left-1/2 -translate-x-1/2
+            absolute bottom-20 left-1/2 -translate-x-1/2
             flex flex-col-reverse gap-2.5 items-center w-max
             transition-all duration-300 ease-out
             ${open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none translate-y-4'}
@@ -345,52 +332,121 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
               <span className="text-sm text-gray-500">Cargando...</span>
             </div>
           ) : (
-            actions.map((action, index) => (
+            <>
+              {/* Context-specific actions */}
+              {actions.map((action, index) => (
+                <button
+                  key={action.id}
+                  onClick={() => handleActionClick(action)}
+                  className={`
+                    flex items-center gap-3 px-4 py-2.5 rounded-2xl
+                    font-medium text-sm whitespace-nowrap min-w-[200px]
+                    transition-all duration-200 ease-out
+                    hover:scale-[1.02] active:scale-[0.98]
+                    ${getActionStyle(action.variant)}
+                    ${open ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}
+                  `}
+                  style={{
+                    transitionDelay: open ? `${(index + 2) * 50}ms` : '0ms',
+                  }}
+                >
+                  <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                    {action.icon}
+                  </span>
+                  <div className="flex-1 text-left">
+                    <div className="flex items-center gap-2">
+                      <span>{action.label}</span>
+                      {action.badge && action.badge > 0 && (
+                        <span className={`
+                          px-1.5 py-0.5 text-[10px] font-bold rounded-full
+                          ${action.variant === 'default'
+                            ? 'bg-red-500 text-white'
+                            : 'bg-white/30 text-white'}
+                        `}>
+                          {action.badge > 99 ? '99+' : action.badge}
+                        </span>
+                      )}
+                    </div>
+                    {action.sublabel && (
+                      <div className={`text-xs mt-0.5 ${
+                        action.variant === 'default' ? 'text-gray-500' : 'text-white/80'
+                      }`}>
+                        {action.sublabel}
+                      </div>
+                    )}
+                  </div>
+                </button>
+              ))}
+
+              {/* AI Command Center button */}
+              {onOpenAICommandCenter && (
+                <button
+                  onClick={() => {
+                    onToggle();
+                    onOpenAICommandCenter();
+                  }}
+                  className={`
+                    flex items-center gap-3 px-4 py-2.5 rounded-2xl
+                    font-medium text-sm whitespace-nowrap min-w-[200px]
+                    bg-gradient-to-r from-purple-600 to-indigo-600 text-white
+                    shadow-lg shadow-purple-500/25
+                    transition-all duration-200 ease-out
+                    hover:scale-[1.02] active:scale-[0.98]
+                    ${open ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}
+                  `}
+                  style={{
+                    transitionDelay: open ? '50ms' : '0ms',
+                  }}
+                >
+                  <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                    <Settings size={18} />
+                  </span>
+                  <div className="flex-1 text-left">
+                    <div className="flex items-center gap-2">
+                      <span>Centro de Comando</span>
+                      {pendingProposals > 0 && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-white/30 text-white">
+                          {pendingProposals}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs mt-0.5 text-white/80">
+                      Monitorear y configurar IA
+                    </div>
+                  </div>
+                </button>
+              )}
+
+              {/* Chat with AI button - always first */}
               <button
-                key={action.id}
-                onClick={() => handleActionClick(action)}
+                onClick={() => {
+                  openAIPanel();
+                  onToggle();
+                }}
                 className={`
-                  flex items-center gap-3 px-4 py-2.5 rounded-2xl
-                  font-medium text-sm whitespace-nowrap min-w-[180px]
+                  flex items-center gap-3 px-4 py-3 rounded-2xl
+                  font-medium text-sm whitespace-nowrap min-w-[200px]
+                  bg-gradient-to-r from-emerald-500 to-green-600 text-white
+                  shadow-lg shadow-emerald-500/30
                   transition-all duration-200 ease-out
                   hover:scale-[1.02] active:scale-[0.98]
-                  ${getActionStyle(action.variant)}
                   ${open ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}
                 `}
                 style={{
-                  transitionDelay: open ? `${index * 50}ms` : '0ms',
+                  transitionDelay: open ? '0ms' : '0ms',
                 }}
               >
-                {/* Icon */}
-                <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                  {action.icon}
+                <span className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                  <MessageCircle size={20} />
                 </span>
-
-                {/* Labels */}
                 <div className="flex-1 text-left">
-                  <div className="flex items-center gap-2">
-                    <span>{action.label}</span>
-                    {action.badge && action.badge > 0 && (
-                      <span className={`
-                        px-1.5 py-0.5 text-[10px] font-bold rounded-full
-                        ${action.variant === 'default'
-                          ? 'bg-red-500 text-white'
-                          : 'bg-white/30 text-white'}
-                      `}>
-                        {action.badge > 99 ? '99+' : action.badge}
-                      </span>
-                    )}
+                  <span className="font-semibold">Hablar con IA</span>
+                  <div className="text-xs mt-0.5 text-white/80">
+                    Pregunta lo que necesites
                   </div>
-                  {action.sublabel && (
-                    <div className={`text-xs mt-0.5 ${
-                      action.variant === 'default' ? 'text-gray-500' : 'text-white/80'
-                    }`}>
-                      {action.sublabel}
-                    </div>
-                  )}
                 </div>
               </button>
-            ))
+            </>
           )}
         </div>
 
@@ -534,7 +590,7 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
           </div>
         )}
 
-        {/* Main FAB Button */}
+        {/* Main FAB Button - AI Brain */}
         <button
           onMouseDown={handlePressStart}
           onMouseUp={handlePressEnd}
@@ -543,23 +599,29 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
           onTouchEnd={handlePressEnd}
           onTouchCancel={handlePressCancel}
           className={`
-            w-14 h-14 rounded-full shadow-xl
+            w-16 h-16 rounded-full
             flex items-center justify-center
             text-white select-none
             transition-all duration-300 ease-out
+            shadow-[0_4px_20px_rgba(16,185,129,0.5)]
             ${isListening
-              ? 'bg-gradient-to-br from-red-500 to-rose-600 scale-110 shadow-2xl'
+              ? 'bg-gradient-to-br from-red-500 to-rose-600 scale-110 shadow-[0_4px_30px_rgba(239,68,68,0.6)]'
               : `bg-gradient-to-br ${getFABStyle()}`}
-            ${open ? 'rotate-45 scale-110 shadow-2xl' : 'hover:scale-105 hover:shadow-2xl'}
+            ${open ? 'scale-110 shadow-[0_4px_30px_rgba(16,185,129,0.6)]' : 'hover:scale-105 hover:shadow-[0_4px_25px_rgba(16,185,129,0.6)]'}
             ${!isListening && 'active:scale-95'}
           `}
+          style={{
+            boxShadow: isListening
+              ? '0 4px 30px rgba(239,68,68,0.6), 0 0 60px rgba(239,68,68,0.3)'
+              : '0 4px 20px rgba(16,185,129,0.5), 0 0 40px rgba(16,185,129,0.2)'
+          }}
         >
           {isListening ? (
-            <Mic size={26} strokeWidth={2.5} className="animate-pulse" />
+            <Mic size={28} strokeWidth={2.5} className="animate-pulse" />
           ) : open ? (
-            <X size={26} strokeWidth={2.5} />
+            <X size={28} strokeWidth={2.5} />
           ) : (
-            <Plus size={26} strokeWidth={2.5} />
+            <Brain size={28} strokeWidth={2} />
           )}
 
           {/* Recording indicator ring */}
@@ -567,25 +629,29 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
             <span className="absolute inset-0 rounded-full border-4 border-red-400 animate-ping" />
           )}
 
-          {/* Alert/AI badge on FAB when closed */}
-          {!open && !isListening && alertCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold animate-pulse shadow-lg">
-              {alertCount > 9 ? '9+' : alertCount}
+          {/* Glow ring effect when idle */}
+          {!open && !isListening && (
+            <span className="absolute inset-0 rounded-full bg-gradient-to-br from-emerald-400 to-green-500 opacity-0 animate-pulse-slow" />
+          )}
+
+          {/* Badge for alerts/proposals */}
+          {!open && !isListening && totalBadge > 0 && (
+            <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold animate-bounce shadow-lg border-2 border-white">
+              {totalBadge > 9 ? '9+' : totalBadge}
             </span>
           )}
 
-          {/* AI indicator ring when has smart suggestions */}
-          {!open && !isListening && actions.some(a => a.variant === 'ai') && alertCount === 0 && (
-            <span className="absolute inset-0 rounded-full border-2 border-white/30 animate-ping" />
+          {/* Subtle pulsing ring when has AI suggestions */}
+          {!open && !isListening && actions.some(a => a.variant === 'ai') && totalBadge === 0 && (
+            <span className="absolute inset-[-4px] rounded-full border-2 border-emerald-300/50 animate-ping" />
           )}
         </button>
 
-        {/* Context indicator - subtle text below FAB */}
+        {/* AI Label below FAB */}
         {!open && !isListening && (
           <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap">
-            <span className="text-[10px] text-gray-400 font-medium">
-              {contextInfo.timeOfDay === 'morning' ? 'Buenos días' :
-               contextInfo.timeOfDay === 'afternoon' ? 'Buenas tardes' : 'Buenas noches'}
+            <span className="text-[10px] text-emerald-600 font-semibold tracking-wide">
+              IA
             </span>
           </div>
         )}

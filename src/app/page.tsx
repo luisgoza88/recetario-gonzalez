@@ -1,14 +1,18 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { BookOpen, ShoppingCart, UtensilsCrossed, Sparkles, Home as HomeIcon, Users, ClipboardList, Zap } from 'lucide-react';
 import BottomNavigation from '@/components/navigation/BottomNavigation';
 import RecetarioSection from '@/components/sections/RecetarioSection';
 import HomeView from '@/components/home/HomeView';
 import TodayDashboard from '@/components/sections/TodayDashboard';
 import SettingsView from '@/components/sections/SettingsView';
+import AICommandCenter from '@/components/ai/AICommandCenter';
 import { FABAction } from '@/components/navigation/SmartFAB';
 import { useRecipes, useMarketItems, useSuggestionsCount, useRefreshAppData } from '@/lib/hooks/useAppData';
 import { useAppStore } from '@/lib/stores/useAppStore';
+import { useHouseholdId } from '@/lib/stores/useHouseholdStore';
+import { supabase } from '@/lib/supabase/client';
 
 export default function Home() {
   // Estado global con Zustand (navegación y UI)
@@ -25,6 +29,45 @@ export default function Home() {
     navigateToRecetario,
     navigateToHogar,
   } = useAppStore();
+
+  // AI Command Center state
+  const [showAICommandCenter, setShowAICommandCenter] = useState(false);
+  const [pendingAIProposals, setPendingAIProposals] = useState(0);
+  const householdId = useHouseholdId();
+
+  // Fetch pending AI proposals count
+  useEffect(() => {
+    if (!householdId) return;
+
+    const fetchProposals = async () => {
+      const { count } = await supabase
+        .from('ai_action_queue')
+        .select('*', { count: 'exact', head: true })
+        .eq('household_id', householdId)
+        .eq('status', 'pending');
+
+      setPendingAIProposals(count || 0);
+    };
+
+    fetchProposals();
+
+    // Subscribe to changes
+    const subscription = supabase
+      .channel('ai_proposals')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'ai_action_queue',
+        filter: `household_id=eq.${householdId}`
+      }, () => {
+        fetchProposals();
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [householdId]);
 
   // Datos con TanStack Query (cache automático, refetch inteligente)
   const { data: recipes = [], isLoading: recipesLoading } = useRecipes();
@@ -174,6 +217,16 @@ export default function Home() {
     );
   }
 
+  // Show AI Command Center as full screen overlay
+  if (showAICommandCenter) {
+    return (
+      <AICommandCenter
+        onClose={() => setShowAICommandCenter(false)}
+        householdId={householdId || undefined}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Content - pb-32 para dejar espacio para los tabs secundarios */}
@@ -205,7 +258,7 @@ export default function Home() {
         )}
       </main>
 
-      {/* Bottom Navigation with Smart FAB */}
+      {/* Bottom Navigation with AI FAB */}
       <BottomNavigation
         activeSection={activeSection}
         onSectionChange={setActiveSection}
@@ -215,6 +268,8 @@ export default function Home() {
         recetarioTab={recetarioTab}
         onRecetarioTabChange={setRecetarioTab}
         pendingSuggestions={pendingSuggestions}
+        onOpenAICommandCenter={() => setShowAICommandCenter(true)}
+        pendingAIProposals={pendingAIProposals}
       />
     </div>
   );

@@ -16,6 +16,9 @@ interface BottomNavigationProps {
   recetarioTab?: RecetarioTab;
   onRecetarioTabChange?: (tab: RecetarioTab) => void;
   pendingSuggestions?: number;
+  // AI Command Center
+  onOpenAICommandCenter?: () => void;
+  pendingAIProposals?: number;
 }
 
 interface NavItemProps {
@@ -69,7 +72,9 @@ export default function BottomNavigation({
   fabActions,
   recetarioTab = 'calendar',
   onRecetarioTabChange,
-  pendingSuggestions = 0
+  pendingSuggestions = 0,
+  onOpenAICommandCenter,
+  pendingAIProposals = 0
 }: BottomNavigationProps) {
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 safe-area-pb">
@@ -133,13 +138,15 @@ export default function BottomNavigation({
             activeBg="bg-green-50"
           />
 
-          {/* FAB - Center elevated button */}
-          <div className="relative -top-4">
+          {/* FAB - Center elevated AI button */}
+          <div className="relative -top-5">
             <SmartFAB
               open={fabOpen}
               onToggle={onFabToggle}
               actions={fabActions}
               activeSection={activeSection}
+              onOpenAICommandCenter={onOpenAICommandCenter}
+              pendingProposals={pendingAIProposals}
             />
           </div>
 
