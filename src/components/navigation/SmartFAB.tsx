@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, X, Loader2, Mic } from 'lucide-react';
+import { Plus, X, Loader2, Mic, Sparkles } from 'lucide-react';
 import { useSmartFABContext, SmartAction } from '@/lib/hooks/useSmartFABContext';
 import { getVoiceManager, isSpeechRecognitionSupported } from '@/lib/voice-commands';
+import { getAIContext } from '@/lib/ai-memory';
 
 // Re-export for backwards compatibility
 export interface FABAction {
@@ -30,6 +31,9 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [voiceSupported, setVoiceSupported] = useState(false);
+  const [isProcessingAI, setIsProcessingAI] = useState(false);
+  const [aiResponse, setAiResponse] = useState<string | null>(null);
+  const [showVoicePanel, setShowVoicePanel] = useState(false);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const isLongPress = useRef(false);
   const LONG_PRESS_DURATION = 400; // ms
@@ -68,13 +72,83 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
     setVoiceSupported(isSpeechRecognitionSupported());
   }, []);
 
+  // Process voice command - send to AI (defined first since startListening uses it)
+  const processVoiceCommand = useCallback(async (text: string) => {
+    if (!text.trim()) {
+      setShowVoicePanel(false);
+      return;
+    }
+
+    setIsProcessingAI(true);
+    setAiResponse(null);
+
+    try {
+      // Get AI context for better responses
+      const context = await getAIContext();
+
+      const response = await fetch('/api/ai-assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          context: {
+            activeSection,
+            ...context
+          }
+        })
+      });
+
+      if (!response.ok) throw new Error('AI request failed');
+
+      // Read streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullResponse = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.content) {
+                  fullResponse += data.content;
+                  setAiResponse(fullResponse);
+                }
+              } catch {
+                // Ignore parse errors from incomplete chunks
+              }
+            }
+          }
+        }
+      }
+
+      if (!fullResponse) {
+        setAiResponse('Lo siento, no pude procesar tu solicitud.');
+      }
+    } catch (error) {
+      console.error('AI error:', error);
+      setAiResponse('Error al conectar con la IA. Intenta de nuevo.');
+    } finally {
+      setIsProcessingAI(false);
+    }
+  }, [activeSection]);
+
   // Start voice recognition
   const startListening = useCallback(() => {
     if (!voiceSupported) return;
 
     const voiceManager = getVoiceManager();
     setTranscript('');
+    setAiResponse(null);
     setIsListening(true);
+    setShowVoicePanel(true);
 
     // Haptic feedback if available
     if (navigator.vibrate) {
@@ -93,32 +167,19 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
         console.error('Voice error:', error);
         setIsListening(false);
         setTranscript('');
+        setShowVoicePanel(false);
       },
       onEnd: () => {
         setIsListening(false);
       }
     });
-  }, [voiceSupported]);
+  }, [voiceSupported, processVoiceCommand]);
 
   // Stop voice recognition
   const stopListening = useCallback(() => {
     const voiceManager = getVoiceManager();
     voiceManager.stop();
     setIsListening(false);
-  }, []);
-
-  // Process voice command - send to AI
-  const processVoiceCommand = useCallback((text: string) => {
-    if (!text.trim()) return;
-
-    // Dispatch event to open AI chat with the voice command
-    window.dispatchEvent(new CustomEvent('openAIChat', {
-      detail: { initialMessage: text }
-    }));
-
-    // Show feedback
-    setShowSuccess(`"${text.length > 30 ? text.substring(0, 30) + '...' : text}"`);
-    setTimeout(() => setShowSuccess(null), 2500);
   }, []);
 
   // Long press handlers
@@ -164,6 +225,14 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
     }
     isLongPress.current = false;
   }, [isListening, stopListening]);
+
+  // Close voice panel
+  const closeVoicePanel = useCallback(() => {
+    setShowVoicePanel(false);
+    setTranscript('');
+    setAiResponse(null);
+    setIsProcessingAI(false);
+  }, []);
 
   // Get FAB button style based on context
   const getFABStyle = () => {
@@ -297,10 +366,79 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
           )}
         </div>
 
-        {/* Voice Transcript Bubble */}
-        {isListening && transcript && (
-          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-white rounded-2xl px-4 py-2 shadow-xl max-w-[250px] animate-fade-in">
-            <p className="text-sm text-gray-700 text-center">{transcript}</p>
+        {/* Voice Panel - Full Width Bottom Card */}
+        {showVoicePanel && (
+          <div className="fixed inset-x-4 bottom-24 z-[60] animate-slide-up">
+            <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-500">
+                <div className="flex items-center gap-2 text-white">
+                  {isListening ? (
+                    <>
+                      <Mic size={18} className="animate-pulse" />
+                      <span className="text-sm font-medium">Escuchando...</span>
+                    </>
+                  ) : isProcessingAI ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      <span className="text-sm font-medium">Procesando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={18} />
+                      <span className="text-sm font-medium">Asistente IA</span>
+                    </>
+                  )}
+                </div>
+                <button
+                  onClick={closeVoicePanel}
+                  className="text-white/80 hover:text-white p-1"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-4 max-h-[50vh] overflow-y-auto">
+                {/* User's transcript */}
+                {transcript && (
+                  <div className="mb-3">
+                    <p className="text-xs text-gray-400 mb-1">Tu mensaje:</p>
+                    <p className="text-gray-800 bg-gray-50 rounded-xl px-3 py-2 text-sm">
+                      {transcript}
+                    </p>
+                  </div>
+                )}
+
+                {/* AI Response */}
+                {isProcessingAI && !aiResponse && (
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <Loader2 size={16} className="animate-spin" />
+                    <span className="text-sm">Pensando...</span>
+                  </div>
+                )}
+
+                {aiResponse && (
+                  <div>
+                    <p className="text-xs text-emerald-600 mb-1">Respuesta:</p>
+                    <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
+                      {aiResponse}
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty state while listening */}
+                {isListening && !transcript && (
+                  <div className="text-center py-4">
+                    <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-red-50 flex items-center justify-center">
+                      <Mic size={32} className="text-red-500 animate-pulse" />
+                    </div>
+                    <p className="text-gray-500 text-sm">Habla ahora...</p>
+                    <p className="text-gray-400 text-xs mt-1">Suelta el botón para enviar</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -360,8 +498,8 @@ export default function SmartFAB({ open, onToggle, activeSection }: SmartFABProp
           </div>
         )}
 
-        {/* Voice hint when listening */}
-        {isListening && (
+        {/* Voice hint when listening (only if panel not showing) */}
+        {isListening && !showVoicePanel && (
           <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap">
             <span className="text-[10px] text-red-500 font-medium animate-pulse">
               Escuchando... suelta para enviar

@@ -2,12 +2,47 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, base64ToGeminiFormat } from '@/lib/gemini/client';
 import { FunctionDeclaration, Type } from '@google/genai';
+import {
+  getFunctionRiskLevel,
+  shouldAutoApprove,
+  createAuditLog,
+  completeAuditLog,
+  createProposal,
+  functionCallToProposedAction,
+  generateSessionId,
+  generateProposalSummary,
+  AI_RISK_LEVELS,
+} from '@/lib/ai/ai-command-service';
+import { AIProposedAction, AIRiskLevel } from '@/types';
 
 // Types for messages with images
 interface MessageWithImage {
   role: string;
   content: string;
   image?: string; // Base64 image data
+}
+
+// Types for AI Command Center integration
+interface ExecutionContext {
+  householdId: string;
+  userId?: string;
+  sessionId: string;
+}
+
+interface ExecutionResult {
+  result: unknown;
+  auditLogId?: string;
+  canUndo: boolean;
+  riskLevel: AIRiskLevel;
+}
+
+interface ProposalResponse {
+  type: 'proposal';
+  proposalId: string;
+  summary: string;
+  actions: AIProposedAction[];
+  riskLevel: AIRiskLevel;
+  expiresAt: string;
 }
 
 const supabase = createClient(
@@ -291,6 +326,337 @@ La función ejecutará automáticamente todos los pasos necesarios y reportará 
         days_ahead: { type: Type.NUMBER, description: 'Número de días a planificar (default: 7)' }
       },
       required: []
+    }
+  },
+  // ============================================
+  // CRUD - ESPACIOS DEL HOGAR
+  // ============================================
+  {
+    name: 'list_spaces',
+    description: 'Obtiene la lista de todos los espacios configurados en el hogar (cocina, baños, habitaciones, etc.)',
+    parameters: { type: Type.OBJECT, properties: {}, required: [] }
+  },
+  {
+    name: 'get_space_details',
+    description: 'Obtiene los detalles completos de un espacio específico',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        space_id: { type: Type.STRING, description: 'ID del espacio' },
+        space_name: { type: Type.STRING, description: 'Nombre del espacio (alternativa a space_id)' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'create_space',
+    description: 'Crea un nuevo espacio en el hogar. Requiere confirmación del usuario.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        name: { type: Type.STRING, description: 'Nombre del espacio (ej: "Cocina principal", "Baño master")' },
+        space_type: { type: Type.STRING, description: 'Tipo de espacio: kitchen, bedroom, bathroom, living_room, dining_room, garage, garden, laundry, office, storage, other' },
+        category: { type: Type.STRING, description: 'Categoría: common_area, private, service, outdoor' },
+        usage_level: { type: Type.STRING, description: 'Nivel de uso: high, medium, low' },
+        has_bathroom: { type: Type.BOOLEAN, description: 'Si el espacio tiene baño incluido (para habitaciones)' },
+        area_sqm: { type: Type.NUMBER, description: 'Área en metros cuadrados (opcional)' },
+        notes: { type: Type.STRING, description: 'Notas adicionales sobre el espacio' }
+      },
+      required: ['name', 'space_type']
+    }
+  },
+  {
+    name: 'update_space',
+    description: 'Actualiza la información de un espacio existente. Requiere confirmación del usuario.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        space_id: { type: Type.STRING, description: 'ID del espacio a actualizar' },
+        name: { type: Type.STRING, description: 'Nuevo nombre del espacio' },
+        category: { type: Type.STRING, description: 'Nueva categoría' },
+        usage_level: { type: Type.STRING, description: 'Nuevo nivel de uso' },
+        has_bathroom: { type: Type.BOOLEAN, description: 'Si tiene baño' },
+        area_sqm: { type: Type.NUMBER, description: 'Nueva área' },
+        notes: { type: Type.STRING, description: 'Nuevas notas' }
+      },
+      required: ['space_id']
+    }
+  },
+  {
+    name: 'delete_space',
+    description: 'Elimina un espacio del hogar. ACCIÓN CRÍTICA: requiere confirmación explícita y no se puede deshacer fácilmente.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        space_id: { type: Type.STRING, description: 'ID del espacio a eliminar' },
+        confirm: { type: Type.BOOLEAN, description: 'Confirmación explícita de eliminación' }
+      },
+      required: ['space_id', 'confirm']
+    }
+  },
+  // ============================================
+  // CRUD - EMPLEADOS DEL HOGAR
+  // ============================================
+  {
+    name: 'list_employees',
+    description: 'Obtiene la lista de todos los empleados del hogar',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        active_only: { type: Type.BOOLEAN, description: 'Solo mostrar empleados activos (default: true)' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'get_employee_details',
+    description: 'Obtiene los detalles completos de un empleado específico',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        employee_id: { type: Type.STRING, description: 'ID del empleado' },
+        employee_name: { type: Type.STRING, description: 'Nombre del empleado (alternativa a employee_id)' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'create_employee',
+    description: 'Registra un nuevo empleado en el hogar. Requiere confirmación del usuario.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        name: { type: Type.STRING, description: 'Nombre completo del empleado' },
+        role: { type: Type.STRING, description: 'Rol: empleada_domestica, niñera, jardinero, conductor, cocinero, cuidador, mantenimiento, seguridad, otro' },
+        zone: { type: Type.STRING, description: 'Zona de trabajo principal' },
+        work_days: { type: Type.ARRAY, description: 'Días de trabajo: ["lunes", "martes", ...]' },
+        hours_per_day: { type: Type.NUMBER, description: 'Horas de trabajo por día' },
+        schedule: { type: Type.STRING, description: 'Horario (ej: "8:00 AM - 4:00 PM")' },
+        phone: { type: Type.STRING, description: 'Teléfono de contacto' },
+        notes: { type: Type.STRING, description: 'Notas adicionales' }
+      },
+      required: ['name', 'role']
+    }
+  },
+  {
+    name: 'update_employee',
+    description: 'Actualiza la información de un empleado. Requiere confirmación del usuario.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        employee_id: { type: Type.STRING, description: 'ID del empleado a actualizar' },
+        name: { type: Type.STRING, description: 'Nuevo nombre' },
+        role: { type: Type.STRING, description: 'Nuevo rol' },
+        zone: { type: Type.STRING, description: 'Nueva zona' },
+        work_days: { type: Type.ARRAY, description: 'Nuevos días de trabajo' },
+        hours_per_day: { type: Type.NUMBER, description: 'Nuevas horas por día' },
+        schedule: { type: Type.STRING, description: 'Nuevo horario' },
+        phone: { type: Type.STRING, description: 'Nuevo teléfono' },
+        notes: { type: Type.STRING, description: 'Nuevas notas' },
+        active: { type: Type.BOOLEAN, description: 'Estado activo/inactivo' }
+      },
+      required: ['employee_id']
+    }
+  },
+  {
+    name: 'delete_employee',
+    description: 'Elimina o desactiva un empleado. ACCIÓN CRÍTICA: requiere confirmación explícita.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        employee_id: { type: Type.STRING, description: 'ID del empleado' },
+        hard_delete: { type: Type.BOOLEAN, description: 'Eliminar permanentemente (false = solo desactivar)' },
+        confirm: { type: Type.BOOLEAN, description: 'Confirmación explícita' }
+      },
+      required: ['employee_id', 'confirm']
+    }
+  },
+  // ============================================
+  // CRUD - TAREAS AVANZADAS
+  // ============================================
+  {
+    name: 'list_task_templates',
+    description: 'Obtiene la lista de plantillas de tareas recurrentes del hogar',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        employee_id: { type: Type.STRING, description: 'Filtrar por empleado (opcional)' },
+        week_number: { type: Type.NUMBER, description: 'Filtrar por semana del ciclo 1-4 (opcional)' },
+        category: { type: Type.STRING, description: 'Filtrar por categoría (opcional)' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'create_task_template',
+    description: 'Crea una nueva plantilla de tarea recurrente. Requiere confirmación.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        employee_name: { type: Type.STRING, description: 'Nombre del empleado asignado' },
+        task_name: { type: Type.STRING, description: 'Nombre de la tarea' },
+        week_number: { type: Type.NUMBER, description: 'Semana del ciclo (1-4)' },
+        day_of_week: { type: Type.NUMBER, description: 'Día de la semana (0=domingo, 1=lunes, ..., 6=sábado)' },
+        time_start: { type: Type.STRING, description: 'Hora de inicio (formato HH:MM)' },
+        time_end: { type: Type.STRING, description: 'Hora de fin (formato HH:MM)' },
+        category: { type: Type.STRING, description: 'Categoría: cocina, limpieza, lavanderia, perros, piscina, jardin, etc.' },
+        is_special: { type: Type.BOOLEAN, description: 'Si es una tarea especial (★)' },
+        description: { type: Type.STRING, description: 'Descripción detallada (opcional)' }
+      },
+      required: ['employee_name', 'task_name', 'week_number', 'day_of_week', 'time_start', 'time_end', 'category']
+    }
+  },
+  {
+    name: 'update_task_template',
+    description: 'Actualiza una plantilla de tarea existente. Requiere confirmación.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        template_id: { type: Type.STRING, description: 'ID de la plantilla a actualizar' },
+        task_name: { type: Type.STRING, description: 'Nuevo nombre de la tarea' },
+        employee_name: { type: Type.STRING, description: 'Nuevo empleado asignado' },
+        time_start: { type: Type.STRING, description: 'Nueva hora de inicio' },
+        time_end: { type: Type.STRING, description: 'Nueva hora de fin' },
+        category: { type: Type.STRING, description: 'Nueva categoría' },
+        is_special: { type: Type.BOOLEAN, description: 'Si es tarea especial' },
+        description: { type: Type.STRING, description: 'Nueva descripción' }
+      },
+      required: ['template_id']
+    }
+  },
+  {
+    name: 'delete_task_template',
+    description: 'Elimina una plantilla de tarea recurrente. ACCIÓN CRÍTICA.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        template_id: { type: Type.STRING, description: 'ID de la plantilla a eliminar' },
+        confirm: { type: Type.BOOLEAN, description: 'Confirmación explícita' }
+      },
+      required: ['template_id', 'confirm']
+    }
+  },
+  {
+    name: 'reschedule_task',
+    description: 'Reprograma una tarea para otro horario o día. Requiere confirmación.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        task_id: { type: Type.STRING, description: 'ID de la instancia de tarea' },
+        new_date: { type: Type.STRING, description: 'Nueva fecha (formato YYYY-MM-DD)' },
+        new_time_start: { type: Type.STRING, description: 'Nueva hora de inicio (HH:MM)' },
+        new_time_end: { type: Type.STRING, description: 'Nueva hora de fin (HH:MM)' },
+        new_employee_name: { type: Type.STRING, description: 'Nuevo empleado (opcional)' }
+      },
+      required: ['task_id']
+    }
+  },
+  {
+    name: 'generate_tasks_for_date',
+    description: 'Genera las tareas programadas para una fecha específica basándose en las plantillas',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        date: { type: Type.STRING, description: 'Fecha para generar tareas (formato YYYY-MM-DD)' }
+      },
+      required: ['date']
+    }
+  },
+  // ============================================
+  // CRUD - RECETAS
+  // ============================================
+  {
+    name: 'create_recipe',
+    description: 'Crea una nueva receta en el recetario. Requiere confirmación.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        name: { type: Type.STRING, description: 'Nombre de la receta' },
+        type: { type: Type.STRING, description: 'Tipo de comida: breakfast, lunch o dinner' },
+        ingredients: { type: Type.ARRAY, description: 'Lista de ingredientes con cantidades para Luis y Mariana' },
+        steps: { type: Type.ARRAY, description: 'Pasos de preparación' },
+        prep_time: { type: Type.NUMBER, description: 'Tiempo de preparación en minutos' },
+        cook_time: { type: Type.NUMBER, description: 'Tiempo de cocción en minutos' },
+        difficulty: { type: Type.STRING, description: 'Dificultad: fácil, media o difícil' },
+        description: { type: Type.STRING, description: 'Descripción breve de la receta' },
+        tips: { type: Type.STRING, description: 'Consejos de preparación' }
+      },
+      required: ['name', 'type', 'ingredients', 'steps']
+    }
+  },
+  {
+    name: 'update_recipe',
+    description: 'Actualiza una receta existente. Requiere confirmación.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        recipe_id: { type: Type.STRING, description: 'ID de la receta a actualizar' },
+        name: { type: Type.STRING, description: 'Nuevo nombre' },
+        type: { type: Type.STRING, description: 'Nuevo tipo de comida' },
+        ingredients: { type: Type.ARRAY, description: 'Nueva lista de ingredientes' },
+        steps: { type: Type.ARRAY, description: 'Nuevos pasos' },
+        prep_time: { type: Type.NUMBER, description: 'Nuevo tiempo de preparación' },
+        cook_time: { type: Type.NUMBER, description: 'Nuevo tiempo de cocción' },
+        difficulty: { type: Type.STRING, description: 'Nueva dificultad' },
+        description: { type: Type.STRING, description: 'Nueva descripción' },
+        tips: { type: Type.STRING, description: 'Nuevos consejos' }
+      },
+      required: ['recipe_id']
+    }
+  },
+  {
+    name: 'delete_recipe',
+    description: 'Elimina una receta del recetario. ACCIÓN CRÍTICA: no se puede deshacer.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        recipe_id: { type: Type.STRING, description: 'ID de la receta a eliminar' },
+        confirm: { type: Type.BOOLEAN, description: 'Confirmación explícita de eliminación' }
+      },
+      required: ['recipe_id', 'confirm']
+    }
+  },
+  // ============================================
+  // INVENTARIO AVANZADO
+  // ============================================
+  {
+    name: 'bulk_update_inventory',
+    description: 'Actualiza múltiples items del inventario de una vez. ACCIÓN CRÍTICA.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        updates: {
+          type: Type.ARRAY,
+          description: 'Lista de actualizaciones: [{item_name, quantity, action}]'
+        },
+        confirm: { type: Type.BOOLEAN, description: 'Confirmación explícita' }
+      },
+      required: ['updates', 'confirm']
+    }
+  },
+  {
+    name: 'scan_receipt_items',
+    description: 'Procesa una lista de items de un ticket de compra y actualiza el inventario',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        items: {
+          type: Type.ARRAY,
+          description: 'Lista de items del ticket: [{name, quantity, unit}]'
+        }
+      },
+      required: ['items']
+    }
+  },
+  {
+    name: 'reset_inventory_to_default',
+    description: 'Reinicia todo el inventario a valores predeterminados. ACCIÓN CRÍTICA.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        confirm: { type: Type.BOOLEAN, description: 'Confirmación explícita' }
+      },
+      required: ['confirm']
     }
   }
 ];
@@ -824,6 +1190,1290 @@ async function getTasksSummary() {
       completed: 0,
       progress_percent: 0
     };
+  }
+}
+
+// ============================================
+// CRUD - ESPACIOS DEL HOGAR
+// ============================================
+
+async function listSpaces(householdId?: string) {
+  try {
+    let query = supabase
+      .from('spaces')
+      .select(`
+        *,
+        space_type:space_types(name, icon, category)
+      `)
+      .order('custom_name');
+
+    if (householdId) {
+      query = query.eq('household_id', householdId);
+    }
+
+    const { data: spaces, error } = await query;
+
+    if (error) {
+      console.error('Error listing spaces:', error);
+      return { success: false, message: 'Error al obtener espacios', spaces: [] };
+    }
+
+    return {
+      success: true,
+      count: spaces?.length || 0,
+      spaces: spaces?.map(s => ({
+        id: s.id,
+        name: s.custom_name,
+        type: s.space_type?.name || 'Desconocido',
+        icon: s.space_type?.icon || '🏠',
+        category: s.category,
+        usage_level: s.usage_level,
+        has_bathroom: s.has_bathroom,
+        area_sqm: s.area_sqm,
+        notes: s.notes
+      })) || []
+    };
+  } catch (err) {
+    console.error('listSpaces error:', err);
+    return { success: false, message: 'Error al obtener espacios', spaces: [] };
+  }
+}
+
+async function getSpaceDetails(spaceId?: string, spaceName?: string) {
+  try {
+    let query = supabase
+      .from('spaces')
+      .select(`
+        *,
+        space_type:space_types(id, name, icon, category, default_tasks)
+      `);
+
+    if (spaceId) {
+      query = query.eq('id', spaceId);
+    } else if (spaceName) {
+      query = query.ilike('custom_name', `%${spaceName}%`);
+    } else {
+      return { success: false, message: 'Se requiere space_id o space_name' };
+    }
+
+    const { data: space, error } = await query.single();
+
+    if (error || !space) {
+      return { success: false, message: 'Espacio no encontrado' };
+    }
+
+    return {
+      success: true,
+      space: {
+        id: space.id,
+        name: space.custom_name,
+        type: space.space_type?.name || 'Desconocido',
+        type_id: space.space_type_id,
+        icon: space.space_type?.icon || '🏠',
+        category: space.category,
+        usage_level: space.usage_level,
+        has_bathroom: space.has_bathroom,
+        area_sqm: space.area_sqm,
+        attributes: space.attributes,
+        notes: space.notes,
+        default_tasks: space.space_type?.default_tasks || []
+      }
+    };
+  } catch (err) {
+    console.error('getSpaceDetails error:', err);
+    return { success: false, message: 'Error al obtener detalles del espacio' };
+  }
+}
+
+async function createSpace(
+  householdId: string,
+  name: string,
+  spaceType: string,
+  category?: string,
+  usageLevel?: string,
+  hasBathroom?: boolean,
+  areaSqm?: number,
+  notes?: string
+) {
+  try {
+    // Buscar el space_type_id
+    const { data: typeData } = await supabase
+      .from('space_types')
+      .select('id, category')
+      .ilike('name', `%${spaceType}%`)
+      .single();
+
+    const spaceTypeId = typeData?.id;
+    const derivedCategory = category || typeData?.category || 'common_area';
+
+    const { data: newSpace, error } = await supabase
+      .from('spaces')
+      .insert({
+        household_id: householdId,
+        space_type_id: spaceTypeId,
+        custom_name: name,
+        category: derivedCategory,
+        usage_level: usageLevel || 'medium',
+        has_bathroom: hasBathroom || false,
+        area_sqm: areaSqm,
+        notes
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating space:', error);
+      return { success: false, message: `Error al crear espacio: ${error.message}` };
+    }
+
+    return {
+      success: true,
+      message: `Espacio "${name}" creado exitosamente`,
+      space: {
+        id: newSpace.id,
+        name: newSpace.custom_name,
+        type: spaceType,
+        category: derivedCategory
+      },
+      previousState: null,
+      newState: newSpace,
+      affectedTables: ['spaces'],
+      affectedRecordIds: [newSpace.id]
+    };
+  } catch (err) {
+    console.error('createSpace error:', err);
+    return { success: false, message: 'Error al crear espacio' };
+  }
+}
+
+async function updateSpace(
+  spaceId: string,
+  updates: {
+    name?: string;
+    category?: string;
+    usageLevel?: string;
+    hasBathroom?: boolean;
+    areaSqm?: number;
+    notes?: string;
+  }
+) {
+  try {
+    // Obtener estado anterior
+    const { data: previousSpace } = await supabase
+      .from('spaces')
+      .select('*')
+      .eq('id', spaceId)
+      .single();
+
+    if (!previousSpace) {
+      return { success: false, message: 'Espacio no encontrado' };
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (updates.name) updateData.custom_name = updates.name;
+    if (updates.category) updateData.category = updates.category;
+    if (updates.usageLevel) updateData.usage_level = updates.usageLevel;
+    if (typeof updates.hasBathroom === 'boolean') updateData.has_bathroom = updates.hasBathroom;
+    if (updates.areaSqm) updateData.area_sqm = updates.areaSqm;
+    if (updates.notes !== undefined) updateData.notes = updates.notes;
+
+    const { data: updatedSpace, error } = await supabase
+      .from('spaces')
+      .update(updateData)
+      .eq('id', spaceId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating space:', error);
+      return { success: false, message: `Error al actualizar: ${error.message}` };
+    }
+
+    return {
+      success: true,
+      message: `Espacio "${updatedSpace.custom_name}" actualizado`,
+      space: {
+        id: updatedSpace.id,
+        name: updatedSpace.custom_name
+      },
+      previousState: previousSpace,
+      newState: updatedSpace,
+      affectedTables: ['spaces'],
+      affectedRecordIds: [spaceId]
+    };
+  } catch (err) {
+    console.error('updateSpace error:', err);
+    return { success: false, message: 'Error al actualizar espacio' };
+  }
+}
+
+async function deleteSpace(spaceId: string, confirm: boolean) {
+  if (!confirm) {
+    return {
+      success: false,
+      message: 'Debe confirmar la eliminación estableciendo confirm: true',
+      requires_confirmation: true
+    };
+  }
+
+  try {
+    // Obtener estado anterior
+    const { data: previousSpace } = await supabase
+      .from('spaces')
+      .select('*')
+      .eq('id', spaceId)
+      .single();
+
+    if (!previousSpace) {
+      return { success: false, message: 'Espacio no encontrado' };
+    }
+
+    const { error } = await supabase
+      .from('spaces')
+      .delete()
+      .eq('id', spaceId);
+
+    if (error) {
+      console.error('Error deleting space:', error);
+      return { success: false, message: `Error al eliminar: ${error.message}` };
+    }
+
+    return {
+      success: true,
+      message: `Espacio "${previousSpace.custom_name}" eliminado`,
+      previousState: previousSpace,
+      newState: null,
+      affectedTables: ['spaces'],
+      affectedRecordIds: [spaceId]
+    };
+  } catch (err) {
+    console.error('deleteSpace error:', err);
+    return { success: false, message: 'Error al eliminar espacio' };
+  }
+}
+
+// ============================================
+// CRUD - EMPLEADOS DEL HOGAR
+// ============================================
+
+async function listEmployees(householdId?: string, activeOnly: boolean = true) {
+  try {
+    let query = supabase
+      .from('home_employees')
+      .select('*')
+      .order('name');
+
+    if (householdId) {
+      query = query.eq('household_id', householdId);
+    }
+    if (activeOnly) {
+      query = query.eq('active', true);
+    }
+
+    const { data: employees, error } = await query;
+
+    if (error) {
+      console.error('Error listing employees:', error);
+      return { success: false, message: 'Error al obtener empleados', employees: [] };
+    }
+
+    return {
+      success: true,
+      count: employees?.length || 0,
+      employees: employees?.map(e => ({
+        id: e.id,
+        name: e.name,
+        role: e.role,
+        zone: e.zone,
+        work_days: e.work_days,
+        hours_per_day: e.hours_per_day,
+        schedule: e.schedule,
+        phone: e.phone,
+        active: e.active,
+        notes: e.notes
+      })) || []
+    };
+  } catch (err) {
+    console.error('listEmployees error:', err);
+    return { success: false, message: 'Error al obtener empleados', employees: [] };
+  }
+}
+
+async function getEmployeeDetails(employeeId?: string, employeeName?: string) {
+  try {
+    let query = supabase
+      .from('home_employees')
+      .select('*');
+
+    if (employeeId) {
+      query = query.eq('id', employeeId);
+    } else if (employeeName) {
+      query = query.ilike('name', `%${employeeName}%`);
+    } else {
+      return { success: false, message: 'Se requiere employee_id o employee_name' };
+    }
+
+    const { data: employee, error } = await query.single();
+
+    if (error || !employee) {
+      return { success: false, message: 'Empleado no encontrado' };
+    }
+
+    return {
+      success: true,
+      employee: {
+        id: employee.id,
+        name: employee.name,
+        role: employee.role,
+        zone: employee.zone,
+        work_days: employee.work_days,
+        hours_per_day: employee.hours_per_day,
+        schedule: employee.schedule,
+        phone: employee.phone,
+        active: employee.active,
+        notes: employee.notes
+      }
+    };
+  } catch (err) {
+    console.error('getEmployeeDetails error:', err);
+    return { success: false, message: 'Error al obtener detalles del empleado' };
+  }
+}
+
+async function createEmployee(
+  householdId: string,
+  name: string,
+  role: string,
+  zone?: string,
+  workDays?: string[],
+  hoursPerDay?: number,
+  schedule?: string,
+  phone?: string,
+  notes?: string
+) {
+  try {
+    const { data: newEmployee, error } = await supabase
+      .from('home_employees')
+      .insert({
+        household_id: householdId,
+        name,
+        role,
+        zone,
+        work_days: workDays || [],
+        hours_per_day: hoursPerDay,
+        schedule,
+        phone,
+        notes,
+        active: true
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating employee:', error);
+      return { success: false, message: `Error al crear empleado: ${error.message}` };
+    }
+
+    return {
+      success: true,
+      message: `Empleado "${name}" registrado exitosamente`,
+      employee: {
+        id: newEmployee.id,
+        name: newEmployee.name,
+        role: newEmployee.role
+      },
+      previousState: null,
+      newState: newEmployee,
+      affectedTables: ['home_employees'],
+      affectedRecordIds: [newEmployee.id]
+    };
+  } catch (err) {
+    console.error('createEmployee error:', err);
+    return { success: false, message: 'Error al crear empleado' };
+  }
+}
+
+async function updateEmployee(
+  employeeId: string,
+  updates: {
+    name?: string;
+    role?: string;
+    zone?: string;
+    workDays?: string[];
+    hoursPerDay?: number;
+    schedule?: string;
+    phone?: string;
+    notes?: string;
+    active?: boolean;
+  }
+) {
+  try {
+    // Obtener estado anterior
+    const { data: previousEmployee } = await supabase
+      .from('home_employees')
+      .select('*')
+      .eq('id', employeeId)
+      .single();
+
+    if (!previousEmployee) {
+      return { success: false, message: 'Empleado no encontrado' };
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (updates.name) updateData.name = updates.name;
+    if (updates.role) updateData.role = updates.role;
+    if (updates.zone !== undefined) updateData.zone = updates.zone;
+    if (updates.workDays) updateData.work_days = updates.workDays;
+    if (updates.hoursPerDay) updateData.hours_per_day = updates.hoursPerDay;
+    if (updates.schedule !== undefined) updateData.schedule = updates.schedule;
+    if (updates.phone !== undefined) updateData.phone = updates.phone;
+    if (updates.notes !== undefined) updateData.notes = updates.notes;
+    if (typeof updates.active === 'boolean') updateData.active = updates.active;
+
+    const { data: updatedEmployee, error } = await supabase
+      .from('home_employees')
+      .update(updateData)
+      .eq('id', employeeId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating employee:', error);
+      return { success: false, message: `Error al actualizar: ${error.message}` };
+    }
+
+    return {
+      success: true,
+      message: `Empleado "${updatedEmployee.name}" actualizado`,
+      employee: {
+        id: updatedEmployee.id,
+        name: updatedEmployee.name
+      },
+      previousState: previousEmployee,
+      newState: updatedEmployee,
+      affectedTables: ['home_employees'],
+      affectedRecordIds: [employeeId]
+    };
+  } catch (err) {
+    console.error('updateEmployee error:', err);
+    return { success: false, message: 'Error al actualizar empleado' };
+  }
+}
+
+async function deleteEmployee(employeeId: string, hardDelete: boolean = false, confirm: boolean = false) {
+  if (!confirm) {
+    return {
+      success: false,
+      message: 'Debe confirmar la eliminación estableciendo confirm: true',
+      requires_confirmation: true
+    };
+  }
+
+  try {
+    // Obtener estado anterior
+    const { data: previousEmployee } = await supabase
+      .from('home_employees')
+      .select('*')
+      .eq('id', employeeId)
+      .single();
+
+    if (!previousEmployee) {
+      return { success: false, message: 'Empleado no encontrado' };
+    }
+
+    if (hardDelete) {
+      // Eliminación permanente
+      const { error } = await supabase
+        .from('home_employees')
+        .delete()
+        .eq('id', employeeId);
+
+      if (error) {
+        console.error('Error deleting employee:', error);
+        return { success: false, message: `Error al eliminar: ${error.message}` };
+      }
+
+      return {
+        success: true,
+        message: `Empleado "${previousEmployee.name}" eliminado permanentemente`,
+        previousState: previousEmployee,
+        newState: null,
+        affectedTables: ['home_employees'],
+        affectedRecordIds: [employeeId]
+      };
+    } else {
+      // Solo desactivar (soft delete)
+      const { data: updatedEmployee, error } = await supabase
+        .from('home_employees')
+        .update({ active: false })
+        .eq('id', employeeId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error deactivating employee:', error);
+        return { success: false, message: `Error al desactivar: ${error.message}` };
+      }
+
+      return {
+        success: true,
+        message: `Empleado "${previousEmployee.name}" desactivado`,
+        previousState: previousEmployee,
+        newState: updatedEmployee,
+        affectedTables: ['home_employees'],
+        affectedRecordIds: [employeeId]
+      };
+    }
+  } catch (err) {
+    console.error('deleteEmployee error:', err);
+    return { success: false, message: 'Error al eliminar empleado' };
+  }
+}
+
+// ============================================
+// CRUD - TAREAS AVANZADAS
+// ============================================
+
+async function listTaskTemplates(
+  employeeId?: string,
+  weekNumber?: number,
+  category?: string
+) {
+  try {
+    let query = supabase
+      .from('schedule_templates')
+      .select(`
+        *,
+        employee:employees(id, name)
+      `)
+      .order('week_number')
+      .order('day_of_week')
+      .order('time_start');
+
+    if (employeeId) {
+      query = query.eq('employee_id', employeeId);
+    }
+    if (weekNumber) {
+      query = query.eq('week_number', weekNumber);
+    }
+    if (category) {
+      query = query.eq('category', category);
+    }
+
+    const { data: templates, error } = await query;
+
+    if (error) {
+      console.error('Error listing task templates:', error);
+      return { success: false, message: 'Error al obtener plantillas', templates: [] };
+    }
+
+    const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+    return {
+      success: true,
+      count: templates?.length || 0,
+      templates: templates?.map(t => ({
+        id: t.id,
+        task_name: t.task_name,
+        employee: t.employee?.name || 'Sin asignar',
+        week_number: t.week_number,
+        day_of_week: t.day_of_week,
+        day_name: dayNames[t.day_of_week],
+        time: `${t.time_start?.substring(0, 5)} - ${t.time_end?.substring(0, 5)}`,
+        category: t.category,
+        is_special: t.is_special,
+        description: t.task_description
+      })) || []
+    };
+  } catch (err) {
+    console.error('listTaskTemplates error:', err);
+    return { success: false, message: 'Error al obtener plantillas', templates: [] };
+  }
+}
+
+async function createTaskTemplate(
+  employeeName: string,
+  taskName: string,
+  weekNumber: number,
+  dayOfWeek: number,
+  timeStart: string,
+  timeEnd: string,
+  category: string,
+  isSpecial: boolean = false,
+  description?: string
+) {
+  try {
+    // Buscar empleado por nombre
+    const { data: employee } = await supabase
+      .from('employees')
+      .select('id, name')
+      .ilike('name', `%${employeeName}%`)
+      .single();
+
+    if (!employee) {
+      return { success: false, message: `Empleado "${employeeName}" no encontrado` };
+    }
+
+    const { data: newTemplate, error } = await supabase
+      .from('schedule_templates')
+      .insert({
+        employee_id: employee.id,
+        task_name: taskName,
+        week_number: weekNumber,
+        day_of_week: dayOfWeek,
+        time_start: timeStart,
+        time_end: timeEnd,
+        category,
+        is_special: isSpecial,
+        task_description: description
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating task template:', error);
+      return { success: false, message: `Error al crear plantilla: ${error.message}` };
+    }
+
+    const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+    return {
+      success: true,
+      message: `Plantilla "${taskName}" creada para ${employee.name} los ${dayNames[dayOfWeek]} de la semana ${weekNumber}`,
+      template: {
+        id: newTemplate.id,
+        task_name: taskName,
+        employee: employee.name
+      },
+      previousState: null,
+      newState: newTemplate,
+      affectedTables: ['schedule_templates'],
+      affectedRecordIds: [newTemplate.id]
+    };
+  } catch (err) {
+    console.error('createTaskTemplate error:', err);
+    return { success: false, message: 'Error al crear plantilla de tarea' };
+  }
+}
+
+async function updateTaskTemplate(
+  templateId: string,
+  updates: {
+    taskName?: string;
+    employeeName?: string;
+    timeStart?: string;
+    timeEnd?: string;
+    category?: string;
+    isSpecial?: boolean;
+    description?: string;
+  }
+) {
+  try {
+    // Obtener estado anterior
+    const { data: previousTemplate } = await supabase
+      .from('schedule_templates')
+      .select('*')
+      .eq('id', templateId)
+      .single();
+
+    if (!previousTemplate) {
+      return { success: false, message: 'Plantilla no encontrada' };
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (updates.taskName) updateData.task_name = updates.taskName;
+    if (updates.timeStart) updateData.time_start = updates.timeStart;
+    if (updates.timeEnd) updateData.time_end = updates.timeEnd;
+    if (updates.category) updateData.category = updates.category;
+    if (typeof updates.isSpecial === 'boolean') updateData.is_special = updates.isSpecial;
+    if (updates.description !== undefined) updateData.task_description = updates.description;
+
+    // Si se especifica nuevo empleado, buscarlo
+    if (updates.employeeName) {
+      const { data: employee } = await supabase
+        .from('employees')
+        .select('id')
+        .ilike('name', `%${updates.employeeName}%`)
+        .single();
+
+      if (employee) {
+        updateData.employee_id = employee.id;
+      }
+    }
+
+    const { data: updatedTemplate, error } = await supabase
+      .from('schedule_templates')
+      .update(updateData)
+      .eq('id', templateId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating task template:', error);
+      return { success: false, message: `Error al actualizar: ${error.message}` };
+    }
+
+    return {
+      success: true,
+      message: `Plantilla "${updatedTemplate.task_name}" actualizada`,
+      template: {
+        id: updatedTemplate.id,
+        task_name: updatedTemplate.task_name
+      },
+      previousState: previousTemplate,
+      newState: updatedTemplate,
+      affectedTables: ['schedule_templates'],
+      affectedRecordIds: [templateId]
+    };
+  } catch (err) {
+    console.error('updateTaskTemplate error:', err);
+    return { success: false, message: 'Error al actualizar plantilla' };
+  }
+}
+
+async function deleteTaskTemplate(templateId: string, confirm: boolean) {
+  if (!confirm) {
+    return {
+      success: false,
+      message: 'Debe confirmar la eliminación estableciendo confirm: true',
+      requires_confirmation: true
+    };
+  }
+
+  try {
+    // Obtener estado anterior
+    const { data: previousTemplate } = await supabase
+      .from('schedule_templates')
+      .select('*')
+      .eq('id', templateId)
+      .single();
+
+    if (!previousTemplate) {
+      return { success: false, message: 'Plantilla no encontrada' };
+    }
+
+    const { error } = await supabase
+      .from('schedule_templates')
+      .delete()
+      .eq('id', templateId);
+
+    if (error) {
+      console.error('Error deleting task template:', error);
+      return { success: false, message: `Error al eliminar: ${error.message}` };
+    }
+
+    return {
+      success: true,
+      message: `Plantilla "${previousTemplate.task_name}" eliminada`,
+      previousState: previousTemplate,
+      newState: null,
+      affectedTables: ['schedule_templates'],
+      affectedRecordIds: [templateId]
+    };
+  } catch (err) {
+    console.error('deleteTaskTemplate error:', err);
+    return { success: false, message: 'Error al eliminar plantilla' };
+  }
+}
+
+async function rescheduleTask(
+  taskId: string,
+  newDate?: string,
+  newTimeStart?: string,
+  newTimeEnd?: string,
+  newEmployeeName?: string
+) {
+  try {
+    // Obtener estado anterior
+    const { data: previousTask } = await supabase
+      .from('daily_task_instances')
+      .select('*')
+      .eq('id', taskId)
+      .single();
+
+    if (!previousTask) {
+      return { success: false, message: 'Tarea no encontrada' };
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (newDate) updateData.date = newDate;
+    if (newTimeStart) updateData.time_start = newTimeStart;
+    if (newTimeEnd) updateData.time_end = newTimeEnd;
+
+    // Si se especifica nuevo empleado, buscarlo
+    if (newEmployeeName) {
+      const { data: employee } = await supabase
+        .from('employees')
+        .select('id')
+        .ilike('name', `%${newEmployeeName}%`)
+        .single();
+
+      if (employee) {
+        updateData.employee_id = employee.id;
+      } else {
+        // Intentar en home_employees
+        const { data: homeEmp } = await supabase
+          .from('home_employees')
+          .select('id')
+          .ilike('name', `%${newEmployeeName}%`)
+          .single();
+
+        if (homeEmp) {
+          updateData.employee_id = homeEmp.id;
+        }
+      }
+    }
+
+    const { data: updatedTask, error } = await supabase
+      .from('daily_task_instances')
+      .update(updateData)
+      .eq('id', taskId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error rescheduling task:', error);
+      return { success: false, message: `Error al reprogramar: ${error.message}` };
+    }
+
+    return {
+      success: true,
+      message: `Tarea "${updatedTask.task_name}" reprogramada`,
+      task: {
+        id: updatedTask.id,
+        task_name: updatedTask.task_name,
+        date: updatedTask.date,
+        time: `${updatedTask.time_start?.substring(0, 5)} - ${updatedTask.time_end?.substring(0, 5)}`
+      },
+      previousState: previousTask,
+      newState: updatedTask,
+      affectedTables: ['daily_task_instances'],
+      affectedRecordIds: [taskId]
+    };
+  } catch (err) {
+    console.error('rescheduleTask error:', err);
+    return { success: false, message: 'Error al reprogramar tarea' };
+  }
+}
+
+async function generateTasksForDate(dateStr: string) {
+  try {
+    // Llamar a la función RPC que genera las tareas
+    const { data, error } = await supabase.rpc('generate_daily_tasks', {
+      target_date: dateStr
+    });
+
+    if (error) {
+      console.error('Error generating tasks:', error);
+      return { success: false, message: `Error al generar tareas: ${error.message}` };
+    }
+
+    const tasksCreated = data || 0;
+
+    if (tasksCreated === 0) {
+      return {
+        success: true,
+        message: `Ya existen tareas para ${dateStr} o no hay plantillas aplicables`,
+        tasks_created: 0
+      };
+    }
+
+    return {
+      success: true,
+      message: `${tasksCreated} tareas generadas para ${dateStr}`,
+      tasks_created: tasksCreated
+    };
+  } catch (err) {
+    console.error('generateTasksForDate error:', err);
+    return { success: false, message: 'Error al generar tareas' };
+  }
+}
+
+// ============================================
+// CRUD - RECETAS
+// ============================================
+
+interface RecipeIngredient {
+  name: string;
+  luis: string;
+  mariana: string;
+  total?: string;
+}
+
+async function createRecipe(
+  name: string,
+  type: 'breakfast' | 'lunch' | 'dinner',
+  ingredients: RecipeIngredient[],
+  steps: string[],
+  prepTime?: number,
+  cookTime?: number,
+  difficulty?: string,
+  description?: string,
+  tips?: string
+) {
+  try {
+    // Calcular tiempo total
+    const totalTime = (prepTime || 0) + (cookTime || 0);
+
+    const { data: newRecipe, error } = await supabase
+      .from('recipes')
+      .insert({
+        name,
+        type,
+        ingredients,
+        steps,
+        prep_time: prepTime,
+        cook_time: cookTime,
+        total_time: totalTime || null,
+        difficulty: difficulty || 'media',
+        description,
+        tips,
+        source: 'manual'
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating recipe:', error);
+      return { success: false, message: `Error al crear receta: ${error.message}` };
+    }
+
+    return {
+      success: true,
+      message: `Receta "${name}" creada exitosamente`,
+      recipe: {
+        id: newRecipe.id,
+        name: newRecipe.name,
+        type: newRecipe.type
+      },
+      previousState: null,
+      newState: newRecipe,
+      affectedTables: ['recipes'],
+      affectedRecordIds: [newRecipe.id]
+    };
+  } catch (err) {
+    console.error('createRecipe error:', err);
+    return { success: false, message: 'Error al crear receta' };
+  }
+}
+
+async function updateRecipe(
+  recipeId: string,
+  updates: {
+    name?: string;
+    type?: string;
+    ingredients?: RecipeIngredient[];
+    steps?: string[];
+    prepTime?: number;
+    cookTime?: number;
+    difficulty?: string;
+    description?: string;
+    tips?: string;
+  }
+) {
+  try {
+    // Obtener estado anterior
+    const { data: previousRecipe } = await supabase
+      .from('recipes')
+      .select('*')
+      .eq('id', recipeId)
+      .single();
+
+    if (!previousRecipe) {
+      return { success: false, message: 'Receta no encontrada' };
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (updates.name) updateData.name = updates.name;
+    if (updates.type) updateData.type = updates.type;
+    if (updates.ingredients) updateData.ingredients = updates.ingredients;
+    if (updates.steps) updateData.steps = updates.steps;
+    if (updates.prepTime) updateData.prep_time = updates.prepTime;
+    if (updates.cookTime) updateData.cook_time = updates.cookTime;
+    if (updates.difficulty) updateData.difficulty = updates.difficulty;
+    if (updates.description !== undefined) updateData.description = updates.description;
+    if (updates.tips !== undefined) updateData.tips = updates.tips;
+
+    // Recalcular tiempo total si se actualizó algún tiempo
+    if (updates.prepTime || updates.cookTime) {
+      const prep = updates.prepTime || previousRecipe.prep_time || 0;
+      const cook = updates.cookTime || previousRecipe.cook_time || 0;
+      updateData.total_time = prep + cook;
+    }
+
+    const { data: updatedRecipe, error } = await supabase
+      .from('recipes')
+      .update(updateData)
+      .eq('id', recipeId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating recipe:', error);
+      return { success: false, message: `Error al actualizar: ${error.message}` };
+    }
+
+    return {
+      success: true,
+      message: `Receta "${updatedRecipe.name}" actualizada`,
+      recipe: {
+        id: updatedRecipe.id,
+        name: updatedRecipe.name
+      },
+      previousState: previousRecipe,
+      newState: updatedRecipe,
+      affectedTables: ['recipes'],
+      affectedRecordIds: [recipeId]
+    };
+  } catch (err) {
+    console.error('updateRecipe error:', err);
+    return { success: false, message: 'Error al actualizar receta' };
+  }
+}
+
+async function deleteRecipe(recipeId: string, confirm: boolean) {
+  if (!confirm) {
+    return {
+      success: false,
+      message: 'Debe confirmar la eliminación estableciendo confirm: true',
+      requires_confirmation: true
+    };
+  }
+
+  try {
+    // Obtener estado anterior
+    const { data: previousRecipe } = await supabase
+      .from('recipes')
+      .select('*')
+      .eq('id', recipeId)
+      .single();
+
+    if (!previousRecipe) {
+      return { success: false, message: 'Receta no encontrada' };
+    }
+
+    // Verificar si la receta está en uso en el menú
+    const { data: menuUsage } = await supabase
+      .from('day_menu')
+      .select('day_number')
+      .or(`breakfast_id.eq.${recipeId},lunch_id.eq.${recipeId},dinner_id.eq.${recipeId}`);
+
+    if (menuUsage && menuUsage.length > 0) {
+      return {
+        success: false,
+        message: `No se puede eliminar: la receta está en uso en ${menuUsage.length} día(s) del menú`,
+        menu_days: menuUsage.map(m => m.day_number)
+      };
+    }
+
+    const { error } = await supabase
+      .from('recipes')
+      .delete()
+      .eq('id', recipeId);
+
+    if (error) {
+      console.error('Error deleting recipe:', error);
+      return { success: false, message: `Error al eliminar: ${error.message}` };
+    }
+
+    return {
+      success: true,
+      message: `Receta "${previousRecipe.name}" eliminada`,
+      previousState: previousRecipe,
+      newState: null,
+      affectedTables: ['recipes'],
+      affectedRecordIds: [recipeId]
+    };
+  } catch (err) {
+    console.error('deleteRecipe error:', err);
+    return { success: false, message: 'Error al eliminar receta' };
+  }
+}
+
+// ============================================
+// INVENTARIO AVANZADO
+// ============================================
+
+interface InventoryUpdate {
+  item_name: string;
+  quantity: number;
+  action?: 'set' | 'add' | 'subtract';
+}
+
+async function bulkUpdateInventory(updates: InventoryUpdate[], confirm: boolean) {
+  if (!confirm) {
+    return {
+      success: false,
+      message: 'Debe confirmar la actualización masiva estableciendo confirm: true',
+      requires_confirmation: true
+    };
+  }
+
+  try {
+    const results: Array<{
+      item: string;
+      success: boolean;
+      previousQuantity?: number;
+      newQuantity?: number;
+      error?: string;
+    }> = [];
+
+    const previousStates: Record<string, unknown>[] = [];
+    const newStates: Record<string, unknown>[] = [];
+    const affectedIds: string[] = [];
+
+    for (const update of updates) {
+      // Buscar el item
+      const { data: item } = await supabase
+        .from('market_items')
+        .select('id, name')
+        .ilike('name', `%${update.item_name}%`)
+        .single();
+
+      if (!item) {
+        results.push({
+          item: update.item_name,
+          success: false,
+          error: 'Item no encontrado'
+        });
+        continue;
+      }
+
+      // Obtener cantidad actual
+      const { data: inventory } = await supabase
+        .from('inventory')
+        .select('*')
+        .eq('item_id', item.id)
+        .single();
+
+      const previousQuantity = inventory?.current_number || 0;
+      previousStates.push({ item_id: item.id, quantity: previousQuantity });
+
+      let newQuantity: number;
+      const action = update.action || 'set';
+
+      switch (action) {
+        case 'add':
+          newQuantity = previousQuantity + update.quantity;
+          break;
+        case 'subtract':
+          newQuantity = Math.max(0, previousQuantity - update.quantity);
+          break;
+        default:
+          newQuantity = update.quantity;
+      }
+
+      // Actualizar inventario
+      const { error: updateError } = await supabase
+        .from('inventory')
+        .upsert({
+          item_id: item.id,
+          current_number: newQuantity
+        });
+
+      if (updateError) {
+        results.push({
+          item: item.name,
+          success: false,
+          error: updateError.message
+        });
+      } else {
+        results.push({
+          item: item.name,
+          success: true,
+          previousQuantity,
+          newQuantity
+        });
+        newStates.push({ item_id: item.id, quantity: newQuantity });
+        affectedIds.push(item.id);
+      }
+    }
+
+    const successCount = results.filter(r => r.success).length;
+
+    return {
+      success: successCount > 0,
+      message: `${successCount} de ${updates.length} items actualizados`,
+      results,
+      previousState: previousStates,
+      newState: newStates,
+      affectedTables: ['inventory'],
+      affectedRecordIds: affectedIds
+    };
+  } catch (err) {
+    console.error('bulkUpdateInventory error:', err);
+    return { success: false, message: 'Error al actualizar inventario' };
+  }
+}
+
+interface ReceiptItem {
+  name: string;
+  quantity: number;
+  unit?: string;
+}
+
+async function scanReceiptItems(items: ReceiptItem[]) {
+  try {
+    const updates: InventoryUpdate[] = items.map(item => ({
+      item_name: item.name,
+      quantity: item.quantity,
+      action: 'add' as const
+    }));
+
+    // Usar la función de actualización masiva
+    return await bulkUpdateInventory(updates, true);
+  } catch (err) {
+    console.error('scanReceiptItems error:', err);
+    return { success: false, message: 'Error al procesar items del ticket' };
+  }
+}
+
+async function resetInventoryToDefault(confirm: boolean) {
+  if (!confirm) {
+    return {
+      success: false,
+      message: 'Debe confirmar el reinicio estableciendo confirm: true',
+      requires_confirmation: true
+    };
+  }
+
+  try {
+    // Obtener estado anterior de todo el inventario
+    const { data: previousInventory } = await supabase
+      .from('inventory')
+      .select('*, item:market_items(name)');
+
+    // Obtener valores por defecto de market_items
+    const { data: defaultValues } = await supabase
+      .from('market_items')
+      .select('id, default_quantity');
+
+    // Actualizar cada item a su valor por defecto
+    for (const item of defaultValues || []) {
+      await supabase
+        .from('inventory')
+        .upsert({
+          item_id: item.id,
+          current_number: item.default_quantity || 0
+        });
+    }
+
+    // Obtener nuevo estado
+    const { data: newInventory } = await supabase
+      .from('inventory')
+      .select('*, item:market_items(name)');
+
+    return {
+      success: true,
+      message: `Inventario reiniciado a valores predeterminados (${defaultValues?.length || 0} items)`,
+      previousState: previousInventory,
+      newState: newInventory,
+      affectedTables: ['inventory'],
+      affectedRecordIds: (defaultValues || []).map(i => i.id)
+    };
+  } catch (err) {
+    console.error('resetInventoryToDefault error:', err);
+    return { success: false, message: 'Error al reiniciar inventario' };
   }
 }
 
@@ -1779,7 +3429,293 @@ async function smartShoppingList(daysAhead: number = 7): Promise<{
 }
 
 // ============================================
-// EJECUTOR DE FUNCIONES
+// EJECUTOR DE FUNCIONES CON LOGGING
+// ============================================
+
+/**
+ * Captura el estado previo antes de ejecutar una función de modificación
+ */
+async function capturePreState(
+  functionName: string,
+  args: Record<string, unknown>
+): Promise<Record<string, unknown> | null> {
+  try {
+    switch (functionName) {
+      case 'swap_menu_recipe': {
+        const dayNumber = args.day_number as number;
+        const mealType = args.meal_type as string;
+        const { data } = await supabase
+          .from('day_menu')
+          .select(`
+            *,
+            breakfast:recipes!day_menu_breakfast_id_fkey(id, name),
+            lunch:recipes!day_menu_lunch_id_fkey(id, name),
+            dinner:recipes!day_menu_dinner_id_fkey(id, name)
+          `)
+          .eq('day_number', dayNumber)
+          .single();
+        return data ? { day_menu: data, mealType, dayNumber } : null;
+      }
+      case 'update_inventory': {
+        const itemName = args.item_name as string;
+        const { data: item } = await supabase
+          .from('market_items')
+          .select('id, name')
+          .ilike('name', `%${itemName}%`)
+          .single();
+        if (!item) return null;
+        const { data: inv } = await supabase
+          .from('inventory')
+          .select('*')
+          .eq('item_id', item.id)
+          .single();
+        return inv ? { inventory: inv, item } : { item, inventory: null };
+      }
+      case 'mark_shopping_item': {
+        const itemName = args.item_name as string;
+        const { data: item } = await supabase
+          .from('market_items')
+          .select('id, name')
+          .ilike('name', `%${itemName}%`)
+          .single();
+        if (!item) return null;
+        const { data: checklist } = await supabase
+          .from('market_checklist')
+          .select('*')
+          .eq('item_id', item.id)
+          .single();
+        return checklist ? { market_checklist: checklist, item } : null;
+      }
+      case 'complete_task': {
+        const taskName = args.task_name as string;
+        const today = new Date().toISOString().split('T')[0];
+        const { data: task } = await supabase
+          .from('daily_task_instances')
+          .select('*')
+          .eq('date', today)
+          .ilike('task_name', `%${taskName}%`)
+          .single();
+        return task ? { daily_task_instances: task } : null;
+      }
+      default:
+        return null;
+    }
+  } catch (error) {
+    console.error(`Error capturing pre-state for ${functionName}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Captura el estado posterior después de ejecutar una función
+ */
+async function capturePostState(
+  functionName: string,
+  args: Record<string, unknown>,
+  preState: Record<string, unknown> | null
+): Promise<Record<string, unknown> | null> {
+  // Reutiliza la misma lógica de capturePreState para obtener el nuevo estado
+  return capturePreState(functionName, args);
+}
+
+/**
+ * Determina las tablas afectadas por una función
+ */
+function getAffectedTables(functionName: string): string[] {
+  const tableMap: Record<string, string[]> = {
+    swap_menu_recipe: ['day_menu'],
+    update_inventory: ['inventory'],
+    mark_shopping_item: ['market_checklist'],
+    add_to_shopping_list: ['market_checklist', 'market_items'],
+    add_missing_to_shopping: ['market_checklist', 'market_items'],
+    complete_task: ['daily_task_instances'],
+    add_quick_task: ['daily_task_instances'],
+  };
+  return tableMap[functionName] || [];
+}
+
+/**
+ * Ejecuta una función con logging completo (para funciones de riesgo bajo/medio)
+ */
+async function executeFunctionWithLogging(
+  name: string,
+  args: Record<string, unknown>,
+  context: ExecutionContext
+): Promise<ExecutionResult> {
+  const riskLevel = await getFunctionRiskLevel(name);
+
+  // Las funciones de solo lectura (get_*) no necesitan logging completo
+  if (name.startsWith('get_') || name.startsWith('search_') || name.startsWith('suggest_') || name === 'calculate_portions') {
+    const result = await executeFunction(name, args);
+    return {
+      result,
+      canUndo: false,
+      riskLevel,
+    };
+  }
+
+  // Capturar estado previo para funciones de modificación
+  const previousState = await capturePreState(name, args);
+
+  // Crear audit log
+  const auditLogId = await createAuditLog({
+    householdId: context.householdId,
+    userId: context.userId,
+    sessionId: context.sessionId,
+    functionName: name,
+    parameters: args,
+    riskLevel,
+  });
+
+  try {
+    // Ejecutar la función
+    const result = await executeFunction(name, args);
+
+    // Capturar nuevo estado
+    const newState = await capturePostState(name, args, previousState);
+
+    // Completar audit log
+    if (auditLogId) {
+      await completeAuditLog({
+        logId: auditLogId,
+        status: 'completed',
+        result: result as Record<string, unknown>,
+        previousState: previousState || undefined,
+        newState: newState || undefined,
+        affectedTables: getAffectedTables(name),
+      });
+    }
+
+    return {
+      result,
+      auditLogId: auditLogId || undefined,
+      canUndo: !!previousState && !!auditLogId,
+      riskLevel,
+    };
+  } catch (error) {
+    // Log error en audit
+    if (auditLogId) {
+      await completeAuditLog({
+        logId: auditLogId,
+        status: 'failed',
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+    }
+    throw error;
+  }
+}
+
+/**
+ * Crea una propuesta para funciones de alto riesgo
+ */
+async function createFunctionProposal(
+  functionCalls: Array<{ name: string; args: Record<string, unknown> }>,
+  context: ExecutionContext
+): Promise<ProposalResponse> {
+  const actions: AIProposedAction[] = [];
+
+  for (const fc of functionCalls) {
+    const action = await functionCallToProposedAction(
+      fc.name,
+      fc.args,
+      generateActionDescription(fc.name, fc.args)
+    );
+    actions.push(action);
+  }
+
+  const proposal = await createProposal({
+    householdId: context.householdId,
+    userId: context.userId,
+    sessionId: context.sessionId,
+    summary: generateProposalSummary(actions),
+    actions,
+  });
+
+  if (!proposal) {
+    throw new Error('No se pudo crear la propuesta');
+  }
+
+  return {
+    type: 'proposal',
+    proposalId: proposal.proposal_id,
+    summary: proposal.summary,
+    actions: proposal.actions,
+    riskLevel: proposal.risk_level as AIRiskLevel,
+    expiresAt: proposal.expires_at,
+  };
+}
+
+/**
+ * Genera una descripción legible para una acción
+ */
+function generateActionDescription(functionName: string, args: Record<string, unknown>): string {
+  const descriptions: Record<string, (args: Record<string, unknown>) => string> = {
+    // Recetas y menú
+    swap_menu_recipe: (a) => `Cambiar ${a.meal_type} del día ${a.day_number} a "${a.new_recipe_name}"`,
+    // Inventario y compras
+    update_inventory: (a) => `Actualizar inventario de "${a.item_name}" a ${a.quantity}`,
+    mark_shopping_item: (a) => `${a.checked ? 'Marcar' : 'Desmarcar'} "${a.item_name}" en la lista de compras`,
+    add_to_shopping_list: (a) => `Agregar "${a.item_name}" a la lista de compras`,
+    add_missing_to_shopping: (a) => `Agregar ingredientes faltantes de "${a.recipe_name}" a la lista`,
+    // Tareas
+    complete_task: (a) => `Marcar como completada la tarea "${a.task_name}"`,
+    add_quick_task: (a) => `Crear tarea rápida "${a.task_name}"`,
+    create_task_template: (a) => `Crear plantilla de tarea "${a.task_name}" para ${a.employee_name}`,
+    update_task_template: (a) => `Actualizar plantilla de tarea ${a.template_id}`,
+    delete_task_template: (a) => `Eliminar plantilla de tarea ${a.template_id}`,
+    reschedule_task: (a) => `Reprogramar tarea ${a.task_id}${a.new_date ? ` para ${a.new_date}` : ''}`,
+    generate_tasks_for_date: (a) => `Generar tareas para ${a.date}`,
+    // Espacios
+    create_space: (a) => `Crear espacio "${a.name}" (${a.space_type})`,
+    update_space: (a) => `Actualizar espacio ${a.space_id}`,
+    delete_space: (a) => `Eliminar espacio ${a.space_id}`,
+    // Empleados
+    create_employee: (a) => `Registrar empleado "${a.name}" (${a.role})`,
+    update_employee: (a) => `Actualizar empleado ${a.employee_id}`,
+    delete_employee: (a) => `${a.hard_delete ? 'Eliminar' : 'Desactivar'} empleado ${a.employee_id}`,
+    // Multi-paso
+    execute_multi_step_task: (a) => `Ejecutar plan: ${a.task_type}`,
+    smart_shopping_list: (a) => `Generar lista de compras para ${a.days_ahead || 7} días`,
+  };
+
+  const generator = descriptions[functionName];
+  if (generator) {
+    return generator(args);
+  }
+
+  // Default description
+  return `Ejecutar ${functionName}`;
+}
+
+/**
+ * Determina si se debe crear una propuesta basada en el nivel de riesgo
+ */
+async function shouldCreateProposal(
+  functionNames: string[],
+  householdId: string
+): Promise<boolean> {
+  for (const name of functionNames) {
+    const riskLevel = await getFunctionRiskLevel(name);
+
+    // Nivel 3+ siempre crea propuesta
+    if (riskLevel >= AI_RISK_LEVELS.HIGH) {
+      return true;
+    }
+
+    // Para nivel 2, verificar configuración del household
+    if (riskLevel === AI_RISK_LEVELS.MEDIUM) {
+      const autoApprove = await shouldAutoApprove(householdId, riskLevel);
+      if (!autoApprove) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+// ============================================
+// EJECUTOR DE FUNCIONES ORIGINAL
 // ============================================
 
 async function executeFunction(name: string, args: Record<string, unknown>) {
@@ -1853,6 +3789,154 @@ async function executeFunction(name: string, args: Record<string, unknown>) {
     case 'smart_shopping_list':
       return await smartShoppingList(args.days_ahead as number);
 
+    // CRUD - Espacios
+    case 'list_spaces':
+      return await listSpaces(args.household_id as string);
+    case 'get_space_details':
+      return await getSpaceDetails(args.space_id as string, args.space_name as string);
+    case 'create_space':
+      return await createSpace(
+        args.household_id as string || 'default-household',
+        args.name as string,
+        args.space_type as string,
+        args.category as string,
+        args.usage_level as string,
+        args.has_bathroom as boolean,
+        args.area_sqm as number,
+        args.notes as string
+      );
+    case 'update_space':
+      return await updateSpace(args.space_id as string, {
+        name: args.name as string,
+        category: args.category as string,
+        usageLevel: args.usage_level as string,
+        hasBathroom: args.has_bathroom as boolean,
+        areaSqm: args.area_sqm as number,
+        notes: args.notes as string
+      });
+    case 'delete_space':
+      return await deleteSpace(args.space_id as string, args.confirm as boolean);
+
+    // CRUD - Empleados
+    case 'list_employees':
+      return await listEmployees(args.household_id as string, args.active_only as boolean ?? true);
+    case 'get_employee_details':
+      return await getEmployeeDetails(args.employee_id as string, args.employee_name as string);
+    case 'create_employee':
+      return await createEmployee(
+        args.household_id as string || 'default-household',
+        args.name as string,
+        args.role as string,
+        args.zone as string,
+        args.work_days as string[],
+        args.hours_per_day as number,
+        args.schedule as string,
+        args.phone as string,
+        args.notes as string
+      );
+    case 'update_employee':
+      return await updateEmployee(args.employee_id as string, {
+        name: args.name as string,
+        role: args.role as string,
+        zone: args.zone as string,
+        workDays: args.work_days as string[],
+        hoursPerDay: args.hours_per_day as number,
+        schedule: args.schedule as string,
+        phone: args.phone as string,
+        notes: args.notes as string,
+        active: args.active as boolean
+      });
+    case 'delete_employee':
+      return await deleteEmployee(
+        args.employee_id as string,
+        args.hard_delete as boolean,
+        args.confirm as boolean
+      );
+
+    // CRUD - Tareas
+    case 'list_task_templates':
+      return await listTaskTemplates(
+        args.employee_id as string,
+        args.week_number as number,
+        args.category as string
+      );
+    case 'create_task_template':
+      return await createTaskTemplate(
+        args.employee_name as string,
+        args.task_name as string,
+        args.week_number as number,
+        args.day_of_week as number,
+        args.time_start as string,
+        args.time_end as string,
+        args.category as string,
+        args.is_special as boolean,
+        args.description as string
+      );
+    case 'update_task_template':
+      return await updateTaskTemplate(args.template_id as string, {
+        taskName: args.task_name as string,
+        employeeName: args.employee_name as string,
+        timeStart: args.time_start as string,
+        timeEnd: args.time_end as string,
+        category: args.category as string,
+        isSpecial: args.is_special as boolean,
+        description: args.description as string
+      });
+    case 'delete_task_template':
+      return await deleteTaskTemplate(args.template_id as string, args.confirm as boolean);
+    case 'reschedule_task':
+      return await rescheduleTask(
+        args.task_id as string,
+        args.new_date as string,
+        args.new_time_start as string,
+        args.new_time_end as string,
+        args.new_employee_name as string
+      );
+    case 'generate_tasks_for_date':
+      return await generateTasksForDate(args.date as string);
+
+    // CRUD - Recetas
+    case 'create_recipe':
+      return await createRecipe(
+        args.name as string,
+        args.type as 'breakfast' | 'lunch' | 'dinner',
+        args.ingredients as RecipeIngredient[],
+        args.steps as string[],
+        args.prep_time as number,
+        args.cook_time as number,
+        args.difficulty as string,
+        args.description as string,
+        args.tips as string
+      );
+    case 'update_recipe':
+      return await updateRecipe(
+        args.recipe_id as string,
+        args.updates as Partial<{
+          name: string;
+          type: 'breakfast' | 'lunch' | 'dinner';
+          ingredients: RecipeIngredient[];
+          steps: string[];
+          prep_time: number;
+          cook_time: number;
+          difficulty: string;
+          description: string;
+          tips: string;
+        }>
+      );
+    case 'delete_recipe':
+      return await deleteRecipe(args.recipe_id as string, args.confirm as boolean);
+
+    // Inventario avanzado
+    case 'bulk_update_inventory':
+      return await bulkUpdateInventory(
+        args.updates as InventoryUpdate[],
+        args.confirm as boolean
+      );
+    case 'scan_receipt_items':
+      return await scanReceiptItems(args.items as ReceiptItem[]);
+    case 'reset_inventory_to_default':
+      return await resetInventoryToDefault(args.confirm as boolean);
+
     default:
       return { error: `Función desconocida: ${name}` };
   }
@@ -1896,6 +3980,89 @@ Si get_recipe_details devuelve recipe_not_found=true:
 5. Da los pasos de preparación
 
 NUNCA digas solo "no tengo esa receta" - SIEMPRE ayuda con tu conocimiento culinario.`;
+
+// Helper for tool streaming events
+interface ToolStreamEvent {
+  type: 'tool_start' | 'tool_result' | 'content' | 'done';
+  tool?: {
+    name: string;
+    description?: string;
+    args?: Record<string, unknown>;
+  };
+  result?: {
+    success: boolean;
+    summary?: string;
+  };
+  content?: string;
+  done?: boolean;
+  sessionId?: string;
+  executionMetadata?: {
+    actionsExecuted: number;
+    undoAvailable: boolean;
+    undoableActions: Array<{ functionName: string; auditLogId?: string }>;
+  };
+}
+
+function createToolStreamEvent(event: ToolStreamEvent): string {
+  return `data: ${JSON.stringify(event)}\n\n`;
+}
+
+// Get human-readable description for a tool
+function getToolDescription(name: string): string {
+  const descriptions: Record<string, string> = {
+    // Queries
+    get_current_menu: 'Consultando menú actual',
+    get_recipe_details: 'Buscando detalles de receta',
+    get_inventory: 'Revisando inventario',
+    search_recipes: 'Buscando recetas',
+    suggest_recipes: 'Generando sugerencias',
+    get_shopping_list: 'Obteniendo lista de compras',
+    get_tasks_summary: 'Consultando resumen de tareas',
+    list_spaces: 'Listando espacios',
+    list_employees: 'Listando empleados',
+    list_task_templates: 'Listando plantillas de tareas',
+
+    // Actions
+    swap_menu_recipe: 'Cambiando receta del menú',
+    update_inventory: 'Actualizando inventario',
+    add_to_shopping_list: 'Agregando a lista de compras',
+    remove_from_shopping_list: 'Quitando de lista de compras',
+    clear_shopping_list: 'Limpiando lista de compras',
+    smart_shopping_list: 'Generando lista inteligente',
+
+    // CRUD Spaces
+    create_space: 'Creando espacio',
+    update_space: 'Actualizando espacio',
+    delete_space: 'Eliminando espacio',
+
+    // CRUD Employees
+    create_employee: 'Registrando empleado',
+    update_employee: 'Actualizando empleado',
+    delete_employee: 'Eliminando empleado',
+
+    // CRUD Tasks
+    create_task_template: 'Creando plantilla de tarea',
+    update_task_template: 'Actualizando plantilla',
+    delete_task_template: 'Eliminando plantilla',
+    reschedule_task: 'Reprogramando tarea',
+    generate_tasks_for_date: 'Generando tareas',
+
+    // CRUD Recipes
+    create_recipe: 'Creando receta',
+    update_recipe: 'Actualizando receta',
+    delete_recipe: 'Eliminando receta',
+
+    // Inventory
+    bulk_update_inventory: 'Actualizando inventario masivo',
+    scan_receipt_items: 'Procesando ticket',
+    reset_inventory_to_default: 'Restableciendo inventario',
+
+    // Multi-step
+    execute_multi_step_task: 'Ejecutando tarea compleja',
+  };
+
+  return descriptions[name] || `Ejecutando ${name}`;
+}
 
 // Detectar si una respuesta contiene código o errores que no deberían mostrarse
 function isInvalidResponse(text: string): boolean {
@@ -1944,11 +4111,29 @@ function getFallbackResponse(userMessage: string): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { messages, conversationContext, stream = false } = body;
+    const {
+      messages,
+      conversationContext,
+      stream = false,
+      // AI Command Center parameters
+      householdId,
+      userId,
+      sessionId: providedSessionId,
+      // If true, skip proposals and execute directly (for approved proposals)
+      executeDirectly = false,
+    } = body;
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: 'Messages required' }, { status: 400 });
     }
+
+    // Create execution context
+    const sessionId = providedSessionId || generateSessionId();
+    const context: ExecutionContext = {
+      householdId: householdId || 'default-household', // Fallback for backwards compatibility
+      userId,
+      sessionId,
+    };
 
     const gemini = getGeminiClient();
 
@@ -2021,56 +4206,168 @@ export async function POST(request: NextRequest) {
     const functionCalls = parts.filter(part => part.functionCall);
 
     if (functionCalls.length > 0) {
-      // Ejecutar todas las funciones
-      const functionResponses = [];
+      // Parse function calls
+      const parsedCalls = functionCalls
+        .map(part => part.functionCall!)
+        .filter(fc => fc.name)
+        .map(fc => ({
+          name: fc.name!,
+          args: (fc.args as Record<string, unknown>) || {}
+        }));
 
-      for (const part of functionCalls) {
-        const fc = part.functionCall!;
-        if (!fc.name) continue;
-        const result = await executeFunction(fc.name, fc.args as Record<string, unknown> || {});
+      // Check if we should create a proposal (only for write operations)
+      const writeOperations = parsedCalls.filter(fc =>
+        !fc.name.startsWith('get_') &&
+        !fc.name.startsWith('search_') &&
+        !fc.name.startsWith('suggest_') &&
+        fc.name !== 'calculate_portions'
+      );
 
-        functionResponses.push({
-          functionResponse: {
-            name: fc.name,
-            response: result
-          }
-        });
+      // If there are high-risk write operations and we're not in executeDirectly mode
+      if (writeOperations.length > 0 && !executeDirectly && householdId) {
+        const needsProposal = await shouldCreateProposal(
+          writeOperations.map(fc => fc.name),
+          householdId
+        );
+
+        if (needsProposal) {
+          // Create a proposal instead of executing
+          const proposal = await createFunctionProposal(writeOperations, context);
+
+          // Return proposal response with explanation
+          return NextResponse.json({
+            type: 'proposal',
+            content: `He preparado un plan que requiere tu aprobación:\n\n**${proposal.summary}**\n\nEste plan incluye ${proposal.actions.length} acción(es) que modificarán datos. ¿Quieres que lo ejecute?`,
+            role: 'assistant',
+            proposal,
+            sessionId,
+          });
+        }
       }
 
-      // Segunda llamada con los resultados de las funciones
-      // Si streaming está habilitado, usar generateContentStream
+      // Execute all functions with logging
+      // If streaming, create a response that streams tool events
       if (stream) {
-        const streamResponse = await gemini.models.generateContentStream({
-          model: GEMINI_MODELS.FLASH,
-          contents: [
-            ...geminiMessages,
-            { role: 'model' as const, parts: parts },
-            { role: 'user' as const, parts: functionResponses }
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ] as any,
-          config: {
-            temperature: GEMINI_CONFIG.assistant.temperature,
-            maxOutputTokens: GEMINI_CONFIG.assistant.maxOutputTokens,
-            systemInstruction: enhancedSystemPrompt,
-          }
-        });
-
-        // Crear un ReadableStream para enviar chunks al cliente
         const readableStream = new ReadableStream({
           async start(controller) {
             try {
+              const functionResponses = [];
+              const executionMetadata: Array<{ functionName: string; auditLogId?: string; canUndo: boolean }> = [];
+
+              // Stream tool execution events
+              for (const fc of parsedCalls) {
+                // Send tool_start event
+                controller.enqueue(new TextEncoder().encode(
+                  createToolStreamEvent({
+                    type: 'tool_start',
+                    tool: {
+                      name: fc.name,
+                      description: getToolDescription(fc.name),
+                      args: fc.args,
+                    },
+                  })
+                ));
+
+                let result: unknown;
+                let auditLogId: string | undefined;
+                let canUndo = false;
+
+                // Execute the function
+                if (householdId) {
+                  const executionResult = await executeFunctionWithLogging(fc.name, fc.args, context);
+                  result = executionResult.result;
+                  auditLogId = executionResult.auditLogId;
+                  canUndo = executionResult.canUndo;
+                } else {
+                  result = await executeFunction(fc.name, fc.args);
+                }
+
+                // Determine if successful
+                const isSuccess = typeof result === 'object' && result !== null
+                  ? (result as Record<string, unknown>).success !== false
+                  : true;
+
+                // Send tool_result event
+                controller.enqueue(new TextEncoder().encode(
+                  createToolStreamEvent({
+                    type: 'tool_result',
+                    tool: { name: fc.name },
+                    result: {
+                      success: isSuccess,
+                      summary: typeof result === 'object' && result !== null
+                        ? ((result as Record<string, unknown>).message as string) || getToolDescription(fc.name) + ' completado'
+                        : 'Completado',
+                    },
+                  })
+                ));
+
+                functionResponses.push({
+                  functionResponse: {
+                    name: fc.name,
+                    response: result,
+                  },
+                });
+
+                executionMetadata.push({
+                  functionName: fc.name,
+                  auditLogId,
+                  canUndo,
+                });
+              }
+
+              // Now stream the AI response
+              const streamResponse = await gemini.models.generateContentStream({
+                model: GEMINI_MODELS.FLASH,
+                contents: [
+                  ...geminiMessages,
+                  { role: 'model' as const, parts: parts },
+                  { role: 'user' as const, parts: functionResponses },
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                ] as any,
+                config: {
+                  temperature: GEMINI_CONFIG.assistant.temperature,
+                  maxOutputTokens: GEMINI_CONFIG.assistant.maxOutputTokens,
+                  systemInstruction: enhancedSystemPrompt,
+                },
+              });
+
+              // Stream the content
               for await (const chunk of streamResponse) {
                 const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text || '';
                 if (text) {
-                  controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ content: text, done: false })}\n\n`));
+                  controller.enqueue(new TextEncoder().encode(
+                    createToolStreamEvent({ type: 'content', content: text, done: false })
+                  ));
                 }
               }
-              controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ content: '', done: true })}\n\n`));
+
+              // Prepare execution metadata for final message
+              const undoableActions = executionMetadata.filter(m => m.canUndo);
+              const streamMetadata = executionMetadata.length > 0 ? {
+                actionsExecuted: executionMetadata.length,
+                undoAvailable: undoableActions.length > 0,
+                undoableActions: undoableActions.map(a => ({
+                  functionName: a.functionName,
+                  auditLogId: a.auditLogId,
+                })),
+              } : undefined;
+
+              // Send done event
+              controller.enqueue(new TextEncoder().encode(
+                createToolStreamEvent({
+                  type: 'done',
+                  done: true,
+                  sessionId,
+                  executionMetadata: streamMetadata,
+                })
+              ));
+
               controller.close();
             } catch (error) {
+              console.error('Tool streaming error:', error);
               controller.error(error);
             }
-          }
+          },
         });
 
         return new Response(readableStream, {
@@ -2082,7 +4379,41 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Sin streaming - comportamiento original
+      // Non-streaming execution
+      const functionResponses = [];
+      const executionMetadata: Array<{ functionName: string; auditLogId?: string; canUndo: boolean }> = [];
+
+      for (const fc of parsedCalls) {
+        let result: unknown;
+        let auditLogId: string | undefined;
+        let canUndo = false;
+
+        // Use logging wrapper if householdId is provided
+        if (householdId) {
+          const executionResult = await executeFunctionWithLogging(fc.name, fc.args, context);
+          result = executionResult.result;
+          auditLogId = executionResult.auditLogId;
+          canUndo = executionResult.canUndo;
+        } else {
+          // Fallback to direct execution for backwards compatibility
+          result = await executeFunction(fc.name, fc.args);
+        }
+
+        functionResponses.push({
+          functionResponse: {
+            name: fc.name,
+            response: result
+          }
+        });
+
+        executionMetadata.push({
+          functionName: fc.name,
+          auditLogId,
+          canUndo,
+        });
+      }
+
+      // Non-streaming - make final call and return
       const finalResponse = await gemini.models.generateContent({
         model: GEMINI_MODELS.FLASH,
         contents: [
@@ -2107,9 +4438,22 @@ export async function POST(request: NextRequest) {
         console.warn('Invalid response detected, using fallback');
       }
 
+      // Check if any actions can be undone
+      const undoableActions = executionMetadata.filter(m => m.canUndo);
+
       return NextResponse.json({
         content: finalContent,
-        role: 'assistant'
+        role: 'assistant',
+        sessionId,
+        // AI Command Center metadata
+        executionMetadata: executionMetadata.length > 0 ? {
+          actionsExecuted: executionMetadata.length,
+          undoAvailable: undoableActions.length > 0,
+          undoableActions: undoableActions.map(a => ({
+            functionName: a.functionName,
+            auditLogId: a.auditLogId,
+          })),
+        } : undefined,
       });
     }
 

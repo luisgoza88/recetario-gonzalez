@@ -12,6 +12,11 @@ import { useAIChat, parseMessageContent, type Message, type MessageAction } from
 import { useVoiceInput } from '@/lib/hooks/useVoiceInput';
 import { useImageInput } from '@/lib/hooks/useImageInput';
 import { useProactiveAlerts } from '@/lib/hooks/useProactiveAlerts';
+import { useAIProposal, type Proposal } from '@/lib/hooks/useAIProposal';
+import { ProposalCard } from '@/components/ai/ProposalCard';
+import { UndoToastContainer } from '@/components/ai/UndoToast';
+import { ContextPills } from '@/components/ai/ContextPills';
+import { useOptionalAuth } from '@/contexts/AuthContext';
 
 type ActiveSection = 'hoy' | 'recetario' | 'hogar' | 'ia' | 'ajustes';
 
@@ -124,9 +129,21 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [input, setInput] = useState('');
+  const [showProposalModal, setShowProposalModal] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auth context for household and user info
+  const auth = useOptionalAuth();
+  const householdId = auth?.currentHousehold?.id || 'default-household';
+  const userId = auth?.user?.id;
+
+  // AI Proposal hook for managing proposals and undo actions
+  const proposal = useAIProposal({
+    householdId,
+    userId,
+  });
 
   // Custom hooks
   const voice = useVoiceInput({
@@ -144,7 +161,26 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
   const image = useImageInput();
 
   const chat = useAIChat({
-    onSpeakResponse: voice.speakText
+    onSpeakResponse: voice.speakText,
+    householdId,
+    userId,
+    onProposal: (proposalData) => {
+      // Convert to proposal format and set active
+      proposal.setActiveProposal({
+        id: proposalData.proposalId,
+        summary: proposalData.summary,
+        actions: proposalData.actions,
+        riskLevel: proposalData.riskLevel,
+        expiresAt: proposalData.expiresAt,
+      });
+      setShowProposalModal(true);
+    },
+    onExecutionMetadata: (metadata) => {
+      // Process execution metadata for undo actions
+      proposal.processAIResponse({
+        executionMetadata: metadata,
+      });
+    },
   });
 
   const alertsHook = useProactiveAlerts();
@@ -349,12 +385,26 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
                   }
                 `}>
                   {message.isLoading && !message.content ? (
-                    <div className="flex items-center gap-1.5 text-purple-600 p-2.5">
-                      <Loader2 size={14} className="animate-spin" />
-                      <span className="text-xs">Pensando...</span>
+                    <div className="p-2.5 space-y-2">
+                      {/* Show active tools */}
+                      {chat.activeTools.length > 0 && (
+                        <ContextPills tools={chat.activeTools} className="mb-2" />
+                      )}
+                      <div className="flex items-center gap-1.5 text-purple-600">
+                        <Loader2 size={14} className="animate-spin" />
+                        <span className="text-xs">
+                          {chat.activeTools.length > 0
+                            ? chat.activeTools.find(t => t.status === 'running')?.description || 'Procesando...'
+                            : 'Pensando...'}
+                        </span>
+                      </div>
                     </div>
                   ) : message.isLoading && message.content ? (
                     <div className="p-2.5">
+                      {/* Show active tools while streaming */}
+                      {chat.activeTools.length > 0 && (
+                        <ContextPills tools={chat.activeTools} className="mb-2" />
+                      )}
                       <FormattedMessage content={message.content} />
                       <div className="flex items-center gap-0.5 mt-1.5 text-purple-400">
                         <span className="w-1 h-1 bg-purple-400 rounded-full animate-bounce" />
@@ -557,6 +607,37 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
           </button>
         </div>
       </div>
+
+      {/* Proposal Modal */}
+      {showProposalModal && proposal.activeProposal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50">
+          <div className="w-full max-w-md max-h-[80vh] overflow-y-auto">
+            <ProposalCard
+              proposalId={proposal.activeProposal.id}
+              summary={proposal.activeProposal.summary}
+              actions={proposal.activeProposal.actions}
+              riskLevel={proposal.activeProposal.riskLevel}
+              expiresAt={proposal.activeProposal.expiresAt}
+              onApprove={async (proposalId, selectedActions) => {
+                await proposal.approveProposal(proposalId, selectedActions);
+                setShowProposalModal(false);
+              }}
+              onReject={async (proposalId) => {
+                await proposal.rejectProposal(proposalId);
+                setShowProposalModal(false);
+              }}
+              onClose={() => setShowProposalModal(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Undo Toast Container */}
+      <UndoToastContainer
+        actions={proposal.undoActions}
+        onUndo={proposal.undoAction}
+        onDismiss={proposal.removeUndoAction}
+      />
     </div>
   );
 }

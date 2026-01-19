@@ -576,3 +576,277 @@ export interface SessionState {
   currentHouseholdId: string | null;
   lastActivity: string;
 }
+
+// =====================================================
+// TIPOS PARA AI COMMAND CENTER
+// =====================================================
+
+// Niveles de riesgo para funciones de IA
+export type AIRiskLevel = 1 | 2 | 3 | 4;
+
+export const AI_RISK_LEVELS = {
+  LOW: 1 as const,        // Auto-execute (consultas)
+  MEDIUM: 2 as const,     // Execute + Undo disponible
+  HIGH: 3 as const,       // Requiere confirmación
+  CRITICAL: 4 as const,   // Multi-step + confirmación detallada
+};
+
+export const AI_RISK_LABELS: Record<AIRiskLevel, string> = {
+  1: 'Automático',
+  2: 'Con opción de deshacer',
+  3: 'Requiere confirmación',
+  4: 'Acción crítica',
+};
+
+// Categorías de funciones
+export type AIFunctionCategory =
+  | 'query'
+  | 'action_recipe'
+  | 'action_inventory'
+  | 'action_home'
+  | 'action_destructive'
+  | 'action_bulk';
+
+// Registro de función en la base de datos
+export interface AIFunctionConfig {
+  function_name: string;
+  category: AIFunctionCategory;
+  risk_level: AIRiskLevel;
+  requires_confirmation: boolean;
+  is_reversible: boolean;
+  description?: string;
+  description_es?: string;
+  is_enabled: boolean;
+  rate_limit_per_minute: number;
+}
+
+// Estado de una acción en el audit log
+export type AIActionStatus = 'pending' | 'completed' | 'failed' | 'rolled_back';
+
+// Entrada del audit log
+export interface AIAuditLog {
+  id: string;
+  household_id: string;
+  user_id?: string;
+  session_id: string;
+  conversation_id?: string;
+
+  // Información de la acción
+  action_type: 'query' | 'mutation' | 'bulk_mutation';
+  function_name: string;
+  parameters: Record<string, unknown>;
+
+  // Estado para rollback
+  previous_state?: Record<string, unknown>;
+  new_state?: Record<string, unknown>;
+  affected_tables?: string[];
+  affected_record_ids?: string[];
+
+  // Resultado
+  status: AIActionStatus;
+  result?: Record<string, unknown>;
+  error_message?: string;
+
+  // Contexto de riesgo
+  risk_level: AIRiskLevel;
+  required_confirmation: boolean;
+  confirmed_by?: string;
+  confirmed_at?: string;
+
+  // Rollback info
+  rolled_back_at?: string;
+  rolled_back_by?: string;
+  rollback_reason?: string;
+
+  // Timestamps
+  created_at: string;
+  executed_at?: string;
+}
+
+// Estado de una propuesta
+export type AIProposalStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'expired'
+  | 'partially_approved'
+  | 'executing'
+  | 'completed'
+  | 'failed';
+
+// Acción propuesta individual
+export interface AIProposedAction {
+  id: string;
+  function_name: string;
+  parameters: Record<string, unknown>;
+  description: string;
+  description_es: string;
+  risk_level: AIRiskLevel;
+  is_reversible: boolean;
+  current_state?: unknown;
+  new_state?: unknown;
+  estimated_impact?: string;
+}
+
+// Propuesta completa de la IA
+export interface AIProposal {
+  id: string;
+  proposal_id: string;
+  household_id: string;
+  user_id?: string;
+  session_id: string;
+
+  // Contenido
+  summary: string;
+  risk_level: AIRiskLevel;
+  actions: AIProposedAction[];
+
+  // Impacto
+  tables_affected: string[];
+  records_affected: number;
+
+  // Estado
+  status: AIProposalStatus;
+  approved_actions?: string[];
+  rejected_actions?: string[];
+
+  // Decisión
+  decision_by?: string;
+  decision_at?: string;
+  decision_notes?: string;
+
+  // Ejecución
+  execution_started_at?: string;
+  execution_completed_at?: string;
+  execution_result?: Record<string, unknown>;
+  audit_log_ids?: string[];
+
+  // Expiración
+  expires_at: string;
+
+  // Timestamps
+  created_at: string;
+  updated_at: string;
+}
+
+// Trust score del household
+export interface HouseholdAITrust {
+  id: string;
+  household_id: string;
+
+  // Métricas
+  trust_level: 1 | 2 | 3 | 4 | 5;
+  successful_actions: number;
+  failed_actions: number;
+  rolled_back_actions: number;
+
+  // Configuración
+  auto_approve_level: AIRiskLevel;
+  max_actions_per_minute: number;
+  max_critical_actions_per_day: number;
+  max_items_per_bulk_operation: number;
+
+  // Historial
+  last_incident_at?: string;
+  incident_count: number;
+
+  // Preferencias
+  require_confirmation_always: boolean;
+  allow_bulk_operations: boolean;
+  allow_destructive_actions: boolean;
+
+  // Timestamps
+  created_at: string;
+  updated_at: string;
+}
+
+// Respuesta del API con propuesta
+export interface AIResponseWithProposal {
+  type: 'proposal';
+  proposal: AIProposal;
+  message: string;
+}
+
+// Respuesta del API con resultado directo
+export interface AIResponseDirect {
+  type: 'direct';
+  content: string;
+  actions_executed?: {
+    function_name: string;
+    result: unknown;
+    audit_log_id?: string;
+  }[];
+}
+
+// Respuesta del API combinada
+export type AIResponse = AIResponseWithProposal | AIResponseDirect;
+
+// Resultado de ejecución de propuesta
+export interface ProposalExecutionResult {
+  success: boolean;
+  proposal_id: string;
+  executed_actions: {
+    action_id: string;
+    function_name: string;
+    success: boolean;
+    result?: unknown;
+    error?: string;
+    audit_log_id: string;
+  }[];
+  failed_actions?: {
+    action_id: string;
+    function_name: string;
+    error: string;
+  }[];
+  can_rollback: boolean;
+}
+
+// Resultado de rollback
+export interface RollbackResult {
+  success: boolean;
+  audit_log_id: string;
+  function_name: string;
+  previous_state?: Record<string, unknown>;
+  error?: string;
+}
+
+// Evento de streaming de herramientas
+export type AIStreamEvent =
+  | { type: 'tool_start'; tool: string; message: string }
+  | { type: 'tool_end'; tool: string; result_summary: string }
+  | { type: 'thinking'; message: string }
+  | { type: 'content'; content: string; done: boolean }
+  | { type: 'proposal'; proposal: AIProposal }
+  | { type: 'error'; error: string };
+
+// Context pills (fuentes de datos activas)
+export interface AIContextPill {
+  id: string;
+  icon: string;
+  label: string;
+  count?: number;
+  tooltip?: string;
+}
+
+// Hook de undo
+export interface AIUndoState {
+  canUndo: boolean;
+  undoStack: {
+    audit_log_id: string;
+    function_name: string;
+    description: string;
+    executed_at: string;
+  }[];
+  undo: (audit_log_id?: string) => Promise<RollbackResult>;
+  clearUndoStack: () => void;
+}
+
+// Guardrails
+export interface AIGuardrails {
+  max_items_per_bulk_operation: number;
+  max_menu_days_to_change: number;
+  max_actions_per_minute: number;
+  max_critical_actions_per_day: number;
+  prevent_delete_last_admin: boolean;
+  require_confirmation_for_destructive: boolean;
+}
