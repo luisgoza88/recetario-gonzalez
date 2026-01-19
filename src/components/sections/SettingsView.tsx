@@ -3,8 +3,10 @@
 import { useState } from 'react';
 import {
   Settings, Bell, Database, Info, ChevronRight,
-  Moon, Globe, Shield, HelpCircle, Smartphone
+  Moon, Globe, Shield, HelpCircle, Smartphone, Brain
 } from 'lucide-react';
+import AICommandCenter from '@/components/ai/AICommandCenter';
+import { useHouseholdId } from '@/lib/stores/useHouseholdStore';
 
 interface SettingsSectionProps {
   icon: React.ReactNode;
@@ -42,6 +44,18 @@ function SettingsSection({ icon, title, description, onClick, rightContent, dang
 
 export default function SettingsView() {
   const [notifications, setNotifications] = useState(true);
+  const [showAICommandCenter, setShowAICommandCenter] = useState(false);
+  const householdId = useHouseholdId();
+
+  // Show AI Command Center as full screen
+  if (showAICommandCenter) {
+    return (
+      <AICommandCenter
+        onClose={() => setShowAICommandCenter(false)}
+        householdId={householdId || undefined}
+      />
+    );
+  }
 
   return (
     <div className="p-4 max-w-lg mx-auto pb-24">
@@ -52,6 +66,27 @@ export default function SettingsView() {
           Ajustes
         </h1>
         <p className="text-gray-500 mt-1">Configura tu aplicación</p>
+      </div>
+
+      {/* AI Command Center - Prominent Card */}
+      <div className="mb-6">
+        <button
+          onClick={() => setShowAICommandCenter(true)}
+          className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl p-4 text-white text-left hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+              <Brain size={28} />
+            </div>
+            <div className="flex-1">
+              <p className="font-bold text-lg">Centro de Comando IA</p>
+              <p className="text-purple-200 text-sm">
+                Monitorea, controla y configura tu asistente
+              </p>
+            </div>
+            <ChevronRight size={24} className="text-purple-200" />
+          </div>
+        </button>
       </div>
 
       {/* Profile Section */}

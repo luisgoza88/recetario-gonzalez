@@ -8,7 +8,7 @@ import {
   ChevronDown, Eye, RotateCcw, ThumbsUp, ThumbsDown,
   ArrowLeft
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase/client';
 
 // Types
 interface TrustStats {
@@ -214,8 +214,6 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [functions, setFunctions] = useState<FunctionConfig[]>([]);
   const [todayStats, setTodayStats] = useState({ total: 0, successful: 0, failed: 0 });
-
-  const supabase = createClient();
 
   const fetchData = useCallback(async () => {
     if (!householdId) return;
