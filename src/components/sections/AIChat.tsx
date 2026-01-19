@@ -907,9 +907,25 @@ export default function AIChat() {
                       </div>
                     </div>
                   ) : message.role === 'user' ? (
-                    // User message - simple text
+                    // User message - text + optional image
                     <>
-                      <p className="text-sm whitespace-pre-line">{message.content}</p>
+                      {/* Show image if present */}
+                      {message.image && (
+                        <div className="mb-2 -mx-3 -mt-3">
+                          <img
+                            src={message.image}
+                            alt="Imagen enviada"
+                            className="w-full max-h-48 object-cover rounded-t-2xl"
+                          />
+                        </div>
+                      )}
+                      {/* Only show text if it's not just the placeholder */}
+                      {message.content && message.content !== '📷 Imagen enviada' && (
+                        <p className="text-sm whitespace-pre-line">{message.content}</p>
+                      )}
+                      {message.content === '📷 Imagen enviada' && (
+                        <p className="text-sm text-green-200 italic">Analiza esta imagen</p>
+                      )}
                       <p className="text-xs mt-1 text-green-200">
                         {formatTime(message.timestamp)}
                       </p>
@@ -967,9 +983,86 @@ export default function AIChat() {
         </div>
       )}
 
+      {/* Hidden file inputs */}
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleImageSelect}
+        className="hidden"
+      />
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleImageSelect}
+        className="hidden"
+      />
+
+      {/* Image Preview */}
+      {selectedImage && (
+        <div className="px-4 py-2 bg-gray-50 border-t">
+          <div className="relative inline-block">
+            <img
+              src={selectedImage}
+              alt="Preview"
+              className="h-20 w-auto rounded-lg object-cover"
+            />
+            <button
+              onClick={removeSelectedImage}
+              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">Imagen lista para enviar</p>
+        </div>
+      )}
+
+      {/* Image Options Popup */}
+      {showImageOptions && (
+        <div className="absolute bottom-24 left-4 bg-white rounded-xl shadow-xl border p-2 z-50">
+          <button
+            onClick={() => {
+              cameraInputRef.current?.click();
+              setShowImageOptions(false);
+            }}
+            className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 rounded-lg w-full"
+          >
+            <Camera size={20} className="text-purple-600" />
+            <span className="text-sm font-medium">Tomar foto</span>
+          </button>
+          <button
+            onClick={() => {
+              imageInputRef.current?.click();
+              setShowImageOptions(false);
+            }}
+            className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 rounded-lg w-full"
+          >
+            <ImageIcon size={20} className="text-purple-600" />
+            <span className="text-sm font-medium">Elegir de galería</span>
+          </button>
+        </div>
+      )}
+
       {/* Input Area */}
       <div className="p-4 bg-white border-t flex-shrink-0">
         <div className="flex gap-2 items-center">
+          {/* Image Button */}
+          <button
+            onClick={() => setShowImageOptions(!showImageOptions)}
+            disabled={isLoading || isListening}
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+              selectedImage
+                ? 'bg-purple-100 text-purple-600'
+                : 'bg-gray-100 text-gray-500 hover:bg-purple-50 hover:text-purple-600'
+            }`}
+            title="Enviar imagen"
+          >
+            <Camera size={18} />
+          </button>
+
           {/* TTS Toggle */}
           {isSpeechSynthesisSupported() && (
             <button
@@ -991,7 +1084,7 @@ export default function AIChat() {
             value={isListening ? interimTranscript : input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={isListening ? 'Escuchando...' : 'Escribe tu pregunta...'}
+            placeholder={selectedImage ? 'Describe la imagen (opcional)...' : (isListening ? 'Escuchando...' : 'Escribe tu pregunta...')}
             disabled={isLoading || isListening}
             className="flex-1 px-4 py-3 bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
           />
@@ -1017,10 +1110,10 @@ export default function AIChat() {
           {/* Send Button */}
           <button
             onClick={() => sendMessage(input)}
-            disabled={!input.trim() || isLoading || isListening}
+            disabled={(!input.trim() && !selectedImage) || isLoading || isListening}
             className={`
               w-12 h-12 rounded-full flex items-center justify-center transition-all
-              ${input.trim() && !isLoading && !isListening
+              ${(input.trim() || selectedImage) && !isLoading && !isListening
                 ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg hover:shadow-xl'
                 : 'bg-gray-200 text-gray-400'
               }
