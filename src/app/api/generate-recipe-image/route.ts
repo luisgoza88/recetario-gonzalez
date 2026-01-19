@@ -66,53 +66,58 @@ Requisitos de la imagen:
 - NO incluir texto, marcas de agua ni elementos artificiales
 - Colores vibrantes y naturales`;
 
-    // Usar Gemini 2.0 Flash Exp con capacidad de generación de imágenes
-    const response = await gemini.models.generateContent({
-      model: GEMINI_MODELS.FLASH_IMAGE,
-      contents: [{
-        role: 'user',
-        parts: [{ text: prompt }]
-      }],
-      config: {
-        responseModalities: ['Text', 'Image'],
-      },
-    });
-
-    // Extraer la imagen de la respuesta
-    const parts = response.candidates?.[0]?.content?.parts;
+    // Usar Imagen 3 primero para mejor calidad fotorrealista
     let imageData: string | null = null;
     let textResponse: string | null = null;
 
-    if (parts) {
-      for (const part of parts) {
-        if (part.inlineData) {
-          imageData = part.inlineData.data as string;
-        }
-        if (part.text) {
-          textResponse = part.text;
-        }
+    try {
+      console.log('Generando imagen con Imagen 3...');
+      const imagen3Response = await gemini.models.generateImages({
+        model: GEMINI_MODELS.IMAGE_GEN,
+        prompt: prompt,
+        config: {
+          numberOfImages: 1,
+          aspectRatio: '4:3',
+          outputMimeType: 'image/png',
+        },
+      });
+
+      const generatedImage = imagen3Response.generatedImages?.[0];
+      if (generatedImage?.image?.imageBytes) {
+        imageData = generatedImage.image.imageBytes;
+        console.log('Imagen generada exitosamente con Imagen 3');
       }
+    } catch (imagen3Error) {
+      console.error('Imagen 3 error, intentando con Gemini Flash:', imagen3Error);
     }
 
+    // Si Imagen 3 falla, usar Gemini 2.0 Flash Exp como respaldo
     if (!imageData) {
-      // Si Gemini Flash no genera imagen, intentar con Imagen 3 directamente
       try {
-        const imagen3Response = await gemini.models.generateImages({
-          model: GEMINI_MODELS.IMAGE_GEN,
-          prompt: prompt,
+        const response = await gemini.models.generateContent({
+          model: GEMINI_MODELS.FLASH_IMAGE,
+          contents: [{
+            role: 'user',
+            parts: [{ text: prompt }]
+          }],
           config: {
-            numberOfImages: 1,
-            aspectRatio: '4:3',
-            outputMimeType: 'image/png',
+            responseModalities: ['Text', 'Image'],
           },
         });
 
-        const generatedImage = imagen3Response.generatedImages?.[0];
-        if (generatedImage?.image?.imageBytes) {
-          imageData = generatedImage.image.imageBytes;
+        const parts = response.candidates?.[0]?.content?.parts;
+        if (parts) {
+          for (const part of parts) {
+            if (part.inlineData) {
+              imageData = part.inlineData.data as string;
+            }
+            if (part.text) {
+              textResponse = part.text;
+            }
+          }
         }
-      } catch (imagen3Error) {
-        console.error('Imagen 3 error:', imagen3Error);
+      } catch (flashError) {
+        console.error('Gemini Flash error:', flashError);
       }
     }
 
