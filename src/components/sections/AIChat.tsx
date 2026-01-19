@@ -17,6 +17,13 @@ import {
   resetSession,
   type ConversationMessage
 } from '@/lib/ai-memory';
+import {
+  generateProactiveAlerts,
+  getActiveAlerts,
+  dismissAlert,
+  requestNotificationPermission,
+  type ProactiveAlert
+} from '@/lib/ai-notifications';
 
 // Types for rich messages
 interface MessageAction {
@@ -221,6 +228,8 @@ export default function AIChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [alerts, setAlerts] = useState<ProactiveAlert[]>([]);
+  const [showAlerts, setShowAlerts] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -228,7 +237,7 @@ export default function AIChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
-  // Load conversation history on mount
+  // Load conversation history and alerts on mount
   useEffect(() => {
     const loadHistory = async () => {
       try {
@@ -243,6 +252,13 @@ export default function AIChat() {
           setMessages(loadedMessages);
           setShowWelcome(false);
         }
+
+        // Load proactive alerts
+        const activeAlerts = await generateProactiveAlerts();
+        setAlerts(activeAlerts);
+
+        // Request notification permission
+        requestNotificationPermission();
       } catch (error) {
         console.error('Error loading conversation history:', error);
       } finally {
@@ -251,6 +267,16 @@ export default function AIChat() {
     };
 
     loadHistory();
+  }, []);
+
+  // Refresh alerts periodically
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const activeAlerts = getActiveAlerts();
+      setAlerts(activeAlerts);
+    }, 5 * 60 * 1000); // Every 5 minutes
+
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -411,8 +437,51 @@ export default function AIChat() {
         sendMessage('Agrega los ingredientes faltantes a la lista de compras');
         break;
 
+      case 'view_tasks':
+        sendMessage('¿Cómo van las tareas de hoy?');
+        break;
+
+      case 'view_inventory':
+        sendMessage('Muéstrame el estado del inventario');
+        break;
+
       default:
         console.log('Unknown action:', action);
+    }
+  };
+
+  // Handle alert actions
+  const handleAlertAction = (alert: ProactiveAlert) => {
+    if (alert.actionable) {
+      handleAction(alert.actionable.action);
+    }
+    handleDismissAlert(alert.id);
+    setShowAlerts(false);
+  };
+
+  // Dismiss alert
+  const handleDismissAlert = (alertId: string) => {
+    dismissAlert(alertId);
+    setAlerts(prev => prev.filter(a => a.id !== alertId));
+  };
+
+  // Get priority color
+  const getPriorityColor = (priority: ProactiveAlert['priority']) => {
+    switch (priority) {
+      case 'high': return 'bg-red-50 border-red-200 text-red-800';
+      case 'medium': return 'bg-amber-50 border-amber-200 text-amber-800';
+      case 'low': return 'bg-blue-50 border-blue-200 text-blue-800';
+    }
+  };
+
+  // Get priority icon
+  const getPriorityIcon = (type: ProactiveAlert['type']) => {
+    switch (type) {
+      case 'inventory_alert': return <AlertTriangle size={16} className="text-red-500" />;
+      case 'meal_reminder': return <UtensilsCrossed size={16} className="text-amber-500" />;
+      case 'task_reminder': return <ListTodo size={16} className="text-blue-500" />;
+      case 'prep_tip': return <Clock size={16} className="text-green-500" />;
+      case 'weekly_summary': return <TrendingUp size={16} className="text-purple-500" />;
     }
   };
 
@@ -430,17 +499,80 @@ export default function AIChat() {
               <p className="text-sm text-purple-200">Tu ayudante para el hogar</p>
             </div>
           </div>
-          {messages.length > 0 && (
+          <div className="flex items-center gap-2">
+            {/* Alerts Button */}
             <button
-              onClick={clearChat}
-              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-              title="Nueva conversación"
+              onClick={() => setShowAlerts(!showAlerts)}
+              className="relative p-2 hover:bg-white/20 rounded-lg transition-colors"
+              title="Alertas"
             >
-              <RefreshCw size={20} />
+              <AlertCircle size={20} />
+              {alerts.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
+                  {alerts.length}
+                </span>
+              )}
             </button>
-          )}
+            {/* Clear Chat Button */}
+            {messages.length > 0 && (
+              <button
+                onClick={clearChat}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                title="Nueva conversación"
+              >
+                <RefreshCw size={20} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Alerts Panel */}
+      {showAlerts && alerts.length > 0 && (
+        <div className="absolute top-16 right-2 left-2 z-50 bg-white rounded-xl shadow-xl border max-h-80 overflow-y-auto">
+          <div className="p-3 border-b flex items-center justify-between sticky top-0 bg-white">
+            <h3 className="font-semibold text-gray-800">Alertas inteligentes</h3>
+            <button
+              onClick={() => setShowAlerts(false)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="p-2 space-y-2">
+            {alerts.map(alert => (
+              <div
+                key={alert.id}
+                className={`p-3 rounded-lg border ${getPriorityColor(alert.priority)}`}
+              >
+                <div className="flex items-start gap-2">
+                  {getPriorityIcon(alert.type)}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm">{alert.title}</p>
+                    <p className="text-xs mt-0.5 whitespace-pre-line">{alert.body}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      {alert.actionable && (
+                        <button
+                          onClick={() => handleAlertAction(alert)}
+                          className="text-xs px-2 py-1 bg-white rounded border hover:bg-gray-50"
+                        >
+                          {alert.actionable.label}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDismissAlert(alert.id)}
+                        className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700"
+                      >
+                        Descartar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Quick Actions - Scroll horizontal */}
       <div className="flex-shrink-0 bg-white border-b">
