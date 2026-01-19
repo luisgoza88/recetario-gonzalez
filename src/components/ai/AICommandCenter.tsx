@@ -378,8 +378,8 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [...chatMessages, { role: 'user', content: userMessage }],
+          householdId, // AI Command Center parameter - top level
           conversationContext: {
-            householdId,
             activeSection: 'ai-command-center'
           },
           stream: true
@@ -483,7 +483,7 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-32">
+    <div className="h-dvh bg-gray-50 overflow-hidden flex flex-col">
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-4 pb-6">
         <div className="flex items-center gap-3 mb-4">
@@ -557,10 +557,11 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
       </div>
 
       {/* Content */}
-      <div className={`${activeTab === 'chat' ? 'p-0' : 'p-4'} max-w-lg mx-auto`}>
+      <div className={`flex-1 overflow-hidden ${activeTab === 'chat' ? '' : 'overflow-y-auto p-4'}`}>
+        <div className="max-w-lg mx-auto h-full">
         {/* Chat Tab */}
         {activeTab === 'chat' && (
-          <div className="flex flex-col h-[calc(100vh-220px)]">
+          <div className="flex flex-col h-full">
             {/* Chat Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {chatMessages.length === 0 && (
@@ -621,9 +622,12 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
               )}
             </div>
 
-            {/* Chat Input */}
-            <div className="border-t bg-white p-4">
-              <div className="flex gap-2">
+            {/* Chat Input - sticky at bottom with safe area for iPhone */}
+            <div
+              className="sticky bottom-0 border-t bg-white p-4"
+              style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+            >
+              <div className="flex gap-2 max-w-lg mx-auto">
                 <input
                   type="text"
                   value={chatInput}
@@ -641,7 +645,7 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
                 <button
                   onClick={handleSendMessage}
                   disabled={!chatInput.trim() || isProcessingChat}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
                     chatInput.trim() && !isProcessingChat
                       ? 'bg-purple-600 text-white shadow-lg'
                       : 'bg-gray-200 text-gray-400'
@@ -967,6 +971,7 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
             )}
           </div>
         )}
+        </div>
       </div>
     </div>
   );
