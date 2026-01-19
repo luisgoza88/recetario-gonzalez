@@ -300,32 +300,51 @@ La función ejecutará automáticamente todos los pasos necesarios y reportará 
 // ============================================
 
 async function getTodayMenu() {
-  const today = new Date();
-  const dayOfWeek = today.getDay();
-  const cycleDay = ((dayOfWeek === 0 ? 7 : dayOfWeek) - 1) % 12 + 1;
+  try {
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const cycleDay = ((dayOfWeek === 0 ? 7 : dayOfWeek) - 1) % 12 + 1;
+    const isWeekend = dayOfWeek === 5 || dayOfWeek === 6; // Viernes o Sábado
 
-  const { data: menu } = await supabase
-    .from('day_menu')
-    .select(`
-      *,
-      breakfast:recipes!day_menu_breakfast_id_fkey(name, prep_time),
-      lunch:recipes!day_menu_lunch_id_fkey(name, prep_time),
-      dinner:recipes!day_menu_dinner_id_fkey(name, prep_time)
-    `)
-    .eq('day_number', cycleDay)
-    .single();
+    const { data: menu, error } = await supabase
+      .from('day_menu')
+      .select(`
+        *,
+        breakfast:recipes!day_menu_breakfast_id_fkey(name, prep_time),
+        lunch:recipes!day_menu_lunch_id_fkey(name, prep_time),
+        dinner:recipes!day_menu_dinner_id_fkey(name, prep_time)
+      `)
+      .eq('day_number', cycleDay)
+      .single();
 
-  if (!menu) {
-    return { message: 'No hay menú programado para hoy' };
+    if (error || !menu) {
+      console.error('Error fetching menu:', error);
+      return {
+        message: 'No hay menú programado para hoy',
+        date: today.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }),
+        cycle_day: cycleDay,
+        breakfast: 'No programado',
+        lunch: 'No programado',
+        dinner: isWeekend ? 'Sin cena (salen a comer)' : 'No programado'
+      };
+    }
+
+    return {
+      date: today.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }),
+      cycle_day: cycleDay,
+      breakfast: menu.breakfast?.name || 'No programado',
+      lunch: menu.lunch?.name || 'No programado',
+      dinner: isWeekend ? 'Sin cena (salen a comer)' : (menu.dinner?.name || 'No programado')
+    };
+  } catch (err) {
+    console.error('getTodayMenu error:', err);
+    return {
+      message: 'No se pudo obtener el menú de hoy',
+      breakfast: 'Error al cargar',
+      lunch: 'Error al cargar',
+      dinner: 'Error al cargar'
+    };
   }
-
-  return {
-    date: today.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }),
-    cycle_day: cycleDay,
-    breakfast: menu.breakfast?.name || 'No programado',
-    lunch: menu.lunch?.name || 'No programado',
-    dinner: menu.dinner?.name || 'No programado (viernes/sábado sin cena)'
-  };
 }
 
 async function getWeekMenu() {
@@ -554,33 +573,86 @@ async function getMissingIngredients(recipeName: string) {
 }
 
 async function getInventory() {
-  const { data } = await supabase
-    .from('inventory')
-    .select('*, market_item:market_items(name, category)')
-    .gt('current_number', 0)
-    .limit(30);
+  try {
+    const { data, error } = await supabase
+      .from('inventory')
+      .select('*, market_item:market_items(name, category)')
+      .gt('current_number', 0)
+      .limit(50);
 
-  const grouped: Record<string, string[]> = {};
-  data?.forEach(item => {
-    const cat = item.market_item?.category || 'Otros';
-    if (!grouped[cat]) grouped[cat] = [];
-    grouped[cat].push(`${item.market_item?.name} (${item.current_number})`);
-  });
+    if (error) {
+      console.error('Error fetching inventory:', error);
+      return { message: 'No se pudo obtener el inventario', items: [], by_category: {} };
+    }
 
-  return grouped;
+    if (!data || data.length === 0) {
+      return { message: 'El inventario está vacío', items: [], by_category: {} };
+    }
+
+    const items: string[] = [];
+    const grouped: Record<string, string[]> = {};
+
+    data.forEach(item => {
+      const name = item.market_item?.name || 'Item';
+      const cat = item.market_item?.category || 'Otros';
+      const qty = item.current_number || 0;
+
+      items.push(name);
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(`${name} (${qty})`);
+    });
+
+    return {
+      message: `${data.length} ingredientes disponibles`,
+      total: data.length,
+      items,
+      by_category: grouped
+    };
+  } catch (err) {
+    console.error('getInventory error:', err);
+    return { message: 'No se pudo obtener el inventario', items: [], by_category: {} };
+  }
 }
 
 async function getShoppingList() {
-  const { data } = await supabase
-    .from('market_checklist')
-    .select('*, market_item:market_items(name, category)')
-    .eq('checked', false)
-    .limit(20);
+  try {
+    const { data, error } = await supabase
+      .from('market_checklist')
+      .select('*, market_item:market_items(name, category)')
+      .eq('checked', false)
+      .limit(30);
 
-  return data?.map(item => ({
-    name: item.market_item?.name || 'Item',
-    category: item.market_item?.category || 'Otros'
-  })) || [];
+    if (error) {
+      console.error('Error fetching shopping list:', error);
+      return { message: 'No hay items en la lista de compras', items: [] };
+    }
+
+    if (!data || data.length === 0) {
+      return { message: 'La lista de compras está vacía', items: [] };
+    }
+
+    const items = data.map(item => ({
+      name: item.market_item?.name || 'Item',
+      category: item.market_item?.category || 'Otros'
+    }));
+
+    // Agrupar por categoría
+    const byCategory: Record<string, string[]> = {};
+    items.forEach(item => {
+      if (!byCategory[item.category]) byCategory[item.category] = [];
+      byCategory[item.category].push(item.name);
+    });
+
+    return {
+      message: `${items.length} items pendientes`,
+      total: items.length,
+      items,
+      by_category: byCategory
+    };
+  } catch (err) {
+    console.error('getShoppingList error:', err);
+    return { message: 'No hay items en la lista de compras', items: [] };
+  }
 }
 
 async function suggestRecipe(preferences?: string) {
@@ -634,38 +706,38 @@ async function suggestRecipe(preferences?: string) {
 }
 
 async function getTodayTasks() {
-  const today = new Date().toISOString().split('T')[0];
+  try {
+    const today = new Date().toISOString().split('T')[0];
 
-  const { data: tasks } = await supabase
-    .from('daily_task_instances')
-    .select('*, employee:employees(name)')
-    .eq('date', today)
-    .order('time_start');
-
-  if (!tasks || tasks.length === 0) {
-    // Intentar con home_employees
-    const { data: tasks2 } = await supabase
+    const { data: tasks, error } = await supabase
       .from('daily_task_instances')
       .select('*, employee:home_employees(name)')
       .eq('date', today)
       .order('time_start');
 
-    return tasks2?.map(t => ({
-      task: t.task_name,
-      employee: t.employee?.name || 'Sin asignar',
-      time: `${t.time_start} - ${t.time_end}`,
-      status: t.status,
-      category: t.category
-    })) || [];
-  }
+    if (error) {
+      console.error('Error fetching tasks:', error);
+      return { message: 'No hay tareas programadas para hoy', tasks: [] };
+    }
 
-  return tasks.map(t => ({
-    task: t.task_name,
-    employee: t.employee?.name || 'Sin asignar',
-    time: `${t.time_start} - ${t.time_end}`,
-    status: t.status,
-    category: t.category
-  }));
+    if (!tasks || tasks.length === 0) {
+      return { message: 'No hay tareas programadas para hoy', tasks: [] };
+    }
+
+    return {
+      message: `${tasks.length} tareas para hoy`,
+      tasks: tasks.map(t => ({
+        task: t.task_name || 'Tarea',
+        employee: t.employee?.name || 'Sin asignar',
+        time: `${t.time_start || '?'} - ${t.time_end || '?'}`,
+        status: t.status || 'pending',
+        category: t.category || 'general'
+      }))
+    };
+  } catch (err) {
+    console.error('getTodayTasks error:', err);
+    return { message: 'No hay tareas programadas para hoy', tasks: [] };
+  }
 }
 
 async function getEmployeeSchedule(employeeName: string, period: string = 'today') {
@@ -712,29 +784,47 @@ async function getEmployeeSchedule(employeeName: string, period: string = 'today
 }
 
 async function getTasksSummary() {
-  const today = new Date().toISOString().split('T')[0];
+  try {
+    const today = new Date().toISOString().split('T')[0];
 
-  const { data: tasks } = await supabase
-    .from('daily_task_instances')
-    .select('status, employee_id')
-    .eq('date', today);
+    const { data: tasks, error } = await supabase
+      .from('daily_task_instances')
+      .select('status, employee_id')
+      .eq('date', today);
 
-  if (!tasks || tasks.length === 0) {
-    return { message: 'No hay tareas programadas para hoy' };
+    if (error || !tasks || tasks.length === 0) {
+      return {
+        message: 'No hay tareas programadas para hoy',
+        total: 0,
+        completed: 0,
+        in_progress: 0,
+        pending: 0,
+        progress_percent: 0
+      };
+    }
+
+    const completed = tasks.filter(t => t.status === 'completed').length;
+    const inProgress = tasks.filter(t => t.status === 'in_progress').length;
+    const pending = tasks.filter(t => t.status === 'pending').length;
+    const total = tasks.length;
+
+    return {
+      message: `${completed}/${total} tareas completadas`,
+      total,
+      completed,
+      in_progress: inProgress,
+      pending,
+      progress_percent: total > 0 ? Math.round((completed / total) * 100) : 0
+    };
+  } catch (err) {
+    console.error('getTasksSummary error:', err);
+    return {
+      message: 'No hay tareas programadas para hoy',
+      total: 0,
+      completed: 0,
+      progress_percent: 0
+    };
   }
-
-  const completed = tasks.filter(t => t.status === 'completed').length;
-  const inProgress = tasks.filter(t => t.status === 'in_progress').length;
-  const pending = tasks.filter(t => t.status === 'pending').length;
-  const total = tasks.length;
-
-  return {
-    total,
-    completed,
-    in_progress: inProgress,
-    pending,
-    progress_percent: Math.round((completed / total) * 100)
-  };
 }
 
 async function addToShoppingList(itemName: string, quantity?: string) {
@@ -1398,11 +1488,13 @@ async function executeMultiStepTask(
       stepsCompleted.push('✅ Generar lista optimizada');
       results.optimized_list = smartList;
 
+      const currentCount = 'total' in currentList ? currentList.total : (currentList.items?.length || 0);
+
       return {
         task_type: taskType,
         steps_completed: stepsCompleted,
         results,
-        summary: `Lista de compras optimizada. ${currentList.length} items actuales, ${
+        summary: `Lista de compras optimizada. ${currentCount} items actuales, ${
           'total_items' in smartList ? smartList.total_items : 0
         } items recomendados para los próximos 5 días.`,
         next_suggestions: [
