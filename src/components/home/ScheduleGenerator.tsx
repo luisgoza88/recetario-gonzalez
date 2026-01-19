@@ -3,10 +3,16 @@
 import { useState } from 'react';
 import {
   X, Sparkles, Calendar, Clock, CheckCircle2, AlertTriangle,
-  RefreshCw, User, Home
+  RefreshCw, User, Home, Brain, TrendingUp
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { Space, HomeEmployee, TaskTemplate, SpaceType } from '@/types';
+import {
+  calculateLearnedDuration,
+  calculateEmployeeScore,
+  suggestOptimalAssignment,
+  EmployeeScore
+} from '@/lib/home/intelligence';
 
 interface ScheduleGeneratorProps {
   householdId: string;
@@ -65,6 +71,9 @@ export default function ScheduleGenerator({
   const [weeksToGenerate, setWeeksToGenerate] = useState(2);
   const [step, setStep] = useState<'config' | 'preview' | 'done'>('config');
   const [savedCount, setSavedCount] = useState(0);
+  const [useIntelligence, setUseIntelligence] = useState(true);
+  const [employeeScores, setEmployeeScores] = useState<EmployeeScore[]>([]);
+  const [learnedTasksCount, setLearnedTasksCount] = useState(0);
 
   const getTasksForSpace = (space: Space): string[] => {
     const typeName = space.space_type?.name?.toLowerCase() || '';
@@ -99,7 +108,8 @@ export default function ScheduleGenerator({
   const findBestEmployee = (
     space: Space,
     date: Date,
-    taskAssignments: Map<string, number>
+    minutesAssignments: Map<string, number>, // Changed: now tracks MINUTES not tasks
+    taskMinutes: number // New: estimated minutes for this specific task
   ): HomeEmployee | null => {
     // Filtrar empleados por zona compatible
     const compatibleEmployees = employees.filter(emp => {
@@ -120,26 +130,82 @@ export default function ScheduleGenerator({
 
     if (availableEmployees.length === 0) return null;
 
-    // Seleccionar el que tenga menos tareas asignadas ese día
     const dateKey = date.toISOString().split('T')[0];
-    let bestEmployee = availableEmployees[0];
-    let minTasks = taskAssignments.get(`${bestEmployee.id}-${dateKey}`) || 0;
+    const DAILY_WORK_MINUTES = 480; // 8 hours
 
-    for (const emp of availableEmployees) {
-      const empTasks = taskAssignments.get(`${emp.id}-${dateKey}`) || 0;
-      if (empTasks < minTasks) {
-        bestEmployee = emp;
-        minTasks = empTasks;
+    if (useIntelligence && availableEmployees.length > 1) {
+      // INTELLIGENT BALANCING: Score each employee based on multiple factors
+      const scored = availableEmployees.map(emp => {
+        const currentMinutes = minutesAssignments.get(`${emp.id}-${dateKey}`) || 0;
+        const newMinutes = currentMinutes + taskMinutes;
+        const utilizationPercent = (newMinutes / DAILY_WORK_MINUTES) * 100;
+
+        // Get employee performance score
+        const empScore = employeeScores.find(s => s.employeeId === emp.id);
+        const performanceScore = empScore?.overallScore || 50;
+
+        // Calculate assignment score (higher = better candidate)
+        let score = 0;
+
+        // Factor 1: Favor employees with lower current load (up to 50 points)
+        // An employee at 0% gets 50 points, at 100% gets 0
+        score += Math.max(0, 50 - (utilizationPercent / 2));
+
+        // Factor 2: Favor employees with higher performance (up to 30 points)
+        score += (performanceScore / 100) * 30;
+
+        // Factor 3: Penalize if this would overload them (up to -20 points)
+        if (utilizationPercent > 100) {
+          score -= Math.min(20, (utilizationPercent - 100) / 2);
+        }
+
+        return { employee: emp, score, currentMinutes, utilizationPercent };
+      });
+
+      // Sort by score (highest first)
+      scored.sort((a, b) => b.score - a.score);
+
+      return scored[0].employee;
+    } else {
+      // SIMPLE BALANCING: Just use minutes (fallback)
+      let bestEmployee = availableEmployees[0];
+      let minMinutes = minutesAssignments.get(`${bestEmployee.id}-${dateKey}`) || 0;
+
+      for (const emp of availableEmployees) {
+        const empMinutes = minutesAssignments.get(`${emp.id}-${dateKey}`) || 0;
+        if (empMinutes < minMinutes) {
+          bestEmployee = emp;
+          minMinutes = empMinutes;
+        }
       }
-    }
 
-    return bestEmployee;
+      return bestEmployee;
+    }
   };
 
   const generateSchedule = async () => {
     setGenerating(true);
     const generatedTasks: GeneratedTask[] = [];
-    const taskAssignments = new Map<string, number>();
+    const minutesAssignments = new Map<string, number>(); // Track MINUTES per employee per day
+
+    // Load intelligence data if enabled
+    if (useIntelligence) {
+      // Load employee scores
+      const scores: EmployeeScore[] = [];
+      for (const emp of employees) {
+        try {
+          const score = await calculateEmployeeScore(emp.id);
+          if (score) scores.push(score);
+        } catch (e) {
+          // Ignore errors, use default scores
+        }
+      }
+      setEmployeeScores(scores);
+    }
+
+    // Cache for learned durations to avoid repeated queries
+    const learnedDurations = new Map<string, number>();
+    let learnedCount = 0;
 
     const startDate = new Date();
     startDate.setHours(0, 0, 0, 0);
@@ -154,6 +220,48 @@ export default function ScheduleGenerator({
       for (const taskName of tasks) {
         const frequencyDays = getFrequencyDays(taskName, space.usage_level);
 
+        // Get or calculate task duration
+        let estimatedMinutes = 30; // Default
+        const durationKey = `${space.id}-${taskName}`;
+
+        if (useIntelligence && !learnedDurations.has(durationKey)) {
+          // Try to find existing space_task for this
+          const { data: existingTask } = await supabase
+            .from('space_tasks')
+            .select('id, estimated_minutes')
+            .eq('space_id', space.id)
+            .ilike('name', taskName)
+            .single();
+
+          if (existingTask) {
+            try {
+              const learned = await calculateLearnedDuration(existingTask.id, space.id);
+              if (learned && learned.sampleCount > 0) {
+                estimatedMinutes = learned.learnedMinutes;
+                learnedCount++;
+              } else {
+                estimatedMinutes = existingTask.estimated_minutes || 30;
+              }
+            } catch {
+              estimatedMinutes = existingTask.estimated_minutes || 30;
+            }
+          } else {
+            // Estimate based on task type
+            if (taskName.toLowerCase().includes('trapear') || taskName.toLowerCase().includes('aspirar')) {
+              estimatedMinutes = 40;
+            } else if (taskName.toLowerCase().includes('limpiar')) {
+              estimatedMinutes = 25;
+            } else if (taskName.toLowerCase().includes('organizar')) {
+              estimatedMinutes = 35;
+            } else {
+              estimatedMinutes = 30;
+            }
+          }
+          learnedDurations.set(durationKey, estimatedMinutes);
+        } else if (learnedDurations.has(durationKey)) {
+          estimatedMinutes = learnedDurations.get(durationKey)!;
+        }
+
         // Calcular fechas para esta tarea
         const currentDate = new Date(startDate);
 
@@ -162,12 +270,13 @@ export default function ScheduleGenerator({
         currentDate.setDate(currentDate.getDate() + (spaceIndex % frequencyDays));
 
         while (currentDate < endDate) {
-          const employee = findBestEmployee(space, currentDate, taskAssignments);
+          const employee = findBestEmployee(space, currentDate, minutesAssignments, estimatedMinutes);
 
           if (employee) {
             const dateKey = currentDate.toISOString().split('T')[0];
             const empKey = `${employee.id}-${dateKey}`;
-            taskAssignments.set(empKey, (taskAssignments.get(empKey) || 0) + 1);
+            // Track MINUTES instead of task count
+            minutesAssignments.set(empKey, (minutesAssignments.get(empKey) || 0) + estimatedMinutes);
           }
 
           generatedTasks.push({
@@ -181,13 +290,15 @@ export default function ScheduleGenerator({
             assignedTo: employee?.id || null,
             assignedName: employee?.name || null,
             scheduledDate: currentDate.toISOString().split('T')[0],
-            estimatedMinutes: 15 + Math.floor(Math.random() * 30)
+            estimatedMinutes
           });
 
           currentDate.setDate(currentDate.getDate() + frequencyDays);
         }
       }
     }
+
+    setLearnedTasksCount(learnedCount);
 
     // Ordenar por fecha
     generatedTasks.sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate));
@@ -373,15 +484,44 @@ export default function ScheduleGenerator({
                 </div>
               </div>
 
-              {/* Info */}
-              <div className="bg-purple-50 rounded-xl p-4 text-sm text-purple-800">
-                <p className="font-medium mb-1">La programación considera:</p>
-                <ul className="list-disc list-inside space-y-1 text-purple-700">
-                  <li>Nivel de uso de cada espacio</li>
-                  <li>Zona de trabajo de cada empleado</li>
-                  <li>Días laborales de cada empleado</li>
-                  <li>Distribución equitativa de tareas</li>
-                </ul>
+              {/* Intelligence Toggle */}
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Brain size={20} className="text-purple-600" />
+                    <span className="font-medium">Programación Inteligente</span>
+                  </div>
+                  <button
+                    onClick={() => setUseIntelligence(!useIntelligence)}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                      useIntelligence ? 'bg-purple-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <div className={`absolute w-5 h-5 bg-white rounded-full top-0.5 transition-transform ${
+                      useIntelligence ? 'translate-x-6' : 'translate-x-0.5'
+                    }`} />
+                  </button>
+                </div>
+                {useIntelligence ? (
+                  <ul className="text-sm text-purple-700 space-y-1">
+                    <li className="flex items-center gap-2">
+                      <TrendingUp size={14} />
+                      Aprende duración real de tareas
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Clock size={14} />
+                      Balancea carga por MINUTOS
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <User size={14} />
+                      Considera rendimiento de empleados
+                    </li>
+                  </ul>
+                ) : (
+                  <p className="text-sm text-gray-600">
+                    Usa tiempos estimados y balance simple por número de tareas
+                  </p>
+                )}
               </div>
 
               {employees.length === 0 && (
@@ -425,6 +565,46 @@ export default function ScheduleGenerator({
                   {preview.length} tareas en {Object.keys(tasksByDate).length} días
                 </span>
               </div>
+
+              {/* Intelligence Metrics */}
+              {useIntelligence && (learnedTasksCount > 0 || employeeScores.length > 0) && (
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center gap-2 text-green-700 font-medium text-sm">
+                    <Brain size={16} />
+                    Datos de Inteligencia Aplicados
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {learnedTasksCount > 0 && (
+                      <div className="bg-white/60 rounded-lg p-2">
+                        <div className="text-green-600 font-semibold">{learnedTasksCount}</div>
+                        <div className="text-gray-600">Duraciones aprendidas</div>
+                      </div>
+                    )}
+                    {employeeScores.length > 0 && (
+                      <div className="bg-white/60 rounded-lg p-2">
+                        <div className="text-green-600 font-semibold">{employeeScores.length}</div>
+                        <div className="text-gray-600">Empleados evaluados</div>
+                      </div>
+                    )}
+                  </div>
+                  {employeeScores.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {employeeScores.map(score => (
+                        <span
+                          key={score.employeeId}
+                          className={`text-xs px-2 py-1 rounded-full ${
+                            score.overallScore >= 70 ? 'bg-green-100 text-green-700' :
+                            score.overallScore >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-red-100 text-red-700'
+                          }`}
+                        >
+                          {score.employeeName}: {score.overallScore}%
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="max-h-96 overflow-y-auto space-y-3">
                 {Object.entries(tasksByDate).slice(0, 14).map(([date, tasks]) => (

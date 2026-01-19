@@ -47,6 +47,7 @@ import MonthlyReport from './MonthlyReport';
 import ScheduleDashboard from './ScheduleDashboard';
 import ScheduleTemplateEditor from './ScheduleTemplateEditor';
 import HomeAnalyticsSummary from './HomeAnalyticsSummary';
+import SmartAlerts from './SmartAlerts';
 import Button from '@/components/ui/Button';
 
 interface HomeViewProps {
@@ -222,6 +223,17 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
             <span className="text-sm">{pendingTasks} tarea{pendingTasks > 1 ? 's' : ''} pendiente{pendingTasks > 1 ? 's' : ''}</span>
           </div>
         )}
+      </div>
+
+      {/* Smart Alerts - Intelligence Panel */}
+      <div className="mb-4">
+        <SmartAlerts
+          householdId={household.id}
+          onNavigateToDate={(date) => {
+            // TODO: Navigate to specific date in calendar
+            openModal({ type: 'weeklyCalendar' });
+          }}
+        />
       </div>
 
       {/* Today's Progress */}

@@ -328,7 +328,7 @@ export default function Home() {
         )}
 
         {activeSection === 'ia' && (
-          <div className="fixed inset-0 top-0 bottom-[140px] bg-gray-50">
+          <div className="fixed inset-0 top-0 bottom-[72px] pb-safe bg-gray-50">
             <AIChat />
           </div>
         )}
