@@ -6,8 +6,17 @@ import {
   ChevronDown, ChevronUp, Scan, Sparkles
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
-import { Space, SpaceType, TaskTemplate, SpaceAttributes } from '@/types';
+import { Space, SpaceType, SpaceAttributes } from '@/types';
 import RoomScanner from './RoomScanner';
+import SpaceTypeSelector from './SpaceTypeSelector';
+import {
+  TaskConfig,
+  SpaceForm,
+  DEFAULT_ATTRIBUTES,
+  ATTRIBUTE_TASKS,
+  FREQUENCY_OPTIONS,
+  getDefaultTasksForType
+} from '@/lib/config/spaceConfig';
 
 interface SpacesPanelProps {
   householdId: string;
@@ -16,190 +25,6 @@ interface SpacesPanelProps {
   onClose: () => void;
   onUpdate: () => void;
 }
-
-interface TaskConfig {
-  id?: string;
-  name: string;
-  frequency: 'diaria' | 'semanal' | 'quincenal' | 'mensual';
-  enabled: boolean;
-  estimatedMinutes: number;
-  isCustom?: boolean;
-  requiresAttribute?: keyof SpaceAttributes; // La tarea solo aparece si el atributo está activo
-}
-
-interface SpaceForm {
-  id?: string;
-  spaceTypeId: string;
-  customName: string;
-  category: 'interior' | 'exterior';
-  usageLevel: 'alto' | 'medio' | 'bajo';
-  areaSqm: number;
-  attributes: SpaceAttributes;
-  tasks: TaskConfig[];
-}
-
-const DEFAULT_ATTRIBUTES: SpaceAttributes = {
-  has_bathroom: false,
-  has_walkin_closet: false,
-  has_balcony: false,
-  has_windows: 2,
-  floor_type: 'tile',
-  has_curtains: true,
-  has_air_conditioning: false,
-};
-
-// Tareas adicionales basadas en atributos
-const ATTRIBUTE_TASKS: Record<keyof SpaceAttributes, TaskConfig[]> = {
-  has_bathroom: [
-    { name: 'Limpiar sanitario', frequency: 'diaria', enabled: true, estimatedMinutes: 10, requiresAttribute: 'has_bathroom' },
-    { name: 'Limpiar lavamanos', frequency: 'diaria', enabled: true, estimatedMinutes: 5, requiresAttribute: 'has_bathroom' },
-    { name: 'Limpiar ducha/bañera', frequency: 'semanal', enabled: true, estimatedMinutes: 15, requiresAttribute: 'has_bathroom' },
-    { name: 'Limpiar espejo baño', frequency: 'semanal', enabled: true, estimatedMinutes: 5, requiresAttribute: 'has_bathroom' },
-    { name: 'Desinfección baño', frequency: 'quincenal', enabled: true, estimatedMinutes: 20, requiresAttribute: 'has_bathroom' },
-  ],
-  has_walkin_closet: [
-    { name: 'Organizar walking closet', frequency: 'mensual', enabled: true, estimatedMinutes: 45, requiresAttribute: 'has_walkin_closet' },
-    { name: 'Barrer walking closet', frequency: 'semanal', enabled: true, estimatedMinutes: 10, requiresAttribute: 'has_walkin_closet' },
-    { name: 'Limpiar estantes closet', frequency: 'quincenal', enabled: true, estimatedMinutes: 20, requiresAttribute: 'has_walkin_closet' },
-  ],
-  has_balcony: [
-    { name: 'Barrer balcón', frequency: 'semanal', enabled: true, estimatedMinutes: 10, requiresAttribute: 'has_balcony' },
-    { name: 'Limpiar baranda balcón', frequency: 'quincenal', enabled: true, estimatedMinutes: 10, requiresAttribute: 'has_balcony' },
-    { name: 'Lavar piso balcón', frequency: 'quincenal', enabled: true, estimatedMinutes: 15, requiresAttribute: 'has_balcony' },
-  ],
-  has_windows: [], // Las tareas de ventanas se calculan dinámicamente
-  floor_type: [], // Se usa para calcular tiempo de limpieza
-  has_curtains: [
-    { name: 'Limpiar cortinas', frequency: 'mensual', enabled: true, estimatedMinutes: 20, requiresAttribute: 'has_curtains' },
-    { name: 'Aspirar cortinas', frequency: 'quincenal', enabled: false, estimatedMinutes: 15, requiresAttribute: 'has_curtains' },
-  ],
-  has_air_conditioning: [
-    { name: 'Limpiar filtros A/C', frequency: 'quincenal', enabled: true, estimatedMinutes: 15, requiresAttribute: 'has_air_conditioning' },
-    { name: 'Limpiar rejillas A/C', frequency: 'mensual', enabled: true, estimatedMinutes: 10, requiresAttribute: 'has_air_conditioning' },
-  ],
-};
-
-// Tareas predeterminadas por tipo de espacio
-const DEFAULT_TASKS: Record<string, TaskConfig[]> = {
-  'sala': [
-    { name: 'Barrer/Aspirar', frequency: 'semanal', enabled: true, estimatedMinutes: 20 },
-    { name: 'Trapear', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
-    { name: 'Sacudir muebles', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
-    { name: 'Limpiar vidrios/ventanas', frequency: 'quincenal', enabled: true, estimatedMinutes: 20 },
-    { name: 'Limpiar marcos y puertas', frequency: 'mensual', enabled: true, estimatedMinutes: 15 },
-    { name: 'Aspirar sofás', frequency: 'quincenal', enabled: true, estimatedMinutes: 20 },
-  ],
-  'cocina': [
-    { name: 'Limpiar mesones', frequency: 'diaria', enabled: true, estimatedMinutes: 10 },
-    { name: 'Barrer/Trapear', frequency: 'diaria', enabled: true, estimatedMinutes: 15 },
-    { name: 'Lavar platos', frequency: 'diaria', enabled: true, estimatedMinutes: 20 },
-    { name: 'Limpiar estufa', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
-    { name: 'Limpiar campana extractora', frequency: 'quincenal', enabled: true, estimatedMinutes: 20 },
-    { name: 'Limpiar nevera por fuera', frequency: 'semanal', enabled: true, estimatedMinutes: 10 },
-    { name: 'Limpiar nevera por dentro', frequency: 'quincenal', enabled: true, estimatedMinutes: 30 },
-    { name: 'Limpiar horno/microondas', frequency: 'semanal', enabled: true, estimatedMinutes: 20 },
-    { name: 'Limpiar gabinetes por fuera', frequency: 'quincenal', enabled: true, estimatedMinutes: 20 },
-    { name: 'Organizar alacena', frequency: 'mensual', enabled: true, estimatedMinutes: 45 },
-    { name: 'Desinfectar superficies', frequency: 'semanal', enabled: true, estimatedMinutes: 10 },
-    { name: 'Limpiar fregadero profundo', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
-  ],
-  'habitacion': [
-    { name: 'Tender cama', frequency: 'diaria', enabled: true, estimatedMinutes: 5 },
-    { name: 'Barrer/Aspirar', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
-    { name: 'Trapear', frequency: 'semanal', enabled: true, estimatedMinutes: 10 },
-    { name: 'Sacudir muebles', frequency: 'semanal', enabled: true, estimatedMinutes: 10 },
-    { name: 'Cambiar sábanas', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
-    { name: 'Organizar closet', frequency: 'mensual', enabled: true, estimatedMinutes: 40 },
-    { name: 'Limpiar debajo de cama', frequency: 'quincenal', enabled: true, estimatedMinutes: 15 },
-    { name: 'Voltear colchón', frequency: 'mensual', enabled: false, estimatedMinutes: 10 },
-    { name: 'Limpiar lámparas', frequency: 'mensual', enabled: true, estimatedMinutes: 10 },
-  ],
-  'baño': [
-    { name: 'Limpiar sanitario', frequency: 'diaria', enabled: true, estimatedMinutes: 10 },
-    { name: 'Limpiar lavamanos', frequency: 'diaria', enabled: true, estimatedMinutes: 5 },
-    { name: 'Limpiar espejo', frequency: 'semanal', enabled: true, estimatedMinutes: 5 },
-    { name: 'Limpiar ducha/bañera', frequency: 'semanal', enabled: true, estimatedMinutes: 20 },
-    { name: 'Trapear', frequency: 'semanal', enabled: true, estimatedMinutes: 10 },
-    { name: 'Cambiar toallas', frequency: 'semanal', enabled: true, estimatedMinutes: 5 },
-    { name: 'Desinfección profunda', frequency: 'quincenal', enabled: true, estimatedMinutes: 30 },
-    { name: 'Limpiar rejillas desagüe', frequency: 'quincenal', enabled: true, estimatedMinutes: 10 },
-    { name: 'Organizar gabinete baño', frequency: 'mensual', enabled: true, estimatedMinutes: 20 },
-  ],
-  'comedor': [
-    { name: 'Limpiar mesa', frequency: 'diaria', enabled: true, estimatedMinutes: 5 },
-    { name: 'Limpiar sillas', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
-    { name: 'Barrer', frequency: 'semanal', enabled: true, estimatedMinutes: 10 },
-    { name: 'Trapear', frequency: 'semanal', enabled: true, estimatedMinutes: 10 },
-    { name: 'Limpiar aparador/vitrina', frequency: 'quincenal', enabled: true, estimatedMinutes: 20 },
-  ],
-  'estudio': [
-    { name: 'Organizar escritorio', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
-    { name: 'Barrer/Aspirar', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
-    { name: 'Sacudir muebles', frequency: 'semanal', enabled: true, estimatedMinutes: 10 },
-    { name: 'Limpiar equipos electrónicos', frequency: 'quincenal', enabled: true, estimatedMinutes: 15 },
-    { name: 'Organizar documentos', frequency: 'mensual', enabled: true, estimatedMinutes: 30 },
-    { name: 'Limpiar estantería/libros', frequency: 'mensual', enabled: true, estimatedMinutes: 25 },
-  ],
-  'lavanderia': [
-    { name: 'Lavar ropa blanca', frequency: 'semanal', enabled: true, estimatedMinutes: 60 },
-    { name: 'Lavar ropa de color', frequency: 'semanal', enabled: true, estimatedMinutes: 60 },
-    { name: 'Lavar ropa delicada', frequency: 'semanal', enabled: false, estimatedMinutes: 45 },
-    { name: 'Planchar', frequency: 'semanal', enabled: true, estimatedMinutes: 90 },
-    { name: 'Limpiar lavadora', frequency: 'quincenal', enabled: true, estimatedMinutes: 20 },
-    { name: 'Limpiar secadora/filtros', frequency: 'quincenal', enabled: true, estimatedMinutes: 15 },
-    { name: 'Organizar productos', frequency: 'mensual', enabled: true, estimatedMinutes: 20 },
-    { name: 'Lavar sábanas', frequency: 'semanal', enabled: true, estimatedMinutes: 45 },
-    { name: 'Lavar toallas', frequency: 'semanal', enabled: true, estimatedMinutes: 30 },
-  ],
-  'jardin': [
-    { name: 'Regar plantas/césped', frequency: 'diaria', enabled: true, estimatedMinutes: 25 },
-    { name: 'Podar plantas', frequency: 'semanal', enabled: true, estimatedMinutes: 30 },
-    { name: 'Recoger hojas', frequency: 'semanal', enabled: true, estimatedMinutes: 20 },
-    { name: 'Cortar césped', frequency: 'quincenal', enabled: true, estimatedMinutes: 60 },
-    { name: 'Fertilizar', frequency: 'mensual', enabled: true, estimatedMinutes: 30 },
-    { name: 'Fumigar', frequency: 'mensual', enabled: false, estimatedMinutes: 45 },
-    { name: 'Deshierbar', frequency: 'quincenal', enabled: true, estimatedMinutes: 40 },
-    { name: 'Limpiar caminos/senderos', frequency: 'semanal', enabled: true, estimatedMinutes: 20 },
-  ],
-  'piscina': [
-    { name: 'Verificar químicos', frequency: 'diaria', enabled: true, estimatedMinutes: 10 },
-    { name: 'Limpiar superficie', frequency: 'diaria', enabled: true, estimatedMinutes: 15 },
-    { name: 'Aspirar fondo', frequency: 'semanal', enabled: true, estimatedMinutes: 45 },
-    { name: 'Limpiar filtros', frequency: 'semanal', enabled: true, estimatedMinutes: 20 },
-    { name: 'Limpiar bordes/azulejos', frequency: 'semanal', enabled: true, estimatedMinutes: 25 },
-    { name: 'Mantenimiento bomba', frequency: 'mensual', enabled: true, estimatedMinutes: 30 },
-    { name: 'Limpiar zona deck', frequency: 'semanal', enabled: true, estimatedMinutes: 20 },
-    { name: 'Revisar nivel de agua', frequency: 'diaria', enabled: true, estimatedMinutes: 5 },
-  ],
-  'terraza': [
-    { name: 'Barrer', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
-    { name: 'Limpiar muebles exterior', frequency: 'semanal', enabled: true, estimatedMinutes: 20 },
-    { name: 'Regar plantas', frequency: 'diaria', enabled: true, estimatedMinutes: 10 },
-    { name: 'Lavar piso a presión', frequency: 'quincenal', enabled: true, estimatedMinutes: 35 },
-    { name: 'Limpiar barandas', frequency: 'quincenal', enabled: true, estimatedMinutes: 15 },
-  ],
-  'garaje': [
-    { name: 'Barrer', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
-    { name: 'Organizar herramientas', frequency: 'mensual', enabled: true, estimatedMinutes: 40 },
-    { name: 'Limpiar manchas aceite', frequency: 'mensual', enabled: true, estimatedMinutes: 30 },
-    { name: 'Revisar iluminación', frequency: 'mensual', enabled: false, estimatedMinutes: 15 },
-    { name: 'Limpiar puertas garaje', frequency: 'quincenal', enabled: true, estimatedMinutes: 20 },
-  ],
-  'patio': [
-    { name: 'Barrer', frequency: 'semanal', enabled: true, estimatedMinutes: 20 },
-    { name: 'Recoger basura/hojas', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
-    { name: 'Lavar piso', frequency: 'quincenal', enabled: true, estimatedMinutes: 30 },
-    { name: 'Limpiar desagües', frequency: 'quincenal', enabled: true, estimatedMinutes: 15 },
-    { name: 'Regar plantas', frequency: 'diaria', enabled: false, estimatedMinutes: 10 },
-  ],
-};
-
-const FREQUENCIES = [
-  { value: 'diaria', label: 'Diaria', color: 'red' },
-  { value: 'semanal', label: 'Semanal', color: 'blue' },
-  { value: 'quincenal', label: 'Quincenal', color: 'green' },
-  { value: 'mensual', label: 'Mensual', color: 'gray' },
-];
 
 export default function SpacesPanel({
   householdId,
@@ -248,53 +73,6 @@ export default function SpacesPanel({
     }
 
     return [];
-  };
-
-  const getDefaultTasksForType = (typeName: string, attributes?: SpaceAttributes): TaskConfig[] => {
-    const normalizedName = typeName.toLowerCase();
-    let baseTasks: TaskConfig[] = [];
-
-    for (const [key, tasks] of Object.entries(DEFAULT_TASKS)) {
-      if (normalizedName.includes(key)) {
-        baseTasks = tasks.map(t => ({ ...t }));
-        break;
-      }
-    }
-
-    // Tareas genéricas si no hay match
-    if (baseTasks.length === 0) {
-      baseTasks = [
-        { name: 'Barrer/Aspirar', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
-        { name: 'Trapear', frequency: 'semanal', enabled: true, estimatedMinutes: 15 },
-        { name: 'Limpiar polvo', frequency: 'semanal', enabled: true, estimatedMinutes: 10 },
-      ];
-    }
-
-    // Agregar tareas basadas en atributos
-    if (attributes) {
-      // Solo agregar tareas de atributos si NO es un baño (los baños ya tienen sus propias tareas)
-      if (!normalizedName.includes('baño') && !normalizedName.includes('bano')) {
-        for (const [attrKey, attrTasks] of Object.entries(ATTRIBUTE_TASKS)) {
-          const attrValue = attributes[attrKey as keyof SpaceAttributes];
-          if (attrValue && typeof attrValue === 'boolean' && attrTasks.length > 0) {
-            baseTasks = [...baseTasks, ...attrTasks.map(t => ({ ...t }))];
-          }
-        }
-
-        // Tareas de ventanas basadas en cantidad
-        if (attributes.has_windows > 0) {
-          const windowMinutes = attributes.has_windows * 8; // ~8 min por ventana
-          baseTasks.push({
-            name: `Limpiar ventanas (${attributes.has_windows})`,
-            frequency: 'quincenal',
-            enabled: true,
-            estimatedMinutes: windowMinutes
-          });
-        }
-      }
-    }
-
-    return baseTasks;
   };
 
   const interiorSpaces = spaces.filter(s => s.category === 'interior');
@@ -721,30 +499,13 @@ export default function SpacesPanel({
                 </button>
               </div>
 
-              {/* Space Type */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tipo de espacio
-                </label>
-                <div className="grid grid-cols-4 gap-2 max-h-32 overflow-y-auto">
-                  {(editingSpace.category === 'interior' ? interiorTypes : exteriorTypes).map(type => (
-                    <button
-                      key={type.id}
-                      onClick={() => updateSpaceType(type.id)}
-                      className={`p-2 rounded-xl text-center transition-colors ${
-                        editingSpace.spaceTypeId === type.id
-                          ? editingSpace.category === 'interior'
-                            ? 'bg-blue-100 border-2 border-blue-600'
-                            : 'bg-green-100 border-2 border-green-600'
-                          : 'bg-gray-50 border-2 border-transparent'
-                      }`}
-                    >
-                      <div className="text-xl">{type.icon}</div>
-                      <div className="text-[10px] font-medium truncate">{type.name}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {/* Space Type - Autocomplete with grouping */}
+              <SpaceTypeSelector
+                spaceTypes={spaceTypes}
+                selectedTypeId={editingSpace.spaceTypeId}
+                category={editingSpace.category}
+                onSelect={updateSpaceType}
+              />
 
               {/* Custom Name */}
               <div>
@@ -932,7 +693,7 @@ export default function SpacesPanel({
                           </div>
                           {task.enabled && (
                             <div className="flex gap-1 mt-2 ml-7">
-                              {FREQUENCIES.map(freq => (
+                              {FREQUENCY_OPTIONS.map(freq => (
                                 <button
                                   key={freq.value}
                                   onClick={() => updateTaskFrequency(index, freq.value as TaskConfig['frequency'])}

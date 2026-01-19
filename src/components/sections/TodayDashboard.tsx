@@ -1,252 +1,54 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Sun, Moon, Coffee, UtensilsCrossed, Sparkles,
   CheckCircle2, Circle, Clock, Users, Home,
-  ShoppingCart, Plus, Bot, AlertCircle, TrendingUp,
-  ChefHat, Briefcase, ArrowRight, Calendar, Settings,
+  ShoppingCart, Plus, AlertCircle, TrendingUp,
+  ChefHat, Briefcase, ArrowRight, Lightbulb,
   X, ChevronRight
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase/client';
-import { Recipe, DayMenu, ScheduledTask, HomeEmployee } from '@/types';
+import { ScheduledTask } from '@/types';
 import ProactiveAlerts from '@/components/ProactiveAlerts';
 import ShareButton from '@/components/ShareButton';
 import { formatDayMenuForWhatsApp } from '@/lib/whatsapp-share';
+import {
+  useTodayDashboard,
+  useGreeting,
+  getMealLabel,
+  EmployeeTaskSummary
+} from '@/lib/hooks/useTodayDashboard';
 
 interface TodayDashboardProps {
   onNavigateToRecetario: (tab?: string) => void;
   onNavigateToHogar: () => void;
-  onNavigateToIA: () => void;
-}
-
-interface TodayMenu {
-  breakfast?: Recipe;
-  lunch?: Recipe;
-  dinner?: Recipe | null;
-  dayNumber: number;
-}
-
-interface EmployeeTaskSummary {
-  employee: HomeEmployee;
-  tasks: ScheduledTask[];
-  completedCount: number;
-  totalCount: number;
-  isCheckedIn: boolean;
 }
 
 export default function TodayDashboard({
   onNavigateToRecetario,
   onNavigateToHogar,
-  onNavigateToIA,
 }: TodayDashboardProps) {
-  const [loading, setLoading] = useState(true);
-  const [todayMenu, setTodayMenu] = useState<TodayMenu | null>(null);
-  const [employeeSummaries, setEmployeeSummaries] = useState<EmployeeTaskSummary[]>([]);
-  const [pendingSuggestions, setPendingSuggestions] = useState(0);
-  const [lowSupplies, setLowSupplies] = useState(0);
-  const [weeklyStats, setWeeklyStats] = useState({
-    mealsCompleted: 0,
-    mealsTotal: 0,
-    tasksCompleted: 0,
-    tasksTotal: 0
-  });
+  // Estado local para modales
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeTaskSummary | null>(null);
   const [selectedTask, setSelectedTask] = useState<ScheduledTask | null>(null);
 
-  const today = new Date();
-  const dayOfWeek = today.toLocaleDateString('es-CO', { weekday: 'long' });
-  const formattedDate = today.toLocaleDateString('es-CO', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  });
-  const hour = today.getHours();
+  // Hooks extraídos para datos
+  const {
+    todayMenu,
+    employeeSummaries,
+    pendingSuggestions,
+    lowSupplies,
+    weeklyStats,
+    loading
+  } = useTodayDashboard();
 
-  const getGreeting = () => {
-    if (hour < 12) return 'Buenos días';
-    if (hour < 18) return 'Buenas tardes';
-    return 'Buenas noches';
-  };
+  const { greeting, timeOfDay, dayOfWeek, formattedDate } = useGreeting();
 
+  // Íconos basados en hora del día
   const getGreetingIcon = () => {
-    if (hour < 12) return <Sun className="text-yellow-500" size={24} />;
-    if (hour < 18) return <Sun className="text-orange-500" size={24} />;
+    if (timeOfDay === 'morning') return <Sun className="text-yellow-500" size={24} />;
+    if (timeOfDay === 'afternoon') return <Sun className="text-orange-500" size={24} />;
     return <Moon className="text-indigo-500" size={24} />;
-  };
-
-  useEffect(() => {
-    loadTodayData();
-  }, []);
-
-  const loadTodayData = async () => {
-    try {
-      setLoading(true);
-      await Promise.all([
-        loadTodayMenu(),
-        loadTodayTasks(),
-        loadAlerts(),
-        loadWeeklyStats()
-      ]);
-    } catch (error) {
-      console.error('Error loading today data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadTodayMenu = async () => {
-    try {
-      // Calcular el día del ciclo (0-11, excluyendo domingos)
-      const startDate = new Date('2025-01-06'); // Inicio del ciclo
-      const diffDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-
-      // Contar domingos entre startDate y today
-      let sundays = 0;
-      const tempDate = new Date(startDate);
-      while (tempDate <= today) {
-        if (tempDate.getDay() === 0) sundays++;
-        tempDate.setDate(tempDate.getDate() + 1);
-      }
-
-      const effectiveDays = diffDays - sundays;
-      const dayNumber = ((effectiveDays % 12) + 12) % 12;
-
-      // Cargar menú del día
-      const { data: menuData } = await supabase
-        .from('day_menu')
-        .select(`
-          *,
-          breakfast:recipes!day_menu_breakfast_id_fkey(*),
-          lunch:recipes!day_menu_lunch_id_fkey(*),
-          dinner:recipes!day_menu_dinner_id_fkey(*)
-        `)
-        .eq('day_number', dayNumber)
-        .single();
-
-      if (menuData) {
-        setTodayMenu({
-          breakfast: menuData.breakfast,
-          lunch: menuData.lunch,
-          dinner: menuData.dinner,
-          dayNumber
-        });
-      }
-    } catch (error) {
-      console.error('Error loading menu:', error);
-    }
-  };
-
-  const loadTodayTasks = async () => {
-    try {
-      const todayStr = today.toISOString().split('T')[0];
-
-      // Cargar empleados activos
-      const { data: employees } = await supabase
-        .from('home_employees')
-        .select('*')
-        .eq('active', true);
-
-      if (!employees || employees.length === 0) {
-        setEmployeeSummaries([]);
-        return;
-      }
-
-      // Cargar tareas de hoy
-      const { data: tasks } = await supabase
-        .from('scheduled_tasks')
-        .select(`
-          *,
-          space:spaces(*, space_type:space_types(*)),
-          task_template:task_templates(*)
-        `)
-        .eq('scheduled_date', todayStr);
-
-      // Cargar check-ins de hoy
-      const { data: checkins } = await supabase
-        .from('employee_checkins')
-        .select('*')
-        .eq('date', todayStr);
-
-      const checkinMap = new Map(
-        (checkins || []).map(c => [c.employee_id, c])
-      );
-
-      // Crear resumen por empleado
-      const summaries: EmployeeTaskSummary[] = employees.map(emp => {
-        const empTasks = (tasks || []).filter(t => t.employee_id === emp.id);
-        const completedTasks = empTasks.filter(t => t.status === 'completada');
-
-        return {
-          employee: emp,
-          tasks: empTasks,
-          completedCount: completedTasks.length,
-          totalCount: empTasks.length,
-          isCheckedIn: checkinMap.has(emp.id)
-        };
-      });
-
-      setEmployeeSummaries(summaries);
-    } catch (error) {
-      console.error('Error loading tasks:', error);
-    }
-  };
-
-  const loadAlerts = async () => {
-    try {
-      // Sugerencias pendientes
-      const { count: suggestionsCount } = await supabase
-        .from('adjustment_suggestions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
-
-      setPendingSuggestions(suggestionsCount || 0);
-
-      // Suministros bajos
-      const { count: suppliesCount } = await supabase
-        .from('cleaning_supplies')
-        .select('*', { count: 'exact', head: true })
-        .lt('current_quantity', 'min_quantity');
-
-      setLowSupplies(suppliesCount || 0);
-    } catch (error) {
-      console.error('Error loading alerts:', error);
-    }
-  };
-
-  const loadWeeklyStats = async () => {
-    try {
-      // Calcular inicio de semana (lunes)
-      const startOfWeek = new Date(today);
-      startOfWeek.setDate(today.getDate() - today.getDay() + 1);
-      const startStr = startOfWeek.toISOString().split('T')[0];
-      const endStr = today.toISOString().split('T')[0];
-
-      // Comidas completadas esta semana
-      const { count: mealsCount } = await supabase
-        .from('meal_feedback')
-        .select('*', { count: 'exact', head: true })
-        .gte('date', startStr)
-        .lte('date', endStr);
-
-      // Tareas completadas esta semana
-      const { data: weekTasks } = await supabase
-        .from('scheduled_tasks')
-        .select('status')
-        .gte('scheduled_date', startStr)
-        .lte('scheduled_date', endStr);
-
-      const completedTasks = (weekTasks || []).filter(t => t.status === 'completada').length;
-
-      setWeeklyStats({
-        mealsCompleted: mealsCount || 0,
-        mealsTotal: (today.getDay() || 7) * 3, // 3 comidas por día
-        tasksCompleted: completedTasks,
-        tasksTotal: weekTasks?.length || 0
-      });
-    } catch (error) {
-      console.error('Error loading stats:', error);
-    }
   };
 
   const getMealIcon = (type: string) => {
@@ -255,15 +57,6 @@ export default function TodayDashboard({
       case 'lunch': return <UtensilsCrossed size={18} className="text-green-600" />;
       case 'dinner': return <Moon size={18} className="text-indigo-600" />;
       default: return <UtensilsCrossed size={18} />;
-    }
-  };
-
-  const getMealLabel = (type: string) => {
-    switch (type) {
-      case 'breakfast': return 'Desayuno';
-      case 'lunch': return 'Almuerzo';
-      case 'dinner': return 'Cena';
-      default: return type;
     }
   };
 
@@ -288,7 +81,7 @@ export default function TodayDashboard({
               <div className="flex items-center gap-2">
                 {getGreetingIcon()}
                 <h1 className="text-xl font-bold text-gray-800">
-                  {getGreeting()}
+                  {greeting}
                 </h1>
               </div>
               <p className="text-gray-500 text-sm mt-1 capitalize">
@@ -391,7 +184,7 @@ export default function TodayDashboard({
               </div>
               {!todayMenu?.dinner ? (
                 <button
-                  onClick={() => onNavigateToIA()}
+                  onClick={() => onNavigateToRecetario('suggestions')}
                   className="bg-purple-100 text-purple-700 px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 hover:bg-purple-200"
                 >
                   <Sparkles size={14} />
@@ -527,11 +320,11 @@ export default function TodayDashboard({
               <span className="text-xs text-gray-600">Receta</span>
             </button>
             <button
-              onClick={onNavigateToIA}
+              onClick={() => onNavigateToRecetario('suggestions')}
               className="bg-white rounded-xl p-4 shadow-sm border flex flex-col items-center gap-2 hover:shadow-md transition-shadow"
             >
-              <Bot size={24} className="text-purple-600" />
-              <span className="text-xs text-gray-600">IA</span>
+              <Lightbulb size={24} className="text-purple-600" />
+              <span className="text-xs text-gray-600">Sugerencias</span>
             </button>
             <button
               onClick={onNavigateToHogar}

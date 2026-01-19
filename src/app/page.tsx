@@ -193,7 +193,6 @@ export default function Home() {
           <TodayDashboard
             onNavigateToRecetario={(tab) => navigateToRecetario(tab as 'calendar' | 'market' | 'recipes' | 'suggestions' | undefined)}
             onNavigateToHogar={navigateToHogar}
-            onNavigateToIA={() => navigateToRecetario('suggestions')}
           />
         )}
 
