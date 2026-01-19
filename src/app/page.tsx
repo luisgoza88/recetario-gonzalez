@@ -1,115 +1,43 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { BookOpen, ShoppingCart, UtensilsCrossed, Sparkles, Home as HomeIcon, Users, ClipboardList, Zap } from 'lucide-react';
-import { supabase } from '@/lib/supabase/client';
 import BottomNavigation from '@/components/navigation/BottomNavigation';
 import RecetarioSection from '@/components/sections/RecetarioSection';
 import HomeView from '@/components/home/HomeView';
 import AIChat from '@/components/sections/AIChat';
 import TodayDashboard from '@/components/sections/TodayDashboard';
 import SettingsView from '@/components/sections/SettingsView';
-import { Recipe, MarketItem, MainSection, RecetarioTab } from '@/types';
 import { FABAction } from '@/components/navigation/DynamicFAB';
+import { useRecipes, useMarketItems, useSuggestionsCount, useRefreshAppData } from '@/lib/hooks/useAppData';
+import { useAppStore } from '@/lib/stores/useAppStore';
 
 export default function Home() {
-  // Navegación principal - "hoy" como vista por defecto
-  const [activeSection, setActiveSection] = useState<MainSection>('hoy');
-  const [recetarioTab, setRecetarioTab] = useState<RecetarioTab>('calendar');
-  const [showSettings, setShowSettings] = useState(false);
+  // Estado global con Zustand (navegación y UI)
+  const {
+    activeSection,
+    recetarioTab,
+    showSettings,
+    fabOpen,
+    setActiveSection,
+    setRecetarioTab,
+    setShowSettings,
+    setFabOpen,
+    toggleFab,
+    navigateToRecetario,
+    navigateToHogar,
+    navigateToIA,
+  } = useAppStore();
 
-  // FAB
-  const [fabOpen, setFabOpen] = useState(false);
+  // Datos con TanStack Query (cache automático, refetch inteligente)
+  const { data: recipes = [], isLoading: recipesLoading } = useRecipes();
+  const { data: marketItems = [], isLoading: itemsLoading } = useMarketItems();
+  const { data: pendingSuggestions = 0 } = useSuggestionsCount();
+  const refreshAppData = useRefreshAppData();
 
-  // Datos
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [marketItems, setMarketItems] = useState<MarketItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [pendingSuggestions, setPendingSuggestions] = useState(0);
-
-  useEffect(() => {
-    loadData();
-    loadSuggestionsCount();
-  }, []);
-
-  // Cerrar FAB y Settings cuando cambia la sección
-  useEffect(() => {
-    setFabOpen(false);
-    setShowSettings(false);
-  }, [activeSection]);
-
-  const loadSuggestionsCount = async () => {
-    try {
-      const { count } = await supabase
-        .from('adjustment_suggestions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
-
-      setPendingSuggestions(count || 0);
-    } catch (error) {
-      console.error('Error loading suggestions count:', error);
-    }
-  };
-
-  const loadData = async () => {
-    try {
-      // Ejecutar todas las queries en paralelo para mejor rendimiento
-      const [recipesResult, itemsResult, checklistResult, inventoryResult] = await Promise.all([
-        supabase.from('recipes').select('*').order('name'),
-        supabase.from('market_items').select('*').order('order_index'),
-        supabase.from('market_checklist').select('item_id, checked'),
-        supabase.from('inventory').select('item_id, current_quantity, current_number'),
-      ]);
-
-      // Procesar recetas
-      if (recipesResult.error) {
-        console.error('Error loading recipes:', recipesResult.error);
-      } else if (recipesResult.data) {
-        setRecipes(recipesResult.data);
-      }
-
-      // Procesar items del mercado
-      if (itemsResult.error) {
-        console.error('Error loading items:', itemsResult.error);
-        return;
-      }
-
-      if (checklistResult.error) {
-        console.error('Error loading checklist:', checklistResult.error);
-      }
-
-      if (inventoryResult.error) {
-        console.error('Error loading inventory:', inventoryResult.error);
-      }
-
-      // Crear mapas para búsqueda rápida
-      const checklistMap = new Map(
-        (checklistResult.data || []).map(c => [c.item_id, c.checked])
-      );
-      const inventoryMap = new Map(
-        (inventoryResult.data || []).map(i => [i.item_id, { qty: i.current_quantity, num: i.current_number }])
-      );
-
-      // Combinar datos
-      if (itemsResult.data) {
-        const items = itemsResult.data.map(item => ({
-          ...item,
-          checked: checklistMap.get(item.id) || false,
-          currentQuantity: inventoryMap.get(item.id)?.qty || '0',
-          currentNumber: inventoryMap.get(item.id)?.num || 0
-        }));
-        setMarketItems(items);
-      }
-    } catch (error) {
-      console.error('Error loading data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loading = recipesLoading || itemsLoading;
 
   const handleUpdate = () => {
-    loadData();
-    loadSuggestionsCount();
+    refreshAppData();
   };
 
   // Acciones del FAB según la sección activa
@@ -209,42 +137,28 @@ export default function Home() {
       icon: <UtensilsCrossed size={20} />,
       label: 'Ver menú',
       color: 'bg-green-500',
-      onClick: () => {
-        setFabOpen(false);
-        setActiveSection('recetario');
-        setRecetarioTab('calendar');
-      }
+      onClick: () => navigateToRecetario('calendar')
     },
     {
       id: 'go-market',
       icon: <ShoppingCart size={20} />,
       label: 'Mercado',
       color: 'bg-blue-500',
-      onClick: () => {
-        setFabOpen(false);
-        setActiveSection('recetario');
-        setRecetarioTab('market');
-      }
+      onClick: () => navigateToRecetario('market')
     },
     {
       id: 'go-hogar',
       icon: <HomeIcon size={20} />,
       label: 'Tareas hogar',
       color: 'bg-orange-500',
-      onClick: () => {
-        setFabOpen(false);
-        setActiveSection('hogar');
-      }
+      onClick: () => navigateToHogar()
     },
     {
       id: 'go-ia',
       icon: <Sparkles size={20} />,
       label: 'Asistente IA',
       color: 'bg-purple-500',
-      onClick: () => {
-        setFabOpen(false);
-        setActiveSection('ia');
-      }
+      onClick: () => navigateToIA()
     }
   ];
 
@@ -278,12 +192,9 @@ export default function Home() {
       <main className="pb-32">
         {activeSection === 'hoy' && !showSettings && (
           <TodayDashboard
-            onNavigateToRecetario={(tab) => {
-              setActiveSection('recetario');
-              if (tab) setRecetarioTab(tab as RecetarioTab);
-            }}
-            onNavigateToHogar={() => setActiveSection('hogar')}
-            onNavigateToIA={() => setActiveSection('ia')}
+            onNavigateToRecetario={(tab) => navigateToRecetario(tab as 'calendar' | 'market' | 'recipes' | 'suggestions' | undefined)}
+            onNavigateToHogar={navigateToHogar}
+            onNavigateToIA={navigateToIA}
             onNavigateToSettings={() => setShowSettings(true)}
           />
         )}
@@ -327,7 +238,7 @@ export default function Home() {
         activeSection={activeSection}
         onSectionChange={setActiveSection}
         fabOpen={fabOpen}
-        onFabToggle={() => setFabOpen(!fabOpen)}
+        onFabToggle={toggleFab}
         fabActions={getFABActions()}
         pendingAlerts={pendingSuggestions}
         recetarioTab={recetarioTab}

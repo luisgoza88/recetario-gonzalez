@@ -1236,13 +1236,41 @@ Cuando hagas algo, usa este formato:
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages } = await request.json();
+    const { messages, conversationContext } = await request.json();
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: 'Messages required' }, { status: 400 });
     }
 
     const gemini = getGeminiClient();
+
+    // Build enhanced system prompt with context
+    let enhancedSystemPrompt = SYSTEM_PROMPT;
+
+    if (conversationContext) {
+      const { history, lastTopic, preferences } = conversationContext;
+
+      if (history && history.trim()) {
+        enhancedSystemPrompt += `\n\n## CONTEXTO DE CONVERSACIÓN ANTERIOR\n${history}`;
+      }
+
+      if (lastTopic) {
+        enhancedSystemPrompt += `\n\n## TEMA ACTUAL DE CONVERSACIÓN\nEl usuario estaba hablando sobre: ${lastTopic}. Continúa con este contexto si es relevante.`;
+      }
+
+      if (preferences && Object.keys(preferences).length > 0) {
+        enhancedSystemPrompt += `\n\n## PREFERENCIAS DEL USUARIO CONOCIDAS`;
+        if (preferences.favoriteRecipes?.length) {
+          enhancedSystemPrompt += `\n- Recetas favoritas: ${preferences.favoriteRecipes.join(', ')}`;
+        }
+        if (preferences.dislikedIngredients?.length) {
+          enhancedSystemPrompt += `\n- Ingredientes que no le gustan: ${preferences.dislikedIngredients.join(', ')}`;
+        }
+        if (preferences.dietaryRestrictions?.length) {
+          enhancedSystemPrompt += `\n- Restricciones alimentarias: ${preferences.dietaryRestrictions.join(', ')}`;
+        }
+      }
+    }
 
     // Convertir mensajes al formato de Gemini
     const geminiMessages: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = messages.map((msg: { role: string; content: string }) => ({
@@ -1257,7 +1285,7 @@ export async function POST(request: NextRequest) {
       config: {
         temperature: GEMINI_CONFIG.assistant.temperature,
         maxOutputTokens: GEMINI_CONFIG.assistant.maxOutputTokens,
-        systemInstruction: SYSTEM_PROMPT,
+        systemInstruction: enhancedSystemPrompt,
         tools: [{
           functionDeclarations
         }]
@@ -1299,7 +1327,7 @@ export async function POST(request: NextRequest) {
         config: {
           temperature: GEMINI_CONFIG.assistant.temperature,
           maxOutputTokens: GEMINI_CONFIG.assistant.maxOutputTokens,
-          systemInstruction: SYSTEM_PROMPT,
+          systemInstruction: enhancedSystemPrompt,
         }
       });
 

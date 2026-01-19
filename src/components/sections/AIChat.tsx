@@ -6,8 +6,17 @@ import {
   Calendar, ShoppingCart, Home, UtensilsCrossed,
   CheckCircle2, ListTodo, ChefHat, RefreshCw,
   Clock, AlertTriangle, Check, Plus, ChevronRight,
-  AlertCircle, TrendingUp
+  AlertCircle, TrendingUp, Trash2
 } from 'lucide-react';
+import {
+  saveMessage,
+  loadConversationHistory,
+  clearConversationHistory,
+  getAIContext,
+  updateContextFromMessage,
+  resetSession,
+  type ConversationMessage
+} from '@/lib/ai-memory';
 
 // Types for rich messages
 interface MessageAction {
@@ -211,11 +220,37 @@ export default function AIChat() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
+
+  // Load conversation history on mount
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const history = await loadConversationHistory(20);
+        if (history.length > 0) {
+          const loadedMessages: Message[] = history.map((msg: ConversationMessage) => ({
+            id: msg.id,
+            role: msg.role,
+            content: msg.content,
+            timestamp: new Date(msg.created_at),
+          }));
+          setMessages(loadedMessages);
+          setShowWelcome(false);
+        }
+      } catch (error) {
+        console.error('Error loading conversation history:', error);
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+
+    loadHistory();
   }, []);
 
   useEffect(() => {
@@ -248,6 +283,10 @@ export default function AIChat() {
     setInput('');
     setIsLoading(true);
 
+    // Save user message to database (don't await)
+    saveMessage('user', userMessage.content).catch(console.error);
+    updateContextFromMessage(userMessage.content, 'user').catch(console.error);
+
     try {
       // Preparar historial para la API (últimos 10 mensajes)
       const history = [...messages, userMessage]
@@ -258,10 +297,16 @@ export default function AIChat() {
           content: m.content
         }));
 
+      // Get conversation context for enhanced prompt
+      const conversationContext = await getAIContext();
+
       const response = await fetch('/api/ai-assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history }),
+        body: JSON.stringify({
+          messages: history,
+          conversationContext
+        }),
       });
 
       const data = await response.json();
@@ -270,6 +315,12 @@ export default function AIChat() {
         throw new Error(data.error);
       }
 
+      const assistantContent = data.content || 'No pude procesar tu solicitud.';
+
+      // Save assistant message to database (don't await)
+      saveMessage('assistant', assistantContent).catch(console.error);
+      updateContextFromMessage(assistantContent, 'assistant').catch(console.error);
+
       // Reemplazar mensaje de loading con respuesta real
       setMessages(prev =>
         prev.map(m =>
@@ -277,7 +328,7 @@ export default function AIChat() {
             ? {
                 id: m.id,
                 role: 'assistant',
-                content: data.content || 'No pude procesar tu solicitud.',
+                content: assistantContent,
                 timestamp: new Date(),
               }
             : m
@@ -318,9 +369,12 @@ export default function AIChat() {
     }
   };
 
-  const clearChat = () => {
+  const clearChat = async () => {
     setMessages([]);
     setShowWelcome(true);
+    // Clear history in database and reset session
+    await clearConversationHistory();
+    resetSession();
   };
 
   const formatTime = (date: Date) => {
@@ -407,7 +461,14 @@ export default function AIChat() {
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        {showWelcome && messages.length === 0 ? (
+        {isLoadingHistory ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="flex flex-col items-center gap-2 text-gray-500">
+              <Loader2 size={24} className="animate-spin" />
+              <span className="text-sm">Cargando conversación...</span>
+            </div>
+          </div>
+        ) : showWelcome && messages.length === 0 ? (
           // Welcome Screen - scrollable content
           <div className="p-4 flex flex-col items-center py-6">
             <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center mb-3 shadow-lg">
