@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, base64ToGeminiFormat } from '@/lib/gemini/client';
-import { FunctionDeclaration, Type } from '@google/genai';
+import { FunctionDeclaration, Type, FunctionCallingConfigMode } from '@google/genai';
 import {
   getFunctionRiskLevel,
   shouldAutoApprove,
@@ -4137,6 +4137,48 @@ function isInvalidResponse(text: string): boolean {
   return false;
 }
 
+// Detectar si un mensaje REQUIERE una función para responder correctamente
+function messageRequiresFunction(userMessage: string): { required: boolean; suggestedFunction: string | null } {
+  const msg = userMessage.toLowerCase();
+
+  // Preguntas sobre menú/comida del día
+  if (msg.includes('qué hay') || msg.includes('que hay') || msg.includes('almuerzo') ||
+      msg.includes('cena') || msg.includes('desayuno') || msg.includes('comida') ||
+      msg.includes('comer hoy') || msg.includes('menú')) {
+    return { required: true, suggestedFunction: 'get_today_menu' };
+  }
+
+  // Preguntas sobre recetas específicas
+  if ((msg.includes('cómo') || msg.includes('como')) &&
+      (msg.includes('hago') || msg.includes('preparo') || msg.includes('hacer') || msg.includes('preparar'))) {
+    return { required: true, suggestedFunction: 'get_recipe_details' };
+  }
+
+  // Preguntas sobre inventario
+  if (msg.includes('inventario') || msg.includes('despensa') ||
+      (msg.includes('qué tengo') || msg.includes('que tengo'))) {
+    return { required: true, suggestedFunction: 'get_inventory' };
+  }
+
+  // Lista de compras
+  if (msg.includes('lista de compras') || msg.includes('comprar') || msg.includes('falta')) {
+    return { required: true, suggestedFunction: 'get_shopping_list' };
+  }
+
+  // Tareas
+  if (msg.includes('tarea') || msg.includes('pendiente') || msg.includes('yolima')) {
+    return { required: true, suggestedFunction: 'get_today_tasks' };
+  }
+
+  // Sugerir receta
+  if (msg.includes('sugiér') || msg.includes('sugier') || msg.includes('qué puedo cocinar') ||
+      msg.includes('que puedo cocinar')) {
+    return { required: true, suggestedFunction: 'suggest_recipe' };
+  }
+
+  return { required: false, suggestedFunction: null };
+}
+
 // Generar una respuesta de fallback cuando hay errores
 function getFallbackResponse(userMessage: string): string {
   const msg = userMessage.toLowerCase();
@@ -4252,7 +4294,12 @@ export async function POST(request: NextRequest) {
           systemInstruction: enhancedSystemPrompt,
           tools: [{
             functionDeclarations
-          }]
+          }],
+          toolConfig: {
+            functionCallingConfig: {
+              mode: FunctionCallingConfigMode.AUTO
+            }
+          }
         }
       });
       console.log('[AI Assistant] Gemini API response received');
@@ -4267,6 +4314,91 @@ export async function POST(request: NextRequest) {
 
     // Buscar si hay llamadas a funciones
     const functionCalls = parts.filter(part => part.functionCall);
+
+    // Log para diagnóstico
+    const lastUserMessage = messages[messages.length - 1]?.content || '';
+    console.log('[AI Assistant] User message:', lastUserMessage.substring(0, 100));
+    console.log('[AI Assistant] Function calls count:', functionCalls.length);
+
+    // Verificar si el mensaje requería una función pero no se llamó
+    const functionRequirement = messageRequiresFunction(lastUserMessage);
+    if (functionCalls.length === 0 && functionRequirement.required) {
+      console.log('[AI Assistant] Message required function but none was called. Forcing:', functionRequirement.suggestedFunction);
+
+      // Crear una llamada artificial a la función sugerida
+      const forcedFunctionCall = {
+        name: functionRequirement.suggestedFunction!,
+        args: {}
+      };
+
+      // Si es get_recipe_details, intentar extraer el nombre de la receta
+      if (functionRequirement.suggestedFunction === 'get_recipe_details') {
+        const msg = lastUserMessage.toLowerCase();
+        // Extraer nombre de receta después de "cómo hago" o similar
+        const patterns = [/cómo (?:hago|preparo|hacer|preparar) (?:una?|el|la|los|las)?\s*(.+)/i,
+                         /como (?:hago|preparo|hacer|preparar) (?:una?|el|la|los|las)?\s*(.+)/i];
+        for (const pattern of patterns) {
+          const match = msg.match(pattern);
+          if (match) {
+            forcedFunctionCall.args = { recipe_name: match[1].trim().replace(/\?$/, '') };
+            break;
+          }
+        }
+      }
+
+      // Ejecutar la función forzada
+      const forcedResult = await executeFunction(forcedFunctionCall.name, forcedFunctionCall.args as Record<string, unknown>);
+      console.log('[AI Assistant] Forced function result:', JSON.stringify(forcedResult).substring(0, 200));
+
+      // Ahora pedir a Gemini que genere respuesta basada en el resultado
+      const contextMessage = `El usuario preguntó: "${lastUserMessage}"
+
+Resultado de consultar ${forcedFunctionCall.name}:
+${JSON.stringify(forcedResult, null, 2)}
+
+Basándote en estos datos, responde al usuario de forma útil y amigable.`;
+
+      const followUpResponse = await gemini.models.generateContent({
+        model: GEMINI_MODELS.FLASH,
+        contents: [{ role: 'user', parts: [{ text: contextMessage }] }],
+        config: {
+          temperature: GEMINI_CONFIG.assistant.temperature,
+          maxOutputTokens: GEMINI_CONFIG.assistant.maxOutputTokens,
+          systemInstruction: enhancedSystemPrompt,
+        }
+      });
+
+      const forcedContent = followUpResponse.candidates?.[0]?.content?.parts?.[0]?.text || 'Hubo un problema al procesar tu solicitud.';
+
+      if (stream) {
+        // Return streaming response for forced function call
+        const streamData = createToolStreamEvent({
+          type: 'content',
+          content: forcedContent
+        });
+        const doneData = createToolStreamEvent({ type: 'done', done: true, sessionId });
+
+        return new Response(streamData + doneData, {
+          headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+          },
+        });
+      }
+
+      return NextResponse.json({
+        content: forcedContent,
+        role: 'assistant',
+        sessionId,
+        forcedFunction: forcedFunctionCall.name,
+      });
+    }
+
+    if (functionCalls.length === 0) {
+      const textResponse = parts.find(part => part.text)?.text || '';
+      console.log('[AI Assistant] No functions called, text response:', textResponse.substring(0, 200));
+    }
 
     if (functionCalls.length > 0) {
       // Parse function calls
