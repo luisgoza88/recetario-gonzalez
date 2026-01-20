@@ -139,13 +139,34 @@ export async function checkAutoApproval(
   riskLevel: number,
   actionCount: number = 1
 ): Promise<TrustDecision> {
+  // Low risk actions (level 1) are always auto-approved - no need to check trust
+  if (riskLevel <= 1) {
+    return {
+      canAutoApprove: true,
+      requiresApproval: false,
+      reason: 'Acción de bajo riesgo - auto-aprobada',
+      trustLevel: 1,
+      riskLevel,
+    };
+  }
+
   const trust = await getHouseholdTrust(householdId);
 
   if (!trust) {
+    // If no trust config exists, allow low-medium risk but deny high risk
+    if (riskLevel <= 2) {
+      return {
+        canAutoApprove: true,
+        requiresApproval: false,
+        reason: 'Acción de riesgo moderado - permitida por defecto',
+        trustLevel: 1,
+        riskLevel,
+      };
+    }
     return {
       canAutoApprove: false,
       requiresApproval: true,
-      reason: 'No se pudo obtener configuración de confianza',
+      reason: 'Esta acción requiere aprobación',
       trustLevel: 1,
       riskLevel,
     };

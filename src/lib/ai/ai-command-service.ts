@@ -76,9 +76,16 @@ export async function getFunctionConfig(functionName: string): Promise<AIFunctio
 
 /**
  * Obtiene el nivel de riesgo de una función
- * Retorna nivel 2 (medium) por defecto si no se encuentra
+ * Las funciones de lectura (get_*, search_*, suggest_*, list_*, calculate_*) siempre son LOW
+ * Retorna nivel 2 (medium) por defecto para funciones de escritura si no se encuentra config
  */
 export async function getFunctionRiskLevel(functionName: string): Promise<AIRiskLevel> {
+  // Funciones de solo lectura siempre son de bajo riesgo
+  const readOnlyPrefixes = ['get_', 'search_', 'suggest_', 'list_', 'calculate_', 'execute_multi_step_task'];
+  if (readOnlyPrefixes.some(prefix => functionName.startsWith(prefix))) {
+    return AI_RISK_LEVELS.LOW as AIRiskLevel;
+  }
+
   const config = await getFunctionConfig(functionName);
   return (config?.risk_level || AI_RISK_LEVELS.MEDIUM) as AIRiskLevel;
 }
