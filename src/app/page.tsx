@@ -138,9 +138,9 @@ export default function Home() {
         )}
       </main>
 
-      {/* AI Command Center Overlay - mantiene la barra de navegación visible */}
+      {/* AI Command Center Overlay - fullscreen above everything */}
       {showAICommandCenter && (
-        <div className="fixed inset-0 z-40">
+        <div className="fixed inset-0 z-[100] bg-gray-50">
           <AICommandCenter
             onClose={() => setShowAICommandCenter(false)}
             householdId={householdId || undefined}

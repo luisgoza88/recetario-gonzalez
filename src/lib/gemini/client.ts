@@ -8,10 +8,13 @@ export function getGeminiClient(): GoogleGenAI {
     const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
 
     if (!apiKey) {
+      console.error('[Gemini] API key not found in environment variables');
       throw new Error('GOOGLE_GEMINI_API_KEY no está configurada en las variables de entorno');
     }
 
+    console.log('[Gemini] Initializing client with API key:', apiKey.substring(0, 10) + '...');
     geminiClient = new GoogleGenAI({ apiKey });
+    console.log('[Gemini] Client initialized successfully');
   }
 
   return geminiClient;

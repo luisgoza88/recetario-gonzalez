@@ -387,52 +387,84 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
         })
       });
 
-      if (!response.ok) throw new Error('AI request failed');
+      if (!response.ok) {
+        // Try to get error details from response
+        let errorDetail = '';
+        try {
+          const errorData = await response.json();
+          errorDetail = errorData.content || errorData.error || '';
+        } catch {
+          errorDetail = `Status: ${response.status}`;
+        }
+        throw new Error(errorDetail || 'AI request failed');
+      }
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let fullResponse = '';
+      // Check content type to determine how to process response
+      const contentType = response.headers.get('content-type') || '';
 
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+      if (contentType.includes('text/event-stream')) {
+        // Process streaming response
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let fullResponse = '';
 
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (data.content) {
-                  fullResponse += data.content;
-                  // Update the last assistant message
-                  setChatMessages(prev => {
-                    const newMessages = [...prev];
-                    const lastMsg = newMessages[newMessages.length - 1];
-                    if (lastMsg?.role === 'assistant') {
-                      lastMsg.content = fullResponse;
-                    } else {
-                      newMessages.push({ role: 'assistant', content: fullResponse });
-                    }
-                    return newMessages;
-                  });
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(line.slice(6));
+                  if (data.content && !data.done) {
+                    fullResponse += data.content;
+                    // Update the last assistant message
+                    setChatMessages(prev => {
+                      const newMessages = [...prev];
+                      const lastMsg = newMessages[newMessages.length - 1];
+                      if (lastMsg?.role === 'assistant') {
+                        lastMsg.content = fullResponse;
+                      } else {
+                        newMessages.push({ role: 'assistant', content: fullResponse });
+                      }
+                      return newMessages;
+                    });
+                  }
+                } catch {
+                  // Ignore parse errors
                 }
-              } catch {
-                // Ignore parse errors
               }
             }
           }
         }
-      }
 
-      if (!fullResponse) {
-        setChatMessages(prev => [...prev, { role: 'assistant', content: 'Lo siento, no pude procesar tu solicitud.' }]);
+        if (!fullResponse) {
+          setChatMessages(prev => [...prev, { role: 'assistant', content: 'Lo siento, no pude procesar tu solicitud.' }]);
+        }
+      } else {
+        // Process JSON response (non-streaming)
+        const data = await response.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        const assistantContent = data.content || 'No pude procesar tu solicitud.';
+        setChatMessages(prev => [...prev, { role: 'assistant', content: assistantContent }]);
       }
     } catch (error) {
       console.error('Chat error:', error);
-      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Error al conectar con la IA. Intenta de nuevo.' }]);
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: errorMessage.includes('Status') || errorMessage.includes('network') || errorMessage.includes('fetch')
+          ? '⚠️ Error de conexión. Verifica tu internet e intenta de nuevo.'
+          : `⚠️ ${errorMessage || 'Error al conectar con la IA. Intenta de nuevo.'}`
+      }]);
     } finally {
       setIsProcessingChat(false);
     }
@@ -484,7 +516,7 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
   }
 
   return (
-    <div className="h-dvh bg-gray-50 overflow-hidden flex flex-col pb-24">
+    <div className="h-dvh bg-gray-50 overflow-hidden flex flex-col">
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-4 pb-6">
         <div className="flex items-center gap-3 mb-4">
@@ -622,10 +654,10 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
               )}
             </div>
 
-            {/* Chat Input - sticky at bottom with safe area for iPhone */}
+            {/* Chat Input - fixed at bottom with safe area for iPhone */}
             <div
-              className="sticky bottom-0 border-t bg-white p-4"
-              style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+              className="border-t bg-white p-4 pb-safe flex-shrink-0"
+              style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
             >
               <div className="flex gap-2 max-w-lg mx-auto">
                 <input

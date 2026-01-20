@@ -4119,8 +4119,10 @@ function getFallbackResponse(userMessage: string): string {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('[AI Assistant] POST request received');
   try {
     const body = await request.json();
+    console.log('[AI Assistant] Request body parsed, messages count:', body.messages?.length);
     const {
       messages,
       conversationContext,
@@ -4196,18 +4198,27 @@ export async function POST(request: NextRequest) {
     });
 
     // Primera llamada a Gemini con las funciones
-    const response = await gemini.models.generateContent({
-      model: GEMINI_MODELS.FLASH,
-      contents: geminiMessages,
-      config: {
-        temperature: GEMINI_CONFIG.assistant.temperature,
-        maxOutputTokens: GEMINI_CONFIG.assistant.maxOutputTokens,
-        systemInstruction: enhancedSystemPrompt,
-        tools: [{
-          functionDeclarations
-        }]
-      }
-    });
+    let response;
+    try {
+      console.log('[AI Assistant] Calling Gemini API with model:', GEMINI_MODELS.FLASH);
+      response = await gemini.models.generateContent({
+        model: GEMINI_MODELS.FLASH,
+        contents: geminiMessages,
+        config: {
+          temperature: GEMINI_CONFIG.assistant.temperature,
+          maxOutputTokens: GEMINI_CONFIG.assistant.maxOutputTokens,
+          systemInstruction: enhancedSystemPrompt,
+          tools: [{
+            functionDeclarations
+          }]
+        }
+      });
+      console.log('[AI Assistant] Gemini API response received');
+    } catch (geminiError) {
+      console.error('[AI Assistant] Gemini API error:', geminiError);
+      const errorMsg = geminiError instanceof Error ? geminiError.message : String(geminiError);
+      throw new Error(`Gemini API error: ${errorMsg}`);
+    }
 
     const candidate = response.candidates?.[0];
     const parts = candidate?.content?.parts || [];
@@ -4616,6 +4627,15 @@ export async function POST(request: NextRequest) {
     if (errorMessage.includes('SAFETY') || errorMessage.includes('blocked')) {
       return NextResponse.json({
         content: 'Lo siento, no puedo procesar esa solicitud. ¿En qué más puedo ayudarte?',
+        role: 'assistant'
+      });
+    }
+
+    // Si es un error de API key
+    if (errorMessage.includes('API_KEY') || errorMessage.includes('apiKey') || errorMessage.includes('GEMINI')) {
+      console.error('Gemini API Key error - check GOOGLE_GEMINI_API_KEY env variable');
+      return NextResponse.json({
+        content: '⚠️ Error de configuración del asistente IA. Contacta al administrador.',
         role: 'assistant'
       });
     }
