@@ -87,6 +87,35 @@ interface UseAIChatOptions {
   onToolEvent?: (tool: ActiveTool) => void;
 }
 
+// Helper para detectar si el mensaje es una acción (write) o consulta (read)
+function isActionMessage(content: string): boolean {
+  const actionPatterns = [
+    // Acciones de escritura
+    /\b(agrega|agregar|añade|añadir)\b/i,
+    /\b(crea|crear|nuevo|nueva)\b/i,
+    /\b(elimina|eliminar|borra|borrar|quita|quitar)\b/i,
+    /\b(cambia|cambiar|modifica|modificar|actualiza|actualizar)\b/i,
+    /\b(marca|marcar|desmarca|desmarcar)\b/i,
+    /\b(mueve|mover|reprograma|reprogramar)\b/i,
+    /\b(registra|registrar)\b/i,
+    /\b(asigna|asignar)\b/i,
+    /\b(completa|completar)\b/i,
+    // Comandos directos
+    /\b(pon|poner)\s+(en|a)\b/i,
+    /\b(quiero|necesito)\s+(agregar|crear|cambiar)\b/i,
+    // Acciones con "la lista de compras"
+    /agreg[ao]\s+.+\s+a\s+(la\s+)?lista/i,
+    /quita\s+.+\s+de\s+(la\s+)?lista/i,
+  ];
+
+  for (const pattern of actionPatterns) {
+    if (pattern.test(content)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function useAIChat(options: UseAIChatOptions = {}) {
   const {
     maxHistoryMessages = 20,
@@ -177,15 +206,21 @@ export function useAIChat(options: UseAIChatOptions = {}) {
       const history = [...historyMessages, currentMessage];
       const conversationContext = await getAIContext();
 
-      const response = await fetch('/api/ai-assistant', {
+      // Determinar qué endpoint usar basado en si es consulta o acción
+      const isAction = isActionMessage(userMessage.content);
+      const endpoint = isAction ? '/api/ai-assistant' : '/api/ai-assistant/chat';
+
+      console.log(`[useAIChat] Using ${isAction ? 'action' : 'query'} endpoint for: "${userMessage.content.substring(0, 50)}..."`);
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: history,
           conversationContext,
           stream: true,
-          householdId,
-          userId,
+          // Solo enviar householdId/userId para acciones (endpoint principal)
+          ...(isAction && { householdId, userId }),
         }),
       });
 
