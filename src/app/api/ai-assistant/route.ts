@@ -908,7 +908,7 @@ async function getRecipeDetails(recipeName: string) {
       requested_recipe: recipeName,
       instruction: `La receta "${recipeName}" no está en la base de datos. DEBES usar tu conocimiento culinario general para ayudar al usuario. Proporciona los ingredientes típicos de esta receta y los pasos de preparación. Verifica qué ingredientes tiene el usuario usando la lista de inventario disponible.`,
       user_inventory: availableIngredients,
-      action_required: 'Usa tu conocimiento general de cocina para dar la receta completa. Indica qué ingredientes de la lista tiene el usuario (✅) y cuáles le faltan (❌). Ofrece agregar los faltantes a la lista de compras.'
+      action_required: 'Usa tu conocimiento general de cocina para dar la receta completa. Indica qué ingredientes tiene el usuario (disponible) y cuáles le faltan. Ofrece agregar los faltantes a la lista de compras.'
     };
   }
 
@@ -2655,7 +2655,7 @@ async function swapMenuRecipe(dayNumber: number, mealType: string, newRecipeName
 
   return {
     success: true,
-    message: `✅ ${mealTypeSpanish[mealType]} del día ${dayNumber} cambiado a "${recipe.name}"`
+    message: `${mealTypeSpanish[mealType]} del día ${dayNumber} cambiado a "${recipe.name}"`
   };
 }
 
@@ -2702,7 +2702,7 @@ async function updateInventory(itemName: string, quantity: number, action: strin
 
   return {
     success: true,
-    message: `✅ ${item.name}: ${currentQty} → ${newQuantity}`,
+    message: `${item.name}: ${currentQty} → ${newQuantity}`,
     item: item.name,
     previous: currentQty,
     current: newQuantity
@@ -2869,8 +2869,8 @@ async function getLowInventoryAlerts(threshold: number = 2) {
     low_count: totalAlerts - criticalCount,
     by_category: grouped,
     message: totalAlerts === 0
-      ? '✅ No hay alertas de inventario'
-      : `⚠️ ${criticalCount} items agotados, ${totalAlerts - criticalCount} items bajos`
+      ? 'No hay alertas de inventario'
+      : `${criticalCount} items agotados, ${totalAlerts - criticalCount} items bajos`
   };
 }
 
@@ -3009,7 +3009,7 @@ async function getPreparationTips() {
   });
 
   if (tips.length === 0) {
-    tips.push('✅ No hay preparaciones especiales necesarias para hoy');
+    tips.push('No hay preparaciones especiales necesarias para hoy');
   }
 
   return {
@@ -3057,7 +3057,7 @@ async function executeMultiStepTask(
       }
 
       const recipeDetails = await getRecipeDetails(recipeName);
-      stepsCompleted.push('✅ Buscar receta en base de datos');
+      stepsCompleted.push('Buscar receta en base de datos');
       results.recipe = recipeDetails;
 
       // Si la receta no existe, indicar que use conocimiento general
@@ -3066,7 +3066,7 @@ async function executeMultiStepTask(
 
         // Obtener inventario para comparar
         const inventory = await getInventory();
-        stepsCompleted.push('✅ Obtener inventario disponible');
+        stepsCompleted.push('Obtener inventario disponible');
         results.inventory = inventory;
 
         return {
@@ -3075,7 +3075,7 @@ async function executeMultiStepTask(
           results,
           summary: `La receta "${recipeName}" no está en la base de datos, pero puedo ayudarte usando mi conocimiento culinario.`,
           use_general_knowledge: true,
-          instruction: `IMPORTANTE: Debes usar tu conocimiento general de cocina para dar los ingredientes y pasos de "${recipeName}". Compara con el inventario del usuario y marca ✅ lo que tiene y ❌ lo que le falta. Ofrece agregar faltantes a la lista de compras.`,
+          instruction: `IMPORTANTE: Debes usar tu conocimiento general de cocina para dar los ingredientes y pasos de "${recipeName}". Compara con el inventario del usuario e indica cuáles tiene disponibles y cuáles le faltan. Ofrece agregar faltantes a la lista de compras.`,
           next_suggestions: [
             'Dame los ingredientes y pasos',
             'Agrega lo que me falta a la lista',
@@ -3086,20 +3086,20 @@ async function executeMultiStepTask(
 
       // Paso 2: Verificar ingredientes (solo si la receta existe)
       const missingCheck = await getMissingIngredients(recipeName);
-      stepsCompleted.push('✅ Verificar ingredientes en inventario');
+      stepsCompleted.push('Verificar ingredientes en inventario');
       results.ingredients_check = missingCheck;
 
       // Paso 3: Si hay faltantes, agregarlos a la lista
       const missingCount = ('missing_count' in missingCheck ? missingCheck.missing_count : 0) || 0;
       if (missingCount && missingCount > 0) {
         const addResult = await addMissingToShopping(recipeName);
-        stepsCompleted.push('✅ Agregar faltantes a lista de compras');
+        stepsCompleted.push('Agregar faltantes a lista de compras');
         results.shopping_added = addResult;
       }
 
       // Paso 4: Obtener tips de preparación
       const tips = await getPreparationTips();
-      stepsCompleted.push('✅ Generar consejos de preparación');
+      stepsCompleted.push('Generar consejos de preparación');
       results.tips = tips;
 
       return {
@@ -3122,22 +3122,22 @@ async function executeMultiStepTask(
     case 'weekly_planning': {
       // Paso 1: Obtener menú de la semana
       const weekMenu = await getWeekMenu();
-      stepsCompleted.push('✅ Obtener menú de la semana');
+      stepsCompleted.push('Obtener menú de la semana');
       results.menu = weekMenu;
 
       // Paso 2: Obtener inventario actual
       const inventory = await getInventory();
-      stepsCompleted.push('✅ Revisar inventario actual');
+      stepsCompleted.push('Revisar inventario actual');
       results.inventory = inventory;
 
       // Paso 3: Generar lista de compras inteligente
       const shoppingList = await smartShoppingList(7);
-      stepsCompleted.push('✅ Generar lista de compras para la semana');
+      stepsCompleted.push('Generar lista de compras para la semana');
       results.shopping_list = shoppingList;
 
       // Paso 4: Alertas de inventario bajo
       const alerts = await getLowInventoryAlerts(2);
-      stepsCompleted.push('✅ Verificar alertas de inventario');
+      stepsCompleted.push('Verificar alertas de inventario');
       results.alerts = alerts;
 
       return {
@@ -3148,7 +3148,7 @@ async function executeMultiStepTask(
           'total_items' in shoppingList ? `${shoppingList.total_items} items necesarios para comprar.` : ''
         } ${
           'critical_count' in alerts && alerts.critical_count > 0
-            ? `⚠️ ${alerts.critical_count} items agotados.`
+            ? `Alerta: ${alerts.critical_count} items agotados.`
             : ''
         }`,
         next_suggestions: [
@@ -3162,22 +3162,22 @@ async function executeMultiStepTask(
     case 'shopping_optimization': {
       // Paso 1: Obtener lista de compras actual
       const currentList = await getShoppingList();
-      stepsCompleted.push('✅ Obtener lista de compras actual');
+      stepsCompleted.push('Obtener lista de compras actual');
       results.current_list = currentList;
 
       // Paso 2: Obtener alertas de bajo inventario
       const alerts = await getLowInventoryAlerts(3);
-      stepsCompleted.push('✅ Identificar items con bajo stock');
+      stepsCompleted.push('Identificar items con bajo stock');
       results.low_stock = alerts;
 
       // Paso 3: Analizar próximas comidas
       const upcomingMeals = await getUpcomingMeals(5);
-      stepsCompleted.push('✅ Analizar comidas de los próximos 5 días');
+      stepsCompleted.push('Analizar comidas de los próximos 5 días');
       results.upcoming = upcomingMeals;
 
       // Paso 4: Generar lista optimizada
       const smartList = await smartShoppingList(5);
-      stepsCompleted.push('✅ Generar lista optimizada');
+      stepsCompleted.push('Generar lista optimizada');
       results.optimized_list = smartList;
 
       const currentCount = 'total' in currentList ? currentList.total : (currentList.items?.length || 0);
@@ -3200,32 +3200,32 @@ async function executeMultiStepTask(
     case 'full_report': {
       // Paso 1: Info de fecha actual
       const dateInfo = getCurrentDateInfo();
-      stepsCompleted.push('✅ Obtener información del día');
+      stepsCompleted.push('Obtener información del día');
       results.date = dateInfo;
 
       // Paso 2: Menú de hoy
       const todayMenu = await getTodayMenu();
-      stepsCompleted.push('✅ Obtener menú de hoy');
+      stepsCompleted.push('Obtener menú de hoy');
       results.today_menu = todayMenu;
 
       // Paso 3: Tareas del día
       const tasks = await getTodayTasks();
-      stepsCompleted.push('✅ Obtener tareas del día');
+      stepsCompleted.push('Obtener tareas del día');
       results.tasks = tasks;
 
       // Paso 4: Resumen de tareas
       const tasksSummary = await getTasksSummary();
-      stepsCompleted.push('✅ Calcular progreso de tareas');
+      stepsCompleted.push('Calcular progreso de tareas');
       results.tasks_summary = tasksSummary;
 
       // Paso 5: Alertas de inventario
       const inventoryAlerts = await getLowInventoryAlerts(2);
-      stepsCompleted.push('✅ Revisar alertas de inventario');
+      stepsCompleted.push('Revisar alertas de inventario');
       results.inventory_alerts = inventoryAlerts;
 
       // Paso 6: Tips de preparación
       const prepTips = await getPreparationTips();
-      stepsCompleted.push('✅ Generar consejos del día');
+      stepsCompleted.push('Generar consejos del día');
       results.tips = prepTips;
 
       return {
@@ -3236,8 +3236,8 @@ async function executeMultiStepTask(
           'progress_percent' in tasksSummary ? `Tareas: ${tasksSummary.progress_percent}% completadas.` : ''
         } ${
           'critical_count' in inventoryAlerts && inventoryAlerts.critical_count > 0
-            ? `⚠️ ${inventoryAlerts.critical_count} items de inventario agotados.`
-            : '✅ Inventario en buen estado.'
+            ? `Alerta: ${inventoryAlerts.critical_count} items de inventario agotados.`
+            : 'Inventario en buen estado.'
         }`,
         next_suggestions: [
           'Ver detalle de tareas pendientes',
@@ -3250,7 +3250,7 @@ async function executeMultiStepTask(
     case 'menu_from_inventory': {
       // Paso 1: Obtener inventario completo
       const inventory = await getInventory();
-      stepsCompleted.push('✅ Analizar inventario disponible');
+      stepsCompleted.push('Analizar inventario disponible');
       results.inventory = inventory;
 
       // Paso 2: Sugerir recetas basadas en inventario
@@ -3301,7 +3301,7 @@ async function executeMultiStepTask(
 
       // Ordenar por match_percent
       suggestions.sort((a, b) => b.match_percent - a.match_percent);
-      stepsCompleted.push('✅ Calcular compatibilidad de recetas');
+      stepsCompleted.push('Calcular compatibilidad de recetas');
       results.suggestions = suggestions.slice(0, 10);
 
       return {
@@ -3994,19 +3994,15 @@ async function executeFunction(name: string, args: Record<string, unknown>) {
 // API ROUTE
 // ============================================
 
-const SYSTEM_PROMPT = `Eres el Asistente del Hogar González. Ayudas con recetas, menú, inventario y tareas del hogar.
+const SYSTEM_PROMPT = `Eres el asistente del hogar González. Ayudas con recetas, menú, inventario y tareas del hogar.
 
-## REGLAS IMPORTANTES
+## REGLAS
 
-1. **USA LAS FUNCIONES** para obtener datos reales. NUNCA escribas código ni llames funciones con texto.
+1. USA LAS FUNCIONES para obtener datos reales. No inventes datos.
 
-2. **SIEMPRE AYUDA con recetas**: Si una receta no está en la base de datos, usa tu conocimiento culinario para dar ingredientes y pasos. Verifica el inventario y marca ✅ lo que tiene y ❌ lo que falta.
+2. SIEMPRE AYUDA con recetas: Si una receta no está en la base de datos, usa tu conocimiento culinario para dar ingredientes y pasos.
 
-3. **Usa execute_multi_step_task** para tareas complejas:
-   - "Ayúdame a hacer X" → task_type: "prepare_recipe"
-   - "Planifica la semana" → task_type: "weekly_planning"
-   - "Reporte del hogar" → task_type: "full_report"
-   - "Qué puedo cocinar" → task_type: "menu_from_inventory"
+3. Para tareas complejas usa execute_multi_step_task con task_type apropiado.
 
 ## DATOS DEL HOGAR
 - Ciclo de menú: 12 días
@@ -4014,20 +4010,21 @@ const SYSTEM_PROMPT = `Eres el Asistente del Hogar González. Ayudas con recetas
 - Viernes/Sábado: Sin cena (salen a comer)
 
 ## FORMATO DE RESPUESTAS
-- Usa **negritas** para destacar
-- Usa listas con bullets
-- Máximo 3-4 párrafos
-- Emojis con moderación (1-2 por respuesta)
+- Sé conciso y directo
+- Usa negritas solo para títulos o datos importantes
+- Listas con guiones simples
+- NO uses emojis ni iconos (nada de ✅❌🍳 etc.)
+- Respuestas cortas, máximo 2-3 párrafos
+- Tono profesional y amigable
 
 ## CUANDO LA RECETA NO EXISTE
 Si get_recipe_details devuelve recipe_not_found=true:
-1. Llama get_inventory() para ver qué tiene el usuario
-2. Da los ingredientes típicos de la receta
-3. Marca ✅ los que tiene y ❌ los que faltan
-4. Ofrece agregar faltantes a la lista de compras
-5. Da los pasos de preparación
+1. Llama get_inventory() para verificar ingredientes
+2. Proporciona los ingredientes típicos indicando cuáles tiene y cuáles faltan (en texto, sin iconos)
+3. Ofrece agregar faltantes a la lista de compras
+4. Da los pasos de preparación
 
-NUNCA digas solo "no tengo esa receta" - SIEMPRE ayuda con tu conocimiento culinario.`;
+NUNCA digas solo "no tengo esa receta" - SIEMPRE ayuda con tu conocimiento.`;
 
 // Helper for tool streaming events
 interface ToolStreamEvent {
@@ -4138,22 +4135,22 @@ function getFallbackResponse(userMessage: string): string {
   const msg = userMessage.toLowerCase();
 
   if (msg.includes('menú') || msg.includes('menu') || msg.includes('almuerzo') || msg.includes('cena') || msg.includes('desayuno')) {
-    return '🍽️ Déjame revisar el menú de hoy. ¿Qué comida te interesa: desayuno, almuerzo o cena?';
+    return 'Déjame revisar el menú de hoy. ¿Qué comida te interesa: desayuno, almuerzo o cena?';
   }
 
   if (msg.includes('receta') || msg.includes('cocinar') || msg.includes('preparar') || msg.includes('hacer')) {
-    return '👨‍🍳 ¡Con gusto te ayudo! ¿Qué receta te gustaría preparar?';
+    return 'Con gusto te ayudo. ¿Qué receta te gustaría preparar?';
   }
 
   if (msg.includes('inventario') || msg.includes('ingredientes') || msg.includes('tengo')) {
-    return '📦 Déjame revisar qué ingredientes tienes disponibles. Un momento...';
+    return 'Déjame revisar qué ingredientes tienes disponibles. Un momento...';
   }
 
   if (msg.includes('compra') || msg.includes('lista') || msg.includes('mercado')) {
-    return '🛒 Te ayudo con la lista de compras. ¿Qué necesitas agregar o revisar?';
+    return 'Te ayudo con la lista de compras. ¿Qué necesitas agregar o revisar?';
   }
 
-  return '¡Hola! Soy tu asistente del hogar. ¿En qué puedo ayudarte hoy? Puedo ayudarte con recetas, el menú, inventario o la lista de compras.';
+  return 'Hola, soy tu asistente del hogar. Puedo ayudarte con recetas, el menú, inventario o la lista de compras.';
 }
 
 export async function POST(request: NextRequest) {
@@ -4305,7 +4302,7 @@ export async function POST(request: NextRequest) {
         if (!rateLimitCheck.allowed) {
           return NextResponse.json({
             type: 'error',
-            content: `⚠️ ${rateLimitCheck.reason}\n\nPor favor, espera un momento antes de realizar más acciones.`,
+            content: `${rateLimitCheck.reason}\n\nPor favor, espera un momento antes de realizar más acciones.`,
             role: 'assistant',
             rateLimited: true,
             sessionId,
@@ -4321,7 +4318,7 @@ export async function POST(request: NextRequest) {
             if (!bulkCheck.allowed) {
               return NextResponse.json({
                 type: 'error',
-                content: `⚠️ ${bulkCheck.reason}\n\nEl límite actual es de ${bulkCheck.limit} items por operación. Intenta dividir la operación en partes más pequeñas.`,
+                content: `${bulkCheck.reason}\n\nEl límite actual es de ${bulkCheck.limit} items por operación. Intenta dividir la operación en partes más pequeñas.`,
                 role: 'assistant',
                 bulkLimited: true,
                 sessionId,
@@ -4656,7 +4653,7 @@ export async function POST(request: NextRequest) {
     // Si es un error de red/timeout, dar respuesta amigable
     if (errorMessage.includes('timeout') || errorMessage.includes('network') || errorMessage.includes('fetch')) {
       return NextResponse.json({
-        content: '⚠️ Tuve un problema de conexión. Por favor intenta de nuevo en unos segundos.',
+        content: 'Tuve un problema de conexión. Por favor intenta de nuevo en unos segundos.',
         role: 'assistant'
       });
     }
@@ -4673,7 +4670,7 @@ export async function POST(request: NextRequest) {
     if (errorMessage.includes('API_KEY') || errorMessage.includes('apiKey') || errorMessage.includes('GEMINI')) {
       console.error('Gemini API Key error - check GOOGLE_GEMINI_API_KEY env variable');
       return NextResponse.json({
-        content: '⚠️ Error de configuración del asistente IA. Contacta al administrador.',
+        content: 'Error de configuración del asistente IA. Contacta al administrador.',
         role: 'assistant'
       });
     }
