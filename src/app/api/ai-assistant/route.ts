@@ -433,7 +433,7 @@ La función ejecutará automáticamente todos los pasos necesarios y reportará 
         name: { type: Type.STRING, description: 'Nombre completo del empleado' },
         role: { type: Type.STRING, description: 'Rol: empleada_domestica, niñera, jardinero, conductor, cocinero, cuidador, mantenimiento, seguridad, otro' },
         zone: { type: Type.STRING, description: 'Zona de trabajo principal' },
-        work_days: { type: Type.ARRAY, description: 'Días de trabajo: ["lunes", "martes", ...]' },
+        work_days: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'Días de trabajo: ["lunes", "martes", ...]' },
         hours_per_day: { type: Type.NUMBER, description: 'Horas de trabajo por día' },
         schedule: { type: Type.STRING, description: 'Horario (ej: "8:00 AM - 4:00 PM")' },
         phone: { type: Type.STRING, description: 'Teléfono de contacto' },
@@ -452,7 +452,7 @@ La función ejecutará automáticamente todos los pasos necesarios y reportará 
         name: { type: Type.STRING, description: 'Nuevo nombre' },
         role: { type: Type.STRING, description: 'Nuevo rol' },
         zone: { type: Type.STRING, description: 'Nueva zona' },
-        work_days: { type: Type.ARRAY, description: 'Nuevos días de trabajo' },
+        work_days: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'Nuevos días de trabajo' },
         hours_per_day: { type: Type.NUMBER, description: 'Nuevas horas por día' },
         schedule: { type: Type.STRING, description: 'Nuevo horario' },
         phone: { type: Type.STRING, description: 'Nuevo teléfono' },
@@ -577,8 +577,19 @@ La función ejecutará automáticamente todos los pasos necesarios y reportará 
       properties: {
         name: { type: Type.STRING, description: 'Nombre de la receta' },
         type: { type: Type.STRING, description: 'Tipo de comida: breakfast, lunch o dinner' },
-        ingredients: { type: Type.ARRAY, description: 'Lista de ingredientes con cantidades para Luis y Mariana' },
-        steps: { type: Type.ARRAY, description: 'Pasos de preparación' },
+        ingredients: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              item: { type: Type.STRING, description: 'Nombre del ingrediente' },
+              quantity_luis: { type: Type.STRING, description: 'Cantidad para Luis (3 porciones)' },
+              quantity_mariana: { type: Type.STRING, description: 'Cantidad para Mariana (2 porciones)' }
+            }
+          },
+          description: 'Lista de ingredientes con cantidades para Luis y Mariana'
+        },
+        steps: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'Pasos de preparación' },
         prep_time: { type: Type.NUMBER, description: 'Tiempo de preparación en minutos' },
         cook_time: { type: Type.NUMBER, description: 'Tiempo de cocción en minutos' },
         difficulty: { type: Type.STRING, description: 'Dificultad: fácil, media o difícil' },
@@ -597,8 +608,19 @@ La función ejecutará automáticamente todos los pasos necesarios y reportará 
         recipe_id: { type: Type.STRING, description: 'ID de la receta a actualizar' },
         name: { type: Type.STRING, description: 'Nuevo nombre' },
         type: { type: Type.STRING, description: 'Nuevo tipo de comida' },
-        ingredients: { type: Type.ARRAY, description: 'Nueva lista de ingredientes' },
-        steps: { type: Type.ARRAY, description: 'Nuevos pasos' },
+        ingredients: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              item: { type: Type.STRING, description: 'Nombre del ingrediente' },
+              quantity_luis: { type: Type.STRING, description: 'Cantidad para Luis' },
+              quantity_mariana: { type: Type.STRING, description: 'Cantidad para Mariana' }
+            }
+          },
+          description: 'Nueva lista de ingredientes'
+        },
+        steps: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'Nuevos pasos' },
         prep_time: { type: Type.NUMBER, description: 'Nuevo tiempo de preparación' },
         cook_time: { type: Type.NUMBER, description: 'Nuevo tiempo de cocción' },
         difficulty: { type: Type.STRING, description: 'Nueva dificultad' },
@@ -631,6 +653,14 @@ La función ejecutará automáticamente todos los pasos necesarios y reportará 
       properties: {
         updates: {
           type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              item_name: { type: Type.STRING, description: 'Nombre del item' },
+              quantity: { type: Type.NUMBER, description: 'Cantidad' },
+              action: { type: Type.STRING, description: 'Acción: set, add, subtract' }
+            }
+          },
           description: 'Lista de actualizaciones: [{item_name, quantity, action}]'
         },
         confirm: { type: Type.BOOLEAN, description: 'Confirmación explícita' }
@@ -646,6 +676,14 @@ La función ejecutará automáticamente todos los pasos necesarios y reportará 
       properties: {
         items: {
           type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              name: { type: Type.STRING, description: 'Nombre del producto' },
+              quantity: { type: Type.NUMBER, description: 'Cantidad' },
+              unit: { type: Type.STRING, description: 'Unidad (kg, g, unidades, etc.)' }
+            }
+          },
           description: 'Lista de items del ticket: [{name, quantity, unit}]'
         }
       },
