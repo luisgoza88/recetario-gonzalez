@@ -23,7 +23,7 @@ export interface KitchenTask {
   scheduled_time?: string;
   estimated_minutes: number;
   priority: 'alta' | 'normal' | 'baja';
-  status: 'pending' | 'in_progress' | 'completed' | 'skipped';
+  status: 'pendiente' | 'en_progreso' | 'completada' | 'omitida';
   ingredients?: string[];
   notes?: string;
   created_at?: string;
@@ -156,7 +156,7 @@ function analyzeRecipeForTasks(
               scheduled_time: taskDateTime.toTimeString().slice(0, 5),
               estimated_minutes: rule.estimatedMinutes,
               priority: rule.priority,
-              status: 'pending',
+              status: 'pendiente',
               ingredients: [ing.name]
             });
           }
@@ -183,7 +183,7 @@ function analyzeRecipeForTasks(
         scheduled_time: cookStartTime.toTimeString().slice(0, 5),
         estimated_minutes: cookTime,
         priority: 'alta',
-        status: 'pending'
+        status: 'pendiente'
       });
     }
   }
@@ -257,27 +257,43 @@ export async function generateKitchenTasks(daysAhead: number = 3): Promise<Kitch
 /**
  * Guardar tareas generadas en la base de datos
  */
-export async function saveKitchenTasks(tasks: KitchenTask[]): Promise<void> {
-  // Verificar si existe la tabla kitchen_tasks, si no, usar scheduled_tasks
+export async function saveKitchenTasks(
+  tasks: KitchenTask[],
+  householdId?: string,
+  kitchenSpaceId?: string
+): Promise<void> {
+  if (!householdId || tasks.length === 0) {
+    return;
+  }
+
   for (const task of tasks) {
+    const taskKey = [
+      task.scheduled_date,
+      task.scheduled_time || '',
+      task.recipe_id || '',
+      task.title.toLowerCase(),
+      task.type
+    ].join('|');
+
     // Verificar que no exista tarea duplicada
     const { data: existing } = await supabase
       .from('scheduled_tasks')
       .select('id')
+      .eq('household_id', householdId)
       .eq('scheduled_date', task.scheduled_date)
-      .ilike('notes', `%${task.recipe_id}%`)
+      .ilike('notes', `%"kitchen_key":"${taskKey}"%`)
       .limit(1);
 
     if (existing && existing.length > 0) continue;
 
-    // Insertar nueva tarea
-    // Nota: Esto asume que tienes un task_template para tareas de cocina
-    // En producción, deberías crear una tabla específica kitchen_tasks
     await supabase.from('scheduled_tasks').insert({
+      household_id: householdId,
+      space_id: kitchenSpaceId || null,
       scheduled_date: task.scheduled_date,
       status: 'pendiente',
       notes: JSON.stringify({
         kitchen_task: true,
+        kitchen_key: taskKey,
         task_type: task.type,
         title: task.title,
         description: task.description,
@@ -364,8 +380,7 @@ export async function getPrepSummary(): Promise<{
  */
 export async function createTaskReminder(task: KitchenTask): Promise<void> {
   // Esta función podría integrarse con el sistema de notificaciones existente
-  // Por ahora, solo logueamos
-  console.log(`Reminder: ${task.title} at ${task.scheduled_time}`);
+  // TODO: integrar con sistema de notificaciones push
 
   // En producción, integrar con sistema de notificaciones push
   // o crear un record en una tabla de reminders
@@ -386,24 +401,10 @@ export async function syncWithHouseholdTasks(householdId: string): Promise<void>
     .single();
 
   if (!kitchen) {
-    console.log('No se encontró espacio de cocina');
+    console.warn('No se encontró espacio de cocina');
     return;
   }
 
-  // Crear tareas en el sistema de hogar
-  for (const task of tasks) {
-    await supabase.from('scheduled_tasks').insert({
-      household_id: householdId,
-      space_id: kitchen.id,
-      scheduled_date: task.scheduled_date,
-      status: 'pendiente',
-      notes: JSON.stringify({
-        kitchen_task: true,
-        type: task.type,
-        recipe: task.recipe_name,
-        meal: task.meal_type,
-        time: task.scheduled_time
-      })
-    });
-  }
+  // Crear tareas en el sistema de hogar evitando duplicados.
+  await saveKitchenTasks(tasks, householdId, kitchen.id);
 }

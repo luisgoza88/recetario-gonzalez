@@ -134,7 +134,7 @@ export async function generateProactiveAlerts(): Promise<ProactiveAlert[]> {
 
     // Store new alerts
     for (const alert of alerts) {
-      const stored = addAlert({
+      addAlert({
         type: alert.type,
         title: alert.title,
         body: alert.body,
@@ -165,15 +165,18 @@ async function checkMorningTasks(): Promise<ProactiveAlert[]> {
   const today = new Date().toISOString().split('T')[0];
 
   const { data: tasks } = await supabase
-    .from('daily_task_instances')
-    .select('task_name, time_start, employee:home_employees(name)')
-    .eq('date', today)
-    .eq('status', 'pending')
-    .order('time_start')
+    .from('scheduled_tasks')
+    .select('task_template:task_templates(name), employee:home_employees!scheduled_tasks_employee_id_fkey(name)')
+    .eq('scheduled_date', today)
+    .eq('status', 'pendiente')
+    .order('created_at')
     .limit(5);
 
   if (tasks && tasks.length > 0) {
-    const taskList = tasks.slice(0, 3).map(t => t.task_name).join(', ');
+    const taskList = tasks
+      .slice(0, 3)
+      .map((t) => (t.task_template as { name?: string } | null)?.name || 'Tarea')
+      .join(', ');
     alerts.push({
       id: '',
       type: 'task_reminder',
@@ -210,8 +213,7 @@ async function checkLunchPreparation(): Promise<ProactiveAlert | null> {
 
   if (!menu?.lunch) return null;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const lunch = menu.lunch as any;
+  const lunch = menu.lunch as { name?: string; prep_time?: number; ingredients?: unknown[] };
   const prepTime = lunch.prep_time || 30;
 
   // Check if any ingredients need defrosting
@@ -260,8 +262,7 @@ async function checkDinnerPreparation(): Promise<ProactiveAlert | null> {
 
   if (!menu?.dinner) return null;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const dinner = menu.dinner as any;
+  const dinner = menu.dinner as { name?: string; prep_time?: number };
 
   return {
     id: '',
@@ -319,13 +320,13 @@ async function generateEveningSummary(): Promise<ProactiveAlert | null> {
 
   // Get today's task completion
   const { data: tasks } = await supabase
-    .from('daily_task_instances')
+    .from('scheduled_tasks')
     .select('status')
-    .eq('date', today);
+    .eq('scheduled_date', today);
 
   if (!tasks || tasks.length === 0) return null;
 
-  const completed = tasks.filter(t => t.status === 'completed').length;
+  const completed = tasks.filter(t => t.status === 'completada').length;
   const total = tasks.length;
   const percent = Math.round((completed / total) * 100);
 
@@ -356,8 +357,7 @@ async function generateEveningSummary(): Promise<ProactiveAlert | null> {
     .eq('day_number', cycleDay)
     .single();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const lunchName = (menu?.lunch as any)?.name || 'Sin programar';
+  const lunchName = (menu?.lunch as { name?: string } | null)?.name || 'Sin programar';
 
   return {
     id: '',
