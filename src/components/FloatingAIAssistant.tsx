@@ -1,18 +1,19 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
 import {
   Send, Bot, User, Sparkles, Loader2,
-  Calendar, ShoppingCart, Home, UtensilsCrossed,
+  Calendar, ShoppingCart, Home,
   ChefHat, RefreshCw, X, Mic, MicOff, Volume2, VolumeX,
   Camera, Image as ImageIcon, Minimize2, Maximize2,
   AlertCircle, ChevronRight
 } from 'lucide-react';
-import { useAIChat, parseMessageContent, type Message, type MessageAction } from '@/lib/hooks/useAIChat';
+import { useAIChat, parseMessageContent, type MessageAction } from '@/lib/hooks/useAIChat';
 import { useVoiceInput } from '@/lib/hooks/useVoiceInput';
 import { useImageInput } from '@/lib/hooks/useImageInput';
 import { useProactiveAlerts } from '@/lib/hooks/useProactiveAlerts';
-import { useAIProposal, type Proposal } from '@/lib/hooks/useAIProposal';
+import { useAIProposal } from '@/lib/hooks/useAIProposal';
 import { ProposalCard } from '@/components/ai/ProposalCard';
 import { UndoToastContainer } from '@/components/ai/UndoToast';
 import { ContextPills } from '@/components/ai/ContextPills';
@@ -57,46 +58,20 @@ const getContextualActions = (section: ActiveSection): QuickAction[] => {
   }
 };
 
-// Format message with markdown-like styling
+// Format message with ReactMarkdown (XSS-safe)
 function FormattedMessage({ content }: { content: string }) {
-  const lines = content.split('\n');
-
   return (
-    <div className="text-sm space-y-1">
-      {lines.map((line, i) => {
-        let formatted = line.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-
-        if (line.match(/^[✅❌⚠️📝💡🍽️⏱️🧊📊]/)) {
-          return (
-            <p
-              key={i}
-              className="flex items-start gap-1"
-              dangerouslySetInnerHTML={{ __html: formatted }}
-            />
-          );
-        }
-
-        if (line.startsWith('- ') || line.startsWith('• ')) {
-          return (
-            <p
-              key={i}
-              className="pl-3 flex items-start gap-1"
-              dangerouslySetInnerHTML={{ __html: '• ' + formatted.slice(2) }}
-            />
-          );
-        }
-
-        if (line.trim()) {
-          return (
-            <p
-              key={i}
-              dangerouslySetInnerHTML={{ __html: formatted }}
-            />
-          );
-        }
-
-        return <br key={i} />;
-      })}
+    <div className="text-sm space-y-1 prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0">
+      <ReactMarkdown
+        components={{
+          p: ({ children }) => <p className="my-1">{children}</p>,
+          ul: ({ children }) => <ul className="list-disc pl-4 my-1">{children}</ul>,
+          li: ({ children }) => <li className="my-0">{children}</li>,
+          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+        }}
+      >
+        {content}
+      </ReactMarkdown>
     </div>
   );
 }
@@ -158,7 +133,18 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
     }
   });
 
-  const image = useImageInput();
+  const {
+    selectedImage,
+    showImageOptions,
+    imageInputRef,
+    cameraInputRef,
+    handleImageSelect,
+    removeSelectedImage,
+    openCamera,
+    openGallery,
+    toggleImageOptions,
+    clearImage,
+  } = useImageInput();
 
   const chat = useAIChat({
     onSpeakResponse: voice.speakText,
@@ -201,11 +187,11 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
 
   const handleSend = async (content?: string) => {
     const messageContent = content || input;
-    if ((!messageContent.trim() && !image.selectedImage) || chat.isLoading) return;
+    if ((!messageContent.trim() && !selectedImage) || chat.isLoading) return;
 
-    await chat.sendMessage(messageContent, image.selectedImage);
+    await chat.sendMessage(messageContent, selectedImage);
     setInput('');
-    image.clearImage();
+    clearImage();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -241,10 +227,6 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
       default:
         console.log('Unknown action:', action);
     }
-  };
-
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
   };
 
   const quickActions = getContextualActions(activeSection);
@@ -474,16 +456,16 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
       )}
 
       {/* Image Preview */}
-      {image.selectedImage && (
+      {selectedImage && (
         <div className="px-3 py-2 bg-gray-50 border-t">
           <div className="relative inline-block">
             <img
-              src={image.selectedImage}
+              src={selectedImage}
               alt="Preview"
               className="h-14 w-auto rounded-lg object-cover"
             />
             <button
-              onClick={image.removeSelectedImage}
+              onClick={removeSelectedImage}
               className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600"
             >
               <X size={12} />
@@ -494,33 +476,33 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
 
       {/* Hidden file inputs */}
       <input
-        ref={image.imageInputRef}
+        ref={imageInputRef}
         type="file"
         accept="image/*"
-        onChange={image.handleImageSelect}
+        onChange={handleImageSelect}
         className="hidden"
       />
       <input
-        ref={image.cameraInputRef}
+        ref={cameraInputRef}
         type="file"
         accept="image/*"
         capture="environment"
-        onChange={image.handleImageSelect}
+        onChange={handleImageSelect}
         className="hidden"
       />
 
       {/* Image Options Popup */}
-      {image.showImageOptions && (
+      {showImageOptions && (
         <div className="absolute bottom-20 left-3 bg-white rounded-xl shadow-xl border p-1 z-50">
           <button
-            onClick={image.openCamera}
+            onClick={openCamera}
             className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 rounded-lg w-full"
           >
             <Camera size={16} className="text-purple-600" />
             <span className="text-xs font-medium">Tomar foto</span>
           </button>
           <button
-            onClick={image.openGallery}
+            onClick={openGallery}
             className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 rounded-lg w-full"
           >
             <ImageIcon size={16} className="text-purple-600" />
@@ -534,10 +516,10 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
         <div className="flex gap-1.5 items-center">
           {/* Image Button */}
           <button
-            onClick={image.toggleImageOptions}
+            onClick={toggleImageOptions}
             disabled={chat.isLoading || voice.isListening}
             className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
-              image.selectedImage
+              selectedImage
                 ? 'bg-purple-100 text-purple-600'
                 : 'bg-gray-100 text-gray-500 hover:bg-purple-50 hover:text-purple-600'
             }`}
@@ -565,7 +547,7 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
             value={voice.isListening ? voice.interimTranscript : input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={image.selectedImage ? 'Describe...' : (voice.isListening ? 'Escuchando...' : 'Escribe...')}
+            placeholder={selectedImage ? 'Describe...' : (voice.isListening ? 'Escuchando...' : 'Escribe...')}
             disabled={chat.isLoading || voice.isListening}
             className="flex-1 px-3 py-2 bg-gray-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
           />
@@ -590,10 +572,10 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
           {/* Send Button */}
           <button
             onClick={() => handleSend()}
-            disabled={(!input.trim() && !image.selectedImage) || chat.isLoading || voice.isListening}
+            disabled={(!input.trim() && !selectedImage) || chat.isLoading || voice.isListening}
             className={`
               w-9 h-9 rounded-full flex items-center justify-center transition-all
-              ${(input.trim() || image.selectedImage) && !chat.isLoading && !voice.isListening
+              ${(input.trim() || selectedImage) && !chat.isLoading && !voice.isListening
                 ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg'
                 : 'bg-gray-200 text-gray-400'
               }

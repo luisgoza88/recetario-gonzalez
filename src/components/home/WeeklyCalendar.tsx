@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import {
   ChevronLeft, ChevronRight, Calendar, CheckCircle2,
-  Clock, User, Plus, X, Circle, Edit3, CalendarDays
+  Clock, User, X, Edit3, CalendarDays
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase/client';
-import { ScheduledTask, HomeEmployee, Space, TaskStatus } from '@/types';
+import { ScheduledTask } from '@/types';
+import { useCalendarTasks, useToggleCalendarTask } from '@/lib/hooks/useWeeklyCalendar';
 
 interface WeeklyCalendarProps {
   householdId: string;
@@ -39,68 +39,25 @@ export default function WeeklyCalendar({
   const [selectedDay, setSelectedDay] = useState<DayData | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
-  const [tasks, setTasks] = useState<ScheduledTask[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (householdId) {
-      loadTasks();
-    }
-  }, [currentDate, viewMode, householdId]);
-
-  const loadTasks = async () => {
-    setLoading(true);
-
-    const { startDate, endDate } = getDateRange();
-
-    try {
-      // NOTA: Usar !scheduled_tasks_employee_id_fkey para desambiguar la relación
-      // ya que hay 2 FKs a home_employees (employee_id y completed_by)
-      const { data, error } = await supabase
-        .from('scheduled_tasks')
-        .select(`
-          *,
-          task_template:task_templates(*),
-          space:spaces(*, space_type:space_types(*)),
-          employee:home_employees!scheduled_tasks_employee_id_fkey(*)
-        `)
-        .eq('household_id', householdId)
-        .gte('scheduled_date', startDate)
-        .lte('scheduled_date', endDate)
-        .order('scheduled_date');
-
-      if (error) {
-        console.error('Error loading tasks:', error);
-      } else if (data) {
-        setTasks(data);
-      }
-    } catch (err) {
-      console.error('Unexpected error in loadTasks:', err);
-    }
-
-    setLoading(false);
-  };
-
-  const getDateRange = () => {
+  // Calculate date range
+  const { startDate, endDate } = useMemo(() => {
     if (viewMode === 'week') {
       const start = new Date(currentDate);
-      start.setDate(start.getDate() - start.getDay()); // Domingo
+      start.setDate(start.getDate() - start.getDay());
       const end = new Date(start);
-      end.setDate(end.getDate() + 6); // Sábado
-      return {
-        startDate: formatLocalDate(start),
-        endDate: formatLocalDate(end)
-      };
+      end.setDate(end.getDate() + 6);
+      return { startDate: formatLocalDate(start), endDate: formatLocalDate(end) };
     } else {
       const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
       const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-      return {
-        startDate: formatLocalDate(start),
-        endDate: formatLocalDate(end)
-      };
+      return { startDate: formatLocalDate(start), endDate: formatLocalDate(end) };
     }
-  };
+  }, [currentDate, viewMode]);
+
+  // TanStack Query
+  const { data: tasks = [], isLoading: loading } = useCalendarTasks(householdId, startDate, endDate);
+  const toggleTaskMutation = useToggleCalendarTask();
 
   const getWeekDays = (): DayData[] => {
     const days: DayData[] = [];
@@ -131,7 +88,6 @@ export default function WeeklyCalendar({
     const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
     const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
 
-    // Start from the Sunday of the first week
     const start = new Date(firstDay);
     start.setDate(start.getDate() - start.getDay());
 
@@ -174,44 +130,11 @@ export default function WeeklyCalendar({
     setCurrentDate(new Date());
   };
 
-  const toggleTaskStatus = async (task: ScheduledTask) => {
-    setUpdatingTaskId(task.id);
-    const newStatus: ScheduledTask['status'] = task.status === 'completada' ? 'pendiente' : 'completada';
-
-    try {
-      await supabase
-        .from('scheduled_tasks')
-        .update({
-          status: newStatus,
-          completed_at: newStatus === 'completada' ? new Date().toISOString() : null
-        })
-        .eq('id', task.id);
-
-      // Actualizar tareas localmente
-      setTasks(prev => prev.map(t =>
-        t.id === task.id ? { ...t, status: newStatus } : t
-      ));
-
-      // Actualizar selectedDay si está seleccionado
-      if (selectedDay) {
-        const updatedTasks: ScheduledTask[] = selectedDay.tasks.map(t =>
-          t.id === task.id ? { ...t, status: newStatus } : t
-        );
-        setSelectedDay({
-          ...selectedDay,
-          tasks: updatedTasks,
-          completedCount: updatedTasks.filter(t => t.status === 'completada').length
-        });
-      }
-    } catch (error) {
-      console.error('Error updating task:', error);
-    } finally {
-      setUpdatingTaskId(null);
-    }
+  const toggleTaskStatus = (task: ScheduledTask) => {
+    toggleTaskMutation.mutate({ task });
   };
 
   const handleDaySelect = (day: DayData) => {
-    // Si ya está seleccionado el mismo día, deseleccionar
     if (selectedDay && selectedDay.date.toDateString() === day.date.toDateString()) {
       setSelectedDay(null);
     } else {
@@ -219,15 +142,10 @@ export default function WeeklyCalendar({
     }
   };
 
-  // Función para obtener las tareas del día seleccionado en tiempo real
-  const getSelectedDayTasks = () => {
-    if (!selectedDay) return [];
-    const dateStr = formatLocalDate(selectedDay.date);
-    return tasks.filter(t => t.scheduled_date === dateStr);
-  };
-
-  // Contar tareas del día seleccionado
-  const selectedDayTasks = getSelectedDayTasks();
+  // Get tasks for the selected day from live data
+  const selectedDayTasks = selectedDay
+    ? tasks.filter(t => t.scheduled_date === formatLocalDate(selectedDay.date))
+    : [];
   const selectedDayCompletedCount = selectedDayTasks.filter(t => t.status === 'completada').length;
 
   const formatMonthYear = (date: Date) => {
@@ -245,7 +163,7 @@ export default function WeeklyCalendar({
             <Calendar size={20} />
             <span className="font-semibold">Calendario</span>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg">
+          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg">
             <X size={20} />
           </button>
         </div>
@@ -300,7 +218,6 @@ export default function WeeklyCalendar({
 
       {/* Calendar Grid */}
       <div className="p-2">
-        {/* Loading indicator */}
         {loading && (
           <div className="text-center py-4">
             <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
@@ -400,12 +317,12 @@ export default function WeeklyCalendar({
                     <div className="flex items-start gap-3">
                       <button
                         onClick={() => toggleTaskStatus(task)}
-                        disabled={updatingTaskId === task.id}
+                        disabled={toggleTaskMutation.isPending}
                         className={`mt-0.5 flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
                           task.status === 'completada'
                             ? 'bg-green-500 border-green-500 text-white'
                             : 'border-gray-300 hover:border-green-400'
-                        } ${updatingTaskId === task.id ? 'opacity-50' : ''}`}
+                        } ${toggleTaskMutation.isPending ? 'opacity-50' : ''}`}
                       >
                         {task.status === 'completada' && <CheckCircle2 size={14} />}
                       </button>
@@ -495,14 +412,12 @@ function DayCell({ day, onClick, isSelected }: DayCellProps) {
         ${!isSelected && allCompleted ? 'bg-green-50' : ''}
       `}
     >
-      {/* Date Number */}
       <div className={`text-base font-semibold ${
         isSelected ? 'text-purple-700' : day.isToday ? 'text-blue-600' : 'text-gray-700'
       }`}>
         {day.date.getDate()}
       </div>
 
-      {/* Task Indicator - simple dots */}
       {day.totalCount > 0 && (
         <div className="flex items-center gap-0.5 mt-1">
           {allCompleted ? (

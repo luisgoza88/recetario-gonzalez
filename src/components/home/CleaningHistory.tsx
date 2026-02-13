@@ -143,7 +143,7 @@ export default function CleaningHistory({
             <History size={20} />
             <span className="font-semibold">Historial de Limpieza</span>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg">
+          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg">
             <X size={20} />
           </button>
         </div>

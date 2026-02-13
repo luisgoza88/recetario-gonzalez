@@ -20,10 +20,6 @@ export interface VoiceCommand {
   description: string;
 }
 
-// Use 'any' to avoid conflicts with DOM's SpeechRecognition types
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type SpeechRecognitionInstance = any;
-
 // Common voice commands that map to quick actions
 export const VOICE_COMMANDS: VoiceCommand[] = [
   {
@@ -76,12 +72,10 @@ export function isSpeechSynthesisSupported(): boolean {
 }
 
 // Create speech recognition instance
-export function createSpeechRecognition(): SpeechRecognitionInstance | null {
+export function createSpeechRecognition(): SpeechRecognition | null {
   if (typeof window === 'undefined') return null;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const win = window as any;
-  const SpeechRecognitionClass = win.SpeechRecognition || win.webkitSpeechRecognition;
+  const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognitionClass) return null;
 
   const recognition = new SpeechRecognitionClass();
@@ -174,7 +168,7 @@ export function formatForSpeech(text: string): string {
 
 // Voice Hook State Manager
 export class VoiceManager {
-  private recognition: SpeechRecognitionInstance | null = null;
+  private recognition: SpeechRecognition | null = null;
   private onResultCallback: ((transcript: string, isFinal: boolean) => void) | null = null;
   private onErrorCallback: ((error: string) => void) | null = null;
   private onEndCallback: (() => void) | null = null;
@@ -188,8 +182,7 @@ export class VoiceManager {
   private setupListeners(): void {
     if (!this.recognition) return;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.recognition.onresult = (event: any) => {
+    this.recognition.onresult = (event: SpeechRecognitionEvent) => {
       const last = event.results.length - 1;
       const result = event.results[last];
       const transcript = result[0].transcript;
@@ -200,8 +193,7 @@ export class VoiceManager {
       }
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.recognition.onerror = (event: any) => {
+    this.recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       let errorMessage = 'Error de reconocimiento de voz';
 
       switch (event.error) {

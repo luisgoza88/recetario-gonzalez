@@ -18,6 +18,23 @@ const nextConfig: NextConfig = {
 
   // Headers de seguridad
   async headers() {
+    // CSP permite: self, Supabase, PostHog, Google APIs, y recursos inline de Next.js
+    const isDev = process.env.NODE_ENV === 'development';
+    const cspDirectives = [
+      "default-src 'self'",
+      // unsafe-inline necesario para Next.js inline styles; unsafe-eval solo en dev (hot reload)
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://us.i.posthog.com https://us-assets.i.posthog.com`,
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https://*.supabase.co https://us.i.posthog.com",
+      "font-src 'self' data:",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://generativelanguage.googleapis.com https://us.i.posthog.com https://us.posthog.com",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "upgrade-insecure-requests",
+    ].join('; ');
+
     return [
       {
         source: '/(.*)',
@@ -40,7 +57,15 @@ const nextConfig: NextConfig = {
           },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()',
+            value: 'camera=(self), microphone=(self), geolocation=()',
+          },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000; includeSubDomains; preload',
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: cspDirectives,
           },
         ],
       },

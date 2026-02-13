@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff, Mail, Lock, ChefHat, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { signIn, isLoading } = useAuth();
 
   const [email, setEmail] = useState('');
@@ -36,7 +37,9 @@ export default function LoginPage() {
         setError(result.error);
       }
     } else {
-      router.push('/');
+      const redirectParam = searchParams.get('redirect');
+      const safeRedirect = redirectParam && redirectParam.startsWith('/') ? redirectParam : '/';
+      router.push(safeRedirect);
     }
   };
 

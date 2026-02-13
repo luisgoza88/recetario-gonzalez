@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { X, Star, Camera, MessageSquare, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { ScheduledTask } from '@/types';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 
 interface CleaningRatingProps {
   task: ScheduledTask;
@@ -18,6 +19,7 @@ export default function CleaningRating({ task, onClose, onSave }: CleaningRating
   const [issues, setIssues] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  useEscapeKey(onClose);
 
   const commonIssues = [
     'Faltó sacudir',
@@ -98,7 +100,7 @@ export default function CleaningRating({ task, onClose, onSave }: CleaningRating
 
   if (saved) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-2xl p-8 text-center max-w-sm">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle2 size={32} className="text-green-600" />
@@ -111,7 +113,7 @@ export default function CleaningRating({ task, onClose, onSave }: CleaningRating
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-gradient-to-r from-amber-500 to-amber-600 text-white p-4 flex justify-between items-center">
@@ -119,7 +121,7 @@ export default function CleaningRating({ task, onClose, onSave }: CleaningRating
             <Star size={20} />
             <span className="font-semibold">Calificar Limpieza</span>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg">
+          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg">
             <X size={20} />
           </button>
         </div>

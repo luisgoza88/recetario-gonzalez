@@ -5,12 +5,13 @@
  * for AI actions per household.
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { createAuthenticatedClient } from '@/lib/supabase/server';
+import { logger } from '@/lib/logger';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+async function getClient(): Promise<SupabaseClient> {
+  return createAuthenticatedClient();
+}
 
 // ============================================
 // TYPES
@@ -102,7 +103,8 @@ const DEFAULT_TRUST_CONFIG = {
  * Get or create trust configuration for a household
  */
 export async function getHouseholdTrust(householdId: string): Promise<HouseholdTrust | null> {
-  const { data, error } = await supabase
+  const db = await getClient();
+  const { data, error } = await db
     .from('household_ai_trust')
     .select('*')
     .eq('household_id', householdId)
@@ -110,21 +112,21 @@ export async function getHouseholdTrust(householdId: string): Promise<HouseholdT
 
   if (error && error.code === 'PGRST116') {
     // No trust record exists, create one
-    const { data: newTrust, error: createError } = await supabase
+    const { data: newTrust, error: createError } = await db
       .from('household_ai_trust')
       .insert({ household_id: householdId })
       .select()
       .single();
 
     if (createError) {
-      console.error('Error creating household trust:', createError);
+      logger.error('Error creating household trust', { error: createError instanceof Error ? createError.message : String(createError) });
       return null;
     }
     return newTrust;
   }
 
   if (error) {
-    console.error('Error getting household trust:', error);
+    logger.error('Error getting household trust', { error: error instanceof Error ? error.message : String(error) });
     return null;
   }
 
@@ -229,9 +231,11 @@ export async function checkRateLimit(
     return { allowed: false, reason: 'No se pudo obtener configuración de confianza' };
   }
 
+  const db = await getClient();
+
   // Check actions per minute
   const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
-  const { count: recentActions } = await supabase
+  const { count: recentActions } = await db
     .from('ai_audit_log')
     .select('*', { count: 'exact', head: true })
     .eq('household_id', householdId)
@@ -251,7 +255,7 @@ export async function checkRateLimit(
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    const { count: criticalToday } = await supabase
+    const { count: criticalToday } = await db
       .from('ai_audit_log')
       .select('*', { count: 'exact', head: true })
       .eq('household_id', householdId)
@@ -315,6 +319,7 @@ export async function recordSuccessfulAction(householdId: string): Promise<Trust
     };
   }
 
+  const db = await getClient();
   const previousLevel = trust.trust_level;
   const newSuccessCount = trust.successful_actions + 1;
 
@@ -348,13 +353,13 @@ export async function recordSuccessfulAction(householdId: string): Promise<Trust
     updateData.max_items_per_bulk_operation = config.max_items_per_bulk_operation;
   }
 
-  const { error } = await supabase
+  const { error } = await db
     .from('household_ai_trust')
     .update(updateData)
     .eq('household_id', householdId);
 
   if (error) {
-    console.error('Error updating trust:', error);
+    logger.error('Error updating trust', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       newTrustLevel: previousLevel,
@@ -388,6 +393,7 @@ export async function recordFailedAction(householdId: string): Promise<TrustUpda
     };
   }
 
+  const db = await getClient();
   const previousLevel = trust.trust_level;
   const newFailedCount = trust.failed_actions + 1;
   const newIncidentCount = trust.incident_count + 1;
@@ -415,13 +421,13 @@ export async function recordFailedAction(householdId: string): Promise<TrustUpda
     updateData.max_items_per_bulk_operation = config.max_items_per_bulk_operation;
   }
 
-  const { error } = await supabase
+  const { error } = await db
     .from('household_ai_trust')
     .update(updateData)
     .eq('household_id', householdId);
 
   if (error) {
-    console.error('Error updating trust:', error);
+    logger.error('Error updating trust', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       newTrustLevel: previousLevel,
@@ -444,11 +450,12 @@ export async function recordFailedAction(householdId: string): Promise<TrustUpda
  * Record a rollback action
  */
 export async function recordRollback(householdId: string): Promise<void> {
-  await supabase
+  const client = await getClient();
+  await client
     .from('household_ai_trust')
     .update({
-      rolled_back_actions: supabase.rpc('increment', { x: 1 }),
-      incident_count: supabase.rpc('increment', { x: 1 }),
+      rolled_back_actions: client.rpc('increment', { x: 1 }),
+      incident_count: client.rpc('increment', { x: 1 }),
       last_incident_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
@@ -478,9 +485,10 @@ export async function setTrustLevel(
   const trust = await getHouseholdTrust(householdId);
   const previousLevel = trust?.trust_level || 1;
 
+  const db = await getClient();
   const config = DEFAULT_TRUST_CONFIG[newLevel as keyof typeof DEFAULT_TRUST_CONFIG];
 
-  const { error } = await supabase
+  const { error } = await db
     .from('household_ai_trust')
     .update({
       trust_level: newLevel,
@@ -521,7 +529,8 @@ export async function updateTrustLimits(
     max_items_per_bulk_operation?: number;
   }
 ): Promise<{ success: boolean; message: string }> {
-  const { error } = await supabase
+  const db = await getClient();
+  const { error } = await db
     .from('household_ai_trust')
     .update({
       ...limits,
@@ -554,13 +563,14 @@ export async function getTrustStats(householdId: string): Promise<{
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
+  const db = await getClient();
   const [hourResult, dayResult] = await Promise.all([
-    supabase
+    db
       .from('ai_audit_log')
       .select('*', { count: 'exact', head: true })
       .eq('household_id', householdId)
       .gte('created_at', oneHourAgo),
-    supabase
+    db
       .from('ai_audit_log')
       .select('*', { count: 'exact', head: true })
       .eq('household_id', householdId)

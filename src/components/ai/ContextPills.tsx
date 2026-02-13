@@ -7,6 +7,7 @@
  * durante el streaming de la IA. Proporciona feedback en tiempo real al usuario.
  */
 
+import { useMemo } from 'react';
 import { Loader2, Check, X, Search, Utensils, Package, ShoppingCart, Users, Home, Calendar, ClipboardList } from 'lucide-react';
 import type { ActiveTool } from '@/lib/hooks/useAIChat';
 
@@ -71,7 +72,7 @@ function getStatusColor(status: ActiveTool['status']) {
 }
 
 function ContextPill({ tool }: { tool: ActiveTool }) {
-  const Icon = getToolIcon(tool.name);
+  const Icon = useMemo(() => getToolIcon(tool.name), [tool.name]);
   const statusColor = getStatusColor(tool.status);
 
   return (
@@ -88,6 +89,7 @@ function ContextPill({ tool }: { tool: ActiveTool }) {
       )}
 
       {/* Tool icon */}
+      {/* eslint-disable-next-line react-hooks/rules-of-hooks */}
       <Icon className="w-3 h-3" />
 
       {/* Tool description */}

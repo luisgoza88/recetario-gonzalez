@@ -1,5 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, cleanJsonResponse, base64ToGeminiFormat } from '@/lib/gemini/client';
+import { logger } from '@/lib/logger';
+
+// Zod schema for input validation
+const GenerateRecipeFromImageSchema = z.object({
+  image: z.string().max(20_000_000).optional(), // base64-encoded image, ~15 MB max raw
+  description: z.string().min(1).max(2000).optional(),
+  type: z.enum(['breakfast', 'lunch', 'dinner']).optional(),
+}).refine(
+  (data) => data.image || data.description,
+  { message: 'Se requiere una imagen o descripción' }
+);
 
 interface GeneratedRecipe {
   name: string;
@@ -24,14 +36,17 @@ interface GeneratedRecipe {
 
 export async function POST(request: NextRequest) {
   try {
-    const { image, description, type } = await request.json();
+    const body = await request.json();
+    const parsed = GenerateRecipeFromImageSchema.safeParse(body);
 
-    if (!image && !description) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Se requiere una imagen o descripción' },
+        { error: 'Datos inválidos', details: parsed.error.flatten() },
         { status: 400 }
       );
     }
+
+    const { image, description, type } = parsed.data;
 
     const gemini = getGeminiClient();
 
@@ -134,7 +149,7 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura:
       const jsonContent = cleanJsonResponse(content);
       recipeData = JSON.parse(jsonContent);
     } catch {
-      console.error('Error parsing recipe response:', content);
+      logger.error(`Error parsing recipe response: ${content}`);
       return NextResponse.json(
         { error: 'No se pudo generar la receta. Intenta con otra descripción.' },
         { status: 400 }
@@ -155,7 +170,7 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura:
     });
 
   } catch (error) {
-    console.error('Error generating recipe:', error);
+    logger.error('Error generating recipe', { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: 'Error al generar la receta' },
       { status: 500 }

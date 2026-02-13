@@ -1,5 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, cleanJsonResponse } from '@/lib/gemini/client';
+import { requireAuth } from '@/lib/api/auth';
+import { logger } from '@/lib/logger';
+
+// Zod schema for formData validation
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'] as const;
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
+
+const ScanReceiptInputSchema = z.object({
+  image: z
+    .instanceof(File, { message: 'Se requiere un archivo de imagen' })
+    .refine((file) => file.size > 0, { message: 'El archivo de imagen está vacío' })
+    .refine((file) => file.size <= MAX_IMAGE_SIZE, { message: 'La imagen no debe superar 10 MB' })
+    .refine(
+      (file) => ALLOWED_MIME_TYPES.includes(file.type as (typeof ALLOWED_MIME_TYPES)[number]),
+      { message: `Tipo de imagen no soportado. Tipos permitidos: ${ALLOWED_MIME_TYPES.join(', ')}` }
+    ),
+});
 
 // Categorías disponibles para mapear
 const CATEGORIES_MAP: Record<string, { id: string; name: string; icon: string }> = {
@@ -35,13 +53,22 @@ export interface ScannedProduct {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const formData = await request.formData();
-    const image = formData.get('image') as File;
+    const rawImage = formData.get('image');
 
-    if (!image) {
-      return NextResponse.json({ error: 'No se proporcionó imagen' }, { status: 400 });
+    const validatedInput = ScanReceiptInputSchema.safeParse({ image: rawImage });
+    if (!validatedInput.success) {
+      return NextResponse.json(
+        { error: 'Datos inválidos', details: validatedInput.error.flatten() },
+        { status: 400 }
+      );
     }
+
+    const image = validatedInput.data.image;
 
     // Convert to base64
     const bytes = await image.arrayBuffer();
@@ -142,7 +169,7 @@ Si no puedes leer claramente el recibo, devuelve: {"items": [], "error": "No se 
     });
 
   } catch (error) {
-    console.error('Error scanning receipt:', error);
+    logger.error('Error scanning receipt', { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: 'Error al procesar el recibo', items: [] },
       { status: 500 }

@@ -184,9 +184,8 @@ export default function SuggestionsPanel({ onUpdate, onNavigate }: SuggestionsPa
         dismissProactive(suggestion.id);
         break;
       case 'generate_recipe':
-        // TODO: Abrir modal de generar receta
         if (onNavigate) {
-          onNavigate('recipes');
+          onNavigate('calendar');
         }
         break;
       case 'add_to_cart':

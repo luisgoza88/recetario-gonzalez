@@ -129,7 +129,7 @@ export default function EmployeeCheckIn({
             <Clock size={20} />
             <span className="font-semibold">Control de Asistencia</span>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg">
+          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg">
             <X size={20} />
           </button>
         </div>

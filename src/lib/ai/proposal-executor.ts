@@ -5,7 +5,8 @@
  * capturando estado previo para rollback y logging.
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { createAuthenticatedClient } from '@/lib/supabase/server';
 import {
   AIProposal,
   AIProposedAction,
@@ -18,11 +19,11 @@ import {
   getProposal,
   generateSessionId,
 } from './ai-command-service';
+import { logger } from '@/lib/logger';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+async function getClient(): Promise<SupabaseClient> {
+  return createAuthenticatedClient();
+}
 
 // ============================================
 // CAPTURA DE ESTADO PREVIO
@@ -41,13 +42,14 @@ interface StateCapture {
 async function captureState(action: AIProposedAction): Promise<StateCapture[]> {
   const states: StateCapture[] = [];
   const { function_name, parameters } = action;
+  const db = await getClient();
 
   try {
     // Determinar qué estado capturar basado en la función
     switch (function_name) {
       case 'swap_menu_recipe': {
         const dayNumber = parameters.day_number as number;
-        const { data } = await supabase
+        const { data } = await db
           .from('day_menu')
           .select('*')
           .eq('day_number', dayNumber)
@@ -60,14 +62,14 @@ async function captureState(action: AIProposedAction): Promise<StateCapture[]> {
 
       case 'update_inventory': {
         const itemName = parameters.item_name as string;
-        const { data: item } = await supabase
+        const { data: item } = await db
           .from('market_items')
           .select('id')
           .ilike('name', `%${itemName}%`)
           .single();
 
         if (item) {
-          const { data: inv } = await supabase
+          const { data: inv } = await db
             .from('inventory')
             .select('*')
             .eq('item_id', item.id)
@@ -81,14 +83,14 @@ async function captureState(action: AIProposedAction): Promise<StateCapture[]> {
 
       case 'mark_shopping_item': {
         const itemName = parameters.item_name as string;
-        const { data: item } = await supabase
+        const { data: item } = await db
           .from('market_items')
           .select('id')
           .ilike('name', `%${itemName}%`)
           .single();
 
         if (item) {
-          const { data: checklist } = await supabase
+          const { data: checklist } = await db
             .from('market_checklist')
             .select('*')
             .eq('item_id', item.id)
@@ -103,15 +105,19 @@ async function captureState(action: AIProposedAction): Promise<StateCapture[]> {
       case 'complete_task': {
         const taskName = parameters.task_name as string;
         const today = new Date().toISOString().split('T')[0];
-        const { data: task } = await supabase
-          .from('daily_task_instances')
-          .select('*')
-          .eq('date', today)
-          .ilike('task_name', `%${taskName}%`)
-          .single();
+        const { data: tasks } = await db
+          .from('scheduled_tasks')
+          .select('*, task_template:task_templates(name)')
+          .eq('scheduled_date', today)
+          .neq('status', 'completada');
 
-        if (task) {
-          states.push({ table: 'daily_task_instances', recordId: task.id, data: task });
+        const matched = tasks?.find(task => {
+          const template = task.task_template as unknown as { name?: string } | null;
+          return (template?.name || '').toLowerCase().includes(taskName.toLowerCase());
+        });
+
+        if (matched) {
+          states.push({ table: 'scheduled_tasks', recordId: matched.id, data: matched });
         }
         break;
       }
@@ -127,7 +133,7 @@ async function captureState(action: AIProposedAction): Promise<StateCapture[]> {
 
       case 'update_space': {
         const spaceId = parameters.space_id as string;
-        const { data } = await supabase
+        const { data } = await db
           .from('spaces')
           .select('*')
           .eq('id', spaceId)
@@ -140,7 +146,7 @@ async function captureState(action: AIProposedAction): Promise<StateCapture[]> {
 
       case 'update_employee': {
         const employeeId = parameters.employee_id as string;
-        const { data } = await supabase
+        const { data } = await db
           .from('home_employees')
           .select('*')
           .eq('id', employeeId)
@@ -153,7 +159,7 @@ async function captureState(action: AIProposedAction): Promise<StateCapture[]> {
 
       case 'update_recipe': {
         const recipeId = parameters.recipe_id as string;
-        const { data } = await supabase
+        const { data } = await db
           .from('recipes')
           .select('*')
           .eq('id', recipeId)
@@ -170,7 +176,7 @@ async function captureState(action: AIProposedAction): Promise<StateCapture[]> {
         const id = parameters.id as string || parameters.recipe_id as string ||
                    parameters.space_id as string || parameters.employee_id as string;
         const table = getTableForFunction(function_name);
-        const { data } = await supabase.from(table).select('*').eq('id', id).single();
+        const { data } = await db.from(table).select('*').eq('id', id).single();
         if (data) {
           states.push({ table, recordId: id, data });
         }
@@ -182,7 +188,7 @@ async function captureState(action: AIProposedAction): Promise<StateCapture[]> {
         break;
     }
   } catch (error) {
-    console.error(`Error capturing state for ${function_name}:`, error);
+    logger.error(`Error capturing state for ${function_name}`, { error: error instanceof Error ? error.message : String(error) });
   }
 
   return states;
@@ -197,8 +203,8 @@ function getTableForFunction(functionName: string): string {
     update_inventory: 'inventory',
     mark_shopping_item: 'market_checklist',
     add_to_shopping_list: 'market_checklist',
-    complete_task: 'daily_task_instances',
-    add_quick_task: 'daily_task_instances',
+    complete_task: 'scheduled_tasks',
+    add_quick_task: 'scheduled_tasks',
     create_space: 'spaces',
     update_space: 'spaces',
     delete_space: 'spaces',
@@ -237,6 +243,8 @@ export async function executeProposal(
   householdId: string,
   userId?: string
 ): Promise<ProposalExecutionResult> {
+  const db = await getClient();
+
   // Obtener la propuesta
   const proposal = await getProposal(proposalId);
 
@@ -262,7 +270,7 @@ export async function executeProposal(
   }
 
   // Marcar como ejecutando
-  await supabase
+  await db
     .from('ai_action_queue')
     .update({
       status: 'executing',
@@ -351,7 +359,7 @@ export async function executeProposal(
         error: errorMessage,
       });
 
-      console.error(`Error executing action ${action.function_name}:`, error);
+      logger.error(`Error executing action ${action.function_name}`, { error: error instanceof Error ? error.message : String(error) });
     }
   }
 
@@ -360,7 +368,7 @@ export async function executeProposal(
   const finalStatus = success ? 'completed' : (executedActions.length > 0 ? 'completed' : 'failed');
 
   // Actualizar propuesta
-  await supabase
+  await db
     .from('ai_action_queue')
     .update({
       status: finalStatus,
@@ -583,6 +591,7 @@ export async function executeProposalTransactional(
   } = options;
 
   const startTime = Date.now();
+  const db = await getClient();
 
   // Obtener la propuesta
   const proposal = await getProposal(proposalId);
@@ -611,7 +620,7 @@ export async function executeProposalTransactional(
   }
 
   // Marcar como ejecutando
-  await supabase
+  await db
     .from('ai_action_queue')
     .update({
       status: 'executing',
@@ -741,7 +750,7 @@ export async function executeProposalTransactional(
         status: 'failed',
       });
 
-      console.error(`Error executing action ${action.function_name}:`, error);
+      logger.error(`Error executing action ${action.function_name}`, { error: error instanceof Error ? error.message : String(error) });
 
       // Decidir si hacer rollback
       if (rollbackOnFailure) {
@@ -783,7 +792,7 @@ export async function executeProposalTransactional(
     }
 
     // Marcar propuesta como rolled back
-    await supabase
+    await db
       .from('ai_action_queue')
       .update({
         status: 'rolled_back',
@@ -814,7 +823,7 @@ export async function executeProposalTransactional(
   const finalStatus = success ? 'completed' : (executedActions.length > 0 ? 'completed' : 'failed');
 
   // Actualizar propuesta
-  await supabase
+  await db
     .from('ai_action_queue')
     .update({
       status: finalStatus,

@@ -47,7 +47,6 @@ function extractNumber(qty: string): number {
 // Cargar aliases desde la base de datos
 async function loadAliases(): Promise<Map<string, string>> {
   if (aliasesCache) {
-    console.log(`[ALIASES-CACHE-HIT] Using cached ${aliasesCache.size} aliases`);
     return aliasesCache;
   }
 
@@ -63,8 +62,6 @@ async function loadAliases(): Promise<Map<string, string>> {
   }
 
   if (data) {
-    console.log(`[ALIASES-RAW] Found ${data.length} alias records in DB`);
-
     // También cargar nombres de market_items para mapear
     const { data: items, error: itemsError } = await supabase
       .from('market_items')
@@ -81,26 +78,14 @@ async function loadAliases(): Promise<Map<string, string>> {
     }
 
     const itemNames = new Map(items.map(i => [i.id, i.name]));
-    console.log(`[MARKET-ITEMS] Loaded ${itemNames.size} market items`);
 
     for (const alias of data) {
       const itemName = itemNames.get(alias.market_item_id);
       if (itemName) {
         const normalizedAlias = normalizeIngredient(alias.alias);
         aliasesCache.set(normalizedAlias, itemName);
-        // Log some sample aliases for debugging
-        if (alias.alias.toLowerCase().includes('bistec') || alias.alias.toLowerCase().includes('queso')) {
-          console.log(`[ALIAS-MAPPED] "${alias.alias}" (normalized: "${normalizedAlias}") → "${itemName}" (market_item_id: ${alias.market_item_id})`);
-        }
-      } else {
-        console.log(`[ALIAS-ORPHAN] alias "${alias.alias}" has market_item_id "${alias.market_item_id}" but no matching item found`);
       }
     }
-    console.log(`[ALIASES-LOADED] ${aliasesCache.size} aliases loaded into cache`);
-
-    // Debug: print first few alias entries
-    const aliasEntries = Array.from(aliasesCache.entries()).slice(0, 10);
-    console.log(`[ALIASES-SAMPLE] First 10 entries: ${aliasEntries.map(([k, v]) => `"${k}" → "${v}"`).join(' | ')}`);
   }
 
   return aliasesCache;
@@ -172,7 +157,6 @@ async function findInventoryMatch(
   // 1. Buscar coincidencia exacta en inventario
   for (const [itemName, data] of inventory.entries()) {
     if (normalizeIngredient(itemName) === normalizedIngredient) {
-      console.log(`[MATCH-EXACT] "${ingredientName}" → "${itemName}" (qty: ${data.number})`);
       return data;
     }
   }
@@ -181,38 +165,13 @@ async function findInventoryMatch(
   const aliases = await loadAliases();
   const aliasMatch = aliases.get(normalizedIngredient);
   if (aliasMatch) {
-    console.log(`[ALIAS-FOUND] "${ingredientName}" → alias: "${aliasMatch}"`);
     const data = inventory.get(aliasMatch);
     if (data) {
-      console.log(`[MATCH-ALIAS] "${ingredientName}" → "${aliasMatch}" (qty: ${data.number})`);
       return data;
-    } else {
-      // Debug: show all inventory keys to find the issue
-      const inventoryKeys = Array.from(inventory.keys());
-      console.log(`[ALIAS-NO-INV] "${ingredientName}" → alias "${aliasMatch}" not found in inventory`);
-      console.log(`[ALIAS-NO-INV] aliasMatch length: ${aliasMatch.length}, charCodes: ${[...aliasMatch].slice(0, 30).map(c => c.charCodeAt(0)).join(',')}`);
-
-      // Try to find exact key match issue
-      const exactMatch = inventoryKeys.find(k => k === aliasMatch);
-      console.log(`[ALIAS-NO-INV] Exact key match: ${exactMatch ? 'YES' : 'NO'}`);
-
-      // Show similar keys
-      const similarKeys = inventoryKeys.filter(k =>
-        k.toLowerCase().includes('bistec') || k.toLowerCase().includes('queso')
-      );
-      console.log(`[ALIAS-NO-INV] Similar inventory keys: ${similarKeys.join(' | ')}`);
     }
-  } else {
-    console.log(`[NO-ALIAS] "${ingredientName}" (normalized: "${normalizedIngredient}") has no alias`);
-    // Show all alias keys for debugging
-    const allAliasKeys = Array.from(aliases.keys()).filter(k =>
-      k.includes('bistec') || k.includes('queso')
-    );
-    console.log(`[NO-ALIAS] Available alias keys with bistec/queso: ${allAliasKeys.join(' | ')}`);
   }
 
   // 3. Buscar coincidencia parcial (uno contiene al otro)
-  console.log(`[STEP-3] Checking partial matches for "${normalizedIngredient}"`);
   for (const [itemName, data] of inventory.entries()) {
     const normalizedItem = normalizeIngredient(itemName);
 
@@ -220,14 +179,11 @@ async function findInventoryMatch(
       normalizedItem.includes(normalizedIngredient) ||
       normalizedIngredient.includes(normalizedItem)
     ) {
-      console.log(`[MATCH-PARTIAL] "${ingredientName}" → "${itemName}" (qty: ${data.number})`);
       return data;
     }
   }
-  console.log(`[STEP-3] No partial match found`);
 
   // 4. Fuzzy matching - buscar palabras clave
-  console.log(`[STEP-4] Checking fuzzy matches for words: ${normalizedIngredient.split(' ').join(', ')}`);
   const ingredientWords = normalizedIngredient.split(' ');
   for (const [itemName, data] of inventory.entries()) {
     const normalizedItem = normalizeIngredient(itemName);
@@ -235,13 +191,11 @@ async function findInventoryMatch(
     // Si la primera palabra clave coincide
     for (const word of ingredientWords) {
       if (word.length >= 4 && normalizedItem.includes(word)) {
-        console.log(`[MATCH-FUZZY] "${ingredientName}" → "${itemName}" (word: ${word}, qty: ${data.number})`);
         return data;
       }
     }
   }
 
-  console.log(`[NO-MATCH] "${ingredientName}" - no match found after all 4 steps`);
   return null;
 }
 
@@ -297,24 +251,6 @@ export async function loadCurrentInventory(): Promise<Map<string, { quantity: st
       });
     }
 
-    // Log items with stock - specifically ones related to our problem
-    const withStock = Array.from(inventoryMap.entries()).filter(([, v]) => v.number > 0);
-    console.log(`[INVENTORY-LOADED] ${inventoryMap.size} items total, ${withStock.length} with stock`);
-
-    // Log specific items we're having trouble with
-    const debugItems = ['Bistec de res (punta anca)', 'Queso costeño', 'Queso cuajada', 'Queso mozzarella'];
-    for (const debugItem of debugItems) {
-      const data = inventoryMap.get(debugItem);
-      if (data) {
-        console.log(`[INVENTORY-DEBUG] "${debugItem}" → qty: ${data.number}`);
-      } else {
-        // Try to find similar keys
-        const similar = Array.from(inventoryMap.keys()).filter(k =>
-          k.toLowerCase().includes('bistec') || k.toLowerCase().includes('queso')
-        );
-        console.log(`[INVENTORY-DEBUG] "${debugItem}" NOT FOUND. Similar keys: ${similar.slice(0, 5).join(', ')}`);
-      }
-    }
   }
 
   return inventoryMap;
@@ -329,13 +265,9 @@ export async function checkRecipeIngredients(
   const missingIngredients: IngredientStatus[] = [];
   const availableIngredients: IngredientStatus[] = [];
 
-  console.log(`[CHECK-RECIPE] Checking recipe: ${recipe.name}`);
-
   for (const ing of ingredients) {
     const requiredQty = ing.total || ing.luis || '1';
     const requiredNum = extractNumber(requiredQty);
-
-    console.log(`[INGREDIENT-CHECK] "${ing.name}" requires "${requiredQty}" (parsed: ${requiredNum})`);
 
     // Separar ingredientes compuestos
     const subIngredients = splitCompoundIngredient(ing.name);
@@ -349,20 +281,14 @@ export async function checkRecipeIngredients(
       if (isPrep) {
         totalAvailable += 1;
         matchedItems.push(`${subIng} (preparación)`);
-        console.log(`[PREP-FOUND] "${subIng}" is available as preparation`);
       } else {
         // Buscar en inventario
         const inventoryMatch = await findInventoryMatch(subIng, inventory);
         if (inventoryMatch) {
-          console.log(`[INV-MATCH] "${subIng}" found → ${inventoryMatch.itemName} (number: ${inventoryMatch.number}, qty: ${inventoryMatch.quantity})`);
           if (inventoryMatch.number > 0) {
             totalAvailable += inventoryMatch.number;
             matchedItems.push(inventoryMatch.itemName);
-          } else {
-            console.log(`[INV-ZERO] "${subIng}" matched but has 0 stock`);
           }
-        } else {
-          console.log(`[INV-NO-MATCH] "${subIng}" not found in inventory`);
         }
       }
     }
@@ -395,7 +321,6 @@ export async function checkRecipeIngredients(
           neededStr = formatQuantity(neededNumber, parsed.unit);
         }
 
-        console.log(`[QUANTITY-CHECK] "${ing.name}": available="${availableStr}", required="${requiredQty}", hasEnough=${hasEnough}, percent=${percentAvailable}%, compatible=${unitCompatible}`);
       }
     } else {
       // No se encontró en inventario
@@ -403,7 +328,6 @@ export async function checkRecipeIngredients(
       percentAvailable = 0;
       neededStr = requiredQty;
       neededNumber = requiredNum;
-      console.log(`[QUANTITY-CHECK] "${ing.name}": NOT FOUND in inventory, need ${requiredQty}`);
     }
 
     const status: IngredientStatus = {

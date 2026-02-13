@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { X, MessageSquare, Check, Brain } from 'lucide-react';
+import { X, MessageSquare, Check } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { Recipe, MealType, PortionRating, LeftoverRating, Ingredient, MealFeedback } from '@/types';
 import { analyzeNewFeedback } from '@/lib/feedback-learning';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 
 interface FeedbackModalProps {
   date: string;
@@ -22,6 +23,8 @@ export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  useEscapeKey(onClose);
 
   const mealLabels: Record<MealType, string> = {
     breakfast: 'Desayuno',
@@ -122,7 +125,7 @@ export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved
 
   if (saved) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
         <div className="bg-white rounded-2xl p-8 text-center">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Check size={32} className="text-green-600" />
@@ -134,7 +137,7 @@ export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-8 pb-24 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-8 pb-24 overflow-y-auto" role="dialog" aria-modal="true">
       <div className="bg-white rounded-2xl w-full max-w-md flex flex-col">
         {/* Header */}
         <div className="bg-green-700 text-white p-4 rounded-t-2xl flex justify-between items-center flex-shrink-0">
@@ -142,7 +145,7 @@ export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved
             <MessageSquare size={20} />
             <span className="font-semibold">Feedback - {mealLabels[mealType]}</span>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg">
+          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg">
             <X size={20} />
           </button>
         </div>

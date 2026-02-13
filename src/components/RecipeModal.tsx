@@ -6,6 +6,7 @@ import { X, Users, Timer, Play, Pause, RotateCcw, Volume2, Lightbulb, ImageIcon 
 import { Recipe, Ingredient } from '@/types';
 import NutritionDisplay, { DietaryTags, PrepTimeDisplay, DifficultyDisplay } from './NutritionDisplay';
 import SmartSubstitutionPanel from './SmartSubstitutionPanel';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 
 interface RecipeModalProps {
   recipe: Recipe;
@@ -24,6 +25,8 @@ export default function RecipeModal({ recipe, onClose, missingIngredients = [] }
   const [scale, setScale] = useState(1);
   const [activeTimers, setActiveTimers] = useState<ActiveTimer[]>([]);
   const [selectedSubstitutions, setSelectedSubstitutions] = useState<Map<string, string>>(new Map());
+
+  useEscapeKey(onClose);
 
   const ingredients = recipe.ingredients as Ingredient[];
   const hasTotal = ingredients[0]?.total;
@@ -159,6 +162,8 @@ export default function RecipeModal({ recipe, onClose, missingIngredients = [] }
   return (
     <div
       className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
       onClick={onClose}
     >
       <div

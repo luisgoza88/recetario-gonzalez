@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGeminiClient, GEMINI_MODELS } from '@/lib/gemini/client';
-import { createClient } from '@supabase/supabase-js';
 import { allDishes, dishStats, DishForLibrary } from '@/data/image-library-dishes';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { requireAuth } from '@/lib/api/auth';
+import { createAuthenticatedClient, createStorageAdminClient } from '@/lib/supabase/server';
+import { logger } from '@/lib/logger';
 
 // Generate food photography prompt for a dish
 function generatePrompt(dish: DishForLibrary): string {
@@ -54,7 +51,7 @@ async function generateImage(dish: DishForLibrary): Promise<{ success: boolean; 
         return { success: true, imageData: generatedImage.image.imageBytes };
       }
     } catch (imagen3Error) {
-      console.error(`Imagen 3 failed for ${dish.name_en}:`, imagen3Error);
+      logger.error(`Imagen 3 failed for ${dish.name_en}`, { error: imagen3Error instanceof Error ? imagen3Error.message : String(imagen3Error) });
     }
 
     // Fallback to Gemini Flash
@@ -74,7 +71,7 @@ async function generateImage(dish: DishForLibrary): Promise<{ success: boolean; 
         }
       }
     } catch (flashError) {
-      console.error(`Gemini Flash failed for ${dish.name_en}:`, flashError);
+      logger.error(`Gemini Flash failed for ${dish.name_en}`, { error: flashError instanceof Error ? flashError.message : String(flashError) });
     }
 
     return { success: false, error: 'Both image generation methods failed' };
@@ -84,7 +81,12 @@ async function generateImage(dish: DishForLibrary): Promise<{ success: boolean; 
 }
 
 // GET: Check status and list dishes to generate
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+
+  const supabase = await createAuthenticatedClient();
+
   try {
     // Get existing images in library
     const { data: existingImages, error: fetchError } = await supabase
@@ -123,13 +125,19 @@ export async function GET() {
       }))
     });
   } catch (error) {
-    console.error('Error checking library status:', error);
+    logger.error('Error checking library status', { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json({ error: 'Error checking library' }, { status: 500 });
   }
 }
 
 // POST: Generate images for a batch of dishes
 export async function POST(request: NextRequest) {
+  const auth = requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+
+  const supabase = await createAuthenticatedClient();
+  const storageClient = createStorageAdminClient();
+
   try {
     const body = await request.json();
     const { batchSize = 5, startIndex = 0, specificDishes } = body;
@@ -176,7 +184,7 @@ export async function POST(request: NextRequest) {
 
     // Process dishes sequentially
     for (const dish of dishesToProcess) {
-      console.log(`Generating image for: ${dish.name_en}`);
+      logger.info(`Generating image for: ${dish.name_en}`);
 
       const imageResult = await generateImage(dish);
 
@@ -188,7 +196,7 @@ export async function POST(request: NextRequest) {
 
         const imageBuffer = Buffer.from(imageResult.imageData, 'base64');
 
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadError } = await storageClient.storage
           .from('recipe-images')
           .upload(fileName, imageBuffer, {
             contentType: 'image/png',
@@ -196,7 +204,7 @@ export async function POST(request: NextRequest) {
           });
 
         if (uploadError) {
-          console.error(`Upload failed for ${dish.name_en}:`, uploadError);
+          logger.error(`Upload failed for ${dish.name_en}`, { error: uploadError instanceof Error ? uploadError.message : String(uploadError) });
           results.push({
             name_en: dish.name_en,
             name_es: dish.name_es,
@@ -207,7 +215,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Get public URL
-        const { data: urlData } = supabase.storage
+        const { data: urlData } = storageClient.storage
           .from('recipe-images')
           .getPublicUrl(fileName);
 
@@ -229,7 +237,7 @@ export async function POST(request: NextRequest) {
           });
 
         if (insertError) {
-          console.error(`Insert failed for ${dish.name_en}:`, insertError);
+          logger.error(`Insert failed for ${dish.name_en}`, { error: insertError instanceof Error ? insertError.message : String(insertError) });
           results.push({
             name_en: dish.name_en,
             name_es: dish.name_es,
@@ -246,7 +254,7 @@ export async function POST(request: NextRequest) {
           imageUrl
         });
 
-        console.log(`✓ Generated: ${dish.name_en}`);
+        logger.info(`Generated: ${dish.name_en}`);
       } else {
         results.push({
           name_en: dish.name_en,
@@ -273,7 +281,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Batch generation error:', error);
+    logger.error('Batch generation error', { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json({ error: 'Batch generation failed' }, { status: 500 });
   }
 }

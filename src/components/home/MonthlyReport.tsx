@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { HomeEmployee, Space } from '@/types';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 
 interface MonthlyReportProps {
   householdId: string;
@@ -58,6 +59,7 @@ export default function MonthlyReport({
   const [employeeStats, setEmployeeStats] = useState<EmployeeStats[]>([]);
   const [spaceStats, setSpaceStats] = useState<SpaceStats[]>([]);
   const [activeTab, setActiveTab] = useState<'overview' | 'employees' | 'spaces'>('overview');
+  useEscapeKey(onClose);
 
   useEffect(() => {
     loadReport();
@@ -222,7 +224,7 @@ export default function MonthlyReport({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 flex justify-between items-center">
@@ -230,7 +232,7 @@ export default function MonthlyReport({
             <BarChart3 size={20} />
             <span className="font-semibold">Reporte Mensual</span>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg">
+          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg">
             <X size={20} />
           </button>
         </div>

@@ -1,6 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, cleanJsonResponse } from '@/lib/gemini/client';
+import { z } from 'zod';
+import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, cleanJsonResponse, geminiWithRetry, sanitizeUserInput } from '@/lib/gemini/client';
+import { withRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
+
+// Zod schemas for input validation
+const IngredientWithContextSchema = z.object({
+  name: z.string().min(1).max(200),
+  quantity: z.string().max(100),
+  category: z.string().max(100).optional(),
+  isCustom: z.boolean().optional(),
+});
+
+const RecipeStyleSchema = z.enum([
+  'saludable',
+  'rapida',
+  'economica',
+  'alta-proteina',
+  'baja-carbohidrato',
+  'vegetariana',
+  'comfort',
+  'ligera',
+]);
+
+const GenerateRecipeRequestSchema = z.object({
+  availableIngredients: z.union([
+    z.array(z.string().min(1).max(200)).min(1).max(100),
+    z.array(IngredientWithContextSchema).min(1).max(100),
+  ]),
+  mealType: z.enum(['breakfast', 'lunch', 'dinner']),
+  servings: z.number().min(1).max(20).optional(),
+  preferences: z.array(z.string().max(200)).max(10).optional(),
+  recipeStyle: RecipeStyleSchema.optional(),
+  recentRecipes: z.array(z.string().max(200)).max(20).optional(),
+  ingredientsByCategory: z.record(z.string(), z.array(z.string().max(200))).optional(),
+  customItems: z.array(z.string().max(200)).max(50).optional(),
+  generateImage: z.boolean().optional(),
+});
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -77,7 +114,7 @@ async function getAvailablePreparations(availableIngredients: string[]): Promise
       description: p.description as string | undefined
     }));
   } catch (error) {
-    console.error('Error loading preparations:', error);
+    logger.error('Error loading preparations', { error: error instanceof Error ? error.message : String(error) });
     return [];
   }
 }
@@ -94,16 +131,47 @@ async function getRecentRecipeNames(): Promise<string[]> {
     if (!feedback) return [];
     return feedback.map(f => f.recipe_name).filter(Boolean) as string[];
   } catch (error) {
-    console.error('Error loading recent recipes:', error);
+    logger.error('Error loading recent recipes', { error: error instanceof Error ? error.message : String(error) });
     return [];
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting - usar user ID del header (set by middleware) o IP como fallback
+    const userId = request.headers.get('x-user-id') || request.headers.get('x-forwarded-for') || 'anonymous';
+    const rateLimit = await withRateLimit(userId, 'generate-recipe');
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(rateLimit.response, {
+        status: 429,
+        headers: rateLimit.headers,
+      });
+    }
+
     const gemini = getGeminiClient();
 
-    const body: GenerateRecipeRequest = await request.json();
+    // Parse and validate request body with Zod
+    let body: GenerateRecipeRequest;
+    try {
+      const rawBody = await request.json();
+      body = GenerateRecipeRequestSchema.parse(rawBody);
+    } catch (validationError) {
+      if (validationError instanceof z.ZodError) {
+        return NextResponse.json(
+          {
+            error: 'Datos de entrada inválidos',
+            details: validationError.issues.map(e => `${e.path.join('.')}: ${e.message}`)
+          },
+          { status: 400 }
+        );
+      }
+      return NextResponse.json(
+        { error: 'Error parsing request body' },
+        { status: 400 }
+      );
+    }
+
     const {
       availableIngredients,
       mealType,
@@ -137,10 +205,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Normalizar ingredientes a string[]
-    const ingredientsList = availableIngredients.map(ing =>
-      typeof ing === 'string' ? ing : `${ing.name} (${ing.quantity})`
-    );
+    // Normalizar y sanitizar ingredientes a string[]
+    const ingredientsList = availableIngredients.map(ing => {
+      const text = typeof ing === 'string' ? ing : `${ing.name} (${ing.quantity})`;
+      return sanitizeUserInput(text, 200); // Limitar longitud por ingrediente
+    });
 
     // Obtener preparaciones disponibles y recetas recientes
     const [availablePreparations, dbRecentRecipes] = await Promise.all([
@@ -189,16 +258,20 @@ Por favor NO sugieras estas recetas ni variaciones muy similares.
       ingredientsSection = ingredientsList.join('\n');
     }
 
-    // Construir sección de items personalizados
+    // Construir sección de items personalizados (sanitizados)
     let customSection = '';
     if (customItems.length > 0) {
+      const sanitizedCustomItems = customItems.map(c => sanitizeUserInput(c, 200));
       customSection = `
 INGREDIENTES ESPECIALES (Compras recientes/regalos que queremos usar):
-${customItems.map(c => `- ${c}`).join('\n')}
+${sanitizedCustomItems.map(c => `- ${c}`).join('\n')}
 
 PRIORIZA usar estos ingredientes especiales! La familia los tiene disponibles y quiere aprovecharlos.
 `;
     }
+
+    // Sanitizar preferencias
+    const sanitizedPreferences = preferences.map(p => sanitizeUserInput(p, 200));
 
     const prompt = `Eres un chef profesional especializado en cocina colombiana y latinoamericana saludable.
 Trabajas para la Familia González: Luis come porciones más grandes (3 porciones) y Mariana porciones medianas (2 porciones).
@@ -211,7 +284,7 @@ REQUERIMIENTOS:
 - Porciones totales: ${servings} (3 para Luis + 2 para Mariana)
 - Estilo de receta: ${recipeStyle.toUpperCase()}
 - ${selectedStyleInstruction}
-- Preferencias adicionales: ${preferences.length > 0 ? preferences.join(', ') : 'Fácil de preparar'}
+- Preferencias adicionales: ${sanitizedPreferences.length > 0 ? sanitizedPreferences.join(', ') : 'Fácil de preparar'}
 
 CONTEXTO IMPORTANTE:
 - Prioriza usar ingredientes que YA están disponibles
@@ -254,19 +327,21 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura exacta:
   "usedPreparations": ["lista de preparaciones caseras usadas (si aplica)"]
 }`;
 
-    // Llamar a Gemini
-    const response = await gemini.models.generateContent({
-      model: GEMINI_MODELS.FLASH,
-      contents: [{
-        role: 'user',
-        parts: [{ text: prompt }]
-      }],
-      config: {
-        temperature: GEMINI_CONFIG.recipe.temperature,
-        maxOutputTokens: GEMINI_CONFIG.recipe.maxOutputTokens,
-        responseMimeType: 'application/json',
-      },
-    });
+    // Llamar a Gemini con retry automático
+    const response = await geminiWithRetry(() =>
+      gemini.models.generateContent({
+        model: GEMINI_MODELS.FLASH,
+        contents: [{
+          role: 'user',
+          parts: [{ text: prompt }]
+        }],
+        config: {
+          temperature: GEMINI_CONFIG.recipe.temperature,
+          maxOutputTokens: GEMINI_CONFIG.recipe.maxOutputTokens,
+          responseMimeType: 'application/json',
+        },
+      })
+    );
 
     const content = response.candidates?.[0]?.content?.parts?.[0]?.text;
 
@@ -301,17 +376,19 @@ ${recipe.description ? `Descripción: ${recipe.description}` : ''}
 Ingredientes principales: ${ingredientNames.join(', ')}.
 Estilo: Fotografía gastronómica profesional, luz natural, plato emplatado elegantemente, fondo desenfocado.`;
 
-          const imageResponse = await gemini.models.generateContent({
-            model: GEMINI_MODELS.FLASH_IMAGE,
-            contents: [{
-              role: 'user',
-              parts: [{ text: imagePrompt }]
-            }],
-            config: {
-              responseModalities: ['image', 'text'],
-              responseMimeType: 'image/png',
-            },
-          });
+          const imageResponse = await geminiWithRetry(() =>
+            gemini.models.generateContent({
+              model: GEMINI_MODELS.FLASH_IMAGE,
+              contents: [{
+                role: 'user',
+                parts: [{ text: imagePrompt }]
+              }],
+              config: {
+                responseModalities: ['image', 'text'],
+                responseMimeType: 'image/png',
+              },
+            })
+          );
 
           const imageParts = imageResponse.candidates?.[0]?.content?.parts;
           if (imageParts) {
@@ -323,7 +400,7 @@ Estilo: Fotografía gastronómica profesional, luz natural, plato emplatado eleg
             }
           }
         } catch (imageError) {
-          console.error('Error generating recipe image:', imageError);
+          logger.error('Error generating recipe image', { error: imageError instanceof Error ? imageError.message : String(imageError) });
           // No fallar si la imagen no se genera
         }
       }
@@ -334,8 +411,8 @@ Estilo: Fotografía gastronómica profesional, luz natural, plato emplatado eleg
         image: recipeImage
       });
     } catch (parseError) {
-      console.error('JSON parse error:', parseError);
-      console.error('Raw content:', content.slice(0, 500));
+      logger.error('JSON parse error', { error: parseError instanceof Error ? parseError.message : String(parseError) });
+      logger.error(`Raw content: ${content.slice(0, 500)}`);
 
       return NextResponse.json(
         {
@@ -346,7 +423,7 @@ Estilo: Fotografía gastronómica profesional, luz natural, plato emplatado eleg
       );
     }
   } catch (error) {
-    console.error('Generate recipe error:', error);
+    logger.error('Generate recipe error', { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

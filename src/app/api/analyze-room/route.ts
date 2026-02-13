@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, cleanJsonResponse, base64ToGeminiFormat } from '@/lib/gemini/client';
+import { logger } from '@/lib/logger';
 
 interface RoomAnalysis {
   roomType: string;
@@ -203,8 +204,8 @@ Sé PRÁCTICO y ÚTIL. Un ama de llaves profesional no limpia "el lapicero", lim
     try {
       const cleanContent = cleanJsonResponse(content);
       analysis = JSON.parse(cleanContent);
-    } catch (parseError) {
-      console.error('Error parsing AI response:', content);
+    } catch {
+      logger.error(`Error parsing AI response: ${content}`);
       return NextResponse.json(
         { error: 'Error al procesar la respuesta del análisis', raw: content },
         { status: 500 }
@@ -218,7 +219,7 @@ Sé PRÁCTICO y ÚTIL. Un ama de llaves profesional no limpia "el lapicero", lim
     });
 
   } catch (error) {
-    console.error('Error analyzing room:', error);
+    logger.error('Error analyzing room', { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: 'Error al analizar el espacio' },
       { status: 500 }

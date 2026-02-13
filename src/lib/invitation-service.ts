@@ -5,6 +5,7 @@
 
 import { supabase } from '@/lib/supabase/client';
 import type { HouseholdInvitation, HouseholdMembership, UserRole } from '@/types';
+import { logger } from '@/lib/logger';
 
 // =====================================================
 // Tipos
@@ -54,7 +55,7 @@ export async function createInvitation(params: CreateInvitationParams): Promise<
     });
 
     if (error) {
-      console.error('Error creando invitación:', error);
+      logger.error('Error creando invitación', { error: error instanceof Error ? error.message : String(error) });
       return { error: error.message };
     }
 
@@ -66,44 +67,39 @@ export async function createInvitation(params: CreateInvitationParams): Promise<
 }
 
 /**
- * Validar un código de invitación sin usarlo
+ * Validar un código de invitación sin usarlo.
+ * Usa el API route /api/validate-invitation que aplica rate limiting server-side.
  */
 export async function validateInvitationCode(code: string): Promise<InvitationValidation> {
   try {
-    const normalizedCode = code.toUpperCase().trim();
+    const response = await fetch('/api/validate-invitation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    });
 
-    const { data, error } = await supabase
-      .from('household_invitations')
-      .select(`
-        *,
-        household:households(id, name)
-      `)
-      .eq('code', normalizedCode)
-      .eq('is_active', true)
-      .gt('expires_at', new Date().toISOString())
-      .single();
+    const data = await response.json();
 
-    if (error || !data) {
+    if (response.status === 429) {
       return {
         isValid: false,
-        error: 'Código de invitación inválido o expirado'
+        error: data.error || 'Demasiados intentos. Espera antes de intentar de nuevo.'
       };
     }
 
-    // Verificar que no se haya alcanzado el límite de usos
-    if (data.current_uses >= data.max_uses) {
+    if (!data.isValid) {
       return {
         isValid: false,
-        error: 'Este código de invitación ya fue utilizado'
+        error: data.error || 'Código de invitación inválido o expirado'
       };
     }
 
     return {
       isValid: true,
-      invitation: data as HouseholdInvitation,
-      householdName: data.household?.name
+      invitation: data.invitation as HouseholdInvitation,
+      householdName: data.householdName
     };
-  } catch (err) {
+  } catch {
     return {
       isValid: false,
       error: 'Error al validar el código'
@@ -114,7 +110,7 @@ export async function validateInvitationCode(code: string): Promise<InvitationVa
 /**
  * Usar un código de invitación para unirse a un hogar
  */
-export async function useInvitationCode(code: string): Promise<UseInvitationResult> {
+export async function redeemInvitationCode(code: string): Promise<UseInvitationResult> {
   try {
     const normalizedCode = code.toUpperCase().trim();
 
@@ -123,7 +119,7 @@ export async function useInvitationCode(code: string): Promise<UseInvitationResu
     });
 
     if (error) {
-      console.error('Error usando invitación:', error);
+      logger.error('Error usando invitación', { error: error instanceof Error ? error.message : String(error) });
       return {
         success: false,
         error: error.message
@@ -162,7 +158,7 @@ export async function getHouseholdInvitations(householdId: string): Promise<{
     }
 
     return { invitations: data as HouseholdInvitation[] };
-  } catch (err) {
+  } catch {
     return { invitations: [], error: 'Error al cargar invitaciones' };
   }
 }
@@ -182,7 +178,7 @@ export async function cancelInvitation(invitationId: string): Promise<{ error?: 
     }
 
     return {};
-  } catch (err) {
+  } catch {
     return { error: 'Error al cancelar la invitación' };
   }
 }
@@ -192,7 +188,8 @@ export async function cancelInvitation(invitationId: string): Promise<{ error?: 
  */
 export function generateInvitationLink(code: string): string {
   if (typeof window === 'undefined') return '';
-  return `${window.location.origin}/join/${code}`;
+  const normalizedCode = code.toUpperCase().trim();
+  return `${window.location.origin}/join?code=${encodeURIComponent(normalizedCode)}`;
 }
 
 /**

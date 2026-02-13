@@ -6,6 +6,7 @@ import {
   RefreshCw, User, Home, Brain, TrendingUp
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
+import { useToast } from '@/components/ui/Toast';
 import { Space, HomeEmployee, TaskTemplate, SpaceType } from '@/types';
 import {
   calculateLearnedDuration,
@@ -14,6 +15,7 @@ import {
   EmployeeScore
 } from '@/lib/home/intelligence';
 import { getDefaultTaskDuration } from '@/lib/home/defaults';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 
 interface ScheduleGeneratorProps {
   householdId: string;
@@ -67,6 +69,8 @@ export default function ScheduleGenerator({
   onClose,
   onComplete
 }: ScheduleGeneratorProps) {
+  const toast = useToast();
+  useEscapeKey(onClose);
   const [generating, setGenerating] = useState(false);
   const [preview, setPreview] = useState<GeneratedTask[]>([]);
   const [weeksToGenerate, setWeeksToGenerate] = useState(2);
@@ -391,7 +395,7 @@ export default function ScheduleGenerator({
       setStep('done');
     } catch (error) {
       console.error('Error saving schedule:', error);
-      alert('Error al guardar la programación');
+      toast.error('Error al guardar la programación');
     } finally {
       setGenerating(false);
     }
@@ -412,7 +416,7 @@ export default function ScheduleGenerator({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-8 pb-24 overflow-y-auto">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-8 pb-24 overflow-y-auto">
       <div className="bg-white rounded-2xl w-full max-w-lg">
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-4 rounded-t-2xl flex justify-between items-center">
@@ -420,7 +424,7 @@ export default function ScheduleGenerator({
             <Sparkles size={20} />
             <span className="font-semibold">Generar Programación</span>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg">
+          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg">
             <X size={20} />
           </button>
         </div>

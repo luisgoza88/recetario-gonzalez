@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
 import {
   Send, Bot, User, Sparkles, Loader2,
   Calendar, ShoppingCart, Home, UtensilsCrossed,
@@ -34,6 +35,7 @@ import {
   formatForSpeech,
   type VoiceManager
 } from '@/lib/voice-commands';
+import { useToast } from '@/components/ui/Toast';
 
 // Types for rich messages
 interface MessageAction {
@@ -184,56 +186,27 @@ function parseMessageContent(content: string): { text: string; actions: MessageA
   return { text: content, actions };
 }
 
-// Format message with markdown-like styling
+// Format message with ReactMarkdown (XSS-safe)
 function FormattedMessage({ content }: { content: string }) {
-  // Split by lines and format
-  const lines = content.split('\n');
-
   return (
-    <div className="text-sm space-y-1">
-      {lines.map((line, i) => {
-        // Bold text **text**
-        let formatted = line.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-
-        // Emoji indicators at start
-        if (line.match(/^[✅❌⚠️📝💡🍽️⏱️🧊📊]/)) {
-          return (
-            <p
-              key={i}
-              className="flex items-start gap-1"
-              dangerouslySetInnerHTML={{ __html: formatted }}
-            />
-          );
-        }
-
-        // Bullet points
-        if (line.startsWith('- ') || line.startsWith('• ')) {
-          return (
-            <p
-              key={i}
-              className="pl-3 flex items-start gap-1"
-              dangerouslySetInnerHTML={{ __html: '• ' + formatted.slice(2) }}
-            />
-          );
-        }
-
-        // Regular line
-        if (line.trim()) {
-          return (
-            <p
-              key={i}
-              dangerouslySetInnerHTML={{ __html: formatted }}
-            />
-          );
-        }
-
-        return <br key={i} />;
-      })}
+    <div className="text-sm space-y-1 prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0">
+      <ReactMarkdown
+        components={{
+          p: ({ children }) => <p className="my-1">{children}</p>,
+          ul: ({ children }) => <ul className="list-disc pl-4 my-1">{children}</ul>,
+          ol: ({ children }) => <ol className="list-decimal pl-4 my-1">{children}</ol>,
+          li: ({ children }) => <li className="my-0">{children}</li>,
+          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+        }}
+      >
+        {content}
+      </ReactMarkdown>
     </div>
   );
 }
 
 export default function AIChat() {
+  const toast = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -395,7 +368,7 @@ export default function AIChat() {
     if (file) {
       // Check file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        alert('La imagen es muy grande. Máximo 5MB.');
+        toast.warning('La imagen es muy grande. Máximo 5MB.');
         return;
       }
 

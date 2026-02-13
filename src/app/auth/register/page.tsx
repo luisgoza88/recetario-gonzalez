@@ -1,13 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff, Mail, Lock, User, ChefHat, AlertCircle, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function RegisterPage() {
-  const router = useRouter();
   const { signUp, isLoading } = useAuth();
 
   const [fullName, setFullName] = useState('');

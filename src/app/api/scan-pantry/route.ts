@@ -1,6 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, cleanJsonResponse, base64ToGeminiFormat } from '@/lib/gemini/client';
+import { z } from 'zod';
+import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, cleanJsonResponse, base64ToGeminiFormat, geminiWithRetry } from '@/lib/gemini/client';
+import { withRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
+
+// Zod schemas for input validation
+// Base64 images should start with data:image/ and have reasonable size
+const Base64ImageSchema = z.string()
+  .refine(
+    (val) => val.startsWith('data:image/'),
+    { message: 'Image must be a valid base64 data URL' }
+  )
+  .refine(
+    (val) => val.length <= 10 * 1024 * 1024, // Max 10MB base64 (roughly 7.5MB actual image)
+    { message: 'Image too large. Maximum size is 10MB' }
+  );
+
+const ScanPantryPostSchema = z.object({
+  images: z.array(Base64ImageSchema).max(5, 'Maximum 5 images allowed').optional(),
+  image: Base64ImageSchema.optional(),
+}).refine(
+  (data) => data.images?.length || data.image,
+  { message: 'At least one image is required' }
+);
+
+const ProductSchema = z.object({
+  name: z.string().max(200),
+  genericName: z.string().max(200),
+  quantity: z.number().min(0).max(10000),
+  unit: z.string().max(50),
+  category: z.string().max(100),
+  confidence: z.number().min(0).max(1),
+  matchesExisting: z.string().max(200).nullable().optional(),
+});
+
+const ScanPantryPutSchema = z.object({
+  matched: z.array(z.object({
+    marketItemId: z.string().uuid(),
+    marketItemName: z.string().max(200),
+    product: ProductSchema,
+  })).max(100).optional(),
+  newItems: z.array(z.object({
+    product: ProductSchema,
+  })).max(50).optional(),
+});
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,14 +78,40 @@ interface ScanResult {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    // Rate limiting
+    const userId = request.headers.get('x-user-id') || request.headers.get('x-forwarded-for') || 'anonymous';
+    const rateLimit = await withRateLimit(userId, 'scan-pantry');
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(rateLimit.response, {
+        status: 429,
+        headers: rateLimit.headers,
+      });
+    }
+
+    // Parse and validate request body with Zod
+    let validatedBody;
+    try {
+      const rawBody = await request.json();
+      validatedBody = ScanPantryPostSchema.parse(rawBody);
+    } catch (validationError) {
+      if (validationError instanceof z.ZodError) {
+        return NextResponse.json(
+          {
+            error: 'Datos de entrada inválidos',
+            details: validationError.issues.map(e => `${e.path.join('.')}: ${e.message}`)
+          },
+          { status: 400 }
+        );
+      }
+      return NextResponse.json(
+        { error: 'Error parsing request body' },
+        { status: 400 }
+      );
+    }
 
     // Soportar tanto 'image' (single) como 'images' (array) para compatibilidad
-    const images: string[] = body.images || (body.image ? [body.image] : []);
-
-    if (images.length === 0) {
-      return NextResponse.json({ error: 'No se proporcionaron imágenes' }, { status: 400 });
-    }
+    const images: string[] = validatedBody.images || (validatedBody.image ? [validatedBody.image] : []);
 
     const gemini = getGeminiClient();
 
@@ -94,30 +164,34 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura:
   "summary": "Resumen breve de lo que se encontró"
 }`;
 
-    // 2. Procesar todas las imágenes en paralelo con Gemini Vision
+    // 2. Procesar imágenes con concurrencia limitada (máx 3 simultáneas)
+    const MAX_CONCURRENT = 3;
     const allProducts: IdentifiedProduct[] = [];
     const summaries: string[] = [];
 
-    const imagePromises = images.map(async (imageUrl, index) => {
+    // Función para procesar una imagen
+    const processImage = async (imageUrl: string, index: number) => {
       try {
         const imageData = base64ToGeminiFormat(imageUrl);
 
-        const response = await gemini.models.generateContent({
-          model: GEMINI_MODELS.FLASH,
-          contents: [{
-            role: 'user',
-            parts: [
-              { text: systemPrompt },
-              imageData,
-              { text: `Identifica todos los productos en esta imagen ${index + 1} de mi despensa/nevera. Convierte las marcas a nombres genéricos.` }
-            ]
-          }],
-          config: {
-            temperature: GEMINI_CONFIG.parsing.temperature,
-            maxOutputTokens: GEMINI_CONFIG.parsing.maxOutputTokens,
-            responseMimeType: 'application/json',
-          },
-        });
+        const response = await geminiWithRetry(() =>
+          gemini.models.generateContent({
+            model: GEMINI_MODELS.FLASH,
+            contents: [{
+              role: 'user',
+              parts: [
+                { text: systemPrompt },
+                imageData,
+                { text: `Identifica todos los productos en esta imagen ${index + 1} de mi despensa/nevera. Convierte las marcas a nombres genéricos.` }
+              ]
+            }],
+            config: {
+              temperature: GEMINI_CONFIG.parsing.temperature,
+              maxOutputTokens: GEMINI_CONFIG.parsing.maxOutputTokens,
+              responseMimeType: 'application/json',
+            },
+          })
+        );
 
         const content = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
@@ -132,12 +206,20 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura:
           return { products: [], summary: '' };
         }
       } catch (err) {
-        console.error(`Error processing image ${index + 1}:`, err);
+        logger.error(`Error processing image ${index + 1}`, { error: err instanceof Error ? err.message : String(err) });
         return { products: [], summary: '' };
       }
-    });
+    };
 
-    const results = await Promise.all(imagePromises);
+    // Procesar con concurrencia limitada
+    const results: Array<{ products: IdentifiedProduct[]; summary: string }> = [];
+    for (let i = 0; i < images.length; i += MAX_CONCURRENT) {
+      const batch = images.slice(i, i + MAX_CONCURRENT);
+      const batchResults = await Promise.all(
+        batch.map((img, batchIndex) => processImage(img, i + batchIndex))
+      );
+      results.push(...batchResults);
+    }
 
     // Combinar resultados de todas las imágenes
     for (const result of results) {
@@ -188,11 +270,6 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura:
       summary: productsData.summary || ''
     };
 
-    // Crear mapa de items existentes para búsqueda rápida
-    const marketItemsMap = new Map(
-      (marketItems || []).map(item => [item.name.toLowerCase(), item])
-    );
-
     for (const product of result.identified) {
       // Buscar coincidencia en items existentes
       let matchedItem = null;
@@ -241,7 +318,7 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura:
     return NextResponse.json(result);
 
   } catch (error) {
-    console.error('Error scanning pantry:', error);
+    logger.error('Error scanning pantry', { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: 'Error al procesar la imagen' },
       { status: 500 }
@@ -252,7 +329,28 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura:
 // Endpoint para aplicar los cambios después de que el usuario confirme
 export async function PUT(request: NextRequest) {
   try {
-    const { matched, newItems } = await request.json();
+    // Parse and validate request body with Zod
+    let validatedBody;
+    try {
+      const rawBody = await request.json();
+      validatedBody = ScanPantryPutSchema.parse(rawBody);
+    } catch (validationError) {
+      if (validationError instanceof z.ZodError) {
+        return NextResponse.json(
+          {
+            error: 'Datos de entrada inválidos',
+            details: validationError.issues.map(e => `${e.path.join('.')}: ${e.message}`)
+          },
+          { status: 400 }
+        );
+      }
+      return NextResponse.json(
+        { error: 'Error parsing request body' },
+        { status: 400 }
+      );
+    }
+
+    const { matched, newItems } = validatedBody;
 
     const results = {
       inventoryUpdated: 0,
@@ -331,7 +429,7 @@ export async function PUT(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error applying scan results:', error);
+    logger.error('Error applying scan results', { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: 'Error al aplicar cambios' },
       { status: 500 }

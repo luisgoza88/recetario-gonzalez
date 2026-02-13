@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGeminiClient, GEMINI_MODELS, cleanJsonResponse } from '@/lib/gemini/client';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { requireAuth } from '@/lib/api/auth';
+import { createAuthenticatedClient } from '@/lib/supabase/server';
+import { logger } from '@/lib/logger';
 
 interface MatchRequest {
   recipeName: string;
@@ -31,6 +28,11 @@ interface LibraryImage {
 
 // POST: Match a recipe to the best image from the library
 export async function POST(request: NextRequest) {
+  const auth = requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+
+  const supabase = await createAuthenticatedClient();
+
   try {
     const body: MatchRequest = await request.json();
     const {
@@ -128,7 +130,7 @@ Respond with JSON only:
     try {
       matchResult = JSON.parse(cleanedJson);
     } catch {
-      console.error('Failed to parse AI response:', responseText);
+      logger.error(`Failed to parse AI response: ${responseText}`);
       // Fallback: return a random match
       const randomIndex = Math.floor(Math.random() * candidates.length);
       matchResult = {
@@ -194,13 +196,17 @@ Respond with JSON only:
     });
 
   } catch (error) {
-    console.error('Match recipe image error:', error);
+    logger.error('Match recipe image error', { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json({ error: 'Matching failed' }, { status: 500 });
   }
 }
 
 // GET: Get statistics about the library
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authCheck = requireAuth(request);
+  if (authCheck instanceof NextResponse) return authCheck;
+
+  const supabase = await createAuthenticatedClient();
   try {
     const { data: stats, error } = await supabase
       .from('image_library')
@@ -228,7 +234,7 @@ export async function GET() {
       byCuisine
     });
   } catch (error) {
-    console.error('Stats error:', error);
+    logger.error('Stats error', { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json({ error: 'Error getting stats' }, { status: 500 });
   }
 }

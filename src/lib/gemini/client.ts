@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { logger } from '@/lib/logger';
 
 // Cliente singleton de Gemini
 let geminiClient: GoogleGenAI | null = null;
@@ -8,13 +9,11 @@ export function getGeminiClient(): GoogleGenAI {
     const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
 
     if (!apiKey) {
-      console.error('[Gemini] API key not found in environment variables');
+      logger.error('[Gemini] API key not found in environment variables');
       throw new Error('GOOGLE_GEMINI_API_KEY no está configurada en las variables de entorno');
     }
 
-    console.log('[Gemini] Initializing client with API key:', apiKey.substring(0, 10) + '...');
     geminiClient = new GoogleGenAI({ apiKey });
-    console.log('[Gemini] Client initialized successfully');
   }
 
   return geminiClient;
@@ -111,4 +110,241 @@ export function base64ToGeminiFormat(base64String: string, mimeType: string = 'i
       mimeType,
     },
   };
+}
+
+// ============================================
+// Retry con Backoff Exponencial
+// ============================================
+
+interface RetryOptions {
+  maxRetries?: number;
+  initialDelayMs?: number;
+  maxDelayMs?: number;
+  backoffMultiplier?: number;
+  retryableErrors?: string[];
+}
+
+const DEFAULT_RETRY_OPTIONS: Required<RetryOptions> = {
+  maxRetries: 3,
+  initialDelayMs: 1000,
+  maxDelayMs: 30000,
+  backoffMultiplier: 2,
+  retryableErrors: [
+    'RESOURCE_EXHAUSTED',
+    'UNAVAILABLE',
+    'DEADLINE_EXCEEDED',
+    'INTERNAL',
+    'rate limit',
+    'quota exceeded',
+    '429',
+    '500',
+    '502',
+    '503',
+    '504',
+  ],
+};
+
+/**
+ * Espera un tiempo determinado
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Verifica si un error es reintentable
+ */
+function isRetryableError(error: unknown, retryableErrors: string[]): boolean {
+  const errorString = String(error).toLowerCase();
+  const errorMessage = error instanceof Error ? error.message.toLowerCase() : '';
+
+  return retryableErrors.some(
+    retryable =>
+      errorString.includes(retryable.toLowerCase()) ||
+      errorMessage.includes(retryable.toLowerCase())
+  );
+}
+
+/**
+ * Ejecuta una función con retry y backoff exponencial
+ *
+ * @param fn - Función asíncrona a ejecutar
+ * @param options - Opciones de retry
+ * @returns Resultado de la función
+ */
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  options?: RetryOptions
+): Promise<T> {
+  const opts = { ...DEFAULT_RETRY_OPTIONS, ...options };
+  let lastError: unknown;
+  let delay = opts.initialDelayMs;
+
+  for (let attempt = 0; attempt <= opts.maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+
+      // Si es el último intento o el error no es reintentable, lanzar
+      if (attempt === opts.maxRetries || !isRetryableError(error, opts.retryableErrors)) {
+        throw error;
+      }
+
+      // Log del retry (solo en desarrollo)
+      if (process.env.NODE_ENV === 'development') {
+        logger.info(
+          `[Gemini Retry] Attempt ${attempt + 1}/${opts.maxRetries} failed, retrying in ${delay}ms...`,
+          { error: error instanceof Error ? error.message : String(error) }
+        );
+      }
+
+      // Esperar antes del siguiente intento
+      await sleep(delay);
+
+      // Incrementar delay con backoff exponencial (con jitter)
+      const jitter = Math.random() * 0.3 + 0.85; // 0.85 - 1.15
+      delay = Math.min(delay * opts.backoffMultiplier * jitter, opts.maxDelayMs);
+    }
+  }
+
+  throw lastError;
+}
+
+/**
+ * Wrapper para llamadas a Gemini con retry automático
+ *
+ * @example
+ * const response = await geminiWithRetry(() =>
+ *   gemini.models.generateContent({...})
+ * );
+ */
+export async function geminiWithRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3
+): Promise<T> {
+  return withRetry(fn, { maxRetries });
+}
+
+// ============================================
+// Sanitización de Prompts (Prevención de Injection)
+// ============================================
+
+/**
+ * Patrones peligrosos que podrían indicar un intento de prompt injection
+ */
+const DANGEROUS_PATTERNS = [
+  // Intentos de cambiar el rol/personalidad
+  /ignore\s+(previous|all|above)\s+(instructions?|prompts?)/i,
+  /forget\s+(everything|all|your)\s+(instructions?|training)/i,
+  /you\s+are\s+now\s+(?:a|an|the)\s+/i,
+  /act\s+as\s+(?:a|an|if)/i,
+  /pretend\s+(?:to\s+be|you\s+are)/i,
+  /new\s+(?:instructions?|persona|role)/i,
+
+  // Intentos de revelar información del sistema
+  /(?:show|reveal|tell|display)\s+(?:me\s+)?(?:your|the)\s+(?:system\s+)?(?:prompt|instructions?)/i,
+  /what\s+(?:are|were)\s+your\s+(?:original\s+)?instructions?/i,
+
+  // Inyección de comandos/código
+  /```(?:bash|sh|shell|cmd|powershell|python|javascript|js)/i,
+  /\$\{.*\}/,  // Template literals
+  /eval\s*\(/i,
+  /exec\s*\(/i,
+  /system\s*\(/i,
+
+  // Intentos de manipulación
+  /(?:do\s+not|don't)\s+(?:follow|obey)/i,
+  /override\s+(?:your|the)\s+(?:rules?|instructions?)/i,
+  /jailbreak/i,
+  /DAN\s+mode/i,
+];
+
+/**
+ * Patrones para limpiar del input del usuario
+ */
+const SANITIZATION_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
+  // Remover caracteres de control
+  { pattern: /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, replacement: '' },
+
+  // Normalizar múltiples espacios/newlines
+  { pattern: /\n{3,}/g, replacement: '\n\n' },
+  { pattern: / {3,}/g, replacement: '  ' },
+
+  // Escapar caracteres especiales de markdown que podrían usarse maliciosamente
+  { pattern: /^#{4,}/gm, replacement: '####' },  // Limitar niveles de heading
+];
+
+/**
+ * Verifica si un texto contiene patrones de prompt injection
+ *
+ * @param text - Texto a verificar
+ * @returns true si se detecta un patrón peligroso
+ */
+export function detectsPromptInjection(text: string): boolean {
+  return DANGEROUS_PATTERNS.some(pattern => pattern.test(text));
+}
+
+/**
+ * Sanitiza el input del usuario para prevenir prompt injection
+ *
+ * @param userInput - Input del usuario a sanitizar
+ * @param maxLength - Longitud máxima permitida (default: 5000)
+ * @returns Input sanitizado
+ */
+export function sanitizeUserInput(userInput: string, maxLength: number = 5000): string {
+  let sanitized = userInput;
+
+  // Aplicar patrones de sanitización
+  for (const { pattern, replacement } of SANITIZATION_PATTERNS) {
+    sanitized = sanitized.replace(pattern, replacement);
+  }
+
+  // Truncar si excede el límite
+  if (sanitized.length > maxLength) {
+    sanitized = sanitized.slice(0, maxLength) + '...';
+  }
+
+  return sanitized.trim();
+}
+
+/**
+ * Prepara el input del usuario de forma segura para incluirlo en un prompt
+ *
+ * @param userInput - Input del usuario
+ * @param options - Opciones de sanitización
+ * @returns Objeto con el input sanitizado y si se detectó injection
+ */
+export function prepareUserInput(
+  userInput: string,
+  options?: {
+    maxLength?: number;
+    allowMarkdown?: boolean;
+    throwOnInjection?: boolean;
+  }
+): { sanitized: string; possibleInjection: boolean } {
+  const { maxLength = 5000, throwOnInjection = false } = options || {};
+
+  const possibleInjection = detectsPromptInjection(userInput);
+
+  if (possibleInjection && throwOnInjection) {
+    throw new Error('Posible intento de prompt injection detectado');
+  }
+
+  const sanitized = sanitizeUserInput(userInput, maxLength);
+
+  return { sanitized, possibleInjection };
+}
+
+/**
+ * Envuelve el input del usuario en delimitadores claros para el modelo
+ *
+ * Esto ayuda al modelo a distinguir entre instrucciones del sistema
+ * y contenido del usuario.
+ *
+ * @param userInput - Input del usuario (ya sanitizado)
+ * @returns Input envuelto en delimitadores
+ */
+export function wrapUserInput(userInput: string): string {
+  return `<user_input>\n${userInput}\n</user_input>`;
 }

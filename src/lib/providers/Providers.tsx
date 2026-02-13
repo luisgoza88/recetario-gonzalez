@@ -5,6 +5,7 @@ import QueryProvider from './QueryProvider';
 import { AuthProvider } from '@/contexts/AuthContext';
 import AnalyticsProvider from '@/lib/analytics/AnalyticsProvider';
 import { HouseholdProvider } from '@/components/providers/HouseholdProvider';
+import { ToastProvider } from '@/components/ui/Toast';
 
 interface ProvidersProps {
   children: ReactNode;
@@ -15,11 +16,13 @@ export default function Providers({ children }: ProvidersProps) {
     <QueryProvider>
       <AuthProvider>
         <HouseholdProvider>
-          <Suspense fallback={null}>
-            <AnalyticsProvider>
-              {children}
-            </AnalyticsProvider>
-          </Suspense>
+          <ToastProvider>
+            <Suspense fallback={null}>
+              <AnalyticsProvider>
+                {children}
+              </AnalyticsProvider>
+            </Suspense>
+          </ToastProvider>
         </HouseholdProvider>
       </AuthProvider>
     </QueryProvider>

@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGeminiClient, GEMINI_MODELS } from '@/lib/gemini/client';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { requireAuth } from '@/lib/api/auth';
+import { createAuthenticatedClient, createStorageAdminClient } from '@/lib/supabase/server';
+import { logger } from '@/lib/logger';
 
 interface GenerateImageRequest {
   recipeName: string;
@@ -17,6 +14,9 @@ interface GenerateImageRequest {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const body: GenerateImageRequest = await request.json();
     const {
@@ -71,7 +71,7 @@ Requisitos de la imagen:
     let textResponse: string | null = null;
 
     try {
-      console.log('Generando imagen con Imagen 3...');
+      logger.info('Generando imagen con Imagen 3...');
       const imagen3Response = await gemini.models.generateImages({
         model: GEMINI_MODELS.IMAGE_GEN,
         prompt: prompt,
@@ -85,10 +85,10 @@ Requisitos de la imagen:
       const generatedImage = imagen3Response.generatedImages?.[0];
       if (generatedImage?.image?.imageBytes) {
         imageData = generatedImage.image.imageBytes;
-        console.log('Imagen generada exitosamente con Imagen 3');
+        logger.info('Imagen generada exitosamente con Imagen 3');
       }
     } catch (imagen3Error) {
-      console.error('Imagen 3 error, intentando con Gemini Flash:', imagen3Error);
+      logger.error('Imagen 3 error, intentando con Gemini Flash', { error: imagen3Error instanceof Error ? imagen3Error.message : String(imagen3Error) });
     }
 
     // Si Imagen 3 falla, usar Gemini 2.0 Flash Exp como respaldo
@@ -117,7 +117,7 @@ Requisitos de la imagen:
           }
         }
       } catch (flashError) {
-        console.error('Gemini Flash error:', flashError);
+        logger.error('Gemini Flash error', { error: flashError instanceof Error ? flashError.message : String(flashError) });
       }
     }
 
@@ -140,8 +140,9 @@ Requisitos de la imagen:
         // Convertir base64 a buffer
         const imageBuffer = Buffer.from(imageData, 'base64');
 
-        // Subir a Supabase Storage
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        // Storage uploads require admin client (bucket-level access)
+        const storageClient = createStorageAdminClient();
+        const { error: uploadError } = await storageClient.storage
           .from('recipe-images')
           .upload(fileName, imageBuffer, {
             contentType: 'image/png',
@@ -149,17 +150,19 @@ Requisitos de la imagen:
           });
 
         if (uploadError) {
-          console.error('Error uploading to Supabase:', uploadError);
+          logger.error('Error uploading to Supabase', { error: uploadError instanceof Error ? uploadError.message : String(uploadError) });
         } else {
           // Obtener URL pública
-          const { data: urlData } = supabase.storage
+          const { data: urlData } = storageClient.storage
             .from('recipe-images')
             .getPublicUrl(fileName);
 
           imageUrl = urlData?.publicUrl || null;
 
           // Si hay recipeId, actualizar la receta con la URL de la imagen
+          // Use authenticated client to respect RLS
           if (recipeId && imageUrl) {
+            const supabase = await createAuthenticatedClient();
             await supabase
               .from('recipes')
               .update({ image_url: imageUrl })
@@ -167,7 +170,7 @@ Requisitos de la imagen:
           }
         }
       } catch (storageError) {
-        console.error('Storage error:', storageError);
+        logger.error('Storage error', { error: storageError instanceof Error ? storageError.message : String(storageError) });
       }
     }
 
@@ -180,7 +183,7 @@ Requisitos de la imagen:
     });
 
   } catch (error) {
-    console.error('Error generating recipe image:', error);
+    logger.error('Error generating recipe image', { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: 'Error al generar la imagen de la receta' },
       { status: 500 }
@@ -189,8 +192,12 @@ Requisitos de la imagen:
 }
 
 // Endpoint para obtener todas las recetas sin imagen y generar automáticamente
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+
   try {
+    const supabase = await createAuthenticatedClient();
     // Obtener todas las recetas sin imagen
     const { data: recipes, error } = await supabase
       .from('recipes')
@@ -225,7 +232,7 @@ export async function GET() {
     });
 
   } catch (error) {
-    console.error('Error checking recipes:', error);
+    logger.error('Error checking recipes', { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: 'Error al verificar recetas' },
       { status: 500 }
@@ -235,6 +242,9 @@ export async function GET() {
 
 // Endpoint para generar imágenes en batch para múltiples recetas
 export async function PUT(request: NextRequest) {
+  const auth = requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { recipeIds } = await request.json();
 
@@ -248,6 +258,7 @@ export async function PUT(request: NextRequest) {
     // Limitar a 10 recetas por batch para evitar timeouts
     const limitedIds = recipeIds.slice(0, 10);
 
+    const supabase = await createAuthenticatedClient();
     // Obtener las recetas sin imagen
     const { data: recipes, error } = await supabase
       .from('recipes')
@@ -263,6 +274,8 @@ export async function PUT(request: NextRequest) {
     }
 
     const results: { recipeId: string; recipeName: string; success: boolean; imageUrl?: string; error?: string }[] = [];
+    const appOrigin = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
+    const cookieHeader = request.headers.get('cookie');
 
     // Procesar cada receta secuencialmente para evitar rate limits
     for (const recipe of recipes) {
@@ -274,9 +287,13 @@ export async function PUT(request: NextRequest) {
             ).filter(Boolean)
           : [];
 
-        const generateResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/generate-recipe-image`, {
+        const generateResponse = await fetch(`${appOrigin}/api/generate-recipe-image`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-id': auth.userId,
+            ...(cookieHeader ? { cookie: cookieHeader } : {}),
+          },
           body: JSON.stringify({
             recipeName: recipe.name,
             recipeDescription: recipe.description,
@@ -321,7 +338,7 @@ export async function PUT(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Batch image generation error:', error);
+    logger.error('Batch image generation error', { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: 'Error en la generación de imágenes en batch' },
       { status: 500 }

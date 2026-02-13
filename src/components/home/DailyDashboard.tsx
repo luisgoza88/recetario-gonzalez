@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
-  Calendar, CheckCircle2, Clock, User, ChevronLeft, ChevronRight,
-  Star, Camera, Play, Pause, MoreVertical, AlertTriangle,
-  TrendingUp, Sparkles, Filter, Eye, X
+  Calendar, User, ChevronLeft, ChevronRight,
+  TrendingUp, AlertTriangle, X
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase/client';
 import { ScheduledTask, HomeEmployee, Space } from '@/types';
+import { useDailyTasks, useDailyCheckins, useToggleDailyTask, useStartTask } from '@/lib/hooks/useDailyDashboard';
+import TaskCard from './TaskCard';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 
 interface DailyDashboardProps {
   householdId: string;
@@ -38,111 +39,29 @@ export default function DailyDashboard({
   onOpenRating
 }: DailyDashboardProps) {
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [tasks, setTasks] = useState<ScheduledTask[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [employeeCheckins, setEmployeeCheckins] = useState<Record<string, { isCheckedIn: boolean; time?: string }>>({});
   const [expandedEmployee, setExpandedEmployee] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'completed'>('all');
 
-  useEffect(() => {
-    loadTasks();
-    loadCheckins();
-  }, [selectedDate, householdId]);
+  const dateStr = selectedDate.toISOString().split('T')[0];
 
-  const loadTasks = async () => {
-    setLoading(true);
-    const dateStr = selectedDate.toISOString().split('T')[0];
+  // TanStack Query hooks
+  const { data: tasks = [], isLoading: loading } = useDailyTasks(householdId, dateStr);
+  const { data: employeeCheckins = {} } = useDailyCheckins(householdId, dateStr);
+  const toggleTaskMutation = useToggleDailyTask();
+  const startTaskMutation = useStartTask();
+  useEscapeKey(onClose);
 
-    const { data } = await supabase
-      .from('scheduled_tasks')
-      .select(`
-        *,
-        task_template:task_templates(*),
-        space:spaces(*, space_type:space_types(*)),
-        employee:home_employees!scheduled_tasks_employee_id_fkey(*)
-      `)
-      .eq('household_id', householdId)
-      .eq('scheduled_date', dateStr)
-      .order('created_at');
-
-    if (data) setTasks(data);
-    setLoading(false);
+  const toggleTaskStatus = (task: ScheduledTask) => {
+    toggleTaskMutation.mutate({ task, householdId }, {
+      onSuccess: () => onTaskComplete(),
+    });
   };
 
-  const loadCheckins = async () => {
-    const dateStr = selectedDate.toISOString().split('T')[0];
-
-    const { data } = await supabase
-      .from('employee_checkins')
-      .select('*')
-      .eq('household_id', householdId)
-      .eq('date', dateStr);
-
-    if (data) {
-      const checkins: Record<string, { isCheckedIn: boolean; time?: string }> = {};
-      data.forEach(c => {
-        checkins[c.employee_id] = {
-          isCheckedIn: !c.check_out_time,
-          time: c.check_in_time
-        };
-      });
-      setEmployeeCheckins(checkins);
-    }
+  const startTask = (task: ScheduledTask) => {
+    startTaskMutation.mutate({ task, householdId });
   };
 
-  const toggleTaskStatus = async (task: ScheduledTask) => {
-    const newStatus = task.status === 'completada' ? 'pendiente' : 'completada';
-    const now = new Date();
-
-    // Calculate actual minutes from started_at if available
-    let actualMinutes: number | null = null;
-    if (newStatus === 'completada' && task.started_at) {
-      const startedAt = new Date(task.started_at);
-      actualMinutes = Math.round((now.getTime() - startedAt.getTime()) / (1000 * 60));
-    }
-
-    await supabase
-      .from('scheduled_tasks')
-      .update({
-        status: newStatus,
-        completed_at: newStatus === 'completada' ? now.toISOString() : null,
-        actual_minutes: actualMinutes,
-        // Reset started_at if going back to pending
-        ...(newStatus === 'pendiente' ? { started_at: null } : {})
-      })
-      .eq('id', task.id);
-
-    // Si se completa, registrar en historial con tiempo REAL
-    if (newStatus === 'completada') {
-      await supabase.from('cleaning_history').insert({
-        household_id: householdId,
-        space_id: task.space_id,
-        task_id: task.id,
-        task_name: task.task_template?.name,
-        employee_id: task.employee_id,
-        completed_at: now.toISOString(),
-        // Use actual measured time, or fallback to estimate
-        actual_minutes: actualMinutes || task.task_template?.estimated_minutes
-      });
-    }
-
-    loadTasks();
-    onTaskComplete();
-  };
-
-  const startTask = async (task: ScheduledTask) => {
-    await supabase
-      .from('scheduled_tasks')
-      .update({
-        status: 'en_progreso',
-        started_at: new Date().toISOString()
-      })
-      .eq('id', task.id);
-
-    loadTasks();
-  };
-
-  // Agrupar tareas por empleado
+  // Group tasks by employee
   const tasksByEmployee: TasksByEmployee[] = employees.map(emp => {
     const empTasks = tasks.filter(t => t.employee_id === emp.id);
     const filtered = filterStatus === 'all'
@@ -161,7 +80,6 @@ export default function DailyDashboard({
     };
   });
 
-  // Tareas sin asignar
   const unassignedTasks = tasks.filter(t => !t.employee_id);
 
   const changeDate = (days: number) => {
@@ -186,7 +104,7 @@ export default function DailyDashboard({
   const progressPercent = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 flex justify-between items-center">
@@ -194,7 +112,7 @@ export default function DailyDashboard({
             <Calendar size={20} />
             <span className="font-semibold">Dashboard del Día</span>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg">
+          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg">
             <X size={20} />
           </button>
         </div>
@@ -398,196 +316,6 @@ export default function DailyDashboard({
           >
             Cerrar
           </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Task Card Component with Gamified Timer
-interface TaskCardProps {
-  task: ScheduledTask;
-  onToggle: () => void;
-  onStart: () => void;
-  onInspect: () => void;
-  onRate: () => void;
-}
-
-function TaskCard({ task, onToggle, onStart, onInspect, onRate }: TaskCardProps) {
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const isCompleted = task.status === 'completada';
-  const isInProgress = task.status === 'en_progreso';
-
-  // Live timer for in-progress tasks
-  useEffect(() => {
-    if (!isInProgress || !task.started_at) {
-      setElapsedTime(0);
-      return;
-    }
-
-    const startedAt = new Date(task.started_at).getTime();
-
-    const updateElapsed = () => {
-      const now = Date.now();
-      setElapsedTime(Math.floor((now - startedAt) / 1000));
-    };
-
-    updateElapsed();
-    const interval = setInterval(updateElapsed, 1000);
-
-    return () => clearInterval(interval);
-  }, [isInProgress, task.started_at]);
-
-  // Format seconds to mm:ss or hh:mm:ss
-  const formatTime = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-
-    if (hrs > 0) {
-      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // Calculate progress percentage vs estimated time
-  const estimatedSeconds = (task.task_template?.estimated_minutes || 30) * 60;
-  const progressPercent = Math.min(100, (elapsedTime / estimatedSeconds) * 100);
-
-  // Get encouraging message based on progress
-  const getEncouragingMessage = () => {
-    if (progressPercent < 50) return { emoji: '🚀', text: '¡Buen ritmo!' };
-    if (progressPercent < 80) return { emoji: '💪', text: '¡Vas muy bien!' };
-    if (progressPercent < 100) return { emoji: '🏁', text: '¡Ya casi!' };
-    return { emoji: '⏰', text: '¡Tómate tu tiempo!' };
-  };
-
-  // Get achievement for completed task
-  const getAchievement = (actualMinutes: number, estimatedMinutes: number) => {
-    const ratio = actualMinutes / estimatedMinutes;
-    if (ratio <= 0.7) return { emoji: '⚡', text: '¡Súper rápido!', color: 'bg-purple-100 text-purple-700' };
-    if (ratio <= 0.9) return { emoji: '🌟', text: '¡Excelente!', color: 'bg-yellow-100 text-yellow-700' };
-    if (ratio <= 1.0) return { emoji: '✨', text: '¡Perfecto!', color: 'bg-green-100 text-green-700' };
-    if (ratio <= 1.2) return { emoji: '👍', text: '¡Bien hecho!', color: 'bg-blue-100 text-blue-700' };
-    return { emoji: '💪', text: '¡Completado!', color: 'bg-gray-100 text-gray-700' };
-  };
-
-  const encouragement = getEncouragingMessage();
-
-  return (
-    <div className={`p-4 ${isCompleted ? 'bg-green-50' : isInProgress ? 'bg-gradient-to-r from-blue-50 to-indigo-50' : ''}`}>
-      <div className="flex items-start gap-3">
-        {/* Checkbox */}
-        <button
-          onClick={onToggle}
-          className={`mt-0.5 w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-            isCompleted
-              ? 'bg-green-500 border-green-500 text-white'
-              : 'border-gray-300 hover:border-blue-500'
-          }`}
-        >
-          {isCompleted && <CheckCircle2 size={16} />}
-        </button>
-
-        {/* Task Info */}
-        <div className="flex-1 min-w-0">
-          <p className={`font-medium ${isCompleted ? 'text-gray-400 line-through' : ''}`}>
-            {task.task_template?.name}
-          </p>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-sm text-gray-500 flex items-center gap-1">
-              {task.space?.space_type?.icon}
-              {task.space?.custom_name || task.space?.space_type?.name}
-            </span>
-            <span className="text-xs text-gray-400">•</span>
-            <span className="text-sm text-gray-400 flex items-center gap-1">
-              <Clock size={12} />
-              ~{task.task_template?.estimated_minutes} min
-            </span>
-          </div>
-
-          {/* Gamified Timer - Friendly & Encouraging */}
-          {isInProgress && (
-            <div className="mt-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">{encouragement.emoji}</span>
-                  <span className="text-lg font-mono font-bold text-indigo-600">
-                    {formatTime(elapsedTime)}
-                  </span>
-                </div>
-                <span className="text-xs text-indigo-500 font-medium">
-                  {encouragement.text}
-                </span>
-              </div>
-              {/* Friendly progress bar - always encouraging colors */}
-              <div className="h-2 bg-indigo-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-indigo-400 to-purple-500 transition-all duration-500 rounded-full"
-                  style={{ width: `${Math.min(100, progressPercent)}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Achievement Badge after completion */}
-          {isCompleted && task.actual_minutes !== undefined && task.actual_minutes !== null && (
-            <div className="mt-2 flex items-center gap-2">
-              {(() => {
-                const achievement = getAchievement(
-                  task.actual_minutes,
-                  task.task_template?.estimated_minutes || 30
-                );
-                return (
-                  <span className={`text-sm px-3 py-1 rounded-full font-medium ${achievement.color}`}>
-                    {achievement.emoji} {achievement.text} • {task.actual_minutes} min
-                  </span>
-                );
-              })()}
-            </div>
-          )}
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-1">
-          {!isCompleted && !isInProgress && (
-            <button
-              onClick={onStart}
-              className="p-2.5 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 rounded-xl text-white shadow-sm"
-              title="¡Empezar!"
-            >
-              <Play size={18} />
-            </button>
-          )}
-
-          {isInProgress && (
-            <button
-              onClick={onToggle}
-              className="p-2.5 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 rounded-xl text-white shadow-sm"
-              title="¡Listo!"
-            >
-              <CheckCircle2 size={18} />
-            </button>
-          )}
-
-          {isCompleted && (
-            <>
-              <button
-                onClick={onRate}
-                className="p-2 hover:bg-amber-100 rounded-lg text-amber-500"
-                title="Calificar"
-              >
-                <Star size={18} />
-              </button>
-              <button
-                onClick={onInspect}
-                className="p-2 hover:bg-purple-100 rounded-lg text-purple-600"
-                title="Inspeccionar"
-              >
-                <Eye size={18} />
-              </button>
-            </>
-          )}
         </div>
       </div>
     </div>

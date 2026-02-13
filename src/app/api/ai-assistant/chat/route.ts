@@ -1,7 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, base64ToGeminiFormat } from '@/lib/gemini/client';
+import { z } from 'zod';
+import { getGeminiClient, GEMINI_MODELS, base64ToGeminiFormat } from '@/lib/gemini/client';
 import { FunctionDeclaration, Type, FunctionCallingConfigMode } from '@google/genai';
+import { withRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
+
+// Import shared types and utilities from the ai-assistant module
+import { MessageWithImage } from '@/lib/ai-assistant/types';
+import { createAIClient } from '@/lib/ai-assistant/db';
+import { DAYS_OF_WEEK } from '@/lib/ai-assistant/constants';
+
+// Lazy-evaluated authenticated Supabase client (created per-request when first called)
+async function getSupabase() { return createAIClient(); }
+
+// Zod schema for request validation
+const MessageSchema = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string().max(10000),
+  image: z.string().max(10 * 1024 * 1024).optional(), // Max ~7.5MB image
+});
+
+const ChatRequestSchema = z.object({
+  messages: z.array(MessageSchema).min(1).max(50),
+  stream: z.boolean().optional(),
+  conversationContext: z.record(z.string(), z.unknown()).optional(),
+});
 
 /**
  * ENDPOINT SIMPLIFICADO PARA CONSULTAS
@@ -13,16 +36,7 @@ import { FunctionDeclaration, Type, FunctionCallingConfigMode } from '@google/ge
  * Para acciones de escritura (crear, actualizar, eliminar), usar /api/ai-assistant
  */
 
-interface MessageWithImage {
-  role: string;
-  content: string;
-  image?: string;
-}
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// Note: MessageWithImage is imported from @/lib/ai-assistant modules
 
 // ============================================
 // SOLO FUNCIONES DE CONSULTA (READ-ONLY)
@@ -208,6 +222,7 @@ const queryFunctions: FunctionDeclaration[] = [
 // ============================================
 
 async function getTodayMenu() {
+  const supabase = await getSupabase();
   const today = new Date();
   const dayOfWeek = today.getDay();
   const cycleDay = ((dayOfWeek === 0 ? 7 : dayOfWeek) - 1) % 12 + 1;
@@ -244,6 +259,7 @@ async function getTodayMenu() {
 }
 
 async function getWeekMenu() {
+  const supabase = await getSupabase();
   const { data: menus } = await supabase
     .from('day_menu')
     .select(`
@@ -255,17 +271,22 @@ async function getWeekMenu() {
     .order('day_number')
     .limit(7);
 
-  const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return menus?.map((m: any, i: number) => ({
-    day: days[i] || `Día ${m.day_number}`,
-    breakfast: m.breakfast?.name || '-',
-    lunch: m.lunch?.name || '-',
-    dinner: m.dinner?.name || 'Sin cena'
-  })) || [];
+  // Using imported DAYS_OF_WEEK constant
+  return menus?.map((m: Record<string, unknown>, i: number) => {
+    const breakfast = m.breakfast as { name?: string } | null;
+    const lunch = m.lunch as { name?: string } | null;
+    const dinner = m.dinner as { name?: string } | null;
+    return {
+      day: DAYS_OF_WEEK[i] || `Día ${m.day_number}`,
+      breakfast: breakfast?.name || '-',
+      lunch: lunch?.name || '-',
+      dinner: dinner?.name || 'Sin cena'
+    };
+  }) || [];
 }
 
 async function getRecipeDetails(recipeName: string) {
+  const supabase = await getSupabase();
   let { data: recipe } = await supabase
     .from('recipes')
     .select('*')
@@ -325,6 +346,7 @@ async function getRecipeDetails(recipeName: string) {
 }
 
 async function searchRecipes(query: string) {
+  const supabase = await getSupabase();
   let { data: recipes } = await supabase
     .from('recipes')
     .select('name, prep_time, category, portions, ingredients')
@@ -352,6 +374,7 @@ async function searchRecipes(query: string) {
 }
 
 async function getInventory() {
+  const supabase = await getSupabase();
   const { data, error } = await supabase
     .from('inventory')
     .select('*, market_item:market_items(name, category)')
@@ -383,6 +406,7 @@ async function getInventory() {
 }
 
 async function getMissingIngredients(recipeName: string) {
+  const supabase = await getSupabase();
   const { data: recipe } = await supabase
     .from('recipes')
     .select('name, ingredients')
@@ -425,6 +449,7 @@ async function getMissingIngredients(recipeName: string) {
 }
 
 async function getShoppingList() {
+  const supabase = await getSupabase();
   const { data, error } = await supabase
     .from('market_checklist')
     .select('*, market_item:market_items(name, category)')
@@ -455,17 +480,15 @@ async function getShoppingList() {
 }
 
 async function getTodayTasks() {
-  const today = new Date();
-  const dayOfWeek = today.getDay();
-  const weekNumber = Math.ceil(today.getDate() / 7);
-  const cycleWeek = ((weekNumber - 1) % 4) + 1;
+  const supabase = await getSupabase();
+  const todayIso = new Date().toISOString().split('T')[0];
+  const today = new Date(`${todayIso}T12:00:00`);
 
   const { data: tasks } = await supabase
-    .from('task_templates')
-    .select('*, employee:employees(name)')
-    .eq('day_of_week', dayOfWeek)
-    .eq('week_number', cycleWeek)
-    .order('time_start');
+    .from('scheduled_tasks')
+    .select('status, task_template:task_templates(name, category, estimated_minutes), employee:home_employees(name)')
+    .eq('scheduled_date', todayIso)
+    .order('created_at');
 
   if (!tasks || tasks.length === 0) {
     return { message: 'No hay tareas programadas para hoy', tasks: [] };
@@ -475,40 +498,43 @@ async function getTodayTasks() {
     date: today.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }),
     total_tasks: tasks.length,
     tasks: tasks.map(t => ({
-      task: t.task_name,
-      employee: t.employee?.name || 'Sin asignar',
-      time: `${t.time_start} - ${t.time_end}`,
-      category: t.category,
-      is_special: t.is_special
+      task: (t.task_template as { name?: string } | null)?.name || 'Tarea',
+      employee: (t.employee as { name?: string } | null)?.name || 'Sin asignar',
+      status: t.status,
+      category: (t.task_template as { category?: string } | null)?.category || 'general',
+      estimated_minutes: (t.task_template as { estimated_minutes?: number } | null)?.estimated_minutes || 0
     }))
   };
 }
 
 async function getTasksSummary() {
-  const today = new Date();
-  const dayOfWeek = today.getDay();
-  const weekNumber = Math.ceil(today.getDate() / 7);
-  const cycleWeek = ((weekNumber - 1) % 4) + 1;
+  const supabase = await getSupabase();
+  const todayIso = new Date().toISOString().split('T')[0];
 
-  const { data: templates } = await supabase
-    .from('task_templates')
-    .select('id')
-    .eq('day_of_week', dayOfWeek)
-    .eq('week_number', cycleWeek);
+  const { data: tasks } = await supabase
+    .from('scheduled_tasks')
+    .select('status')
+    .eq('scheduled_date', todayIso);
 
-  const totalTasks = templates?.length || 0;
+  const totalTasks = tasks?.length || 0;
+  const completed = tasks?.filter(t => t.status === 'completada').length || 0;
+  const inProgress = tasks?.filter(t => t.status === 'en_progreso').length || 0;
+  const pending = tasks?.filter(t => t.status === 'pendiente' || t.status === 'omitida').length || 0;
 
-  // Por ahora asumimos que las tareas no tienen estado de completado persistente
   return {
-    date: today.toLocaleDateString('es-ES', { weekday: 'long' }),
+    date: new Date(`${todayIso}T12:00:00`).toLocaleDateString('es-ES', { weekday: 'long' }),
     total_tasks: totalTasks,
-    message: `${totalTasks} tareas programadas para hoy`
+    completed,
+    in_progress: inProgress,
+    pending,
+    message: `${completed}/${totalTasks} tareas completadas`
   };
 }
 
 async function getEmployeeSchedule(employeeName: string, period: string = 'today') {
+  const supabase = await getSupabase();
   const { data: employee } = await supabase
-    .from('employees')
+    .from('home_employees')
     .select('id, name, work_days, schedule')
     .ilike('name', `%${employeeName}%`)
     .single();
@@ -517,57 +543,70 @@ async function getEmployeeSchedule(employeeName: string, period: string = 'today
     return { error: `No se encontró el empleado "${employeeName}"` };
   }
 
-  const today = new Date();
-  const dayOfWeek = today.getDay();
+  const todayIso = new Date().toISOString().split('T')[0];
+  const today = new Date(`${todayIso}T12:00:00`);
 
   if (period === 'week') {
+    const weekStart = new Date(today);
+    const dayOffset = (weekStart.getDay() + 6) % 7; // Monday-based
+    weekStart.setDate(weekStart.getDate() - dayOffset);
+
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+
+    const startIso = weekStart.toISOString().split('T')[0];
+    const endIso = weekEnd.toISOString().split('T')[0];
+
     const { data: tasks } = await supabase
-      .from('task_templates')
-      .select('*')
+      .from('scheduled_tasks')
+      .select('scheduled_date, status, task_template:task_templates(name, category, estimated_minutes)')
       .eq('employee_id', employee.id)
-      .order('week_number')
-      .order('day_of_week')
-      .order('time_start');
+      .gte('scheduled_date', startIso)
+      .lte('scheduled_date', endIso)
+      .order('scheduled_date');
 
     return {
       employee: employee.name,
       work_days: employee.work_days,
       schedule: employee.schedule,
-      tasks_this_week: tasks?.length || 0
+      tasks_this_week: tasks?.length || 0,
+      tasks: tasks?.map(t => ({
+        date: t.scheduled_date,
+        task: (t.task_template as { name?: string } | null)?.name || 'Tarea',
+        category: (t.task_template as { category?: string } | null)?.category || 'general',
+        estimated_minutes: (t.task_template as { estimated_minutes?: number } | null)?.estimated_minutes || 0,
+        status: t.status
+      })) || []
     };
   }
 
-  // Today
-  const weekNumber = Math.ceil(today.getDate() / 7);
-  const cycleWeek = ((weekNumber - 1) % 4) + 1;
-
   const { data: tasks } = await supabase
-    .from('task_templates')
-    .select('*')
+    .from('scheduled_tasks')
+    .select('status, task_template:task_templates(name, category, estimated_minutes)')
     .eq('employee_id', employee.id)
-    .eq('day_of_week', dayOfWeek)
-    .eq('week_number', cycleWeek)
-    .order('time_start');
+    .eq('scheduled_date', todayIso)
+    .order('created_at');
 
   return {
     employee: employee.name,
     date: today.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }),
     tasks_today: tasks?.map(t => ({
-      task: t.task_name,
-      time: `${t.time_start} - ${t.time_end}`,
-      category: t.category
+      task: (t.task_template as { name?: string } | null)?.name || 'Tarea',
+      status: t.status,
+      category: (t.task_template as { category?: string } | null)?.category || 'general',
+      estimated_minutes: (t.task_template as { estimated_minutes?: number } | null)?.estimated_minutes || 0
     })) || []
   };
 }
 
 async function suggestRecipe(preferences?: string, mealType?: string) {
+  const supabase = await getSupabase();
   const { data: inventory } = await supabase
     .from('inventory')
     .select('market_item:market_items(name)')
     .gt('current_number', 0);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const availableIngredients = inventory?.map((i: any) => i.market_item?.name).filter(Boolean) || [];
+  const availableIngredients = (inventory?.map((i: Record<string, unknown>) => (i.market_item as { name?: string } | null)?.name).filter((n): n is string => !!n)) || [];
 
   const { data: recipes } = await supabase
     .from('recipes')
@@ -634,6 +673,7 @@ async function getCurrentDateInfo() {
 }
 
 async function calculatePortions(recipeName: string, portions: number) {
+  const supabase = await getSupabase();
   const { data: recipe } = await supabase
     .from('recipes')
     .select('name, ingredients, portions')
@@ -674,6 +714,7 @@ async function calculatePortions(recipeName: string, portions: number) {
 }
 
 async function getUpcomingMeals(days: number = 3) {
+  const supabase = await getSupabase();
   const today = new Date();
   const meals = [];
 
@@ -731,6 +772,7 @@ async function getPreparationTips() {
 }
 
 async function getLowInventoryAlerts(threshold: number = 2) {
+  const supabase = await getSupabase();
   const { data } = await supabase
     .from('inventory')
     .select('*, market_item:market_items(name, category)')
@@ -753,17 +795,18 @@ async function getLowInventoryAlerts(threshold: number = 2) {
 }
 
 async function listSpaces() {
+  const supabase = await getSupabase();
   const { data } = await supabase
     .from('spaces')
-    .select('*')
-    .order('name');
+    .select('id, custom_name, category, usage_level, space_type:space_types(name)')
+    .order('custom_name');
 
   return {
     total: data?.length || 0,
     spaces: data?.map(s => ({
       id: s.id,
-      name: s.name,
-      type: s.space_type,
+      name: s.custom_name || (s.space_type as { name?: string } | null)?.name || 'Espacio',
+      type: (s.space_type as { name?: string } | null)?.name || 'Desconocido',
       category: s.category,
       usage_level: s.usage_level
     })) || []
@@ -771,7 +814,8 @@ async function listSpaces() {
 }
 
 async function listEmployees(activeOnly: boolean = true) {
-  let query = supabase.from('employees').select('*').order('name');
+  const supabase = await getSupabase();
+  let query = supabase.from('home_employees').select('*').order('name');
   if (activeOnly) query = query.eq('active', true);
 
   const { data } = await query;
@@ -790,9 +834,13 @@ async function listEmployees(activeOnly: boolean = true) {
 }
 
 async function listTaskTemplates(employeeId?: string, category?: string) {
-  let query = supabase.from('task_templates').select('*, employee:employees(name)').order('week_number').order('day_of_week').order('time_start');
+  const supabase = await getSupabase();
+  let query = supabase
+    .from('task_templates')
+    .select('id, name, frequency, frequency_days, estimated_minutes, priority, category, is_active, employee:home_employees(name), assigned_employee_id')
+    .order('created_at', { ascending: false });
 
-  if (employeeId) query = query.eq('employee_id', employeeId);
+  if (employeeId) query = query.eq('assigned_employee_id', employeeId);
   if (category) query = query.eq('category', category);
 
   const { data } = await query.limit(50);
@@ -801,12 +849,14 @@ async function listTaskTemplates(employeeId?: string, category?: string) {
     total: data?.length || 0,
     templates: data?.map(t => ({
       id: t.id,
-      task: t.task_name,
-      employee: t.employee?.name || 'Sin asignar',
-      week: t.week_number,
-      day: t.day_of_week,
-      time: `${t.time_start} - ${t.time_end}`,
-      category: t.category
+      task: t.name,
+      employee: (t.employee as { name?: string } | null)?.name || 'Sin asignar',
+      frequency: t.frequency,
+      frequency_days: t.frequency_days,
+      estimated_minutes: t.estimated_minutes,
+      priority: t.priority,
+      category: t.category,
+      is_active: t.is_active
     })) || []
   };
 }
@@ -939,15 +989,42 @@ function detectRequiredFunction(message: string): { name: string; args: Record<s
 // ============================================
 
 export async function POST(request: NextRequest) {
-  console.log('[AI Chat Simple] POST request received');
+  logger.info('[AI Chat Simple] POST request received');
 
   try {
-    const body = await request.json();
-    const { messages, stream = false } = body;
+    // Rate limiting
+    const userId = request.headers.get('x-user-id') || request.headers.get('x-forwarded-for') || 'anonymous';
+    const rateLimit = await withRateLimit(userId, 'ai-chat');
 
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return NextResponse.json({ error: 'Messages required' }, { status: 400 });
+    if (!rateLimit.allowed) {
+      return NextResponse.json(rateLimit.response, {
+        status: 429,
+        headers: rateLimit.headers,
+      });
     }
+
+    // Parse and validate request body with Zod
+    let validatedBody;
+    try {
+      const rawBody = await request.json();
+      validatedBody = ChatRequestSchema.parse(rawBody);
+    } catch (validationError) {
+      if (validationError instanceof z.ZodError) {
+        return NextResponse.json(
+          {
+            error: 'Datos de entrada inválidos',
+            details: validationError.issues.map(e => `${e.path.join('.')}: ${e.message}`)
+          },
+          { status: 400 }
+        );
+      }
+      return NextResponse.json(
+        { error: 'Error parsing request body' },
+        { status: 400 }
+      );
+    }
+
+    const { messages, stream = false } = validatedBody;
 
     const gemini = getGeminiClient();
     const lastUserMessage = messages[messages.length - 1]?.content || '';
@@ -987,7 +1064,7 @@ export async function POST(request: NextRequest) {
       const detected = detectRequiredFunction(lastUserMessage);
 
       if (detected) {
-        console.log('[AI Chat Simple] Forcing function:', detected.name);
+        logger.info(`[AI Chat Simple] Forcing function: ${detected.name}`);
         const result = await executeQueryFunction(detected.name, detected.args);
 
         // Generar respuesta basada en el resultado
@@ -1061,7 +1138,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ content: finalContent, role: 'assistant' });
 
   } catch (error) {
-    console.error('[AI Chat Simple] Error:', error);
+    logger.error('[AI Chat Simple] Error', { error: error instanceof Error ? error.message : String(error) });
     const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }

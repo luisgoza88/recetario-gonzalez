@@ -209,6 +209,7 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
   const [activeTab, setActiveTab] = useState<'dashboard' | 'proposals' | 'history' | 'settings'>('dashboard');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedProposal, setSelectedProposal] = useState<PendingProposal | null>(null);
 
   // Data states
   const [trustStats, setTrustStats] = useState<TrustStats | null>(null);
@@ -601,7 +602,7 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
                   proposal={proposal}
                   onApprove={() => handleApproveProposal(proposal.proposal_id)}
                   onReject={() => handleRejectProposal(proposal.proposal_id)}
-                  onView={() => {/* TODO: Show details modal */}}
+                  onView={() => setSelectedProposal(proposal)}
                 />
               ))
             )}
@@ -792,6 +793,81 @@ export default function AICommandCenter({ onClose, householdId }: AICommandCente
         )}
         </div>
       </div>
+
+      {/* Proposal Detail Modal */}
+      {selectedProposal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
+            <div className="p-4 border-b flex items-center justify-between">
+              <h3 className="font-semibold text-gray-800">Detalle de Propuesta</h3>
+              <button
+                onClick={() => setSelectedProposal(null)}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <XCircle size={20} className="text-gray-500" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              <div>
+                <p className="text-sm text-gray-500">Resumen</p>
+                <p className="font-medium text-gray-800">{selectedProposal.summary}</p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <RiskBadge level={selectedProposal.risk_level} />
+                <span className="text-sm text-gray-500">
+                  Creada {new Date(selectedProposal.created_at).toLocaleString('es-CO', {
+                    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+                  })}
+                </span>
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-500 mb-2">
+                  Acciones ({selectedProposal.actions.length})
+                </p>
+                <div className="space-y-2">
+                  {selectedProposal.actions.map((action, idx) => (
+                    <div key={action.id || idx} className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium text-gray-700">
+                          {action.function.replace(/_/g, ' ')}
+                        </span>
+                        <RiskBadge level={action.risk_level} />
+                      </div>
+                      <p className="text-xs text-gray-500">{action.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => {
+                    handleApproveProposal(selectedProposal.proposal_id);
+                    setSelectedProposal(null);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-green-500 text-white rounded-xl font-medium hover:bg-green-600 transition-colors"
+                >
+                  <ThumbsUp size={18} />
+                  Aprobar
+                </button>
+                <button
+                  onClick={() => {
+                    handleRejectProposal(selectedProposal.proposal_id);
+                    setSelectedProposal(null);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors"
+                >
+                  <ThumbsDown size={18} />
+                  Rechazar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

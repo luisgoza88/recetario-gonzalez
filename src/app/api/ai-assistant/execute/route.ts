@@ -21,14 +21,9 @@ import {
   TransactionOptions,
 } from '@/lib/ai/proposal-executor';
 
-// Import the function executor from the main route
-// We need to create a wrapper that matches the FunctionExecutor interface
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { requireAuth } from '@/lib/api/auth';
+import { createAuthenticatedClient } from '@/lib/supabase/server';
+import { logger } from '@/lib/logger';
 
 // ============================================
 // FUNCTION IMPLEMENTATIONS (copied from main route)
@@ -37,7 +32,9 @@ const supabase = createClient(
 // Note: In production, these would be imported from a shared module
 // For now, we duplicate the essential ones needed for proposal execution
 
-async function swapMenuRecipe(dayNumber: number, mealType: string, newRecipeName: string) {
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+async function swapMenuRecipe(supabase: SupabaseClient, dayNumber: number, mealType: string, newRecipeName: string) {
   if (dayNumber < 1 || dayNumber > 12) {
     return { success: false, message: 'El día debe estar entre 1 y 12' };
   }
@@ -79,7 +76,7 @@ async function swapMenuRecipe(dayNumber: number, mealType: string, newRecipeName
   };
 }
 
-async function updateInventory(itemName: string, quantity: number, action: string = 'set') {
+async function updateInventory(supabase: SupabaseClient, itemName: string, quantity: number, action: string = 'set') {
   const { data: item } = await supabase
     .from('market_items')
     .select('id, name')
@@ -126,7 +123,7 @@ async function updateInventory(itemName: string, quantity: number, action: strin
   };
 }
 
-async function markShoppingItem(itemName: string, checked: boolean) {
+async function markShoppingItem(supabase: SupabaseClient, itemName: string, checked: boolean) {
   const { data: item } = await supabase
     .from('market_items')
     .select('id')
@@ -148,7 +145,7 @@ async function markShoppingItem(itemName: string, checked: boolean) {
   };
 }
 
-async function addToShoppingList(itemName: string, quantity?: string) {
+async function addToShoppingList(supabase: SupabaseClient, itemName: string, quantity?: string) {
   const { data: existingItem } = await supabase
     .from('market_items')
     .select('id')
@@ -186,32 +183,60 @@ async function addToShoppingList(itemName: string, quantity?: string) {
   return { success: false, message: 'No se pudo agregar el item' };
 }
 
-async function completeTask(taskName: string, employeeName?: string) {
+async function completeTask(
+  supabase: SupabaseClient,
+  taskName: string,
+  _employeeName?: string,
+  householdId?: string
+) {
   const today = new Date().toISOString().split('T')[0];
 
-  const { data: tasks } = await supabase
-    .from('daily_task_instances')
-    .select('id, task_name')
-    .eq('date', today)
-    .ilike('task_name', `%${taskName}%`);
+  let query = supabase
+    .from('scheduled_tasks')
+    .select('id, task_template:task_templates(name)')
+    .eq('scheduled_date', today)
+    .neq('status', 'completada');
 
-  if (!tasks || tasks.length === 0) {
+  if (householdId) {
+    query = query.eq('household_id', householdId);
+  }
+
+  const { data: tasks } = await query;
+
+  const matched = tasks?.find((task) => {
+    const template = task.task_template as unknown as { name?: string } | null;
+    const templateName = template?.name || '';
+    return templateName.toLowerCase().includes(taskName.toLowerCase());
+  });
+
+  if (!matched) {
     return { success: false, message: `No se encontró la tarea "${taskName}"` };
   }
 
   await supabase
-    .from('daily_task_instances')
+    .from('scheduled_tasks')
     .update({
-      status: 'completed',
+      status: 'completada',
       completed_at: new Date().toISOString()
     })
-    .eq('id', tasks[0].id);
+    .eq('id', matched.id);
 
-  return { success: true, message: `Tarea "${tasks[0].task_name}" marcada como completada` };
+  const templateName = (matched.task_template as unknown as { name?: string } | null)?.name || taskName;
+  return { success: true, message: `Tarea "${templateName}" marcada como completada` };
 }
 
-async function addQuickTask(taskName: string, employeeName?: string, category?: string) {
+async function addQuickTask(
+  supabase: SupabaseClient,
+  taskName: string,
+  employeeName?: string,
+  category?: string,
+  householdId?: string
+) {
   const today = new Date().toISOString().split('T')[0];
+
+  if (!householdId) {
+    return { success: false, message: 'householdId es requerido para crear tareas rápidas' };
+  }
 
   let employeeId = null;
   if (employeeName) {
@@ -224,17 +249,33 @@ async function addQuickTask(taskName: string, employeeName?: string, category?: 
     employeeId = emp?.id;
   }
 
-  const { error } = await supabase
-    .from('daily_task_instances')
+  const { data: template, error: templateError } = await supabase
+    .from('task_templates')
     .insert({
-      date: today,
-      task_name: taskName,
-      employee_id: employeeId,
-      time_start: '09:00',
-      time_end: '10:00',
+      household_id: householdId,
+      name: taskName,
       category: category || 'general',
-      status: 'pending',
-      is_special: false
+      frequency: 'diaria',
+      estimated_minutes: 60,
+      priority: 'normal',
+      assigned_employee_id: employeeId,
+      is_active: false
+    })
+    .select('id')
+    .single();
+
+  if (templateError) {
+    return { success: false, message: 'No se pudo crear la plantilla de tarea rápida' };
+  }
+
+  const { error } = await supabase
+    .from('scheduled_tasks')
+    .insert({
+      household_id: householdId,
+      task_template_id: template?.id,
+      employee_id: employeeId,
+      scheduled_date: today,
+      status: 'pendiente',
     });
 
   if (error) {
@@ -251,60 +292,73 @@ async function addQuickTask(taskName: string, employeeName?: string, category?: 
 // FUNCTION EXECUTOR
 // ============================================
 
-const functionExecutor: FunctionExecutor = {
-  execute: async (functionName: string, args: Record<string, unknown>) => {
-    switch (functionName) {
-      case 'swap_menu_recipe':
-        return await swapMenuRecipe(
-          args.day_number as number,
-          args.meal_type as string,
-          args.new_recipe_name as string
-        );
-      case 'update_inventory':
-        return await updateInventory(
-          args.item_name as string,
-          args.quantity as number,
-          args.action as string
-        );
-      case 'mark_shopping_item':
-        return await markShoppingItem(
-          args.item_name as string,
-          args.checked as boolean
-        );
-      case 'add_to_shopping_list':
-        return await addToShoppingList(
-          args.item_name as string,
-          args.quantity as string
-        );
-      case 'complete_task':
-        return await completeTask(
-          args.task_name as string,
-          args.employee_name as string
-        );
-      case 'add_quick_task':
-        return await addQuickTask(
-          args.task_name as string,
-          args.employee_name as string,
-          args.category as string
-        );
-      default:
-        return { error: `Función no soportada para ejecución de propuestas: ${functionName}` };
+async function createFunctionExecutor(householdId?: string): Promise<FunctionExecutor> {
+  const supabase = await createAuthenticatedClient();
+  return {
+    execute: async (functionName: string, args: Record<string, unknown>) => {
+      switch (functionName) {
+        case 'swap_menu_recipe':
+          return await swapMenuRecipe(
+            supabase,
+            args.day_number as number,
+            args.meal_type as string,
+            args.new_recipe_name as string
+          );
+        case 'update_inventory':
+          return await updateInventory(
+            supabase,
+            args.item_name as string,
+            args.quantity as number,
+            args.action as string
+          );
+        case 'mark_shopping_item':
+          return await markShoppingItem(
+            supabase,
+            args.item_name as string,
+            args.checked as boolean
+          );
+        case 'add_to_shopping_list':
+          return await addToShoppingList(
+            supabase,
+            args.item_name as string,
+            args.quantity as string
+          );
+        case 'complete_task':
+          return await completeTask(
+            supabase,
+            args.task_name as string,
+            args.employee_name as string,
+            householdId
+          );
+        case 'add_quick_task':
+          return await addQuickTask(
+            supabase,
+            args.task_name as string,
+            args.employee_name as string,
+            args.category as string,
+            householdId
+          );
+        default:
+          return { error: `Función no soportada para ejecución de propuestas: ${functionName}` };
+      }
     }
-  }
-};
+  };
+}
 
 // ============================================
 // API ROUTES
 // ============================================
 
 export async function POST(request: NextRequest) {
+  const auth = requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const body = await request.json();
     const {
       action,
       proposalId,
       householdId,
-      userId,
       reason,
       actionIds,
       auditLogId,
@@ -315,9 +369,14 @@ export async function POST(request: NextRequest) {
       timeoutMs,
     } = body;
 
+    // Use server-validated userId from middleware, NOT from request body
+    const userId = auth.userId;
+
     if (!action) {
       return NextResponse.json({ error: 'Action required' }, { status: 400 });
     }
+
+    const functionExecutor = await createFunctionExecutor(householdId);
 
     switch (action) {
       // ============================================
@@ -543,7 +602,7 @@ export async function POST(request: NextRequest) {
         );
     }
   } catch (error) {
-    console.error('AI Execute error:', error);
+    logger.error('AI Execute error', { error: error instanceof Error ? error.message : String(error) });
     const errorMessage = error instanceof Error ? error.message : String(error);
 
     return NextResponse.json(
@@ -555,6 +614,9 @@ export async function POST(request: NextRequest) {
 
 // GET endpoint for checking proposal status
 export async function GET(request: NextRequest) {
+  const auth = requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { searchParams } = new URL(request.url);
     const proposalId = searchParams.get('proposalId');
@@ -573,7 +635,7 @@ export async function GET(request: NextRequest) {
       proposal,
     });
   } catch (error) {
-    console.error('AI Execute GET error:', error);
+    logger.error('AI Execute GET error', { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: 'Error getting proposal status' },
       { status: 500 }

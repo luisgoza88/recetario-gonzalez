@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { SpaceType, Household, HomeEmployee } from '@/types';
+import { useToast } from '@/components/ui/Toast';
 
 interface HomeSetupWizardProps {
   onComplete: (householdId: string) => void;
@@ -48,6 +49,7 @@ const DAYS = [
 
 export default function HomeSetupWizard({ onComplete, existingHouseholdId }: HomeSetupWizardProps) {
   const [currentStep, setCurrentStep] = useState<WizardStep>('welcome');
+  const toast = useToast();
   const [spaceTypes, setSpaceTypes] = useState<SpaceType[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -252,7 +254,7 @@ export default function HomeSetupWizard({ onComplete, existingHouseholdId }: Hom
       onComplete(household.id);
     } catch (error) {
       console.error('Error saving household:', error);
-      alert('Error al guardar. Por favor intenta de nuevo.');
+      toast.error('Error al guardar. Por favor intenta de nuevo.');
     } finally {
       setSaving(false);
     }

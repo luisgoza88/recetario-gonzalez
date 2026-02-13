@@ -176,7 +176,7 @@ export default function SuppliesInventory({
             <Package size={20} />
             <span className="font-semibold">Inventario de Productos</span>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg">
+          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg">
             <X size={20} />
           </button>
         </div>

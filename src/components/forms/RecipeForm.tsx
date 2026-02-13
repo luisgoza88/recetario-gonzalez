@@ -5,6 +5,8 @@ import { X, Plus, Trash2, Sparkles, Camera, Upload, Loader2, Wand2 } from 'lucid
 import { supabase } from '@/lib/supabase/client';
 import { Recipe, Ingredient, MealType } from '@/types';
 import ImageUpload from '../ImageUpload';
+import { useToast } from '@/components/ui/Toast';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 
 interface RecipeFormProps {
   recipe: Recipe | null;
@@ -13,6 +15,8 @@ interface RecipeFormProps {
 }
 
 export default function RecipeForm({ recipe, onClose, onSuccess }: RecipeFormProps) {
+  const toast = useToast();
+  useEscapeKey(onClose);
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState(recipe?.name || '');
   const [type, setType] = useState<MealType>(recipe?.type || 'lunch');
@@ -24,6 +28,7 @@ export default function RecipeForm({ recipe, onClose, onSuccess }: RecipeFormPro
     (recipe?.ingredients as Ingredient[]) || [{ name: '', luis: '', mariana: '', total: '' }]
   );
   const [steps, setSteps] = useState<string[]>(recipe?.steps || ['']);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // AI Generation state
   const [showAIPanel, setShowAIPanel] = useState(false);
@@ -150,21 +155,22 @@ export default function RecipeForm({ recipe, onClose, onSuccess }: RecipeFormPro
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const newErrors: Record<string, string> = {};
     if (!name.trim()) {
-      alert('El nombre es requerido');
-      return;
+      newErrors.name = 'El nombre es requerido';
     }
-
     if (ingredients.some(i => !i.name.trim())) {
-      alert('Todos los ingredientes deben tener nombre');
-      return;
+      newErrors.ingredients = 'Todos los ingredientes deben tener nombre';
     }
-
     if (steps.some(s => !s.trim())) {
-      alert('Todos los pasos deben tener contenido');
+      newErrors.steps = 'Todos los pasos deben tener contenido';
+    }
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
 
+    setErrors({});
     setLoading(true);
 
     try {
@@ -202,7 +208,7 @@ export default function RecipeForm({ recipe, onClose, onSuccess }: RecipeFormPro
       onSuccess();
     } catch (error) {
       console.error('Error saving recipe:', error);
-      alert('Error al guardar la receta');
+      toast.error('Error al guardar la receta');
     } finally {
       setLoading(false);
     }
@@ -210,6 +216,8 @@ export default function RecipeForm({ recipe, onClose, onSuccess }: RecipeFormPro
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
       className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4"
       onClick={onClose}
     >
@@ -370,9 +378,10 @@ export default function RecipeForm({ recipe, onClose, onSuccess }: RecipeFormPro
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
-              className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-700"
+              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-700 ${errors.name ? 'border-red-500' : 'border-gray-200'}`}
               placeholder="Ej: Pollo a la Criolla"
             />
+            {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
           </div>
 
           {/* Type */}
@@ -431,6 +440,7 @@ export default function RecipeForm({ recipe, onClose, onSuccess }: RecipeFormPro
           {/* Ingredients */}
           <div className="mb-4">
             <label className="block text-sm font-medium mb-2">Ingredientes *</label>
+            {errors.ingredients && <p className="text-red-500 text-xs mt-1">{errors.ingredients}</p>}
             {ingredients.map((ing, index) => (
               <div key={index} className="mb-3 p-3 bg-gray-50 rounded-lg">
                 {/* Row 1: Name + Delete */}
@@ -498,6 +508,7 @@ export default function RecipeForm({ recipe, onClose, onSuccess }: RecipeFormPro
           {/* Steps */}
           <div className="mb-4">
             <label className="block text-sm font-medium mb-2">Pasos *</label>
+            {errors.steps && <p className="text-red-500 text-xs mt-1">{errors.steps}</p>}
             {steps.map((step, index) => (
               <div key={index} className="flex gap-2 mb-2">
                 <span className="text-gray-400 pt-2">{index + 1}.</span>

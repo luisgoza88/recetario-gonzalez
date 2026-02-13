@@ -5,7 +5,8 @@
  * de acciones de IA con soporte para rollback.
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { createAuthenticatedClient } from '@/lib/supabase/server';
 import {
   AIRiskLevel,
   AIFunctionConfig,
@@ -29,12 +30,11 @@ import {
   TrustDecision,
   RateLimitCheck,
 } from './trust-service';
+import { logger } from '@/lib/logger';
 
-// Cliente Supabase con service role para operaciones privilegiadas
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+async function getClient(): Promise<SupabaseClient> {
+  return createAuthenticatedClient();
+}
 
 // ============================================
 // CACHE DE CONFIGURACIÓN DE FUNCIONES
@@ -54,13 +54,14 @@ export async function getFunctionConfig(functionName: string): Promise<AIFunctio
   }
 
   // Cargar todas las configuraciones
-  const { data, error } = await supabase
+  const db = await getClient();
+  const { data, error } = await db
     .from('ai_function_registry')
     .select('*')
     .eq('is_enabled', true);
 
   if (error) {
-    console.error('Error loading function configs:', error);
+    logger.error('Error loading function configs', { error: error instanceof Error ? error.message : String(error) });
     return null;
   }
 
@@ -114,14 +115,15 @@ export async function isReversible(functionName: string): Promise<boolean> {
  * Obtiene la configuración de trust de un household
  */
 export async function getHouseholdTrust(householdId: string): Promise<HouseholdAITrust | null> {
-  const { data, error } = await supabase
+  const db = await getClient();
+  const { data, error } = await db
     .from('household_ai_trust')
     .select('*')
     .eq('household_id', householdId)
     .single();
 
   if (error) {
-    console.error('Error getting household trust:', error);
+    logger.error('Error getting household trust', { error: error instanceof Error ? error.message : String(error) });
     return null;
   }
 
@@ -216,7 +218,8 @@ export async function createAuditLog(params: {
   parameters: Record<string, unknown>;
   riskLevel: AIRiskLevel;
 }): Promise<string | null> {
-  const { data, error } = await supabase.rpc('create_ai_audit_log', {
+  const db = await getClient();
+  const { data, error } = await db.rpc('create_ai_audit_log', {
     p_household_id: params.householdId,
     p_user_id: params.userId,
     p_session_id: params.sessionId,
@@ -226,7 +229,7 @@ export async function createAuditLog(params: {
   });
 
   if (error) {
-    console.error('Error creating audit log:', error);
+    logger.error('Error creating audit log', { error: error instanceof Error ? error.message : String(error) });
     return null;
   }
 
@@ -246,7 +249,8 @@ export async function completeAuditLog(params: {
   affectedRecordIds?: string[];
   errorMessage?: string;
 }): Promise<boolean> {
-  const { error } = await supabase.rpc('complete_ai_audit_log', {
+  const db = await getClient();
+  const { error } = await db.rpc('complete_ai_audit_log', {
     p_log_id: params.logId,
     p_status: params.status,
     p_result: params.result || null,
@@ -258,7 +262,7 @@ export async function completeAuditLog(params: {
   });
 
   if (error) {
-    console.error('Error completing audit log:', error);
+    logger.error('Error completing audit log', { error: error instanceof Error ? error.message : String(error) });
     return false;
   }
 
@@ -272,7 +276,8 @@ export async function getRecentAuditLogs(
   householdId: string,
   limit: number = 10
 ): Promise<AIAuditLog[]> {
-  const { data, error } = await supabase
+  const db = await getClient();
+  const { data, error } = await db
     .from('ai_audit_log')
     .select('*')
     .eq('household_id', householdId)
@@ -282,7 +287,7 @@ export async function getRecentAuditLogs(
     .limit(limit);
 
   if (error) {
-    console.error('Error getting recent audit logs:', error);
+    logger.error('Error getting recent audit logs', { error: error instanceof Error ? error.message : String(error) });
     return [];
   }
 
@@ -315,14 +320,15 @@ export async function createProposal(params: {
       const fnName = a.function_name.toLowerCase();
       if (fnName.includes('recipe') || fnName.includes('menu')) return ['recipes', 'day_menu'];
       if (fnName.includes('inventory') || fnName.includes('shopping')) return ['inventory', 'market_checklist'];
-      if (fnName.includes('task')) return ['daily_task_instances', 'task_templates'];
+      if (fnName.includes('task')) return ['scheduled_tasks', 'task_templates'];
       if (fnName.includes('employee')) return ['home_employees'];
       if (fnName.includes('space')) return ['spaces'];
       return ['unknown'];
     })
   )];
 
-  const { data, error } = await supabase
+  const db = await getClient();
+  const { data, error } = await db
     .from('ai_action_queue')
     .insert({
       household_id: params.householdId,
@@ -339,7 +345,7 @@ export async function createProposal(params: {
     .single();
 
   if (error) {
-    console.error('Error creating proposal:', error);
+    logger.error('Error creating proposal', { error: error instanceof Error ? error.message : String(error) });
     return null;
   }
 
@@ -350,14 +356,15 @@ export async function createProposal(params: {
  * Obtiene una propuesta por su ID
  */
 export async function getProposal(proposalId: string): Promise<AIProposal | null> {
-  const { data, error } = await supabase
+  const db = await getClient();
+  const { data, error } = await db
     .from('ai_action_queue')
     .select('*')
     .eq('proposal_id', proposalId)
     .single();
 
   if (error) {
-    console.error('Error getting proposal:', error);
+    logger.error('Error getting proposal', { error: error instanceof Error ? error.message : String(error) });
     return null;
   }
 
@@ -372,7 +379,8 @@ export async function approveProposal(
   userId: string,
   notes?: string
 ): Promise<boolean> {
-  const { error } = await supabase.rpc('decide_ai_proposal', {
+  const db = await getClient();
+  const { error } = await db.rpc('decide_ai_proposal', {
     p_proposal_id: proposalId,
     p_decision: 'approved',
     p_decision_by: userId,
@@ -380,7 +388,7 @@ export async function approveProposal(
   });
 
   if (error) {
-    console.error('Error approving proposal:', error);
+    logger.error('Error approving proposal', { error: error instanceof Error ? error.message : String(error) });
     return false;
   }
 
@@ -395,7 +403,8 @@ export async function rejectProposal(
   userId: string,
   notes?: string
 ): Promise<boolean> {
-  const { error } = await supabase.rpc('decide_ai_proposal', {
+  const db = await getClient();
+  const { error } = await db.rpc('decide_ai_proposal', {
     p_proposal_id: proposalId,
     p_decision: 'rejected',
     p_decision_by: userId,
@@ -403,7 +412,7 @@ export async function rejectProposal(
   });
 
   if (error) {
-    console.error('Error rejecting proposal:', error);
+    logger.error('Error rejecting proposal', { error: error instanceof Error ? error.message : String(error) });
     return false;
   }
 
@@ -419,7 +428,8 @@ export async function partiallyApproveProposal(
   approvedActionIds: string[],
   notes?: string
 ): Promise<boolean> {
-  const { error } = await supabase.rpc('decide_ai_proposal', {
+  const db = await getClient();
+  const { error } = await db.rpc('decide_ai_proposal', {
     p_proposal_id: proposalId,
     p_decision: 'partially_approved',
     p_decision_by: userId,
@@ -428,7 +438,7 @@ export async function partiallyApproveProposal(
   });
 
   if (error) {
-    console.error('Error partially approving proposal:', error);
+    logger.error('Error partially approving proposal', { error: error instanceof Error ? error.message : String(error) });
     return false;
   }
 
@@ -439,7 +449,8 @@ export async function partiallyApproveProposal(
  * Obtiene propuestas pendientes de un household
  */
 export async function getPendingProposals(householdId: string): Promise<AIProposal[]> {
-  const { data, error } = await supabase
+  const db = await getClient();
+  const { data, error } = await db
     .from('ai_action_queue')
     .select('*')
     .eq('household_id', householdId)
@@ -448,7 +459,7 @@ export async function getPendingProposals(householdId: string): Promise<AIPropos
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Error getting pending proposals:', error);
+    logger.error('Error getting pending proposals', { error: error instanceof Error ? error.message : String(error) });
     return [];
   }
 
@@ -467,14 +478,15 @@ export async function rollbackAction(
   userId: string,
   reason?: string
 ): Promise<RollbackResult> {
-  const { data, error } = await supabase.rpc('rollback_ai_action', {
+  const db = await getClient();
+  const { data, error } = await db.rpc('rollback_ai_action', {
     p_log_id: auditLogId,
     p_rolled_back_by: userId,
     p_reason: reason || 'User requested rollback',
   });
 
   if (error) {
-    console.error('Error rolling back action:', error);
+    logger.error('Error rolling back action', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       audit_log_id: auditLogId,

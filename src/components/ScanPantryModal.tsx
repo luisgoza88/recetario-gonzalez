@@ -6,6 +6,7 @@ import {
   AlertCircle, Sparkles, RefreshCw, ChevronDown, ChevronUp,
   Trash2, ImagePlus
 } from 'lucide-react';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 
 const MAX_PHOTOS = 5;
 
@@ -58,6 +59,8 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  useEscapeKey(onClose);
 
   const handleImageCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -214,7 +217,7 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center" role="dialog" aria-modal="true">
       <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">

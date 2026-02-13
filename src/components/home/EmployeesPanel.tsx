@@ -5,7 +5,9 @@ import {
   X, Plus, User, Trash2, Edit2, Check, Clock
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
+import { useToast } from '@/components/ui/Toast';
 import { HomeEmployee } from '@/types';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 
 interface EmployeesPanelProps {
   householdId: string;
@@ -107,6 +109,8 @@ export default function EmployeesPanel({
   onClose,
   onUpdate
 }: EmployeesPanelProps) {
+  const toast = useToast();
+  useEscapeKey(onClose);
   const [showForm, setShowForm] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<EmployeeForm | null>(null);
   const [saving, setSaving] = useState(false);
@@ -199,7 +203,7 @@ export default function EmployeesPanel({
 
       if (error) {
         console.error('Error saving employee:', error);
-        alert('Error al guardar: ' + error.message);
+        toast.error('Error al guardar: ' + error.message);
         return;
       }
 
@@ -207,7 +211,7 @@ export default function EmployeesPanel({
       cancelForm();
     } catch (error) {
       console.error('Error saving employee:', error);
-      alert('Error al guardar empleado');
+      toast.error('Error al guardar empleado');
     } finally {
       setSaving(false);
     }
@@ -239,7 +243,7 @@ export default function EmployeesPanel({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-8 pb-24 overflow-y-auto">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-8 pb-24 overflow-y-auto">
       <div className="bg-white rounded-2xl w-full max-w-lg">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 rounded-t-2xl flex justify-between items-center">
@@ -247,7 +251,7 @@ export default function EmployeesPanel({
             <User size={20} />
             <span className="font-semibold">Gestionar Empleados</span>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg">
+          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg">
             <X size={20} />
           </button>
         </div>

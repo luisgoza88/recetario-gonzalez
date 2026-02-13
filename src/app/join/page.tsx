@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Ticket, AlertCircle, Check, Users, ArrowRight } from 'lucide-react';
 import { useOptionalAuth } from '@/contexts/AuthContext';
 import {
   validateInvitationCode,
-  useInvitationCode,
+  redeemInvitationCode,
   formatInvitationCode,
   getRoleName,
   getRoleColor,
@@ -27,15 +27,45 @@ function JoinPageContent() {
   const [validation, setValidation] = useState<InvitationValidation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [lastValidationTime, setLastValidationTime] = useState(0);
+
+  // Define handleValidate first (before useEffects that use it)
+  const handleValidate = useCallback(async (codeToValidate: string) => {
+    if (codeToValidate.length !== 8) {
+      setError('El codigo debe tener 8 caracteres');
+      return;
+    }
+
+    // Throttle: 2 segundos entre intentos
+    const now = Date.now();
+    if (now - lastValidationTime < 2000) {
+      setError('Espera un momento antes de intentar de nuevo');
+      return;
+    }
+    setLastValidationTime(now);
+
+    setIsValidating(true);
+    setError(null);
+
+    const result = await validateInvitationCode(codeToValidate);
+    setValidation(result);
+
+    if (!result.isValid) {
+      setError(result.error || 'Codigo invalido');
+    }
+
+    setIsValidating(false);
+  }, [lastValidationTime]);
 
   // Si hay un codigo en la URL, usarlo
   useEffect(() => {
     const codeParam = searchParams.get('code');
     if (codeParam) {
-      setCode(codeParam.toUpperCase());
-      handleValidate(codeParam);
+      const upperCode = codeParam.toUpperCase();
+      setCode(upperCode);
+      handleValidate(upperCode);
     }
-  }, [searchParams]);
+  }, [searchParams, handleValidate]);
 
   const handleCodeChange = (value: string) => {
     // Solo permitir letras y numeros, maximo 8 caracteres
@@ -49,39 +79,19 @@ function JoinPageContent() {
     setError(null);
   };
 
-  const handleValidate = async (codeToValidate?: string) => {
-    const finalCode = codeToValidate || code;
-
-    if (finalCode.length !== 8) {
-      setError('El codigo debe tener 8 caracteres');
-      return;
-    }
-
-    setIsValidating(true);
-    setError(null);
-
-    const result = await validateInvitationCode(finalCode);
-    setValidation(result);
-
-    if (!result.isValid) {
-      setError(result.error || 'Codigo invalido');
-    }
-
-    setIsValidating(false);
-  };
-
   const handleJoin = async () => {
     if (!auth?.isAuthenticated) {
       // Guardar codigo y redirigir a login
       sessionStorage.setItem('pendingInvitationCode', code);
-      router.push('/auth/login?redirect=/join');
+      const redirectPath = `/join?code=${encodeURIComponent(code)}`;
+      router.push(`/auth/login?redirect=${encodeURIComponent(redirectPath)}`);
       return;
     }
 
     setIsJoining(true);
     setError(null);
 
-    const result = await useInvitationCode(code);
+    const result = await redeemInvitationCode(code);
 
     if (result.success) {
       setSuccess(true);
@@ -102,13 +112,13 @@ function JoinPageContent() {
   useEffect(() => {
     if (auth?.isAuthenticated) {
       const pendingCode = sessionStorage.getItem('pendingInvitationCode');
-      if (pendingCode && !code) {
+      if (pendingCode) {
         setCode(pendingCode);
         sessionStorage.removeItem('pendingInvitationCode');
         handleValidate(pendingCode);
       }
     }
-  }, [auth?.isAuthenticated]);
+  }, [auth?.isAuthenticated, handleValidate]);
 
   if (success) {
     return (
@@ -199,7 +209,7 @@ function JoinPageContent() {
           {/* Action buttons */}
           {!validation?.isValid ? (
             <button
-              onClick={() => handleValidate()}
+              onClick={() => handleValidate(code)}
               disabled={code.length !== 8 || isValidating}
               className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >

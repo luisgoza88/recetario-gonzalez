@@ -6,7 +6,7 @@ import {
   Home, Users, UtensilsCrossed, Calendar, Target,
   ChevronRight, ChevronLeft, Check, Sparkles,
   Plus, Trash2, Clock, Heart, Leaf, Globe,
-  ShoppingCart, ClipboardList, Bot, AlertCircle,
+  ShoppingCart, ClipboardList, Bot,
   X, Star, Zap, Shield
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -192,7 +192,7 @@ const WORK_DAYS = [
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { currentHousehold, refreshMemberships, user } = useAuth();
+  const { currentHousehold, refreshMemberships } = useAuth();
   const { onboarding: onboardingAnalytics } = useAnalytics();
 
   // Step management
@@ -303,9 +303,10 @@ export default function OnboardingPage() {
     router.push('/');
   };
 
-  // Track onboarding started
+  // Track onboarding started (only once on mount)
   useEffect(() => {
     onboardingAnalytics.started();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Dietary preferences toggle

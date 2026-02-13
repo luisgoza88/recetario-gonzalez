@@ -7,7 +7,9 @@ import {
   Building, TreeDeciduous, Settings, Star, AlertCircle
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
+import { useToast } from '@/components/ui/Toast';
 import { HomeEmployee, Space, ScheduledTask } from '@/types';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 
 interface EmployeeDetailModalProps {
   employee: HomeEmployee;
@@ -75,6 +77,8 @@ export default function EmployeeDetailModal({
   onUpdate,
   onDelete
 }: EmployeeDetailModalProps) {
+  const toast = useToast();
+  useEscapeKey(onClose);
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -170,7 +174,7 @@ export default function EmployeeDetailModal({
       onUpdate();
     } catch (error) {
       console.error('Error saving employee:', error);
-      alert('Error al guardar los cambios');
+      toast.error('Error al guardar los cambios');
     } finally {
       setSaving(false);
     }
@@ -195,7 +199,7 @@ export default function EmployeeDetailModal({
     } catch (error) {
       console.error('Error adding space assignment:', error);
       // If table doesn't exist, show helpful message
-      alert('Necesitas crear la tabla employee_space_assignments primero');
+      toast.error('Error al asignar espacio. Verifica la configuración.');
     }
   };
 
@@ -288,12 +292,12 @@ export default function EmployeeDetailModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-6 pb-24 overflow-y-auto">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-6 pb-24 overflow-y-auto">
       <div className="bg-white rounded-2xl w-full max-w-lg">
         {/* Header with employee info */}
         <div className={`${getZoneColor(zone)} text-white p-4 rounded-t-2xl`}>
           <div className="flex items-center justify-between mb-3">
-            <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg">
+            <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg">
               <ArrowLeft size={20} />
             </button>
             <div className="flex items-center gap-2">

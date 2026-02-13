@@ -1,13 +1,19 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import {
   getPendingOperations,
   removePendingOperation,
   addPendingOperation,
+  clearAllCache,
+  isCacheValid,
+  getCacheStats,
   PendingOperation
 } from '@/lib/indexedDB'
+
+const MAX_RETRY_ATTEMPTS = 3
+const CACHE_MAX_AGE_HOURS = 24
 
 interface UseOfflineSyncReturn {
   isOnline: boolean
@@ -16,6 +22,8 @@ interface UseOfflineSyncReturn {
   syncNow: () => Promise<void>
   queueOperation: (op: Omit<PendingOperation, 'id' | 'createdAt'>) => Promise<void>
   lastSyncTime: number | null
+  syncErrors: string[]
+  clearExpiredCache: () => Promise<void>
 }
 
 export function useOfflineSync(): UseOfflineSyncReturn {
@@ -25,6 +33,8 @@ export function useOfflineSync(): UseOfflineSyncReturn {
   const [isSyncing, setIsSyncing] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null)
+  const [syncErrors, setSyncErrors] = useState<string[]>([])
+  const retryCountRef = useRef<Map<string, number>>(new Map())
 
   // Actualizar estado de conexión
   useEffect(() => {
@@ -50,21 +60,61 @@ export function useOfflineSync(): UseOfflineSyncReturn {
     }
   }, [])
 
+  // Limpiar cache expirado
+  const clearExpiredCache = useCallback(async () => {
+    try {
+      const stats = await getCacheStats()
+      // If there's cached data, check if it's valid
+      if (stats.dayMenus > 0 || stats.recipes > 0 || stats.marketItems > 0) {
+        // We can't check individual items easily, so clear all if online
+        // and cache is potentially stale (app just loaded)
+        if (isOnline) {
+          // Get a sample cached item to check age
+          const { getCachedDayMenus } = await import('@/lib/indexedDB')
+          const menus = await getCachedDayMenus()
+          if (menus.length > 0 && !isCacheValid(menus[0].cachedAt, CACHE_MAX_AGE_HOURS)) {
+            console.log('[CACHE] Clearing expired cache...')
+            await clearAllCache()
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error clearing expired cache:', error)
+    }
+  }, [isOnline])
+
+  // Limpiar cache expirado al inicio
+  useEffect(() => {
+    clearExpiredCache()
+  }, [clearExpiredCache])
+
   // Actualizar count al inicio y cuando cambia isOnline
   useEffect(() => {
     updatePendingCount()
   }, [updatePendingCount, isOnline])
 
-  // Sincronizar operaciones pendientes
+  // Sincronizar operaciones pendientes con retry y backoff
   const syncNow = useCallback(async () => {
     if (!isOnline || isSyncing) return
 
     setIsSyncing(true)
+    const errors: string[] = []
 
     try {
       const operations = await getPendingOperations()
 
       for (const op of operations) {
+        const retryCount = retryCountRef.current.get(op.id) || 0
+
+        // Skip if max retries exceeded
+        if (retryCount >= MAX_RETRY_ATTEMPTS) {
+          errors.push(`"${op.table}" falló después de ${MAX_RETRY_ATTEMPTS} intentos`)
+          // Remove the failed operation to prevent infinite retries
+          await removePendingOperation(op.id)
+          retryCountRef.current.delete(op.id)
+          continue
+        }
+
         try {
           let error = null
 
@@ -100,17 +150,20 @@ export function useOfflineSync(): UseOfflineSyncReturn {
           }
 
           if (error) {
-            console.error(`Sync error for ${op.table}:`, error)
-            // Mantener operación en cola si hay error
+            console.error(`Sync error for ${op.table} (attempt ${retryCount + 1}):`, error)
+            retryCountRef.current.set(op.id, retryCount + 1)
           } else {
-            // Eliminar operación exitosa de la cola
+            // Eliminar operación exitosa
             await removePendingOperation(op.id)
+            retryCountRef.current.delete(op.id)
           }
         } catch (opError) {
           console.error(`Failed to sync operation ${op.id}:`, opError)
+          retryCountRef.current.set(op.id, retryCount + 1)
         }
       }
 
+      setSyncErrors(errors)
       setLastSyncTime(Date.now())
     } catch (error) {
       console.error('Sync error:', error)
@@ -141,7 +194,9 @@ export function useOfflineSync(): UseOfflineSyncReturn {
     pendingCount,
     syncNow,
     queueOperation,
-    lastSyncTime
+    lastSyncTime,
+    syncErrors,
+    clearExpiredCache,
   }
 }
 

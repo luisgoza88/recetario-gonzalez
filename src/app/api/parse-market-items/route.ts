@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, cleanJsonResponse } from '@/lib/gemini/client';
+import { logger } from '@/lib/logger';
 import {
   getProteinIcon,
   getVegetableIcon,
@@ -16,6 +18,11 @@ import {
   getHouseholdIcon,
   getPetFoodIcon
 } from '@/lib/categoryIcons';
+
+// Zod schema for input validation
+const ParseMarketItemsSchema = z.object({
+  input: z.string().min(1, 'El texto de entrada no puede estar vacío').max(5000, 'El texto de entrada es demasiado largo (máximo 5000 caracteres)'),
+});
 
 // Categorías disponibles con ejemplos para ayudar a la IA
 const CATEGORIES_INFO = {
@@ -149,11 +156,16 @@ export interface ParseResponse {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { input } = body;
+    const validatedInput = ParseMarketItemsSchema.safeParse(body);
 
-    if (!input || typeof input !== 'string') {
-      return NextResponse.json({ error: 'Input is required' }, { status: 400 });
+    if (!validatedInput.success) {
+      return NextResponse.json(
+        { error: 'Datos inválidos', details: validatedInput.error.flatten() },
+        { status: 400 }
+      );
     }
+
+    const { input } = validatedInput.data;
 
     // Construir el prompt para la IA
     const categoriesDescription = Object.values(CATEGORIES_INFO)
@@ -273,7 +285,7 @@ Separa múltiples productos si los hay (pueden estar separados por comas, "y", o
     return NextResponse.json({ items, hasQuestions });
 
   } catch (error) {
-    console.error('Error parsing market items:', error);
+    logger.error('Error parsing market items', { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: 'Error processing request' },
       { status: 500 }

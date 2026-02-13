@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   X, Plus, Sparkles, Mic, MicOff, Edit3, Check, Trash2,
   AlertCircle, ChevronUp, Loader2, Camera, ScanBarcode,
-  Search, Clock, Star, Receipt, Package
+  Clock, Star, Receipt
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { IngredientCategory } from '@/types';
@@ -16,6 +16,7 @@ import {
   lookupBarcodeWithCache,
   FrequentItem
 } from '@/lib/userPreferences';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 
 interface AddCustomItemModalProps {
   onClose: () => void;
@@ -93,6 +94,8 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
   const [error, setError] = useState<string | null>(null);
 
   const commonUnits = ['kg', 'g', 'lb', 'unid', 'bolsa', 'paquete', 'botella', 'lata', 'tarro', 'litro', 'ml', 'manojo', 'racimo'];
+
+  useEscapeKey(onClose);
 
   useEffect(() => {
     loadCategories();
@@ -497,7 +500,7 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
   const showResults = parsedItems.length > 0;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
       <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-4">
@@ -506,7 +509,7 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
               <Sparkles size={20} />
               <span className="font-semibold">Agregar Productos</span>
             </div>
-            <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg">
+            <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg">
               <X size={20} />
             </button>
           </div>

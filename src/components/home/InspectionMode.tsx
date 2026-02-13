@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { ScheduledTask } from '@/types';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 
 interface InspectionModeProps {
   task: ScheduledTask;
@@ -80,6 +81,7 @@ export default function InspectionMode({ task, onClose, onComplete }: Inspection
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  useEscapeKey(onClose);
 
   const toggleItemStatus = (itemId: string) => {
     setChecklist(prev =>
@@ -207,7 +209,7 @@ export default function InspectionMode({ task, onClose, onComplete }: Inspection
   const progressPercent = ((goodCount + issueCount) / checklist.length) * 100;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-4 flex justify-between items-center">
@@ -215,7 +217,7 @@ export default function InspectionMode({ task, onClose, onComplete }: Inspection
             <Eye size={20} />
             <span className="font-semibold">Inspección</span>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg">
+          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg">
             <X size={20} />
           </button>
         </div>

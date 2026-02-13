@@ -29,6 +29,7 @@ import {
   getAvailableIngredientsList
 } from '@/lib/inventory-check';
 import { useAnalytics } from '@/lib/analytics/useAnalytics';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 
 // Tipos de estilo de receta
 type RecipeStyle =
@@ -147,6 +148,8 @@ export default function SmartSuggestions({
 
   // Analytics
   const { ai: aiAnalytics, startTimer, getElapsedMs } = useAnalytics();
+
+  useEscapeKey(onClose);
 
   // Modo especial: generar receta desde cero (sin receta existente)
   const isGenerateMode = recipe.id === 'generate-dinner' || recipe.id === 'generate-lunch' || recipe.id === 'generate-breakfast';
@@ -344,7 +347,7 @@ export default function SmartSuggestions({
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
         <div className="bg-white rounded-2xl p-8 text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-700 mx-auto mb-4" />
           <p className="text-gray-600">Verificando inventario...</p>
@@ -358,7 +361,7 @@ export default function SmartSuggestions({
   const mealLabels = { breakfast: 'Desayuno', lunch: 'Almuerzo', dinner: 'Cena' };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-8 pb-24 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-8 pb-24 overflow-y-auto" role="dialog" aria-modal="true">
       <div className="bg-white rounded-2xl w-full max-w-lg">
         {/* Header */}
         <div className="bg-gradient-to-r from-green-700 to-green-600 text-white p-4 rounded-t-2xl flex justify-between items-center">
@@ -366,7 +369,7 @@ export default function SmartSuggestions({
             <Sparkles size={20} />
             <span className="font-semibold">Sugerencias Inteligentes</span>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg">
+          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg">
             <X size={20} />
           </button>
         </div>

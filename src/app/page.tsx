@@ -7,6 +7,8 @@ import HomeView from '@/components/home/HomeView';
 import TodayDashboard from '@/components/sections/TodayDashboard';
 import SettingsView from '@/components/sections/SettingsView';
 import AICommandCenter from '@/components/ai/AICommandCenter';
+import ErrorBoundary from '@/components/ui/ErrorBoundary';
+import { OfflineBadge } from '@/components/ui/OfflineIndicator';
 import { useRecipes, useMarketItems, useSuggestionsCount, useRefreshAppData } from '@/lib/hooks/useAppData';
 import { useAppStore } from '@/lib/stores/useAppStore';
 import { useHouseholdId } from '@/lib/stores/useHouseholdStore';
@@ -109,32 +111,45 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      {/* Offline status badge - fixed top right */}
+      <div className="fixed top-3 right-3 z-50">
+        <OfflineBadge />
+      </div>
+
       {/* Content - pb-32 para dejar espacio para los tabs secundarios */}
       <main className="pb-32">
         {activeSection === 'hoy' && (
-          <TodayDashboard
-            onNavigateToRecetario={(tab) => navigateToRecetario(tab as 'calendar' | 'market' | 'recipes' | 'suggestions' | undefined)}
-            onNavigateToHogar={navigateToHogar}
-          />
+          <ErrorBoundary sectionName="Dashboard">
+            <TodayDashboard
+              onNavigateToRecetario={(tab) => navigateToRecetario(tab as 'calendar' | 'market' | 'recipes' | 'suggestions' | undefined)}
+              onNavigateToHogar={navigateToHogar}
+            />
+          </ErrorBoundary>
         )}
 
         {activeSection === 'recetario' && (
-          <RecetarioSection
-            activeTab={recetarioTab}
-            onTabChange={setRecetarioTab}
-            recipes={recipes}
-            marketItems={marketItems}
-            pendingSuggestions={pendingSuggestions}
-            onUpdate={handleUpdate}
-          />
+          <ErrorBoundary sectionName="Recetario">
+            <RecetarioSection
+              activeTab={recetarioTab}
+              onTabChange={setRecetarioTab}
+              recipes={recipes}
+              marketItems={marketItems}
+              pendingSuggestions={pendingSuggestions}
+              onUpdate={handleUpdate}
+            />
+          </ErrorBoundary>
         )}
 
         {activeSection === 'hogar' && (
-          <HomeView />
+          <ErrorBoundary sectionName="Hogar">
+            <HomeView />
+          </ErrorBoundary>
         )}
 
         {activeSection === 'ajustes' && (
-          <SettingsView />
+          <ErrorBoundary sectionName="Ajustes">
+            <SettingsView />
+          </ErrorBoundary>
         )}
       </main>
 

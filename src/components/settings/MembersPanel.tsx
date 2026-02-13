@@ -64,6 +64,7 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
   // Cargar datos
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [householdId]);
 
   const loadData = async () => {

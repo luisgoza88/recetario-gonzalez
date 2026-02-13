@@ -7,6 +7,7 @@ import { Recipe, Ingredient } from '@/types';
 import RecipeModal from './RecipeModal';
 import RecipeForm from './forms/RecipeForm';
 import { supabase } from '@/lib/supabase/client';
+import { useToast } from '@/components/ui/Toast';
 
 interface RecipesViewProps {
   recipes: Recipe[];
@@ -14,6 +15,7 @@ interface RecipesViewProps {
 }
 
 export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
+  const toast = useToast();
   const [search, setSearch] = useState('');
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
@@ -68,7 +70,7 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
       onUpdate();
     } catch (error) {
       console.error('Error deleting recipe:', error);
-      alert('Error al eliminar la receta');
+      toast.error('Error al eliminar la receta');
     }
   }, [onUpdate]);
 

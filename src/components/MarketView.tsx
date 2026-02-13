@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { RotateCcw, ShoppingCart, Home, Minus, Plus, Edit2, Check, X, AlertTriangle, Search, Sparkles, Trash2, WifiOff, Camera, PlusIcon } from 'lucide-react';
+import { RotateCcw, ShoppingCart, Home, Minus, Plus, Edit2, Check, X, AlertTriangle, Search, Sparkles, Trash2, WifiOff, Camera, PlusIcon, ListChecks, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { MarketItem, IngredientCategory } from '@/types';
 import { CATEGORY_EMOJIS } from '@/data/market';
@@ -9,6 +9,7 @@ import { getItemIcon, isProteinCategory } from '@/lib/categoryIcons';
 import AddCustomItemModal from './AddCustomItemModal';
 import ScanPantryModal from './ScanPantryModal';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
+import { useToast } from '@/components/ui/Toast';
 import { cacheMarketItems, getCachedMarketItems, cacheInventory, getCachedInventory } from '@/lib/indexedDB';
 
 interface MarketViewProps {
@@ -19,6 +20,7 @@ interface MarketViewProps {
 type ViewMode = 'shopping' | 'pantry';
 
 export default function MarketView({ items, onUpdate }: MarketViewProps) {
+  const toast = useToast();
   const [loading, setLoading] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('shopping');
   const [editingItem, setEditingItem] = useState<string | null>(null);
@@ -29,6 +31,15 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
   const [fabOpen, setFabOpen] = useState(false);
   const [categoryData, setCategoryData] = useState<Record<string, IngredientCategory>>({});
   const [isFromCache, setIsFromCache] = useState(false);
+  const [showSmartList, setShowSmartList] = useState(false);
+  const [smartListLoading, setSmartListLoading] = useState(false);
+  const [smartListData, setSmartListData] = useState<{
+    total_items: number;
+    by_category: Record<string, Array<{ item: string; for_recipes: string[]; urgency: string }>>;
+    priority_items: string[];
+    estimated_meals: number;
+    summary: string;
+  } | null>(null);
 
   // Offline sync
   const { isOnline, queueOperation, pendingCount } = useOfflineSync();
@@ -261,13 +272,28 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
     setEditValue('');
   };
 
+  const generateSmartList = async () => {
+    setSmartListLoading(true);
+    try {
+      const res = await fetch('/api/smart-shopping-list');
+      if (!res.ok) throw new Error('Error fetching smart list');
+      const data = await res.json();
+      setSmartListData(data);
+      setShowSmartList(true);
+    } catch (error) {
+      console.error('Error generating smart shopping list:', error);
+    } finally {
+      setSmartListLoading(false);
+    }
+  };
+
   const resetMarket = async () => {
     if (!confirm('¿Reiniciar toda la lista de mercado?')) return;
 
     try {
       if (!isOnline) {
         // Offline: no permitir reset para evitar inconsistencias
-        alert('Esta acción requiere conexión a internet');
+        toast.warning('Esta acción requiere conexión a internet');
         return;
       }
 
@@ -284,7 +310,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
 
     if (!isOnline) {
       // Offline: no permitir eliminación para evitar inconsistencias
-      alert('Esta acción requiere conexión a internet');
+      toast.warning('Esta acción requiere conexión a internet');
       return;
     }
 
@@ -456,6 +482,14 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
+            <button
+              onClick={generateSmartList}
+              disabled={smartListLoading}
+              className="bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-blue-100 disabled:opacity-50"
+            >
+              {smartListLoading ? <Loader2 size={16} className="animate-spin" /> : <ListChecks size={16} />}
+              Generar
+            </button>
             <button
               onClick={resetMarket}
               className="bg-red-50 text-red-700 px-3 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-red-100"
@@ -746,6 +780,79 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
           onClose={() => setShowScanModal(false)}
           onComplete={onUpdate}
         />
+      )}
+
+      {/* Smart Shopping List Modal */}
+      {showSmartList && smartListData && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col">
+            <div className="p-4 border-b flex items-center justify-between bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-t-2xl">
+              <div>
+                <h3 className="font-bold text-lg">Lista Inteligente</h3>
+                <p className="text-sm text-white/80">
+                  {smartListData.total_items} items para {smartListData.estimated_meals} comidas
+                </p>
+              </div>
+              <button
+                onClick={() => setShowSmartList(false)}
+                className="p-2 hover:bg-white/20 rounded-lg"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {smartListData.priority_items.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-red-700 text-sm mb-2 flex items-center gap-2">
+                    <AlertTriangle size={14} />
+                    Prioridad Alta
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {smartListData.priority_items.map((item, i) => (
+                      <span key={i} className="bg-red-50 text-red-700 border border-red-200 px-3 py-1 rounded-full text-sm">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {Object.entries(smartListData.by_category).map(([category, catItems]) => (
+                <div key={category}>
+                  <h4 className="font-semibold text-gray-700 text-sm mb-2">{category}</h4>
+                  <div className="space-y-2">
+                    {catItems.map((ci, i) => (
+                      <div key={i} className="bg-gray-50 rounded-lg p-3">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-gray-800">{ci.item}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            ci.urgency === 'alta' ? 'bg-red-100 text-red-700' :
+                            ci.urgency === 'media' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>
+                            {ci.urgency}
+                          </span>
+                        </div>
+                        {ci.for_recipes.length > 0 && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Para: {ci.for_recipes.join(', ')}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {smartListData.summary && (
+                <p className="text-sm text-gray-500 text-center pt-2">
+                  {smartListData.summary}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

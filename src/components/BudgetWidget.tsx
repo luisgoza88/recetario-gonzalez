@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Wallet, TrendingUp, TrendingDown, AlertTriangle, Plus, ChevronDown, ChevronUp, Coins } from 'lucide-react';
-import { BudgetSummary, Purchase } from '@/types';
+import { BudgetSummary } from '@/types';
 import {
   getBudgetSummary,
   createBudget,
@@ -10,6 +10,7 @@ import {
   formatPrice,
   getBudgetAlerts
 } from '@/lib/budget-service';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 
 interface BudgetWidgetProps {
   compact?: boolean;
@@ -308,6 +309,7 @@ interface AddPurchaseModalProps {
 }
 
 function AddPurchaseModal({ onClose, onSaved }: AddPurchaseModalProps) {
+  useEscapeKey(onClose);
   const [itemName, setItemName] = useState('');
   const [price, setPrice] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -335,7 +337,7 @@ function AddPurchaseModal({ onClose, onSaved }: AddPurchaseModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl w-full max-w-sm">
         <div className="p-4 border-b flex items-center justify-between">
           <div className="flex items-center gap-2">
