@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { ScheduledTask } from '@/types';
 import ProactiveAlerts from '@/components/ProactiveAlerts';
+import EmployeeCompletionBanner from '@/components/yolima/EmployeeCompletionBanner';
 import ShareButton from '@/components/ShareButton';
 import { formatDayMenuForWhatsApp } from '@/lib/whatsapp-share';
 import {
@@ -299,6 +300,9 @@ export default function TodayDashboard({
             </div>
           )}
         </section>
+
+        {/* Estado del empleado (Modo Yolima) */}
+        <EmployeeCompletionBanner />
 
         {/* IA Proactiva - Alertas Inteligentes */}
         <ProactiveAlerts

@@ -10,12 +10,18 @@ import AICommandCenter from '@/components/ai/AICommandCenter';
 import FloatingAIAssistant from '@/components/FloatingAIAssistant';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import { OfflineBadge } from '@/components/ui/OfflineIndicator';
+import YolimaView from '@/components/yolima/YolimaView';
 import { useRecipes, useMarketItems, useSuggestionsCount, useRefreshAppData } from '@/lib/hooks/useAppData';
 import { useAppStore } from '@/lib/stores/useAppStore';
 import { useHouseholdId } from '@/lib/stores/useHouseholdStore';
+import { useOptionalAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase/client';
 
 export default function Home() {
+  // Check if user is employee → render YolimaView (simplified mode)
+  const auth = useOptionalAuth();
+  const isEmployee = auth?.isEmployee?.() ?? false;
+
   // Estado global con Zustand (navegación y UI)
   const {
     activeSection,
@@ -107,6 +113,15 @@ export default function Home() {
           <p className="text-gray-600">Cargando recetario...</p>
         </div>
       </div>
+    );
+  }
+
+  // ─── Modo Yolima: vista simplificada para empleados ───
+  if (isEmployee) {
+    return (
+      <ErrorBoundary sectionName="Modo Yolima">
+        <YolimaView />
+      </ErrorBoundary>
     );
   }
 
