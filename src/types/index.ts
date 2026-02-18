@@ -79,6 +79,16 @@ export type DietaryTag =
 // Dificultad de la receta
 export type RecipeDifficulty = 'fácil' | 'media' | 'difícil';
 
+// Categorías de recetas para la biblioteca expandida
+export type RecipeCategory =
+  | 'colombiana'
+  | 'rapida'
+  | 'thermomix'
+  | 'fitness'
+  | 'internacional'
+  | 'meal-prep'
+  | 'cena-ligera';
+
 export interface Recipe {
   id: string;
   name: string;
@@ -94,6 +104,10 @@ export interface Recipe {
   prep_time?: number;
   cook_time?: number;
   total_time?: number;
+  // Categorización
+  category?: RecipeCategory;
+  thermomixCompatible?: boolean;
+  tags?: string[];
   // Información nutricional (por porción)
   nutrition?: NutritionInfo;
   // Metadatos adicionales

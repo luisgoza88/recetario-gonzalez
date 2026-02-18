@@ -233,12 +233,13 @@ export async function POST(request: NextRequest) {
     const prioritizeThermomix = preferences?.prioritizeThermomix ?? false;
 
     // Gather context in parallel
-    const [inventory, marketItems, recentRecipes, feedback, preparations] = await Promise.all([
+    const [inventory, marketItems, recentRecipes, feedback, preparations, expandedRecipeNames] = await Promise.all([
       getAvailableInventory(),
       getMarketItems(),
       getRecentMenuRecipes(excludeRecentWeeks),
       getMealFeedback(),
       getPreparations(),
+      getExpandedRecipeNames(),
     ]);
 
     const weekDays = getWeekDates(weekStartDate);
@@ -253,6 +254,7 @@ export async function POST(request: NextRequest) {
       preparations,
       style,
       prioritizeThermomix,
+      expandedRecipeNames,
     });
 
     // Call Gemini
@@ -336,6 +338,16 @@ export async function POST(request: NextRequest) {
 // Prompt builder
 // =====================================================
 
+// Lazy-load expanded recipe names to avoid bloating the bundle at module level
+async function getExpandedRecipeNames(): Promise<string[]> {
+  try {
+    const { getRecipeNamesForPrompt } = await import('@/data/expanded-recipes');
+    return getRecipeNamesForPrompt();
+  } catch {
+    return [];
+  }
+}
+
 function buildPrompt(ctx: {
   weekDays: Array<{ dayNumber: number; dayName: string; date: string }>;
   inventory: string[];
@@ -345,8 +357,9 @@ function buildPrompt(ctx: {
   preparations: PreparationRow[];
   style: string;
   prioritizeThermomix?: boolean;
+  expandedRecipeNames?: string[];
 }): string {
-  const { weekDays, inventory, recentRecipes, feedback, preparations, style, prioritizeThermomix } = ctx;
+  const { weekDays, inventory, recentRecipes, feedback, preparations, style, prioritizeThermomix, expandedRecipeNames } = ctx;
 
   const inventorySection = inventory.length > 0
     ? `INGREDIENTES DISPONIBLES EN INVENTARIO:\n${inventory.map(i => `- ${i}`).join('\n')}`
@@ -366,6 +379,10 @@ function buildPrompt(ctx: {
 
   const dislikedSection = feedback.disliked.length > 0
     ? `\nRECETAS QUE NO LES GUSTARON (evitar estilos similares):\n${feedback.disliked.map(r => `- ${r}`).join('\n')}`
+    : '';
+
+  const expandedSection = expandedRecipeNames && expandedRecipeNames.length > 0
+    ? `\nRECETAS DE NUESTRA BIBLIOTECA (puedes usar estas como base o crear variaciones):\n${expandedRecipeNames.map(r => `- ${r}`).join('\n')}`
     : '';
 
   const daysDescription = weekDays.map(d => {
@@ -400,6 +417,7 @@ ${preparationsSection}
 ${recentSection}
 ${likedSection}
 ${dislikedSection}
+${expandedSection}
 
 ${prioritizeThermomix ? `
 THERMOMIX TM6:
