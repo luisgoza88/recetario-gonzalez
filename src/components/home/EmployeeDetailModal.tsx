@@ -299,7 +299,7 @@ export default function EmployeeDetailModal({
         {/* Header with employee info */}
         <div className={`${getZoneColor(zone)} text-white p-4 rounded-t-2xl`}>
           <div className="flex items-center justify-between mb-3">
-            <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg">
+            <button onClick={onClose} aria-label="Cerrar" className="p-2 hover:bg-white/20 rounded-lg">
               <ArrowLeft size={20} />
             </button>
             <div className="flex items-center gap-2">

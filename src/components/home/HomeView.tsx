@@ -125,6 +125,11 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
           <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
             <div
               className="h-full bg-blue-600 transition-all duration-300"
+              role="progressbar"
+              aria-valuenow={Math.round(progressPercent)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Progreso de tareas de hoy"
               style={{ width: `${progressPercent}%` }}
             />
           </div>

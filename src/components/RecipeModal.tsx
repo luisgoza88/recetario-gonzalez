@@ -177,6 +177,7 @@ export default function RecipeModal({ recipe, onClose, missingIngredients = [] }
           <h3 className="font-semibold text-lg pr-2">{recipe.name}</h3>
           <button
             onClick={onClose}
+            aria-label="Cerrar"
             className="text-gray-500 hover:text-gray-700 p-1 flex-shrink-0"
           >
             <X size={24} />

@@ -316,6 +316,8 @@ export default function SmartFAB({
 
         {/* Main FAB Button - AI Brain */}
         <button
+          aria-label="Asistente de IA"
+          aria-expanded={showQuickActions}
           onMouseDown={handlePressStart}
           onMouseUp={handlePressEnd}
           onMouseLeave={handlePressCancel}

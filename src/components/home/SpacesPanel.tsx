@@ -277,7 +277,7 @@ export default function SpacesPanel({
               {activeCategory === 'interior' ? interiorSpaces.length : exteriorSpaces.length}
             </span>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg">
+          <button onClick={onClose} aria-label="Cerrar" className="p-2 hover:bg-white/20 rounded-lg">
             <X size={20} />
           </button>
         </div>

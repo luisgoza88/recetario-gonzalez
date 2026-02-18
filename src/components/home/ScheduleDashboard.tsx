@@ -421,6 +421,11 @@ export default function ScheduleDashboard({
                 <div className="h-3 bg-indigo-200 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-indigo-600 transition-all duration-500"
+                    role="progressbar"
+                    aria-valuenow={totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label="Progreso total de tareas"
                     style={{ width: `${totalTasks > 0 ? (totalCompleted / totalTasks) * 100 : 0}%` }}
                   />
                 </div>
@@ -454,6 +459,11 @@ export default function ScheduleDashboard({
                             ep.progressPercent >= 100 ? 'bg-green-500' :
                             ep.progressPercent >= 50 ? 'bg-blue-500' : 'bg-amber-500'
                           }`}
+                          role="progressbar"
+                          aria-valuenow={ep.progressPercent}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-label={`Progreso de ${ep.employee.name}`}
                           style={{ width: `${ep.progressPercent}%` }}
                         />
                       </div>

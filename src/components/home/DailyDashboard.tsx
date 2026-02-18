@@ -163,6 +163,11 @@ export default function DailyDashboard({
         <div className="h-3 bg-white/30 rounded-full overflow-hidden">
           <div
             className="h-full bg-white transition-all duration-500"
+            role="progressbar"
+            aria-valuenow={Math.round(progressPercent)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Progreso del día"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
@@ -247,6 +252,11 @@ export default function DailyDashboard({
                     <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-blue-600 transition-all"
+                        role="progressbar"
+                        aria-valuenow={Math.round(empProgress)}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`Progreso de ${employee.name}`}
                         style={{ width: `${empProgress}%` }}
                       />
                     </div>

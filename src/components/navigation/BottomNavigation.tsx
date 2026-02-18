@@ -37,6 +37,9 @@ function NavItem({ icon, label, active, onClick, badge, activeColor, activeBg }:
   return (
     <button
       onClick={onClick}
+      role="tab"
+      aria-selected={active}
+      aria-current={active ? 'page' : undefined}
       className={`
         flex flex-col items-center justify-center py-2 px-3 rounded-xl
         transition-all duration-200 min-w-[64px]
@@ -77,11 +80,11 @@ export default function BottomNavigation({
   pendingAIProposals = 0
 }: BottomNavigationProps) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 safe-area-pb">
+    <nav aria-label="Navegación principal" className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 safe-area-pb">
       <div className="max-w-lg mx-auto">
         {/* Tabs secundarios del Recetario - Solo visible cuando está activo */}
         {activeSection === 'recetario' && onRecetarioTabChange && (
-          <div className="flex border-b border-gray-100 bg-gray-50/80">
+          <div className="flex border-b border-gray-100 bg-gray-50/80" role="tablist" aria-label="Secciones del recetario">
             {RECETARIO_TABS.map((tab) => {
               const isActive = recetarioTab === tab.id;
               const showBadge = tab.id === 'suggestions' && pendingSuggestions > 0;
@@ -90,6 +93,9 @@ export default function BottomNavigation({
                 <button
                   key={tab.id}
                   onClick={() => onRecetarioTabChange(tab.id)}
+                  role="tab"
+                  aria-selected={isActive}
+                  aria-label={tab.label}
                   className={`
                     flex-1 flex items-center justify-center gap-2 py-3.5 px-2
                     transition-all duration-200 relative
@@ -117,7 +123,7 @@ export default function BottomNavigation({
         )}
 
         {/* Navegación principal */}
-        <div className="flex items-end justify-around py-2 px-1">
+        <div className="flex items-end justify-around py-2 px-1" role="tablist" aria-label="Secciones principales">
           {/* Hoy */}
           <NavItem
             icon={<Sun size={22} />}

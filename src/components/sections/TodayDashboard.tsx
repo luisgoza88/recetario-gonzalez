@@ -270,6 +270,11 @@ export default function TodayDashboard({
                         <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
                           <div
                             className="bg-blue-500 h-full rounded-full transition-all"
+                            role="progressbar"
+                            aria-valuenow={Math.round((summary.completedCount / summary.totalCount) * 100)}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-label={`Progreso de ${summary.employee.name}`}
                             style={{ width: `${(summary.completedCount / summary.totalCount) * 100}%` }}
                           />
                         </div>

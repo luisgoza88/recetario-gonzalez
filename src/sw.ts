@@ -31,12 +31,12 @@ const serwist = new Serwist({
 
 // Evento de instalación
 self.addEventListener("install", () => {
-  console.log("Service Worker instalado");
+  // Service Worker instalado
 });
 
 // Evento de activación
 self.addEventListener("activate", () => {
-  console.log("Service Worker activado");
+  // Service Worker activado
 });
 
 // Manejar notificaciones push
