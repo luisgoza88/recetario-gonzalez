@@ -7,6 +7,7 @@ import {
   RefreshCw, Settings2, Plus
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { HomeEmployee, TaskFrequency } from '@/types';
 
 type ScheduleStatus = 'pendiente' | 'en_progreso' | 'completada' | 'omitida';
@@ -142,6 +143,7 @@ export default function ScheduleDashboard({
   );
   const [hasTemplates, setHasTemplates] = useState<boolean>(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
+  const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
 
   const loadDailyTasks = useCallback(async () => {
     setLoading(true);
@@ -201,9 +203,6 @@ export default function ScheduleDashboard({
   }, [selectedDate, householdId, employees]);
 
   const generateDailyTasks = async () => {
-    const confirmed = window.confirm('Esto reemplazara las tareas ya programadas para esta fecha. Deseas continuar?');
-    if (!confirmed) return;
-
     setGenerating(true);
     setGenerationError(null);
 
@@ -381,7 +380,7 @@ export default function ScheduleDashboard({
               )}
               <div className="flex flex-col gap-3 items-center">
                 <button
-                  onClick={generateDailyTasks}
+                  onClick={() => setShowGenerateConfirm(true)}
                   disabled={generating}
                   className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2 hover:bg-indigo-700 disabled:opacity-50"
                 >
@@ -529,7 +528,7 @@ export default function ScheduleDashboard({
               )}
 
               <button
-                onClick={generateDailyTasks}
+                onClick={() => setShowGenerateConfirm(true)}
                 disabled={generating}
                 className="w-full mt-4 py-3 border border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-indigo-500 hover:text-indigo-600 transition-colors flex items-center justify-center gap-2"
               >
@@ -540,6 +539,19 @@ export default function ScheduleDashboard({
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={showGenerateConfirm}
+        onConfirm={() => {
+          setShowGenerateConfirm(false);
+          generateDailyTasks();
+        }}
+        onCancel={() => setShowGenerateConfirm(false)}
+        title="Regenerar tareas"
+        message="Esto reemplazará las tareas ya programadas para esta fecha. ¿Deseas continuar?"
+        confirmText="Continuar"
+        variant="warning"
+      />
     </div>
   );
 }

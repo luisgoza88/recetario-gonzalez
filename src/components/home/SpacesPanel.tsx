@@ -8,6 +8,7 @@ import { useSpaceTypes, useSaveSpace, useDeleteSpace } from '@/lib/hooks/useSpac
 import { supabase } from '@/lib/supabase/client';
 import RoomScanner from './RoomScanner';
 import { useToast } from '@/components/ui/Toast';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import SpaceListView from './spaces/SpaceListView';
 import SpaceFormView from './spaces/SpaceFormView';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
@@ -34,6 +35,7 @@ export default function SpacesPanel({
   const [activeCategory, setActiveCategory] = useState<'interior' | 'exterior'>(initialCategory);
   const [showScanner, setShowScanner] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirmDeleteSpaceId, setConfirmDeleteSpaceId] = useState<string | null>(null);
 
   // TanStack Query
   const { data: spaceTypes = [] } = useSpaceTypes();
@@ -174,7 +176,6 @@ export default function SpacesPanel({
   };
 
   const deleteSpace = async (id: string) => {
-    if (!confirm('¿Eliminar este espacio y todas sus tareas?')) return;
     setDeleting(id);
     try {
       await deleteSpaceMutation.mutateAsync({ spaceId: id });
@@ -289,7 +290,7 @@ export default function SpacesPanel({
               interiorSpaces={interiorSpaces}
               exteriorSpaces={exteriorSpaces}
               onEdit={startEdit}
-              onDelete={deleteSpace}
+              onDelete={(id) => setConfirmDeleteSpaceId(id)}
               onAddNew={startNew}
               onClose={onClose}
               deletingId={deleting}
@@ -324,6 +325,19 @@ export default function SpacesPanel({
           onAnalysisComplete={handleScanComplete}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={!!confirmDeleteSpaceId}
+        onConfirm={() => {
+          if (confirmDeleteSpaceId) deleteSpace(confirmDeleteSpaceId);
+          setConfirmDeleteSpaceId(null);
+        }}
+        onCancel={() => setConfirmDeleteSpaceId(null)}
+        title="Eliminar espacio"
+        message="¿Eliminar este espacio y todas sus tareas?"
+        confirmText="Eliminar"
+        variant="danger"
+      />
     </div>
   );
 }

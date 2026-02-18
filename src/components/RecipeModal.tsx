@@ -7,6 +7,7 @@ import { Recipe, Ingredient } from '@/types';
 import NutritionDisplay, { DietaryTags, PrepTimeDisplay, DifficultyDisplay } from './NutritionDisplay';
 import SmartSubstitutionPanel from './SmartSubstitutionPanel';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
+import FocusTrap from '@/components/ui/FocusTrap';
 
 interface RecipeModalProps {
   recipe: Recipe;
@@ -160,6 +161,7 @@ export default function RecipeModal({ recipe, onClose, missingIngredients = [] }
   };
 
   return (
+    <FocusTrap active={true}>
     <div
       className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4"
       role="dialog"
@@ -425,5 +427,6 @@ export default function RecipeModal({ recipe, onClose, missingIngredients = [] }
         </div>
       </div>
     </div>
+    </FocusTrap>
   );
 }

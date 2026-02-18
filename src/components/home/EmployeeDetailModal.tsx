@@ -8,8 +8,10 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/Toast';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { HomeEmployee, Space, ScheduledTask } from '@/types';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
+import FocusTrap from '@/components/ui/FocusTrap';
 
 interface EmployeeDetailModalProps {
   employee: HomeEmployee;
@@ -100,6 +102,10 @@ export default function EmployeeDetailModal({
   // Tasks
   const [recentTasks, setRecentTasks] = useState<ScheduledTask[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
+  const [confirmAction, setConfirmAction] = useState<{
+    type: 'remove-space' | 'delete-employee';
+    id: string;
+  } | null>(null);
 
   useEffect(() => {
     loadSpaceAssignments();
@@ -204,8 +210,6 @@ export default function EmployeeDetailModal({
   };
 
   const removeSpaceAssignment = async (assignmentId: string) => {
-    if (!confirm('¿Quitar este espacio asignado?')) return;
-
     try {
       await supabase
         .from('employee_space_assignments')
@@ -252,8 +256,6 @@ export default function EmployeeDetailModal({
   };
 
   const handleDelete = async () => {
-    if (!confirm(`¿Estás seguro de eliminar a ${employee.name}? Esta acción no se puede deshacer.`)) return;
-
     try {
       await supabase
         .from('home_employees')
@@ -322,7 +324,7 @@ export default function EmployeeDetailModal({
                 </button>
               )}
               <button
-                onClick={handleDelete}
+                onClick={() => setConfirmAction({ type: 'delete-employee', id: employee.id })}
                 className="p-2 hover:bg-red-500/50 rounded-lg"
               >
                 <Trash2 size={18} />
@@ -556,7 +558,7 @@ export default function EmployeeDetailModal({
                           <Star size={16} fill={assignment.is_primary ? 'currentColor' : 'none'} />
                         </button>
                         <button
-                          onClick={() => removeSpaceAssignment(assignment.id)}
+                          onClick={() => setConfirmAction({ type: 'remove-space', id: assignment.id })}
                           className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
                         >
                           <Trash2 size={16} />
@@ -818,6 +820,27 @@ export default function EmployeeDetailModal({
           </button>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={!!confirmAction}
+        onConfirm={() => {
+          if (confirmAction?.type === 'remove-space') {
+            removeSpaceAssignment(confirmAction.id);
+          } else if (confirmAction?.type === 'delete-employee') {
+            handleDelete();
+          }
+          setConfirmAction(null);
+        }}
+        onCancel={() => setConfirmAction(null)}
+        title={confirmAction?.type === 'remove-space' ? 'Quitar espacio' : 'Eliminar empleado'}
+        message={
+          confirmAction?.type === 'remove-space'
+            ? '¿Quitar este espacio asignado?'
+            : `¿Estás seguro de eliminar a ${employee.name}? Esta acción no se puede deshacer.`
+        }
+        confirmText="Eliminar"
+        variant="danger"
+      />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/Toast';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { HomeEmployee, TaskFrequency, TaskPriority } from '@/types';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 
@@ -94,6 +95,7 @@ export default function ScheduleTemplateEditor({
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [editingTask, setEditingTask] = useState<TemplateRecord | null>(null);
   const [taskForm, setTaskForm] = useState<TemplateFormState>(EMPTY_FORM);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const loadCategories = useCallback(async () => {
     const { data: existingCats } = await supabase
@@ -234,9 +236,6 @@ export default function ScheduleTemplateEditor({
   };
 
   const handleDeleteTask = async (taskId: string) => {
-    const confirmed = window.confirm('Eliminar esta plantilla?');
-    if (!confirmed) return;
-
     const { error } = await supabase
       .from('task_templates')
       .delete()
@@ -385,7 +384,7 @@ export default function ScheduleTemplateEditor({
                         <Pencil size={16} />
                       </button>
                       <button
-                        onClick={() => handleDeleteTask(task.id)}
+                        onClick={() => setConfirmDeleteId(task.id)}
                         className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
                       >
                         <Trash2 size={16} />
@@ -580,6 +579,19 @@ export default function ScheduleTemplateEditor({
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!confirmDeleteId}
+        onConfirm={() => {
+          if (confirmDeleteId) handleDeleteTask(confirmDeleteId);
+          setConfirmDeleteId(null);
+        }}
+        onCancel={() => setConfirmDeleteId(null)}
+        title="Eliminar plantilla"
+        message="¿Eliminar esta plantilla?"
+        confirmText="Eliminar"
+        variant="danger"
+      />
     </div>
   );
 }

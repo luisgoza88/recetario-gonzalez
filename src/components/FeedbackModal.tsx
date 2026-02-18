@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase/client';
 import { Recipe, MealType, PortionRating, LeftoverRating, Ingredient, MealFeedback } from '@/types';
 import { analyzeNewFeedback } from '@/lib/feedback-learning';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
+import FocusTrap from '@/components/ui/FocusTrap';
 
 interface FeedbackModalProps {
   date: string;
@@ -137,6 +138,7 @@ export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved
   }
 
   return (
+    <FocusTrap active={true}>
     <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-8 pb-24 overflow-y-auto" role="dialog" aria-modal="true">
       <div className="bg-white rounded-2xl w-full max-w-md flex flex-col">
         {/* Header */}
@@ -289,5 +291,6 @@ export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved
         </div>
       </div>
     </div>
+    </FocusTrap>
   );
 }

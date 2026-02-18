@@ -10,6 +10,7 @@ import AddCustomItemModal from './AddCustomItemModal';
 import ScanPantryModal from './ScanPantryModal';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { useToast } from '@/components/ui/Toast';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { cacheMarketItems, getCachedMarketItems, cacheInventory, getCachedInventory } from '@/lib/indexedDB';
 
 interface MarketViewProps {
@@ -39,6 +40,11 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
     priority_items: string[];
     estimated_meals: number;
     summary: string;
+  } | null>(null);
+
+  const [confirmAction, setConfirmAction] = useState<{
+    type: 'reset-market' | 'delete-item';
+    item?: MarketItem;
   } | null>(null);
 
   // Offline sync
@@ -288,8 +294,6 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
   };
 
   const resetMarket = async () => {
-    if (!confirm('¿Reiniciar toda la lista de mercado?')) return;
-
     try {
       if (!isOnline) {
         // Offline: no permitir reset para evitar inconsistencias
@@ -306,8 +310,6 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
   };
 
   const deleteCustomItem = async (item: MarketItem) => {
-    if (!confirm(`¿Eliminar "${item.name}" de tu lista?`)) return;
-
     if (!isOnline) {
       // Offline: no permitir eliminación para evitar inconsistencias
       toast.warning('Esta acción requiere conexión a internet');
@@ -491,7 +493,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
               Generar
             </button>
             <button
-              onClick={resetMarket}
+              onClick={() => setConfirmAction({ type: 'reset-market' })}
               className="bg-red-50 text-red-700 px-3 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-red-100"
             >
               <RotateCcw size={16} />
@@ -550,7 +552,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
                         </span>
                         {item.is_custom && (
                           <button
-                            onClick={(e) => { e.stopPropagation(); deleteCustomItem(item); }}
+                            onClick={(e) => { e.stopPropagation(); setConfirmAction({ type: 'delete-item', item }); }}
                             disabled={loading === item.id}
                             className="w-7 h-7 flex items-center justify-center bg-gray-100 text-gray-500 rounded-md hover:bg-red-100 hover:text-red-600 disabled:opacity-30 text-sm"
                           >
@@ -617,7 +619,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
                           </span>
                           {item.is_custom && (
                             <button
-                              onClick={() => deleteCustomItem(item)}
+                              onClick={() => setConfirmAction({ type: 'delete-item', item })}
                               disabled={loading === item.id}
                               className="p-1 text-gray-400 hover:text-red-500 disabled:opacity-30"
                             >
@@ -854,6 +856,27 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!confirmAction}
+        onConfirm={() => {
+          if (confirmAction?.type === 'reset-market') {
+            resetMarket();
+          } else if (confirmAction?.type === 'delete-item' && confirmAction.item) {
+            deleteCustomItem(confirmAction.item);
+          }
+          setConfirmAction(null);
+        }}
+        onCancel={() => setConfirmAction(null)}
+        title={confirmAction?.type === 'reset-market' ? 'Reiniciar lista' : 'Eliminar item'}
+        message={
+          confirmAction?.type === 'reset-market'
+            ? '¿Reiniciar toda la lista de mercado?'
+            : `¿Eliminar "${confirmAction?.item?.name}" de tu lista?`
+        }
+        confirmText={confirmAction?.type === 'reset-market' ? 'Reiniciar' : 'Eliminar'}
+        variant="danger"
+      />
     </div>
   );
 }

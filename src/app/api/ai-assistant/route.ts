@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, base64ToGeminiFormat } from '@/lib/gemini/client';
 import { requireAuth } from '@/lib/api/auth';
 import { FunctionCallingConfigMode } from '@google/genai';
@@ -24,8 +25,26 @@ import {
   messageRequiresFunction,
   getFallbackResponse,
 } from '@/lib/ai-assistant/utils';
+import { withRateLimit } from '@/lib/rate-limit';
 
 import { logger } from '@/lib/logger';
+
+// Zod schema for request validation
+const MessageSchema = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string().max(10000),
+  image: z.string().max(10 * 1024 * 1024).optional(),
+});
+
+const AssistantRequestSchema = z.object({
+  messages: z.array(MessageSchema).min(1).max(50),
+  conversationContext: z.record(z.string(), z.unknown()).optional(),
+  stream: z.boolean().optional(),
+  householdId: z.string().optional(),
+  userId: z.string().optional(),
+  sessionId: z.string().optional(),
+  executeDirectly: z.boolean().optional(),
+});
 
 // Import function declarations and orchestrator
 import { functionDeclarations } from './functions';
@@ -46,8 +65,39 @@ export async function POST(request: NextRequest) {
 
   logger.info('POST request received');
   try {
-    const body = await request.json();
-    logger.info('Request body parsed', { messagesCount: body.messages?.length });
+    // Rate limiting
+    const rateLimitId = request.headers.get('x-user-id') || request.headers.get('x-forwarded-for') || 'anonymous';
+    const rateLimit = await withRateLimit(rateLimitId, 'ai-chat');
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(rateLimit.response, {
+        status: 429,
+        headers: rateLimit.headers,
+      });
+    }
+
+    // Parse and validate request body with Zod
+    let validatedBody;
+    try {
+      const rawBody = await request.json();
+      validatedBody = AssistantRequestSchema.parse(rawBody);
+    } catch (validationError) {
+      if (validationError instanceof z.ZodError) {
+        return NextResponse.json(
+          {
+            error: 'Datos de entrada inválidos',
+            details: validationError.issues.map(e => `${e.path.join('.')}: ${e.message}`)
+          },
+          { status: 400 }
+        );
+      }
+      return NextResponse.json(
+        { error: 'Error parsing request body' },
+        { status: 400 }
+      );
+    }
+
+    logger.info('Request body parsed', { messagesCount: validatedBody.messages?.length });
     const {
       messages,
       conversationContext,
@@ -58,11 +108,7 @@ export async function POST(request: NextRequest) {
       sessionId: providedSessionId,
       // If true, skip proposals and execute directly (for approved proposals)
       executeDirectly = false,
-    } = body;
-
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return NextResponse.json({ error: 'Messages required' }, { status: 400 });
-    }
+    } = validatedBody;
 
     // Create execution context
     const sessionId = providedSessionId || generateSessionId();
@@ -88,15 +134,19 @@ export async function POST(request: NextRequest) {
         enhancedSystemPrompt += `\n\nTema actual: ${lastTopic}`;
       }
 
-      if (preferences && Object.keys(preferences).length > 0) {
-        if (preferences.favoriteRecipes?.length) {
-          enhancedSystemPrompt += `\nRecetas favoritas: ${preferences.favoriteRecipes.join(', ')}`;
+      if (preferences && typeof preferences === 'object' && Object.keys(preferences).length > 0) {
+        const prefs = preferences as Record<string, unknown>;
+        const favRecipes = prefs.favoriteRecipes as string[] | undefined;
+        const disliked = prefs.dislikedIngredients as string[] | undefined;
+        const restrictions = prefs.dietaryRestrictions as string[] | undefined;
+        if (favRecipes?.length) {
+          enhancedSystemPrompt += `\nRecetas favoritas: ${favRecipes.join(', ')}`;
         }
-        if (preferences.dislikedIngredients?.length) {
-          enhancedSystemPrompt += `\nNo le gusta: ${preferences.dislikedIngredients.join(', ')}`;
+        if (disliked?.length) {
+          enhancedSystemPrompt += `\nNo le gusta: ${disliked.join(', ')}`;
         }
-        if (preferences.dietaryRestrictions?.length) {
-          enhancedSystemPrompt += `\nRestricciones: ${preferences.dietaryRestrictions.join(', ')}`;
+        if (restrictions?.length) {
+          enhancedSystemPrompt += `\nRestricciones: ${restrictions.join(', ')}`;
         }
       }
     }

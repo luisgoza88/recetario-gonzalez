@@ -9,6 +9,7 @@ import RecipeForm from './forms/RecipeForm';
 import { CanEdit } from '@/components/auth/RoleGate';
 import { supabase } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/Toast';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 interface RecipesViewProps {
   recipes: Recipe[];
@@ -22,6 +23,7 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState<'all' | 'breakfast' | 'lunch' | 'dinner'>('all');
+  const [confirmDeleteRecipe, setConfirmDeleteRecipe] = useState<Recipe | null>(null);
 
   // Memoizar filtrado de recetas para evitar recálculos innecesarios
   const filteredRecipes = useMemo(() => {
@@ -57,10 +59,6 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
 
   // Memoizar handlers para evitar re-renders de componentes hijos
   const handleDelete = useCallback(async (recipe: Recipe) => {
-    if (!confirm(`¿Eliminar la receta "${recipe.name}"? Esta acción no se puede deshacer.`)) {
-      return;
-    }
-
     try {
       const { error } = await supabase
         .from('recipes')
@@ -184,7 +182,7 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
                       <Edit2 size={18} />
                     </button>
                     <button
-                      onClick={() => handleDelete(recipe)}
+                      onClick={() => setConfirmDeleteRecipe(recipe)}
                       className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
                       title="Eliminar"
                     >
@@ -221,6 +219,19 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
           onSuccess={handleFormSuccess}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={!!confirmDeleteRecipe}
+        onConfirm={() => {
+          if (confirmDeleteRecipe) handleDelete(confirmDeleteRecipe);
+          setConfirmDeleteRecipe(null);
+        }}
+        onCancel={() => setConfirmDeleteRecipe(null)}
+        title="Eliminar receta"
+        message={`¿Eliminar la receta "${confirmDeleteRecipe?.name}"? Esta acción no se puede deshacer.`}
+        confirmText="Eliminar"
+        variant="danger"
+      />
     </div>
   );
 }

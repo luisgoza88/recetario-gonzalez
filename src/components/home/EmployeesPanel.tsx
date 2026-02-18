@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/Toast';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { AdminOnly } from '@/components/auth/RoleGate';
 import { HomeEmployee } from '@/types';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
@@ -116,6 +117,7 @@ export default function EmployeesPanel({
   const [editingEmployee, setEditingEmployee] = useState<EmployeeForm | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const startNew = () => {
     setEditingEmployee({ ...emptyForm, schedule: { ...defaultSchedule } });
@@ -219,8 +221,6 @@ export default function EmployeesPanel({
   };
 
   const deleteEmployee = async (id: string) => {
-    if (!confirm('¿Estás seguro de eliminar este empleado?')) return;
-
     setDeleting(id);
     try {
       await supabase
@@ -299,7 +299,7 @@ export default function EmployeesPanel({
                         </button>
                         <AdminOnly>
                           <button
-                            onClick={() => deleteEmployee(emp.id)}
+                            onClick={() => setConfirmDeleteId(emp.id)}
                             disabled={deleting === emp.id}
                             className="p-2 text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50"
                           >
@@ -478,6 +478,19 @@ export default function EmployeesPanel({
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={!!confirmDeleteId}
+        onConfirm={() => {
+          if (confirmDeleteId) deleteEmployee(confirmDeleteId);
+          setConfirmDeleteId(null);
+        }}
+        onCancel={() => setConfirmDeleteId(null)}
+        title="Eliminar empleado"
+        message="¿Estás seguro de eliminar este empleado?"
+        confirmText="Eliminar"
+        variant="danger"
+      />
     </div>
   );
 }

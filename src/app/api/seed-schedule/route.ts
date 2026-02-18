@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { YOLIMA_SCHEDULE, JOHN_SCHEDULE, WeekSchedule } from '@/data/schedule-seed';
+import type { WeekSchedule } from '@/data/schedule-seed';
 import { requireAuth } from '@/lib/api/auth';
 import { createAuthenticatedClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/logger';
@@ -222,6 +222,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const { YOLIMA_SCHEDULE, JOHN_SCHEDULE } = await import('@/data/schedule-seed');
     const seedEmployees = [
       { name: 'Yolima', zone: 'interior' as const, schedule: YOLIMA_SCHEDULE },
       { name: 'John', zone: 'exterior' as const, schedule: JOHN_SCHEDULE },

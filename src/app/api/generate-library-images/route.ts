@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGeminiClient, GEMINI_MODELS } from '@/lib/gemini/client';
-import { allDishes, dishStats, DishForLibrary } from '@/data/image-library-dishes';
+import type { DishForLibrary } from '@/data/image-library-dishes';
 import { requireAuth } from '@/lib/api/auth';
 import { createAuthenticatedClient, createStorageAdminClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/logger';
@@ -97,6 +97,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Error fetching existing images' }, { status: 500 });
     }
 
+    const { allDishes, dishStats } = await import('@/data/image-library-dishes');
     const existingNames = new Set(existingImages?.map(img => img.name_en) || []);
     const remainingDishes = allDishes.filter(dish => !existingNames.has(dish.name_en));
 
@@ -150,6 +151,7 @@ export async function POST(request: NextRequest) {
       .from('image_library')
       .select('name_en');
 
+    const { allDishes: allDishesData } = await import('@/data/image-library-dishes');
     const existingNames = new Set(existingImages?.map(img => img.name_en) || []);
 
     // Get dishes to process
@@ -157,12 +159,12 @@ export async function POST(request: NextRequest) {
 
     if (specificDishes && Array.isArray(specificDishes)) {
       // Process specific dishes by name
-      dishesToProcess = allDishes.filter(d =>
+      dishesToProcess = allDishesData.filter(d =>
         specificDishes.includes(d.name_en) && !existingNames.has(d.name_en)
       );
     } else {
       // Process next batch of remaining dishes
-      const remainingDishes = allDishes.filter(dish => !existingNames.has(dish.name_en));
+      const remainingDishes = allDishesData.filter(dish => !existingNames.has(dish.name_en));
       dishesToProcess = remainingDishes.slice(startIndex, startIndex + limitedBatchSize);
     }
 

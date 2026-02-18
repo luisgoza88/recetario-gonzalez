@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { AdminOnly } from '@/components/auth/RoleGate';
 import {
   createInvitation,
@@ -61,6 +62,11 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [createdInvitation, setCreatedInvitation] = useState<HouseholdInvitation | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{
+    type: 'cancel-invitation' | 'remove-member';
+    id: string;
+    name?: string;
+  } | null>(null);
 
   // Cargar datos
   useEffect(() => {
@@ -137,8 +143,6 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
   };
 
   const handleCancelInvitation = async (invitationId: string) => {
-    if (!confirm('Deseas cancelar esta invitacion?')) return;
-
     const result = await cancelInvitation(invitationId);
     if (result.error) {
       setError(result.error);
@@ -147,9 +151,7 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
     }
   };
 
-  const handleRemoveMember = async (membershipId: string, memberName: string) => {
-    if (!confirm(`Deseas remover a ${memberName} del hogar?`)) return;
-
+  const handleRemoveMember = async (membershipId: string, _memberName: string) => {
     const { error } = await supabase
       .from('household_memberships')
       .update({ is_active: false })
@@ -276,7 +278,7 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
                 <AdminOnly>
                   {canManage && member.user_id !== user?.id && member.role !== 'admin' && (
                     <button
-                      onClick={() => handleRemoveMember(member.id, member.user?.full_name || 'este usuario')}
+                      onClick={() => setConfirmAction({ type: 'remove-member', id: member.id, name: member.user?.full_name || 'este usuario' })}
                       className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                       title="Remover miembro"
                     >
@@ -336,7 +338,7 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
                   </button>
                   {canManage && (
                     <button
-                      onClick={() => handleCancelInvitation(invitation.id)}
+                      onClick={() => setConfirmAction({ type: 'cancel-invitation', id: invitation.id })}
                       className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                       title="Cancelar invitacion"
                     >
@@ -532,6 +534,27 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!confirmAction}
+        onConfirm={() => {
+          if (confirmAction?.type === 'cancel-invitation') {
+            handleCancelInvitation(confirmAction.id);
+          } else if (confirmAction?.type === 'remove-member') {
+            handleRemoveMember(confirmAction.id, confirmAction.name || '');
+          }
+          setConfirmAction(null);
+        }}
+        onCancel={() => setConfirmAction(null)}
+        title={confirmAction?.type === 'cancel-invitation' ? 'Cancelar invitación' : 'Remover miembro'}
+        message={
+          confirmAction?.type === 'cancel-invitation'
+            ? '¿Deseas cancelar esta invitación?'
+            : `¿Deseas remover a ${confirmAction?.name || 'este usuario'} del hogar?`
+        }
+        confirmText={confirmAction?.type === 'cancel-invitation' ? 'Cancelar invitación' : 'Remover'}
+        variant="danger"
+      />
     </div>
   );
 }
