@@ -8,6 +8,8 @@ import { CATEGORY_EMOJIS } from '@/data/market';
 import { getItemIcon, isProteinCategory } from '@/lib/categoryIcons';
 import AddCustomItemModal from './AddCustomItemModal';
 import ScanPantryModal from './ScanPantryModal';
+import SmartShoppingSection from './SmartShoppingSection';
+import PriceLogModal from './PriceLogModal';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { useToast } from '@/components/ui/Toast';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -41,6 +43,8 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
     estimated_meals: number;
     summary: string;
   } | null>(null);
+
+  const [priceLogItem, setPriceLogItem] = useState<{ id: string; name: string } | null>(null);
 
   const [confirmAction, setConfirmAction] = useState<{
     type: 'reset-market' | 'delete-item';
@@ -123,7 +127,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
     });
   }, [items, searchQuery]);
 
-  const toggleItem = async (item: MarketItem) => {
+  const toggleItem = async (item: MarketItem, skipPriceLog?: boolean) => {
     setLoading(item.id);
 
     try {
@@ -200,6 +204,11 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
           );
 
         if (inventoryError) throw inventoryError;
+
+        // Show price log modal for newly checked items (online only, not skipped)
+        if (!skipPriceLog) {
+          setPriceLogItem({ id: item.id, name: item.name });
+        }
       }
 
       onUpdate();
@@ -208,6 +217,24 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
     } finally {
       setLoading(null);
     }
+  };
+
+  const handlePriceLog = async (price: number, store: string) => {
+    if (!priceLogItem) return;
+    try {
+      await fetch('/api/log-price', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itemName: priceLogItem.name,
+          price,
+          store,
+        }),
+      });
+    } catch (err) {
+      console.error('Error logging price:', err);
+    }
+    setPriceLogItem(null);
   };
 
   const updateInventory = async (item: MarketItem, newQuantity: string, newNumber: number) => {
@@ -467,6 +494,9 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
 
       {viewMode === 'shopping' ? (
         <>
+          {/* Smart Shopping Section (AI Weekly List) */}
+          <SmartShoppingSection onRefreshMarket={onUpdate} />
+
           {/* Shopping Info Banner */}
           <div className="bg-green-50 border border-green-200 text-green-700 p-3 rounded-xl mb-4 text-sm flex items-center gap-2">
             <ShoppingCart size={16} />
@@ -855,6 +885,15 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Price Log Modal for regular market items */}
+      {priceLogItem && (
+        <PriceLogModal
+          itemName={priceLogItem.name}
+          onSave={handlePriceLog}
+          onSkip={() => setPriceLogItem(null)}
+        />
       )}
 
       <ConfirmDialog

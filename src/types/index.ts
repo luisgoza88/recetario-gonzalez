@@ -1,6 +1,46 @@
 // Tipos principales del Recetario
 
 // =====================================================
+// TIPOS PARA LISTA DE MERCADO INTELIGENTE
+// =====================================================
+
+export interface ShoppingListItem {
+  name: string;
+  quantity: string;
+  category: string; // 'frutas', 'proteinas', 'lacteos', 'granos', 'otros'
+  estimatedPrice?: number;
+  actualPrice?: number;
+  store?: string;
+  checked: boolean;
+  fromRecipe?: string; // nombre de la receta que lo necesita
+}
+
+export interface ShoppingList {
+  id: string;
+  household_id?: string;
+  week_start_date: string;
+  menu_id?: string;
+  items: ShoppingListItem[];
+  total_estimated?: number;
+  total_actual?: number;
+  status: 'active' | 'completed' | 'archived';
+  created_at?: string;
+  completed_at?: string;
+}
+
+export interface PriceRecord {
+  id?: string;
+  item_name: string;
+  price: number;
+  store: string;
+  quantity?: string;
+  recorded_at: string;
+}
+
+export const STORE_OPTIONS = ['Éxito', 'D1', 'Jumbo', 'Carulla', 'Euro', 'Otro'] as const;
+export type StoreName = typeof STORE_OPTIONS[number];
+
+// =====================================================
 // TIPOS PARA MENÚ GENERATIVO SEMANAL (IA)
 // =====================================================
 
