@@ -16,6 +16,7 @@ export interface GeneratedMeal {
   totalTime?: string;
   tips?: string;
   usedPreparations?: string[];
+  thermomix_adapted?: boolean;
 }
 
 export interface GeneratedIngredient {
@@ -900,4 +901,38 @@ export interface AIGuardrails {
   max_critical_actions_per_day: number;
   prevent_delete_last_admin: boolean;
   require_confirmation_for_destructive: boolean;
+}
+
+// =====================================================
+// TIPOS PARA THERMOMIX TM6
+// =====================================================
+
+export type ThermomixAccessory = 'cuchilla' | 'mariposa' | 'cestillo' | 'varoma' | 'ninguno';
+
+export type ThermomixDifficulty = 'fácil' | 'media' | 'avanzada';
+
+export interface ThermomixStep {
+  stepNumber: number;
+  description: string;
+  speed: string;         // "1" a "10", "Turbo", "Spátula"
+  temperature: string;   // "37°C" a "120°C", "Varoma", "Sin temp"
+  time: string;          // "5 min", "30 seg", etc.
+  accessory: ThermomixAccessory;
+  accessoryEmoji: string; // 🔪🦋🧺🫕
+  tip?: string;           // Tip opcional de Thermomix
+}
+
+export interface ThermomixRecipe {
+  originalRecipeId?: string;
+  name: string;
+  thermomixSteps: ThermomixStep[];
+  totalTimeMinutes: number;
+  manualTimeMinutes: number;
+  timeSaved: string;
+  difficulty: ThermomixDifficulty;
+  accessories: string[];
+  tips: string[];
+  vasoPrincipal: boolean;
+  varoma: boolean;
+  cestillo: boolean;
 }

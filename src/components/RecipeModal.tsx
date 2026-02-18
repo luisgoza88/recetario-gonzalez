@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { X, Users, Timer, Play, Pause, RotateCcw, Volume2, Lightbulb, ImageIcon } from 'lucide-react';
-import { Recipe, Ingredient } from '@/types';
+import { X, Users, Timer, Play, Pause, RotateCcw, Volume2, Lightbulb, ImageIcon, ChefHat, Loader2 } from 'lucide-react';
+import { Recipe, Ingredient, ThermomixRecipe } from '@/types';
 import NutritionDisplay, { DietaryTags, PrepTimeDisplay, DifficultyDisplay } from './NutritionDisplay';
 import SmartSubstitutionPanel from './SmartSubstitutionPanel';
+import ThermomixView from './ThermomixView';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import FocusTrap from '@/components/ui/FocusTrap';
+import { findThermomixRecipe } from '@/data/thermomix-recipes';
 
 interface RecipeModalProps {
   recipe: Recipe;
@@ -22,12 +24,76 @@ interface ActiveTimer {
   isRunning: boolean;
 }
 
+// Cache for Thermomix adaptations to avoid re-generating
+const thermomixCache = new Map<string, ThermomixRecipe>();
+
 export default function RecipeModal({ recipe, onClose, missingIngredients = [] }: RecipeModalProps) {
   const [scale, setScale] = useState(1);
   const [activeTimers, setActiveTimers] = useState<ActiveTimer[]>([]);
   const [selectedSubstitutions, setSelectedSubstitutions] = useState<Map<string, string>>(new Map());
+  const [showThermomix, setShowThermomix] = useState(false);
+  const [thermomixRecipe, setThermomixRecipe] = useState<ThermomixRecipe | null>(null);
+  const [isAdaptingThermomix, setIsAdaptingThermomix] = useState(false);
+  const [thermomixError, setThermomixError] = useState<string | null>(null);
 
   useEscapeKey(onClose);
+
+  // Thermomix adaptation handler
+  const handleThermomixAdapt = useCallback(async () => {
+    // Check cache first
+    const cacheKey = recipe.id || recipe.name;
+    const cached = thermomixCache.get(cacheKey);
+    if (cached) {
+      setThermomixRecipe(cached);
+      setShowThermomix(true);
+      return;
+    }
+
+    // Check library for pre-adapted recipes
+    const libraryRecipe = findThermomixRecipe(recipe.name);
+    if (libraryRecipe) {
+      thermomixCache.set(cacheKey, libraryRecipe);
+      setThermomixRecipe(libraryRecipe);
+      setShowThermomix(true);
+      return;
+    }
+
+    // Call API to adapt
+    setIsAdaptingThermomix(true);
+    setThermomixError(null);
+
+    try {
+      const ingredientNames = (recipe.ingredients as Ingredient[]).map(i => `${i.name}: ${i.total || i.luis}`);
+
+      const response = await fetch('/api/adapt-recipe-thermomix', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipeName: recipe.name,
+          originalSteps: recipe.steps,
+          ingredients: ingredientNames,
+          servings: 5,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al adaptar la receta');
+      }
+
+      const data = await response.json();
+      if (data.success && data.thermomixRecipe) {
+        thermomixCache.set(cacheKey, data.thermomixRecipe);
+        setThermomixRecipe(data.thermomixRecipe);
+        setShowThermomix(true);
+      } else {
+        throw new Error(data.error || 'Error desconocido');
+      }
+    } catch (err) {
+      setThermomixError(err instanceof Error ? err.message : 'Error al adaptar');
+    } finally {
+      setIsAdaptingThermomix(false);
+    }
+  }, [recipe]);
 
   const ingredients = recipe.ingredients as Ingredient[];
   const hasTotal = ingredients[0]?.total;
@@ -257,6 +323,24 @@ export default function RecipeModal({ recipe, onClose, missingIngredients = [] }
             </div>
           )}
 
+          {/* Thermomix Adapt Button */}
+          <div className="mb-4">
+            <button
+              onClick={handleThermomixAdapt}
+              disabled={isAdaptingThermomix}
+              className="w-full bg-gradient-to-r from-teal-500 to-emerald-500 text-white py-3 px-4 rounded-xl font-semibold flex items-center justify-center gap-2 hover:from-teal-600 hover:to-emerald-600 transition-all shadow-md disabled:opacity-60 disabled:cursor-wait"
+            >
+              {isAdaptingThermomix ? (
+                <><Loader2 size={18} className="animate-spin" /> Adaptando a Thermomix...</>
+              ) : (
+                <><ChefHat size={18} /> 🤖 Ver en Thermomix TM6</>
+              )}
+            </button>
+            {thermomixError && (
+              <p className="text-red-500 text-xs mt-1 text-center">{thermomixError}</p>
+            )}
+          </div>
+
           {/* Scale Control */}
           <div className="mb-4 p-3 bg-purple-50 rounded-xl">
             <div className="flex items-center justify-between mb-2">
@@ -427,6 +511,14 @@ export default function RecipeModal({ recipe, onClose, missingIngredients = [] }
           </div>
         </div>
       </div>
+
+      {/* Thermomix View Modal */}
+      {showThermomix && thermomixRecipe && (
+        <ThermomixView
+          recipe={thermomixRecipe}
+          onClose={() => setShowThermomix(false)}
+        />
+      )}
     </div>
     </FocusTrap>
   );

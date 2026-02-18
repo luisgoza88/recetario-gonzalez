@@ -16,6 +16,7 @@ const GenerateWeeklyMenuRequestSchema = z.object({
   preferences: z.object({
     excludeRecent: z.number().min(0).max(8).optional(),
     style: z.string().max(200).optional(),
+    prioritizeThermomix: z.boolean().optional(),
   }).optional(),
 });
 
@@ -229,6 +230,7 @@ export async function POST(request: NextRequest) {
     const { weekStartDate, householdId, preferences } = body;
     const excludeRecentWeeks = preferences?.excludeRecent ?? 3;
     const style = preferences?.style ? sanitizeUserInput(preferences.style, 200) : 'colombiana casera con variaciones internacionales';
+    const prioritizeThermomix = preferences?.prioritizeThermomix ?? false;
 
     // Gather context in parallel
     const [inventory, marketItems, recentRecipes, feedback, preparations] = await Promise.all([
@@ -250,6 +252,7 @@ export async function POST(request: NextRequest) {
       feedback,
       preparations,
       style,
+      prioritizeThermomix,
     });
 
     // Call Gemini
@@ -341,8 +344,9 @@ function buildPrompt(ctx: {
   feedback: { liked: string[]; disliked: string[] };
   preparations: PreparationRow[];
   style: string;
+  prioritizeThermomix?: boolean;
 }): string {
-  const { weekDays, inventory, recentRecipes, feedback, preparations, style } = ctx;
+  const { weekDays, inventory, recentRecipes, feedback, preparations, style, prioritizeThermomix } = ctx;
 
   const inventorySection = inventory.length > 0
     ? `INGREDIENTES DISPONIBLES EN INVENTARIO:\n${inventory.map(i => `- ${i}`).join('\n')}`
@@ -397,6 +401,14 @@ ${recentSection}
 ${likedSection}
 ${dislikedSection}
 
+${prioritizeThermomix ? `
+THERMOMIX TM6:
+La familia tiene una Thermomix TM6. Prioriza recetas que se puedan preparar fácilmente en Thermomix:
+- Cremas, sopas, sofritos, arroces, masas, batidos
+- Recetas con cocción al vapor (varoma)
+- Evita recetas que requieren principalmente horno, plancha o freidora
+- Marca las recetas adaptables a Thermomix con "thermomix_adapted": true en el JSON
+` : ''}
 FORMATO DE RESPUESTA - JSON ESTRICTO:
 Responde ÚNICAMENTE con un JSON válido con esta estructura:
 
