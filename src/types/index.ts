@@ -1,5 +1,56 @@
 // Tipos principales del Recetario
 
+// =====================================================
+// TIPOS PARA MENÚ GENERATIVO SEMANAL (IA)
+// =====================================================
+
+export type GeneratedMenuStatus = 'draft' | 'approved' | 'active' | 'archived';
+
+export interface GeneratedMeal {
+  name: string;
+  description?: string;
+  ingredients: GeneratedIngredient[];
+  steps: string[];
+  prepTime?: string;
+  cookTime?: string;
+  totalTime?: string;
+  tips?: string;
+  usedPreparations?: string[];
+}
+
+export interface GeneratedIngredient {
+  name: string;
+  total: string;
+  luis: string;
+  mariana: string;
+  available?: boolean;
+}
+
+export interface GeneratedDayMenu {
+  dayNumber: number;       // 0=Monday, 5=Saturday
+  dayName: string;         // "Lunes", "Martes", etc.
+  date: string;            // "2026-02-23"
+  breakfast: GeneratedMeal | null;
+  lunch: GeneratedMeal | null;
+  dinner: GeneratedMeal | null;
+}
+
+export interface GeneratedMenu {
+  id: string;
+  household_id?: string;
+  week_start_date: string;  // "2026-02-23" (Monday)
+  status: GeneratedMenuStatus;
+  menu_data: GeneratedDayMenu[];
+  generated_by: string;
+  approved_at?: string;
+  approved_by?: string;
+  feedback_summary?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+// =====================================================
+
 // Información nutricional por porción
 export interface NutritionInfo {
   calories: number;        // kcal por porción

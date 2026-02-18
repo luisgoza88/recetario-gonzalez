@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, MessageSquare, Check } from 'lucide-react';
+import { X, MessageSquare, Check, Star } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { Recipe, MealType, PortionRating, LeftoverRating, Ingredient, MealFeedback } from '@/types';
 import { analyzeNewFeedback } from '@/lib/feedback-learning';
@@ -19,6 +19,8 @@ interface FeedbackModalProps {
 export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved }: FeedbackModalProps) {
   const [portionRating, setPortionRating] = useState<PortionRating | null>(null);
   const [leftoverRating, setLeftoverRating] = useState<LeftoverRating | null>(null);
+  const [starRating, setStarRating] = useState<number>(0);
+  const [wouldRepeat, setWouldRepeat] = useState<boolean | null>(null);
   const [missingIngredients, setMissingIngredients] = useState<string[]>([]);
   const [usedUpIngredients, setUsedUpIngredients] = useState<string[]>([]);
   const [notes, setNotes] = useState('');
@@ -34,6 +36,7 @@ export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved
   };
 
   const ingredients = (recipe.ingredients as Ingredient[]).map(i => i.name);
+  const isAIGenerated = recipe.source === 'ai_generated' || recipe.id.startsWith('generated-');
 
   const toggleIngredient = (list: string[], setList: (v: string[]) => void, ingredient: string) => {
     if (list.includes(ingredient)) {
@@ -47,28 +50,35 @@ export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved
     setSaving(true);
 
     try {
+      const feedbackData: Record<string, unknown> = {
+        date,
+        meal_type: mealType,
+        recipe_id: recipe.id,
+        recipe_name: recipe.name,
+        portion_rating: portionRating,
+        leftover_rating: leftoverRating,
+        missing_ingredients: missingIngredients.length > 0 ? missingIngredients : null,
+        used_up_ingredients: usedUpIngredients.length > 0 ? usedUpIngredients : null,
+        notes: notes.trim() || null,
+      };
+
+      // Add star_rating and would_repeat (new columns)
+      if (starRating > 0) feedbackData.star_rating = starRating;
+      if (wouldRepeat !== null) feedbackData.would_repeat = wouldRepeat;
+      if (isAIGenerated) feedbackData.source = 'generated';
+
       const { error } = await supabase
         .from('meal_feedback')
-        .insert({
-          date,
-          meal_type: mealType,
-          recipe_id: recipe.id,
-          recipe_name: recipe.name, // Guardar nombre para historial de IA
-          portion_rating: portionRating,
-          leftover_rating: leftoverRating,
-          missing_ingredients: missingIngredients.length > 0 ? missingIngredients : null,
-          used_up_ingredients: usedUpIngredients.length > 0 ? usedUpIngredients : null,
-          notes: notes.trim() || null
-        });
+        .insert(feedbackData);
 
       if (error) throw error;
 
-      // Actualizar inventario si se agotaron ingredientes
+      // Update inventory for used-up ingredients
       if (usedUpIngredients.length > 0) {
         await updateInventoryForUsedUp(usedUpIngredients);
       }
 
-      // Analizar y generar sugerencias con el nuevo sistema de aprendizaje
+      // Analyze feedback
       await analyzeAndGenerateSuggestions({
         id: '',
         date,
@@ -94,7 +104,6 @@ export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved
   };
 
   const updateInventoryForUsedUp = async (ingredientNames: string[]) => {
-    // Buscar items del mercado que coincidan con los ingredientes agotados
     for (const name of ingredientNames) {
       const { data: items } = await supabase
         .from('market_items')
@@ -116,7 +125,6 @@ export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved
   };
 
   const analyzeAndGenerateSuggestions = async (feedbackData: Partial<MealFeedback>) => {
-    // Usar el nuevo sistema de aprendizaje con pesos temporales
     try {
       await analyzeNewFeedback(feedbackData as MealFeedback);
     } catch (error) {
@@ -132,6 +140,8 @@ export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved
             <Check size={32} className="text-green-600" />
           </div>
           <h3 className="text-xl font-semibold text-green-700">Feedback guardado</h3>
+          {starRating === 5 && <p className="text-sm text-yellow-600 mt-2">⭐ ¡Añadida a Favoritos!</p>}
+          {starRating <= 2 && starRating > 0 && <p className="text-sm text-red-500 mt-2">🚫 Excluida de futuros menús</p>}
         </div>
       </div>
     );
@@ -157,6 +167,73 @@ export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved
           <div className="text-center pb-4 border-b">
             <h3 className="text-lg font-semibold">{recipe.name}</h3>
             <p className="text-sm text-gray-500">{date}</p>
+            {isAIGenerated && (
+              <span className="inline-block mt-1 bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">
+                🤖 Generada por IA
+              </span>
+            )}
+          </div>
+
+          {/* ⭐ Star Rating (1-5) — NEW */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              ¿Qué tal estuvo? ⭐
+            </label>
+            <div className="flex justify-center gap-2">
+              {[1, 2, 3, 4, 5].map(star => (
+                <button
+                  key={star}
+                  onClick={() => setStarRating(star)}
+                  className={`p-2 rounded-lg transition-all transform ${
+                    star <= starRating
+                      ? 'text-yellow-500 scale-110'
+                      : 'text-gray-300 hover:text-yellow-400'
+                  }`}
+                >
+                  <Star size={32} fill={star <= starRating ? 'currentColor' : 'none'} />
+                </button>
+              ))}
+            </div>
+            {starRating > 0 && (
+              <p className="text-center text-sm mt-1 text-gray-500">
+                {starRating === 1 && '😕 Muy mala'}
+                {starRating === 2 && '😐 Regular'}
+                {starRating === 3 && '🙂 Aceptable'}
+                {starRating === 4 && '😋 Muy buena'}
+                {starRating === 5 && '🤩 ¡Excelente! → Favoritos'}
+              </p>
+            )}
+          </div>
+
+          {/* Would Repeat? — NEW */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              ¿Repetirían esta receta?
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setWouldRepeat(true)}
+                className={`p-3 rounded-xl border-2 transition-all text-center ${
+                  wouldRepeat === true
+                    ? 'border-green-500 bg-green-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="text-2xl mb-1">👍</div>
+                <div className="text-sm font-medium">¡Sí!</div>
+              </button>
+              <button
+                onClick={() => setWouldRepeat(false)}
+                className={`p-3 rounded-xl border-2 transition-all text-center ${
+                  wouldRepeat === false
+                    ? 'border-red-500 bg-red-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="text-2xl mb-1">👎</div>
+                <div className="text-sm font-medium">No, gracias</div>
+              </button>
+            </div>
           </div>
 
           {/* Portion Rating */}
@@ -214,48 +291,52 @@ export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved
           </div>
 
           {/* Missing Ingredients */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              ¿Faltó algún ingrediente?
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {ingredients.map(ing => (
-                <button
-                  key={ing}
-                  onClick={() => toggleIngredient(missingIngredients, setMissingIngredients, ing)}
-                  className={`px-3 py-1.5 rounded-full text-sm transition-all ${
-                    missingIngredients.includes(ing)
-                      ? 'bg-red-100 text-red-700 border-2 border-red-300'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {missingIngredients.includes(ing) && '✗ '}{ing}
-                </button>
-              ))}
+          {ingredients.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                ¿Faltó algún ingrediente?
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {ingredients.map(ing => (
+                  <button
+                    key={ing}
+                    onClick={() => toggleIngredient(missingIngredients, setMissingIngredients, ing)}
+                    className={`px-3 py-1.5 rounded-full text-sm transition-all ${
+                      missingIngredients.includes(ing)
+                        ? 'bg-red-100 text-red-700 border-2 border-red-300'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {missingIngredients.includes(ing) && '✗ '}{ing}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Used Up Ingredients */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              ¿Se agotó algún ingrediente? (actualiza inventario)
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {ingredients.map(ing => (
-                <button
-                  key={ing}
-                  onClick={() => toggleIngredient(usedUpIngredients, setUsedUpIngredients, ing)}
-                  className={`px-3 py-1.5 rounded-full text-sm transition-all ${
-                    usedUpIngredients.includes(ing)
-                      ? 'bg-orange-100 text-orange-700 border-2 border-orange-300'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {usedUpIngredients.includes(ing) && '⚠ '}{ing}
-                </button>
-              ))}
+          {ingredients.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                ¿Se agotó algún ingrediente? (actualiza inventario)
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {ingredients.map(ing => (
+                  <button
+                    key={ing}
+                    onClick={() => toggleIngredient(usedUpIngredients, setUsedUpIngredients, ing)}
+                    className={`px-3 py-1.5 rounded-full text-sm transition-all ${
+                      usedUpIngredients.includes(ing)
+                        ? 'bg-orange-100 text-orange-700 border-2 border-orange-300'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {usedUpIngredients.includes(ing) && '⚠ '}{ing}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Notes */}
           <div>

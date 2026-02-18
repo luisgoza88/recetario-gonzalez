@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Check, Star, MessageSquare, Sparkles, WifiOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Star, MessageSquare, Sparkles, WifiOff, RefreshCw, Loader2, Bot, ThumbsUp, ThumbsDown, Archive } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
-import { Recipe, Ingredient, MealType } from '@/types';
+import { Recipe, Ingredient, MealType, GeneratedMenu, GeneratedDayMenu, GeneratedMeal } from '@/types';
 import RecipeModal from './RecipeModal';
 import FeedbackModal from './FeedbackModal';
 import SmartSuggestions from './SmartSuggestions';
@@ -29,6 +29,17 @@ const WEEKDAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes
 
 const CYCLE_START = new Date(2026, 0, 6); // Lunes 6 de Enero 2026
 
+// =====================================================
+// Helper: Get Monday of the week for a given date
+// =====================================================
+function getWeekMonday(date: Date): string {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  return d.toISOString().split('T')[0];
+}
+
 export default function CalendarView({ recipes }: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -41,26 +52,26 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
   const [isFromCache, setIsFromCache] = useState(false);
   const isOnline = useOnlineStatus();
 
-  // Define getDayOfCycle before useEffect that uses it
+  // --- Generative menu state ---
+  const [generatedMenus, setGeneratedMenus] = useState<Map<string, GeneratedMenu>>(new Map());
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const [expandedGeneratedMeal, setExpandedGeneratedMeal] = useState<string | null>(null);
+
+  // =====================================================
+  // Cycle day calculation (legacy static menu)
+  // =====================================================
   const getDayOfCycle = useCallback((date: Date): number => {
     if (date.getDay() === 0) return -1; // Domingo
-
     const diffTime = date.getTime() - CYCLE_START.getTime();
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0) return -2; // Before cycle starts
-
-    // Count working days (excluding Sundays)
+    if (diffDays < 0) return -2;
     let workingDays = 0;
     const tempDate = new Date(CYCLE_START);
-
     while (tempDate <= date) {
-      if (tempDate.getDay() !== 0) {
-        workingDays++;
-      }
+      if (tempDate.getDay() !== 0) workingDays++;
       tempDate.setDate(tempDate.getDate() + 1);
     }
-
     workingDays--;
     return workingDays % 12;
   }, []);
@@ -71,39 +82,66 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
     return dayMenu.find(m => m.day_number === cycleDay);
   }, [dayMenu, getDayOfCycle]);
 
-  // Load functions defined before useEffect
+  // =====================================================
+  // Check if a date has a generated menu
+  // =====================================================
+  const getGeneratedMenuForDate = useCallback((date: Date): { menu: GeneratedMenu; dayData: GeneratedDayMenu } | null => {
+    const dateStr = date.toISOString().split('T')[0];
+    const weekMonday = getWeekMonday(date);
+    const menu = generatedMenus.get(weekMonday);
+    if (!menu || !Array.isArray(menu.menu_data)) return null;
+    const dayData = menu.menu_data.find(d => d.date === dateStr);
+    if (!dayData) return null;
+    return { menu, dayData };
+  }, [generatedMenus]);
+
+  // =====================================================
+  // Load data
+  // =====================================================
   const loadMenu = useCallback(async () => {
     try {
-      // Try to fetch from Supabase first
       const { data, error } = await supabase
         .from('day_menu')
         .select('*')
         .order('day_number');
-
       if (data && !error) {
         setDayMenu(data);
         setIsFromCache(false);
-        // Cache for offline use
-        await cacheDayMenus(data.map(m => ({
-          ...m,
-          cachedAt: Date.now()
-        })));
+        await cacheDayMenus(data.map(m => ({ ...m, cachedAt: Date.now() })));
         return;
       }
     } catch {
       console.log('Network error, trying cache...');
     }
-
-    // Fallback to cached data
     try {
       const cached = await getCachedDayMenus();
       if (cached.length > 0) {
         setDayMenu(cached);
         setIsFromCache(true);
-        console.log('Using cached menu data');
       }
     } catch (cacheError) {
       console.error('Cache error:', cacheError);
+    }
+  }, []);
+
+  const loadGeneratedMenus = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('generated_menus')
+        .select('*')
+        .in('status', ['draft', 'approved', 'active'])
+        .order('week_start_date', { ascending: false })
+        .limit(8);
+
+      if (data && !error) {
+        const menuMap = new Map<string, GeneratedMenu>();
+        for (const menu of data) {
+          menuMap.set(menu.week_start_date, menu as GeneratedMenu);
+        }
+        setGeneratedMenus(menuMap);
+      }
+    } catch {
+      console.log('Could not load generated menus');
     }
   }, []);
 
@@ -112,67 +150,137 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
       .from('completed_days')
       .select('date')
       .eq('completed', true);
-
-    if (data) {
-      setCompletedDays(new Set(data.map(d => d.date)));
-    }
+    if (data) setCompletedDays(new Set(data.map(d => d.date)));
   }, []);
 
   useEffect(() => {
     loadMenu();
     loadCompletedDays();
+    loadGeneratedMenus();
 
-    // Auto-select today if it has menu
     const today = new Date();
     const cycleDay = getDayOfCycle(today);
-    if (cycleDay >= 0) {
+    if (cycleDay >= 0 || today.getDay() !== 0) {
       setSelectedDate(today);
     }
 
-    // Listen for goToToday event
     const handleGoToToday = () => {
       const today = new Date();
       setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1));
       setSelectedDate(today);
     };
-
     window.addEventListener('goToToday', handleGoToToday);
     return () => window.removeEventListener('goToToday', handleGoToToday);
-  }, [loadMenu, loadCompletedDays, getDayOfCycle]);
+  }, [loadMenu, loadCompletedDays, loadGeneratedMenus, getDayOfCycle]);
 
+  // =====================================================
+  // Generate weekly menu
+  // =====================================================
+  const generateWeeklyMenu = async () => {
+    if (!selectedDate) return;
+    const weekMonday = getWeekMonday(selectedDate);
+
+    setIsGenerating(true);
+    setGenerateError(null);
+
+    try {
+      const res = await fetch('/api/generate-weekly-menu', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          weekStartDate: weekMonday,
+          preferences: { excludeRecent: 3, style: 'colombiana casera con variaciones internacionales' },
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Error generando menú');
+      }
+
+      // Update local state
+      setGeneratedMenus(prev => {
+        const next = new Map(prev);
+        next.set(weekMonday, data.menu as GeneratedMenu);
+        return next;
+      });
+    } catch (error) {
+      setGenerateError(error instanceof Error ? error.message : 'Error desconocido');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const approveMenu = async (menuId: string) => {
+    try {
+      const res = await fetch('/api/generated-menu', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ menuId, action: 'approve' }),
+      });
+      const data = await res.json();
+      if (data.success && data.menu) {
+        setGeneratedMenus(prev => {
+          const next = new Map(prev);
+          next.set(data.menu.week_start_date, data.menu as GeneratedMenu);
+          return next;
+        });
+      }
+    } catch (error) {
+      console.error('Error approving menu:', error);
+    }
+  };
+
+  const archiveMenu = async (menuId: string, weekStart: string) => {
+    try {
+      const res = await fetch('/api/generated-menu', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ menuId, action: 'archive' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setGeneratedMenus(prev => {
+          const next = new Map(prev);
+          next.delete(weekStart);
+          return next;
+        });
+      }
+    } catch (error) {
+      console.error('Error archiving menu:', error);
+    }
+  };
+
+  // =====================================================
+  // Navigation
+  // =====================================================
   const changeMonth = (delta: number) => {
     const newDate = new Date(currentDate);
     newDate.setMonth(newDate.getMonth() + delta);
     setCurrentDate(newDate);
     setSelectedDate(null);
     setExpandedRecipe(null);
+    setExpandedGeneratedMeal(null);
   };
 
   const selectDate = (date: Date) => {
     setSelectedDate(date);
     setExpandedRecipe(null);
-    // Auto-scroll to show day detail after selection
+    setExpandedGeneratedMeal(null);
     setTimeout(() => {
       const dayDetail = document.getElementById('day-detail');
-      if (dayDetail) {
-        dayDetail.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
+      if (dayDetail) dayDetail.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
   };
 
   const toggleDayComplete = async () => {
     if (!selectedDate) return;
     const dateKey = selectedDate.toISOString().split('T')[0];
-
     const isCompleted = completedDays.has(dateKey);
-
     if (isCompleted) {
       await supabase.from('completed_days').delete().eq('date', dateKey);
-      setCompletedDays(prev => {
-        const next = new Set(prev);
-        next.delete(dateKey);
-        return next;
-      });
+      setCompletedDays(prev => { const next = new Set(prev); next.delete(dateKey); return next; });
     } else {
       await supabase.from('completed_days').upsert({ date: dateKey, completed: true });
       setCompletedDays(prev => new Set([...prev, dateKey]));
@@ -181,6 +289,9 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
 
   const getRecipeById = (id: string) => recipes.find(r => r.id === id);
 
+  // =====================================================
+  // Calendar grid rendering
+  // =====================================================
   const renderCalendar = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -188,27 +299,24 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
     const lastDay = new Date(year, month + 1, 0);
     const startingDay = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
     const today = new Date();
-
     const days = [];
 
-    // Empty cells before first day
     for (let i = 0; i < startingDay; i++) {
       days.push(<div key={`empty-${i}`} className="aspect-square" />);
     }
 
-    // Days of month
     for (let day = 1; day <= lastDay.getDate(); day++) {
       const date = new Date(year, month, day);
       const cycleDay = getDayOfCycle(date);
-      const hasMenu = cycleDay >= 0;
+      const hasStaticMenu = cycleDay >= 0;
       const isSunday = date.getDay() === 0;
       const isToday = date.toDateString() === today.toDateString();
       const isSelected = selectedDate && date.toDateString() === selectedDate.toDateString();
       const dateKey = date.toISOString().split('T')[0];
       const isCompleted = completedDays.has(dateKey);
-
-      // Domingos son seleccionables también (para generar con IA)
-      const isSelectable = hasMenu || isSunday;
+      const generatedInfo = getGeneratedMenuForDate(date);
+      const hasGenerated = !!generatedInfo;
+      const isSelectable = hasStaticMenu || isSunday || hasGenerated;
 
       days.push(
         <button
@@ -217,143 +325,210 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
           disabled={!isSelectable}
           className={`
             aspect-square flex flex-col items-center justify-center rounded-lg text-sm relative transition-all
-            ${isSunday && !isSelected ? 'bg-purple-50 text-purple-500 font-medium hover:bg-purple-100 border border-purple-200' : ''}
-            ${hasMenu && !isSelected ? 'bg-green-50 text-green-700 font-semibold hover:bg-green-100' : ''}
-            ${!hasMenu && !isSunday ? 'text-gray-300' : ''}
+            ${isSunday && !hasGenerated && !isSelected ? 'bg-purple-50 text-purple-500 font-medium hover:bg-purple-100 border border-purple-200' : ''}
+            ${hasGenerated && !isSelected ? 'bg-indigo-50 text-indigo-700 font-semibold hover:bg-indigo-100 border border-indigo-200' : ''}
+            ${hasStaticMenu && !hasGenerated && !isSelected ? 'bg-green-50 text-green-700 font-semibold hover:bg-green-100' : ''}
+            ${!hasStaticMenu && !isSunday && !hasGenerated ? 'text-gray-300' : ''}
             ${isToday ? 'ring-2 ring-green-700' : ''}
-            ${isSelected && isSunday ? 'bg-purple-600 text-white' : ''}
-            ${isSelected && !isSunday ? 'bg-green-700 text-white' : ''}
+            ${isSelected && hasGenerated ? 'bg-indigo-600 text-white' : ''}
+            ${isSelected && isSunday && !hasGenerated ? 'bg-purple-600 text-white' : ''}
+            ${isSelected && !isSunday && !hasGenerated ? 'bg-green-700 text-white' : ''}
           `}
         >
           <span>{day}</span>
-          {hasMenu && (
+          {hasGenerated && (
+            <span className={`text-[0.5rem] ${isSelected ? 'opacity-80' : 'opacity-70'}`}>
+              <Bot size={8} className="inline" /> IA
+            </span>
+          )}
+          {hasStaticMenu && !hasGenerated && (
             <span className={`text-[0.6rem] ${isSelected ? 'opacity-80' : 'opacity-70'}`}>
               D{cycleDay + 1}
             </span>
           )}
-          {isSunday && !hasMenu && (
+          {isSunday && !hasStaticMenu && !hasGenerated && (
             <span className={`text-[0.5rem] ${isSelected ? 'opacity-80' : 'opacity-70'}`}>
               IA
             </span>
           )}
           {isCompleted && (
-            <Check
-              size={10}
-              className={`absolute bottom-1 ${isSelected ? 'text-white' : 'text-green-600'}`}
-            />
+            <Check size={10} className={`absolute bottom-1 ${isSelected ? 'text-white' : 'text-green-600'}`} />
           )}
         </button>
       );
     }
-
     return days;
   };
 
-  // Render para domingos (día libre - generar con IA)
-  const renderSundayDetail = () => {
-    if (!selectedDate || selectedDate.getDay() !== 0) return null;
-
+  // =====================================================
+  // Day detail: Generated menu
+  // =====================================================
+  const renderGeneratedDayDetail = (menu: GeneratedMenu, dayData: GeneratedDayMenu) => {
+    if (!selectedDate) return null;
     const dayName = WEEKDAYS[selectedDate.getDay()];
+    const dateKey = selectedDate.toISOString().split('T')[0];
+    const isCompleted = completedDays.has(dateKey);
+    const isDraft = menu.status === 'draft';
 
     return (
       <div className="mt-4">
         {/* Day Header */}
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 rounded-t-xl flex justify-between items-center">
+          <h3 className="font-semibold">
+            📅 {dayName} {selectedDate.getDate()} {MONTHS[selectedDate.getMonth()]}
+          </h3>
+          <span className="bg-white/20 px-3 py-1 rounded-full text-sm flex items-center gap-1">
+            <Bot size={14} />
+            Menú IA {isDraft ? '(Borrador)' : ''}
+          </span>
+        </div>
+
+        {/* Draft banner */}
+        {isDraft && (
+          <div className="bg-amber-50 border-l-4 border-amber-400 p-3 flex items-center justify-between">
+            <div className="text-amber-800 text-sm">
+              <strong>Borrador</strong> — Revisa y aprueba el menú para activarlo.
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => menu.id && approveMenu(menu.id)}
+                className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-green-700 flex items-center gap-1"
+              >
+                <ThumbsUp size={14} /> Aprobar
+              </button>
+              <button
+                onClick={() => menu.id && archiveMenu(menu.id, menu.week_start_date)}
+                className="bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-300 flex items-center gap-1"
+              >
+                <ThumbsDown size={14} /> Descartar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Meals */}
+        {dayData.breakfast && (
+          <GeneratedMealCard
+            type="breakfast"
+            label="🍳 DESAYUNO"
+            meal={dayData.breakfast}
+            expanded={expandedGeneratedMeal === `${dateKey}-breakfast`}
+            onToggle={() => setExpandedGeneratedMeal(
+              expandedGeneratedMeal === `${dateKey}-breakfast` ? null : `${dateKey}-breakfast`
+            )}
+            onFeedback={() => {
+              const fakeRecipe: Recipe = generatedMealToRecipe(dayData.breakfast!, 'breakfast');
+              setFeedbackRecipe({ recipe: fakeRecipe, mealType: 'breakfast' });
+            }}
+          />
+        )}
+
+        {dayData.lunch && (
+          <GeneratedMealCard
+            type="lunch"
+            label="🍗 ALMUERZO (5 porciones)"
+            meal={dayData.lunch}
+            expanded={expandedGeneratedMeal === `${dateKey}-lunch`}
+            onToggle={() => setExpandedGeneratedMeal(
+              expandedGeneratedMeal === `${dateKey}-lunch` ? null : `${dateKey}-lunch`
+            )}
+            onFeedback={() => {
+              const fakeRecipe: Recipe = generatedMealToRecipe(dayData.lunch!, 'lunch');
+              setFeedbackRecipe({ recipe: fakeRecipe, mealType: 'lunch' });
+            }}
+          />
+        )}
+
+        {dayData.dinner ? (
+          <GeneratedMealCard
+            type="dinner"
+            label="🌙 CENA (ligera)"
+            meal={dayData.dinner}
+            expanded={expandedGeneratedMeal === `${dateKey}-dinner`}
+            onToggle={() => setExpandedGeneratedMeal(
+              expandedGeneratedMeal === `${dateKey}-dinner` ? null : `${dateKey}-dinner`
+            )}
+            onFeedback={() => {
+              const fakeRecipe: Recipe = generatedMealToRecipe(dayData.dinner!, 'dinner');
+              setFeedbackRecipe({ recipe: fakeRecipe, mealType: 'dinner' });
+            }}
+            isLast
+          />
+        ) : (
+          <div className="bg-white border-l-4 border-gray-400 p-4 rounded-b-xl">
+            <div className="text-gray-500 text-sm">🌙 CENA</div>
+            <p className="text-gray-400">No hay cena — Salen a comer 🍽️</p>
+          </div>
+        )}
+
+        {/* Complete Day Button */}
+        <button
+          onClick={toggleDayComplete}
+          className={`
+            w-full p-4 rounded-xl font-semibold mt-4 flex items-center justify-center gap-2 transition-colors
+            ${isCompleted
+              ? 'bg-green-50 text-green-700 border-2 border-green-200'
+              : 'bg-indigo-600 text-white hover:bg-indigo-700'}
+          `}
+        >
+          {isCompleted ? (
+            <><Check size={20} /> Día completado</>
+          ) : (
+            <>☐ Marcar día como completado</>
+          )}
+        </button>
+      </div>
+    );
+  };
+
+  // =====================================================
+  // Day detail: Sunday (free day)
+  // =====================================================
+  const renderSundayDetail = () => {
+    if (!selectedDate || selectedDate.getDay() !== 0) return null;
+    const dayName = WEEKDAYS[selectedDate.getDay()];
+
+    return (
+      <div className="mt-4">
         <div className="bg-gradient-to-r from-purple-600 to-purple-500 text-white p-4 rounded-t-xl flex justify-between items-center">
           <h3 className="font-semibold">
             📅 {dayName} {selectedDate.getDate()} {MONTHS[selectedDate.getMonth()]}
           </h3>
           <span className="bg-white/20 px-3 py-1 rounded-full text-sm flex items-center gap-1">
-            <Sparkles size={14} />
-            Día Libre
+            <Sparkles size={14} /> Día Libre
           </span>
         </div>
-
-        {/* Domingo Info */}
         <div className="bg-purple-50 border-l-4 border-purple-500 p-4">
           <div className="flex items-center gap-2 text-purple-700 text-sm font-medium">
-            <Sparkles size={16} />
-            DÍA SIN MENÚ PROGRAMADO
+            <Sparkles size={16} /> DÍA SIN MENÚ PROGRAMADO
           </div>
           <p className="text-purple-800 mt-1">
             ¿Quieres cocinar hoy? Genera recetas con IA basadas en tus ingredientes disponibles.
           </p>
         </div>
-
-        {/* Generate Meals with AI */}
         <div className="bg-white p-4 space-y-3">
-          {/* Breakfast */}
-          <div className="flex justify-between items-center p-3 bg-orange-50 rounded-xl border border-orange-100">
-            <div>
-              <span className="text-orange-600 text-sm font-medium">🍳 DESAYUNO</span>
-              <p className="text-gray-600 text-sm">Sin planificar</p>
-            </div>
-            <button
-              onClick={() => setSuggestionsRecipe({
-                recipe: {
-                  id: 'generate-breakfast',
-                  name: 'Generar desayuno',
-                  type: 'breakfast',
-                  ingredients: [],
-                  steps: []
-                },
-                mealType: 'breakfast'
-              })}
-              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center gap-2 text-sm font-medium"
-            >
-              <Sparkles size={16} />
-              Generar con IA
-            </button>
-          </div>
-
-          {/* Lunch */}
-          <div className="flex justify-between items-center p-3 bg-green-50 rounded-xl border border-green-100">
-            <div>
-              <span className="text-green-600 text-sm font-medium">🍗 ALMUERZO</span>
-              <p className="text-gray-600 text-sm">Sin planificar</p>
-            </div>
-            <button
-              onClick={() => setSuggestionsRecipe({
-                recipe: {
-                  id: 'generate-lunch',
-                  name: 'Generar almuerzo',
-                  type: 'lunch',
-                  ingredients: [],
-                  steps: []
-                },
-                mealType: 'lunch'
-              })}
-              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center gap-2 text-sm font-medium"
-            >
-              <Sparkles size={16} />
-              Generar con IA
-            </button>
-          </div>
-
-          {/* Dinner */}
-          <div className="flex justify-between items-center p-3 bg-blue-50 rounded-xl border border-blue-100">
-            <div>
-              <span className="text-blue-600 text-sm font-medium">🌙 CENA</span>
-              <p className="text-gray-600 text-sm">Sin planificar</p>
-            </div>
-            <button
-              onClick={() => setSuggestionsRecipe({
-                recipe: {
-                  id: 'generate-dinner',
-                  name: 'Generar cena',
-                  type: 'dinner',
-                  ingredients: [],
-                  steps: []
-                },
-                mealType: 'dinner'
-              })}
-              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center gap-2 text-sm font-medium"
-            >
-              <Sparkles size={16} />
-              Generar con IA
-            </button>
-          </div>
+          {(['breakfast', 'lunch', 'dinner'] as const).map(meal => {
+            const icons = { breakfast: '🍳 DESAYUNO', lunch: '🍗 ALMUERZO', dinner: '🌙 CENA' };
+            const colors = { breakfast: 'orange', lunch: 'green', dinner: 'blue' };
+            return (
+              <div key={meal} className={`flex justify-between items-center p-3 bg-${colors[meal]}-50 rounded-xl border border-${colors[meal]}-100`}>
+                <div>
+                  <span className={`text-${colors[meal]}-600 text-sm font-medium`}>{icons[meal]}</span>
+                  <p className="text-gray-600 text-sm">Sin planificar</p>
+                </div>
+                <button
+                  onClick={() => setSuggestionsRecipe({
+                    recipe: { id: `generate-${meal}`, name: `Generar ${meal}`, type: meal, ingredients: [], steps: [] },
+                    mealType: meal
+                  })}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center gap-2 text-sm font-medium"
+                >
+                  <Sparkles size={16} /> Generar con IA
+                </button>
+              </div>
+            );
+          })}
         </div>
-
         <div className="bg-gray-100 p-3 rounded-b-xl text-center text-sm text-gray-500">
           💡 La IA generará recetas usando los ingredientes de tu inventario
         </div>
@@ -361,13 +536,12 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
     );
   };
 
-  const renderDayDetail = () => {
+  // =====================================================
+  // Day detail: Static menu (legacy)
+  // =====================================================
+  const renderStaticDayDetail = () => {
     if (!selectedDate) return null;
-
-    // Si es domingo, mostrar UI especial
-    if (selectedDate.getDay() === 0) {
-      return renderSundayDetail();
-    }
+    if (selectedDate.getDay() === 0) return renderSundayDetail();
 
     const menu = getMenuForDate(selectedDate);
     if (!menu) return null;
@@ -384,7 +558,6 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
 
     return (
       <div className="mt-4">
-        {/* Day Header */}
         <div className="bg-green-700 text-white p-4 rounded-t-xl flex justify-between items-center">
           <h3 className="font-semibold">
             📅 {dayName} {selectedDate.getDate()} {MONTHS[selectedDate.getMonth()]}
@@ -394,23 +567,18 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
           </span>
         </div>
 
-        {/* Reminder */}
         {menu.reminder && (
           <div className="bg-orange-50 border-l-4 border-orange-500 p-4">
             <div className="flex items-center gap-2 text-orange-700 text-sm font-medium">
-              <Star size={16} />
-              RECORDATORIO
+              <Star size={16} /> RECORDATORIO
             </div>
             <p className="text-orange-800 font-semibold mt-1">{menu.reminder}</p>
           </div>
         )}
 
-        {/* Meals */}
         {breakfast && (
           <MealCard
-            type="breakfast"
-            label="🍳 DESAYUNO"
-            recipe={breakfast}
+            type="breakfast" label="🍳 DESAYUNO" recipe={breakfast}
             expanded={expandedRecipe === breakfast.id}
             onToggle={() => setExpandedRecipe(expandedRecipe === breakfast.id ? null : breakfast.id)}
             onView={() => setSelectedRecipe(breakfast)}
@@ -421,9 +589,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
 
         {lunch && (
           <MealCard
-            type="lunch"
-            label="🍗 ALMUERZO (5 porciones)"
-            recipe={lunch}
+            type="lunch" label="🍗 ALMUERZO (5 porciones)" recipe={lunch}
             expanded={expandedRecipe === lunch.id}
             onToggle={() => setExpandedRecipe(expandedRecipe === lunch.id ? null : lunch.id)}
             onView={() => setSelectedRecipe(lunch)}
@@ -434,9 +600,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
 
         {dinner ? (
           <MealCard
-            type="dinner"
-            label="🐟 CENA (2 porciones)"
-            recipe={dinner}
+            type="dinner" label="🐟 CENA (2 porciones)" recipe={dinner}
             expanded={expandedRecipe === dinner.id}
             onToggle={() => setExpandedRecipe(expandedRecipe === dinner.id ? null : dinner.id)}
             onView={() => setSelectedRecipe(dinner)}
@@ -453,29 +617,19 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
               </div>
               <button
                 onClick={() => setSuggestionsRecipe({
-                  recipe: {
-                    id: 'generate-dinner',
-                    name: 'Generar cena',
-                    type: 'dinner',
-                    ingredients: [],
-                    steps: []
-                  },
+                  recipe: { id: 'generate-dinner', name: 'Generar cena', type: 'dinner', ingredients: [], steps: [] },
                   mealType: 'dinner'
                 })}
                 className="bg-purple-100 text-purple-700 p-2 rounded-lg hover:bg-purple-200 flex items-center gap-2"
                 title="Generar receta de cena con IA"
               >
-                <Sparkles size={18} />
-                <span className="text-sm font-medium">Generar</span>
+                <Sparkles size={18} /><span className="text-sm font-medium">Generar</span>
               </button>
             </div>
-            <p className="text-xs text-gray-400 mt-2">
-              ¿Cambio de planes? Genera una receta de cena con IA
-            </p>
+            <p className="text-xs text-gray-400 mt-2">¿Cambio de planes? Genera una receta de cena con IA</p>
           </div>
         )}
 
-        {/* Complete Day Button */}
         <button
           onClick={toggleDayComplete}
           className={`
@@ -485,39 +639,96 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
               : 'bg-green-700 text-white hover:bg-green-800'}
           `}
         >
-          {isCompleted ? (
-            <>
-              <Check size={20} />
-              Día completado
-            </>
-          ) : (
-            <>☐ Marcar día como completado</>
-          )}
+          {isCompleted ? (<><Check size={20} /> Día completado</>) : (<>☐ Marcar día como completado</>)}
         </button>
       </div>
     );
   };
 
+  // =====================================================
+  // Main day detail router
+  // =====================================================
+  const renderDayDetail = () => {
+    if (!selectedDate) return null;
+
+    // Check for generated menu first (takes priority)
+    const generatedInfo = getGeneratedMenuForDate(selectedDate);
+    if (generatedInfo) {
+      return renderGeneratedDayDetail(generatedInfo.menu, generatedInfo.dayData);
+    }
+
+    // Sunday without generated menu
+    if (selectedDate.getDay() === 0) {
+      return renderSundayDetail();
+    }
+
+    // Fallback to static menu
+    return renderStaticDayDetail();
+  };
+
+  // =====================================================
+  // Render
+  // =====================================================
   return (
     <div className="p-4 max-w-lg mx-auto">
       {/* Month Navigation */}
       <div className="flex justify-between items-center p-4 bg-white rounded-xl shadow-sm mb-4">
-        <button
-          onClick={() => changeMonth(-1)}
-          className="bg-green-50 text-green-700 p-2 rounded-lg hover:bg-green-100"
-        >
+        <button onClick={() => changeMonth(-1)} className="bg-green-50 text-green-700 p-2 rounded-lg hover:bg-green-100">
           <ChevronLeft size={24} />
         </button>
         <h2 className="font-semibold text-lg">
           {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
         </h2>
-        <button
-          onClick={() => changeMonth(1)}
-          className="bg-green-50 text-green-700 p-2 rounded-lg hover:bg-green-100"
-        >
+        <button onClick={() => changeMonth(1)} className="bg-green-50 text-green-700 p-2 rounded-lg hover:bg-green-100">
           <ChevronRight size={24} />
         </button>
       </div>
+
+      {/* Generate Weekly Menu Button */}
+      <button
+        onClick={generateWeeklyMenu}
+        disabled={isGenerating || !selectedDate}
+        className={`
+          w-full p-4 rounded-xl font-semibold mb-4 flex items-center justify-center gap-2 transition-all
+          ${isGenerating
+            ? 'bg-indigo-100 text-indigo-400 cursor-wait'
+            : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700 shadow-md hover:shadow-lg'}
+        `}
+      >
+        {isGenerating ? (
+          <><Loader2 size={20} className="animate-spin" /> Generando menú semanal con IA...</>
+        ) : (
+          <><RefreshCw size={20} /> 🔄 Generar Menú Semanal con IA</>
+        )}
+      </button>
+
+      {/* Generate error */}
+      {generateError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg mb-4 text-sm">
+          ❌ {generateError}
+        </div>
+      )}
+
+      {/* Active generated menus indicator */}
+      {generatedMenus.size > 0 && (
+        <div className="bg-indigo-50 border border-indigo-200 text-indigo-700 p-3 rounded-lg mb-4 text-sm flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Bot size={16} />
+            <span><strong>{generatedMenus.size}</strong> menú(s) generado(s) activo(s)</span>
+          </div>
+          <div className="flex gap-1">
+            {Array.from(generatedMenus.values()).map(menu => (
+              <span key={menu.week_start_date} className={`px-2 py-0.5 rounded-full text-xs ${
+                menu.status === 'draft' ? 'bg-amber-100 text-amber-700' :
+                menu.status === 'approved' ? 'bg-green-100 text-green-700' :
+                'bg-indigo-100 text-indigo-700'
+              }`}>
+                {menu.status === 'draft' ? '📝' : '✅'} {menu.week_start_date.slice(5)}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Offline Indicator */}
       {(!isOnline || isFromCache) && (
@@ -533,77 +744,55 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
 
       {/* Cycle Info */}
       <div className="bg-blue-50 text-blue-700 p-3 rounded-lg mb-4 text-sm">
-        📅 El ciclo de 15 días comienza el <strong>Lunes 6 de Enero 2026</strong>
+        📅 Menú estático: ciclo desde <strong>6 Ene 2026</strong> • Menú IA: genera semanas personalizadas
       </div>
 
       {/* Calendar Grid */}
       <div className="bg-white rounded-xl p-4 shadow-sm">
         <div className="grid grid-cols-7 text-center text-xs text-gray-500 font-semibold mb-2">
-          <div>Lu</div>
-          <div>Ma</div>
-          <div>Mi</div>
-          <div>Ju</div>
-          <div>Vi</div>
-          <div>Sá</div>
-          <div>Do</div>
+          <div>Lu</div><div>Ma</div><div>Mi</div><div>Ju</div><div>Vi</div><div>Sá</div><div>Do</div>
         </div>
-        <div className="grid grid-cols-7 gap-1">
-          {renderCalendar()}
-        </div>
+        <div className="grid grid-cols-7 gap-1">{renderCalendar()}</div>
       </div>
 
       {/* Legend */}
       <div className="flex justify-center gap-4 mt-4 text-xs flex-wrap">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-green-50 border-2 border-green-700 rounded" />
-          <span>Con menú</span>
+          <span>Estático</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-green-700 rounded" />
-          <span>Seleccionado</span>
+          <div className="w-3 h-3 bg-indigo-50 border-2 border-indigo-600 rounded" />
+          <span>IA Generado</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-purple-50 border border-purple-300 rounded" />
-          <span>Domingo (IA)</span>
+          <span>Domingo</span>
         </div>
       </div>
 
       {/* Day Detail */}
-      <div id="day-detail">
-        {renderDayDetail()}
-      </div>
+      <div id="day-detail">{renderDayDetail()}</div>
 
-      {/* Recipe Modal */}
-      {selectedRecipe && (
-        <RecipeModal
-          recipe={selectedRecipe}
-          onClose={() => setSelectedRecipe(null)}
-        />
-      )}
+      {/* Modals */}
+      {selectedRecipe && <RecipeModal recipe={selectedRecipe} onClose={() => setSelectedRecipe(null)} />}
 
-      {/* Feedback Modal */}
       {feedbackRecipe && selectedDate && (
         <FeedbackModal
           date={selectedDate.toISOString().split('T')[0]}
           mealType={feedbackRecipe.mealType}
           recipe={feedbackRecipe.recipe}
           onClose={() => setFeedbackRecipe(null)}
-          onSaved={() => {
-            // Recargar datos si es necesario
-          }}
+          onSaved={() => {}}
         />
       )}
 
-      {/* Smart Suggestions Modal */}
       {suggestionsRecipe && (
         <SmartSuggestions
           recipe={suggestionsRecipe.recipe}
           allRecipes={recipes}
           mealType={suggestionsRecipe.mealType}
-          onSelectAlternative={(recipe) => {
-            setSelectedRecipe(recipe);
-            setSuggestionsRecipe(null);
-          }}
+          onSelectAlternative={(recipe) => { setSelectedRecipe(recipe); setSuggestionsRecipe(null); }}
           onClose={() => setSuggestionsRecipe(null)}
         />
       )}
@@ -611,6 +800,149 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
   );
 }
 
+// =====================================================
+// Helper: Convert GeneratedMeal to Recipe type (for FeedbackModal)
+// =====================================================
+function generatedMealToRecipe(meal: GeneratedMeal, type: 'breakfast' | 'lunch' | 'dinner'): Recipe {
+  return {
+    id: `generated-${Date.now()}`,
+    name: meal.name,
+    type,
+    ingredients: (meal.ingredients || []).map(ing => ({
+      name: ing.name,
+      total: ing.total,
+      luis: ing.luis,
+      mariana: ing.mariana,
+    })),
+    steps: meal.steps || [],
+    description: meal.description,
+    tips: meal.tips,
+    source: 'ai_generated',
+  };
+}
+
+// =====================================================
+// Generated Meal Card (for AI menus)
+// =====================================================
+interface GeneratedMealCardProps {
+  type: 'breakfast' | 'lunch' | 'dinner';
+  label: string;
+  meal: GeneratedMeal;
+  expanded: boolean;
+  onToggle: () => void;
+  onFeedback: () => void;
+  isLast?: boolean;
+}
+
+function GeneratedMealCard({ type, label, meal, expanded, onToggle, onFeedback, isLast }: GeneratedMealCardProps) {
+  const borderColor = {
+    breakfast: 'border-orange-500',
+    lunch: 'border-green-700',
+    dinner: 'border-blue-700'
+  }[type];
+
+  return (
+    <div className={`bg-white border-l-4 ${borderColor} p-4 ${isLast ? 'rounded-b-xl' : ''}`}>
+      <div className="flex justify-between items-start">
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <div className="text-gray-500 text-sm">{label}</div>
+            <span className="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
+              <Bot size={10} /> IA
+            </span>
+          </div>
+          <h4 className="font-semibold text-lg">{meal.name}</h4>
+          {meal.description && (
+            <p className="text-sm text-gray-500 mt-0.5">{meal.description}</p>
+          )}
+          {meal.totalTime && (
+            <p className="text-xs text-gray-400 mt-1">⏱ {meal.totalTime}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="flex gap-2 mt-2">
+        <button
+          onClick={onToggle}
+          className="flex-1 bg-gray-100 text-gray-600 py-2 px-4 rounded-full text-sm hover:bg-gray-200"
+        >
+          {expanded ? 'Ocultar receta ▲' : 'Ver receta ▼'}
+        </button>
+        <button
+          onClick={onFeedback}
+          className="bg-yellow-100 text-yellow-700 py-2 px-3 rounded-full text-sm hover:bg-yellow-200"
+          title="Dar feedback"
+        >
+          <MessageSquare size={16} />
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="mt-4 pt-4 border-t">
+          <GeneratedMealDetail meal={meal} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =====================================================
+// Generated Meal Detail (ingredients + steps)
+// =====================================================
+function GeneratedMealDetail({ meal }: { meal: GeneratedMeal }) {
+  return (
+    <>
+      {/* Preparations used */}
+      {meal.usedPreparations && meal.usedPreparations.length > 0 && (
+        <div className="mb-3 p-2 bg-amber-50 rounded-lg">
+          <p className="text-xs text-amber-700 font-medium">
+            🫕 Preparaciones: {meal.usedPreparations.join(', ')}
+          </p>
+        </div>
+      )}
+
+      {/* Ingredients */}
+      <div className="space-y-2">
+        {(meal.ingredients || []).map((ing, i) => (
+          <div key={i} className="p-3 bg-gray-50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-sm">{ing.name}</span>
+              {ing.available && (
+                <span className="bg-green-100 text-green-700 text-xs px-1.5 py-0.5 rounded">✓ Disponible</span>
+              )}
+              {ing.available === false && (
+                <span className="bg-red-100 text-red-600 text-xs px-1.5 py-0.5 rounded">Comprar</span>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-xs text-gray-600 mt-1">
+              <div><span className="text-gray-400">Total:</span> {ing.total}</div>
+              <div><span className="text-gray-400">Luis:</span> {ing.luis}</div>
+              <div><span className="text-gray-400">Mariana:</span> {ing.mariana}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Steps */}
+      <ol className="mt-4 list-decimal pl-5 space-y-1 text-sm">
+        {(meal.steps || []).map((step, i) => (
+          <li key={i}>{step}</li>
+        ))}
+      </ol>
+
+      {/* Tips */}
+      {meal.tips && (
+        <div className="mt-3 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+          💡 {meal.tips}
+        </div>
+      )}
+    </>
+  );
+}
+
+// =====================================================
+// Static MealCard (original, for legacy menu)
+// =====================================================
 interface MealCardProps {
   type: 'breakfast' | 'lunch' | 'dinner';
   label: string;
@@ -647,23 +979,13 @@ function MealCard({ type, label, recipe, expanded, onToggle, onView, onFeedback,
       </div>
 
       <div className="flex gap-2 mt-2">
-        <button
-          onClick={onToggle}
-          className="flex-1 bg-gray-100 text-gray-600 py-2 px-4 rounded-full text-sm hover:bg-gray-200"
-        >
+        <button onClick={onToggle} className="flex-1 bg-gray-100 text-gray-600 py-2 px-4 rounded-full text-sm hover:bg-gray-200">
           {expanded ? 'Ocultar receta ▲' : 'Ver receta ▼'}
         </button>
-        <button
-          onClick={onView}
-          className="bg-green-100 text-green-700 py-2 px-4 rounded-full text-sm hover:bg-green-200"
-        >
+        <button onClick={onView} className="bg-green-100 text-green-700 py-2 px-4 rounded-full text-sm hover:bg-green-200">
           Abrir
         </button>
-        <button
-          onClick={onFeedback}
-          className="bg-yellow-100 text-yellow-700 py-2 px-3 rounded-full text-sm hover:bg-yellow-200"
-          title="Dar feedback"
-        >
+        <button onClick={onFeedback} className="bg-yellow-100 text-yellow-700 py-2 px-3 rounded-full text-sm hover:bg-yellow-200" title="Dar feedback">
           <MessageSquare size={16} />
         </button>
       </div>
@@ -688,26 +1010,15 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
           <div key={i} className="p-3 bg-gray-50 rounded-lg">
             <div className="font-medium text-sm mb-1">{ing.name}</div>
             <div className="grid grid-cols-3 gap-2 text-xs text-gray-600">
-              {hasTotal && (
-                <div>
-                  <span className="text-gray-400">Total:</span> {ing.total || ''}
-                </div>
-              )}
-              <div>
-                <span className="text-gray-400">Grande:</span> {ing.luis}
-              </div>
-              <div>
-                <span className="text-gray-400">Pequeña:</span> {ing.mariana}
-              </div>
+              {hasTotal && <div><span className="text-gray-400">Total:</span> {ing.total || ''}</div>}
+              <div><span className="text-gray-400">Grande:</span> {ing.luis}</div>
+              <div><span className="text-gray-400">Pequeña:</span> {ing.mariana}</div>
             </div>
           </div>
         ))}
       </div>
-
       <ol className="mt-4 list-decimal pl-5 space-y-1 text-sm">
-        {recipe.steps.map((step, i) => (
-          <li key={i}>{step}</li>
-        ))}
+        {recipe.steps.map((step, i) => (<li key={i}>{step}</li>))}
       </ol>
     </>
   );
