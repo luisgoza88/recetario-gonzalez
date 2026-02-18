@@ -5,6 +5,7 @@ import { X, Plus, Trash2, Sparkles, Camera, Upload, Loader2, Wand2 } from 'lucid
 import { supabase } from '@/lib/supabase/client';
 import { Recipe, Ingredient, MealType } from '@/types';
 import ImageUpload from '../ImageUpload';
+import { CanEdit } from '@/components/auth/RoleGate';
 import { useToast } from '@/components/ui/Toast';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 
@@ -215,6 +216,14 @@ export default function RecipeForm({ recipe, onClose, onSuccess }: RecipeFormPro
   };
 
   return (
+    <CanEdit what="recipes" fallback={
+      <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4" onClick={onClose}>
+        <div className="bg-white rounded-2xl p-6 text-center max-w-sm" onClick={e => e.stopPropagation()}>
+          <p className="text-gray-600 mb-4">No tienes permisos para editar recetas.</p>
+          <button onClick={onClose} className="px-4 py-2 bg-gray-200 rounded-lg">Cerrar</button>
+        </div>
+      </div>
+    }>
     <div
       role="dialog"
       aria-modal="true"
@@ -558,5 +567,6 @@ export default function RecipeForm({ recipe, onClose, onSuccess }: RecipeFormPro
         </form>
       </div>
     </div>
+    </CanEdit>
   );
 }

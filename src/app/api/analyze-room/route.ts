@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, cleanJsonResponse, base64ToGeminiFormat } from '@/lib/gemini/client';
+import { requireAuth } from '@/lib/api/auth';
 import { logger } from '@/lib/logger';
 
 interface RoomAnalysis {
@@ -46,6 +47,9 @@ const REFERENCE_DIMENSIONS: Record<string, { name: string; size: string; meters:
 };
 
 export async function POST(request: NextRequest) {
+  const auth = requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { images, referenceObject, capturedSteps } = await request.json();
 

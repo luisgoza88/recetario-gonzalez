@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, cleanJsonResponse, base64ToGeminiFormat, geminiWithRetry } from '@/lib/gemini/client';
 import { withRateLimit } from '@/lib/rate-limit';
+import { requireAuth } from '@/lib/api/auth';
 import { logger } from '@/lib/logger';
 
 // Zod schemas for input validation
@@ -46,10 +47,17 @@ const ScanPantryPutSchema = z.object({
   })).max(50).optional(),
 });
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+let _supabase: ReturnType<typeof createClient> | null = null;
+
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+  }
+  return _supabase;
+}
 
 interface IdentifiedProduct {
   name: string;
@@ -77,6 +85,9 @@ interface ScanResult {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     // Rate limiting
     const userId = request.headers.get('x-user-id') || request.headers.get('x-forwarded-for') || 'anonymous';
@@ -116,9 +127,9 @@ export async function POST(request: NextRequest) {
     const gemini = getGeminiClient();
 
     // 1. Obtener lista actual de items del mercado para matching
-    const { data: marketItems } = await supabase
+    const { data: marketItems } = await getSupabase()
       .from('market_items')
-      .select('id, name, category, quantity');
+      .select('id, name, category, quantity') as { data: Array<{ id: string; name: string; category: string; quantity: string }> | null };
 
     const marketItemsList = marketItems?.map(i => `- ${i.name} (${i.category})`).join('\n') || '';
 
@@ -328,6 +339,9 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura:
 
 // Endpoint para aplicar los cambios después de que el usuario confirme
 export async function PUT(request: NextRequest) {
+  const auth = requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     // Parse and validate request body with Zod
     let validatedBody;
@@ -361,7 +375,8 @@ export async function PUT(request: NextRequest) {
     // 1. Actualizar inventario de items existentes
     for (const match of matched || []) {
       try {
-        const { error } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error } = await (getSupabase() as any)
           .from('inventory')
           .upsert({
             item_id: match.marketItemId,
@@ -381,7 +396,8 @@ export async function PUT(request: NextRequest) {
     for (const newItem of newItems || []) {
       try {
         // Obtener el max order_index
-        const { data: maxOrder } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: maxOrder } = await (getSupabase() as any)
           .from('market_items')
           .select('order_index')
           .order('order_index', { ascending: false })
@@ -390,7 +406,8 @@ export async function PUT(request: NextRequest) {
         const nextOrder = (maxOrder?.[0]?.order_index || 0) + 1;
 
         // Crear el nuevo item
-        const { data: createdItem, error: createError } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: createdItem, error: createError } = await (getSupabase() as any)
           .from('market_items')
           .insert({
             name: newItem.product.genericName,
@@ -406,7 +423,8 @@ export async function PUT(request: NextRequest) {
 
         // Crear entrada de inventario
         if (createdItem) {
-          await supabase
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (getSupabase() as any)
             .from('inventory')
             .upsert({
               item_id: createdItem.id,

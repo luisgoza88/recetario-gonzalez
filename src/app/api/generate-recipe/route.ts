@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, cleanJsonResponse, geminiWithRetry, sanitizeUserInput } from '@/lib/gemini/client';
 import { withRateLimit } from '@/lib/rate-limit';
+import { requireAuth } from '@/lib/api/auth';
 import { logger } from '@/lib/logger';
 
 // Zod schemas for input validation
@@ -39,10 +40,17 @@ const GenerateRecipeRequestSchema = z.object({
   generateImage: z.boolean().optional(),
 });
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+let _supabase: ReturnType<typeof createClient> | null = null;
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+  }
+  return _supabase;
+}
 
 interface IngredientWithContext {
   name: string;
@@ -83,9 +91,9 @@ interface Preparation {
 // Obtener preparaciones disponibles basadas en ingredientes
 async function getAvailablePreparations(availableIngredients: string[]): Promise<Preparation[]> {
   try {
-    const { data: preparations } = await supabase
+    const { data: preparations } = await getSupabase()
       .from('preparations')
-      .select('name, ingredients, description');
+      .select('name, ingredients, description') as { data: Array<{ name: string; ingredients: unknown; description: unknown }> | null };
 
     if (!preparations) return [];
 
@@ -122,11 +130,11 @@ async function getAvailablePreparations(availableIngredients: string[]): Promise
 // Obtener recetas recientes para evitar repetición
 async function getRecentRecipeNames(): Promise<string[]> {
   try {
-    const { data: feedback } = await supabase
+    const { data: feedback } = await getSupabase()
       .from('meal_feedback')
       .select('recipe_name')
       .order('created_at', { ascending: false })
-      .limit(10);
+      .limit(10) as { data: Array<{ recipe_name: string | null }> | null };
 
     if (!feedback) return [];
     return feedback.map(f => f.recipe_name).filter(Boolean) as string[];
@@ -137,6 +145,9 @@ async function getRecentRecipeNames(): Promise<string[]> {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     // Rate limiting - usar user ID del header (set by middleware) o IP como fallback
     const userId = request.headers.get('x-user-id') || request.headers.get('x-forwarded-for') || 'anonymous';

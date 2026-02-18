@@ -2,6 +2,7 @@
 
 import { Home, Trees, Edit2, Trash2, Plus } from 'lucide-react';
 import { Space } from '@/types';
+import { AdminOnly } from '@/components/auth/RoleGate';
 
 interface SpaceListViewProps {
   activeCategory: 'interior' | 'exterior';
@@ -88,13 +89,15 @@ export default function SpaceListView({
                 >
                   <Edit2 size={18} />
                 </button>
-                <button
-                  onClick={() => onDelete(space.id)}
-                  disabled={deletingId === space.id}
-                  className="p-2 text-red-600 hover:bg-red-100 rounded-lg disabled:opacity-50"
-                >
-                  <Trash2 size={18} />
-                </button>
+                <AdminOnly>
+                  <button
+                    onClick={() => onDelete(space.id)}
+                    disabled={deletingId === space.id}
+                    className="p-2 text-red-600 hover:bg-red-100 rounded-lg disabled:opacity-50"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </AdminOnly>
               </div>
             </div>
           ))

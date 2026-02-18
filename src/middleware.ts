@@ -74,13 +74,13 @@ export async function middleware(request: NextRequest) {
       }
     );
 
-    // Verificar sesión
-    const { data: { session }, error } = await supabase.auth.getSession();
+    // Verificar usuario autenticado (getUser() es más seguro que getSession())
+    const { data: { user }, error } = await supabase.auth.getUser();
 
-    if (error || !session) {
+    if (error || !user) {
       // Log para debugging (en desarrollo)
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[Middleware] Auth required for ${pathname} - no valid session`);
+        console.log(`[Middleware] Auth required for ${pathname} - no valid user`);
       }
 
       const unauthorizedResponse = NextResponse.json(
@@ -93,8 +93,8 @@ export async function middleware(request: NextRequest) {
       return unauthorizedResponse;
     }
 
-    // Sesion valida: inyectar user ID en request headers para API routes.
-    requestHeaders.set('x-user-id', session.user.id);
+    // Usuario autenticado: inyectar user ID en request headers para API routes.
+    requestHeaders.set('x-user-id', user.id);
 
     const response = NextResponse.next({
       request: {

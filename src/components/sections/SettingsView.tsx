@@ -6,6 +6,7 @@ import {
   Moon, Globe, Shield, HelpCircle, Smartphone, Brain
 } from 'lucide-react';
 import AICommandCenter from '@/components/ai/AICommandCenter';
+import { AdminOnly } from '@/components/auth/RoleGate';
 import { useHouseholdId } from '@/lib/stores/useHouseholdStore';
 
 interface SettingsSectionProps {
@@ -176,24 +177,26 @@ export default function SettingsView() {
         </div>
       </div>
 
-      {/* Datos */}
-      <div className="mb-6">
-        <p className="text-sm font-medium text-gray-500 mb-2 px-1">DATOS</p>
-        <div className="space-y-2">
-          <SettingsSection
-            icon={<Database size={20} />}
-            title="Exportar datos"
-            description="Descarga tus recetas y menús"
-            onClick={() => {}}
-          />
-          <SettingsSection
-            icon={<Shield size={20} />}
-            title="Privacidad"
-            description="Gestiona tus datos"
-            onClick={() => {}}
-          />
+      {/* Datos - Solo visible para admin */}
+      <AdminOnly>
+        <div className="mb-6">
+          <p className="text-sm font-medium text-gray-500 mb-2 px-1">DATOS</p>
+          <div className="space-y-2">
+            <SettingsSection
+              icon={<Database size={20} />}
+              title="Exportar datos"
+              description="Descarga tus recetas y menús"
+              onClick={() => {}}
+            />
+            <SettingsSection
+              icon={<Shield size={20} />}
+              title="Privacidad"
+              description="Gestiona tus datos"
+              onClick={() => {}}
+            />
+          </div>
         </div>
-      </div>
+      </AdminOnly>
 
       {/* Información */}
       <div className="mb-6">

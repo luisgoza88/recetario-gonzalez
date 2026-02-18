@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, cleanJsonResponse, base64ToGeminiFormat } from '@/lib/gemini/client';
+import { requireAuth } from '@/lib/api/auth';
 import { logger } from '@/lib/logger';
 
 // Zod schema for input validation
@@ -35,6 +36,9 @@ interface GeneratedRecipe {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const body = await request.json();
     const parsed = GenerateRecipeFromImageSchema.safeParse(body);

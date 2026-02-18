@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, cleanJsonResponse } from '@/lib/gemini/client';
+import { requireAuth } from '@/lib/api/auth';
 import { logger } from '@/lib/logger';
 import {
   getProteinIcon,
@@ -154,6 +155,9 @@ export interface ParseResponse {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const body = await request.json();
     const validatedInput = ParseMarketItemsSchema.safeParse(body);

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/Toast';
+import { AdminOnly } from '@/components/auth/RoleGate';
 import { HomeEmployee } from '@/types';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 
@@ -296,13 +297,15 @@ export default function EmployeesPanel({
                         >
                           <Edit2 size={18} />
                         </button>
-                        <button
-                          onClick={() => deleteEmployee(emp.id)}
-                          disabled={deleting === emp.id}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50"
-                        >
-                          <Trash2 size={18} />
-                        </button>
+                        <AdminOnly>
+                          <button
+                            onClick={() => deleteEmployee(emp.id)}
+                            disabled={deleting === emp.id}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </AdminOnly>
                       </div>
                     </div>
                   ))

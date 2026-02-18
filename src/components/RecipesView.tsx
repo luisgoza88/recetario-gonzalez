@@ -6,6 +6,7 @@ import { Search, Plus, Edit2, Trash2, ImageIcon } from 'lucide-react';
 import { Recipe, Ingredient } from '@/types';
 import RecipeModal from './RecipeModal';
 import RecipeForm from './forms/RecipeForm';
+import { CanEdit } from '@/components/auth/RoleGate';
 import { supabase } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/Toast';
 
@@ -123,13 +124,15 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
       </div>
 
       {/* Add Button */}
-      <button
-        onClick={() => setShowForm(true)}
-        className="w-full mb-4 p-4 bg-green-50 text-green-700 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-green-100 transition-colors border-2 border-dashed border-green-300"
-      >
-        <Plus size={20} />
-        Agregar nueva receta
-      </button>
+      <CanEdit what="recipes">
+        <button
+          onClick={() => setShowForm(true)}
+          className="w-full mb-4 p-4 bg-green-50 text-green-700 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-green-100 transition-colors border-2 border-dashed border-green-300"
+        >
+          <Plus size={20} />
+          Agregar nueva receta
+        </button>
+      </CanEdit>
 
       {/* Recipe List */}
       <div className="space-y-3">
@@ -171,22 +174,24 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
                     {getTypeLabel(recipe.type)}
                   </span>
                 </div>
-                <div className="flex gap-1 ml-2">
-                  <button
-                    onClick={() => handleEdit(recipe)}
-                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                    title="Editar"
-                  >
-                    <Edit2 size={18} />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(recipe)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                    title="Eliminar"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </div>
+                <CanEdit what="recipes">
+                  <div className="flex gap-1 ml-2">
+                    <button
+                      onClick={() => handleEdit(recipe)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                      title="Editar"
+                    >
+                      <Edit2 size={18} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(recipe)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                      title="Eliminar"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                </CanEdit>
               </div>
             </div>
           </div>

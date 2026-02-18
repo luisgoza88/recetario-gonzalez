@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { AdminOnly } from '@/components/auth/RoleGate';
 import {
   createInvitation,
   getHouseholdInvitations,
@@ -272,15 +273,17 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
                   {getRoleName(member.role)}
                 </span>
 
-                {canManage && member.user_id !== user?.id && member.role !== 'admin' && (
-                  <button
-                    onClick={() => handleRemoveMember(member.id, member.user?.full_name || 'este usuario')}
-                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Remover miembro"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
+                <AdminOnly>
+                  {canManage && member.user_id !== user?.id && member.role !== 'admin' && (
+                    <button
+                      onClick={() => handleRemoveMember(member.id, member.user?.full_name || 'este usuario')}
+                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Remover miembro"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </AdminOnly>
               </div>
             </div>
           ))}

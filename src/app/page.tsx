@@ -7,6 +7,7 @@ import HomeView from '@/components/home/HomeView';
 import TodayDashboard from '@/components/sections/TodayDashboard';
 import SettingsView from '@/components/sections/SettingsView';
 import AICommandCenter from '@/components/ai/AICommandCenter';
+import FloatingAIAssistant from '@/components/FloatingAIAssistant';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import { OfflineBadge } from '@/components/ui/OfflineIndicator';
 import { useRecipes, useMarketItems, useSuggestionsCount, useRefreshAppData } from '@/lib/hooks/useAppData';
@@ -152,6 +153,9 @@ export default function Home() {
           </ErrorBoundary>
         )}
       </main>
+
+      {/* Floating AI Assistant Chat */}
+      <FloatingAIAssistant activeSection={activeSection} />
 
       {/* AI Command Center Overlay - fullscreen above everything */}
       {showAICommandCenter && (

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, base64ToGeminiFormat } from '@/lib/gemini/client';
+import { requireAuth } from '@/lib/api/auth';
 import { FunctionCallingConfigMode } from '@google/genai';
 import {
   getFunctionRiskLevel,
@@ -40,6 +41,9 @@ import {
 // ============================================
 
 export async function POST(request: NextRequest) {
+  const auth = requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+
   logger.info('POST request received');
   try {
     const body = await request.json();
