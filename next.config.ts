@@ -13,9 +13,6 @@ const withSerwist = withSerwistInit({
 });
 
 const nextConfig: NextConfig = {
-  // Configuración de Turbopack
-  turbopack: {},
-
   // Headers de seguridad
   async headers() {
     // CSP permite: self, Supabase, PostHog, Google APIs, y recursos inline de Next.js
