@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { CheckCircle2, Clock, Play, Star, Eye } from 'lucide-react';
-import { ScheduledTask } from '@/types';
+import { useState, useEffect } from "react";
+import { CheckCircle2, Clock, Play, Star, Eye } from "lucide-react";
+import { ScheduledTask } from "@/types";
 
 interface TaskCardProps {
   task: ScheduledTask;
@@ -12,10 +12,16 @@ interface TaskCardProps {
   onRate: () => void;
 }
 
-export default function TaskCard({ task, onToggle, onStart, onInspect, onRate }: TaskCardProps) {
+export default function TaskCard({
+  task,
+  onToggle,
+  onStart,
+  onInspect,
+  onRate,
+}: TaskCardProps) {
   const [elapsedTime, setElapsedTime] = useState(0);
-  const isCompleted = task.status === 'completada';
-  const isInProgress = task.status === 'en_progreso';
+  const isCompleted = task.status === "completada";
+  const isInProgress = task.status === "en_progreso";
 
   // Live timer for in-progress tasks
   useEffect(() => {
@@ -44,9 +50,9 @@ export default function TaskCard({ task, onToggle, onStart, onInspect, onRate }:
     const secs = seconds % 60;
 
     if (hrs > 0) {
-      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      return `${hrs}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
     }
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   // Calculate progress percentage vs estimated time
@@ -55,34 +61,60 @@ export default function TaskCard({ task, onToggle, onStart, onInspect, onRate }:
 
   // Get encouraging message based on progress
   const getEncouragingMessage = () => {
-    if (progressPercent < 50) return { emoji: '🚀', text: '¡Buen ritmo!' };
-    if (progressPercent < 80) return { emoji: '💪', text: '¡Vas muy bien!' };
-    if (progressPercent < 100) return { emoji: '🏁', text: '¡Ya casi!' };
-    return { emoji: '⏰', text: '¡Tómate tu tiempo!' };
+    if (progressPercent < 50) return { emoji: "🚀", text: "¡Buen ritmo!" };
+    if (progressPercent < 80) return { emoji: "💪", text: "¡Vas muy bien!" };
+    if (progressPercent < 100) return { emoji: "🏁", text: "¡Ya casi!" };
+    return { emoji: "⏰", text: "¡Tómate tu tiempo!" };
   };
 
   // Get achievement for completed task
   const getAchievement = (actualMinutes: number, estimatedMinutes: number) => {
     const ratio = actualMinutes / estimatedMinutes;
-    if (ratio <= 0.7) return { emoji: '⚡', text: '¡Súper rápido!', color: 'bg-purple-100 text-purple-700' };
-    if (ratio <= 0.9) return { emoji: '🌟', text: '¡Excelente!', color: 'bg-yellow-100 text-yellow-700' };
-    if (ratio <= 1.0) return { emoji: '✨', text: '¡Perfecto!', color: 'bg-green-100 text-green-700' };
-    if (ratio <= 1.2) return { emoji: '👍', text: '¡Bien hecho!', color: 'bg-blue-100 text-blue-700' };
-    return { emoji: '💪', text: '¡Completado!', color: 'bg-gray-100 text-gray-700' };
+    if (ratio <= 0.7)
+      return {
+        emoji: "⚡",
+        text: "¡Súper rápido!",
+        color: "bg-purple-100 text-purple-700",
+      };
+    if (ratio <= 0.9)
+      return {
+        emoji: "🌟",
+        text: "¡Excelente!",
+        color: "bg-yellow-100 text-yellow-700",
+      };
+    if (ratio <= 1.0)
+      return {
+        emoji: "✨",
+        text: "¡Perfecto!",
+        color: "bg-green-100 text-green-700",
+      };
+    if (ratio <= 1.2)
+      return {
+        emoji: "👍",
+        text: "¡Bien hecho!",
+        color: "bg-blue-100 text-blue-700",
+      };
+    return {
+      emoji: "💪",
+      text: "¡Completado!",
+      color: "bg-gray-100 text-gray-700",
+    };
   };
 
   const encouragement = getEncouragingMessage();
 
   return (
-    <div className={`p-4 ${isCompleted ? 'bg-green-50' : isInProgress ? 'bg-gradient-to-r from-blue-50 to-indigo-50' : ''}`}>
+    <div
+      className={`p-4 ${isCompleted ? "bg-green-50" : isInProgress ? "bg-gradient-to-r from-blue-50 to-indigo-50" : ""}`}
+    >
       <div className="flex items-start gap-3">
         {/* Checkbox */}
         <button
           onClick={onToggle}
           className={`mt-0.5 w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
             isCompleted
-              ? 'bg-green-500 border-green-500 text-white'
-              : 'border-gray-300 hover:border-blue-500'
+              ? "bg-green-500 border-green-500 text-white"
+              : "border-gray-300 hover:border-blue-500"
           }`}
         >
           {isCompleted && <CheckCircle2 size={16} />}
@@ -90,7 +122,9 @@ export default function TaskCard({ task, onToggle, onStart, onInspect, onRate }:
 
         {/* Task Info */}
         <div className="flex-1 min-w-0">
-          <p className={`font-medium ${isCompleted ? 'text-gray-400 line-through' : ''}`}>
+          <p
+            className={`font-medium ${isCompleted ? "text-gray-400 line-through" : ""}`}
+          >
             {task.task_template?.name}
           </p>
           <div className="flex items-center gap-2 mt-1">
@@ -100,8 +134,7 @@ export default function TaskCard({ task, onToggle, onStart, onInspect, onRate }:
             </span>
             <span className="text-xs text-gray-400">•</span>
             <span className="text-sm text-gray-400 flex items-center gap-1">
-              <Clock size={12} />
-              ~{task.task_template?.estimated_minutes} min
+              <Clock size={12} />~{task.task_template?.estimated_minutes} min
             </span>
           </div>
 
@@ -130,21 +163,26 @@ export default function TaskCard({ task, onToggle, onStart, onInspect, onRate }:
           )}
 
           {/* Achievement Badge after completion */}
-          {isCompleted && task.actual_minutes !== undefined && task.actual_minutes !== null && (
-            <div className="mt-2 flex items-center gap-2">
-              {(() => {
-                const achievement = getAchievement(
-                  task.actual_minutes,
-                  task.task_template?.estimated_minutes || 30
-                );
-                return (
-                  <span className={`text-sm px-3 py-1 rounded-full font-medium ${achievement.color}`}>
-                    {achievement.emoji} {achievement.text} • {task.actual_minutes} min
-                  </span>
-                );
-              })()}
-            </div>
-          )}
+          {isCompleted &&
+            task.actual_minutes !== undefined &&
+            task.actual_minutes !== null && (
+              <div className="mt-2 flex items-center gap-2">
+                {(() => {
+                  const achievement = getAchievement(
+                    task.actual_minutes,
+                    task.task_template?.estimated_minutes || 30,
+                  );
+                  return (
+                    <span
+                      className={`text-sm px-3 py-1 rounded-full font-medium ${achievement.color}`}
+                    >
+                      {achievement.emoji} {achievement.text} •{" "}
+                      {task.actual_minutes} min
+                    </span>
+                  );
+                })()}
+              </div>
+            )}
         </div>
 
         {/* Actions */}

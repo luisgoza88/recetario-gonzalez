@@ -5,7 +5,7 @@
  */
 
 // Gemini function declarations
-export { functionDeclarations } from './declarations';
+export { functionDeclarations } from "./declarations";
 
 // Recetario - Queries
 export {
@@ -17,7 +17,7 @@ export {
   getInventory,
   getShoppingList,
   suggestRecipe,
-} from './recetario-queries';
+} from "./recetario-queries";
 
 // Recetario - Mutations
 export {
@@ -32,7 +32,7 @@ export {
   createRecipe,
   updateRecipe,
   deleteRecipe,
-} from './recetario-mutations';
+} from "./recetario-mutations";
 
 // Home - Queries
 export {
@@ -44,7 +44,7 @@ export {
   listEmployees,
   getEmployeeDetails,
   listTaskTemplates,
-} from './home-queries';
+} from "./home-queries";
 
 // Home - Mutations
 export {
@@ -61,7 +61,7 @@ export {
   deleteTaskTemplate,
   rescheduleTask,
   generateTasksForDate,
-} from './home-mutations';
+} from "./home-mutations";
 
 // Reports & Utilities
 export {
@@ -72,7 +72,7 @@ export {
   calculatePortions,
   getPreparationTips,
   smartShoppingList,
-} from './reports';
+} from "./reports";
 
 // Multi-step Agent
-export { executeMultiStepTask } from './multi-step';
+export { executeMultiStepTask } from "./multi-step";

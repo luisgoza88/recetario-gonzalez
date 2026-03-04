@@ -1,18 +1,19 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
-import { Eye, EyeOff, Mail, Lock, ChefHat, AlertCircle } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { Eye, EyeOff, Mail, Lock, ChefHat, AlertCircle } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import Spinner from "@/components/ui/Spinner";
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { signIn, isLoading } = useAuth();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,7 +22,7 @@ export default function LoginPage() {
     setError(null);
 
     if (!email || !password) {
-      setError('Por favor completa todos los campos');
+      setError("Por favor completa todos los campos");
       return;
     }
 
@@ -29,16 +30,17 @@ export default function LoginPage() {
 
     if (result.error) {
       // Traducir errores comunes
-      if (result.error.includes('Invalid login credentials')) {
-        setError('Email o contrasena incorrectos');
-      } else if (result.error.includes('Email not confirmed')) {
-        setError('Por favor confirma tu email antes de iniciar sesion');
+      if (result.error.includes("Invalid login credentials")) {
+        setError("Email o contrasena incorrectos");
+      } else if (result.error.includes("Email not confirmed")) {
+        setError("Por favor confirma tu email antes de iniciar sesion");
       } else {
         setError(result.error);
       }
     } else {
-      const redirectParam = searchParams.get('redirect');
-      const safeRedirect = redirectParam && redirectParam.startsWith('/') ? redirectParam : '/';
+      const redirectParam = searchParams.get("redirect");
+      const safeRedirect =
+        redirectParam && redirectParam.startsWith("/") ? redirectParam : "/";
       router.push(safeRedirect);
     }
   };
@@ -51,7 +53,9 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-green-600 rounded-full mb-4">
             <ChefHat className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">Recetario Familiar</h1>
+          <h1 className="text-2xl font-bold text-gray-800">
+            Recetario Familiar
+          </h1>
           <p className="text-gray-600 mt-1">Inicia sesion para continuar</p>
         </div>
 
@@ -92,7 +96,7 @@ export default function LoginPage() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
@@ -104,7 +108,11 @@ export default function LoginPage() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
                 </button>
               </div>
             </div>
@@ -127,11 +135,11 @@ export default function LoginPage() {
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <Spinner size="md" color="white" />
                   Iniciando...
                 </span>
               ) : (
-                'Iniciar Sesion'
+                "Iniciar Sesion"
               )}
             </button>
           </form>
@@ -153,8 +161,11 @@ export default function LoginPage() {
 
           {/* Register link */}
           <p className="mt-6 text-center text-gray-600">
-            No tienes cuenta?{' '}
-            <Link href="/auth/register" className="text-green-600 font-semibold hover:text-green-700">
+            No tienes cuenta?{" "}
+            <Link
+              href="/auth/register"
+              className="text-green-600 font-semibold hover:text-green-700"
+            >
               Registrate
             </Link>
           </p>

@@ -1,7 +1,23 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Brain, X, Loader2, Sparkles, MessageCircle, ShoppingCart, Calendar, BookOpen, Lightbulb, Home, ClipboardList, Users, Zap } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  Brain,
+  X,
+  Loader2,
+  Sparkles,
+  MessageCircle,
+  ShoppingCart,
+  Calendar,
+  BookOpen,
+  Lightbulb,
+  Home,
+  ClipboardList,
+  Users,
+  Zap,
+} from "lucide-react";
+import { useAppStore } from "@/lib/stores/useAppStore";
+import type { ModalName } from "@/lib/stores/useAppStore";
 
 // Re-export for backwards compatibility
 export interface FABAction {
@@ -9,7 +25,7 @@ export interface FABAction {
   icon: React.ReactNode;
   label: string;
   onClick: () => void;
-  variant?: 'default' | 'ai' | 'alert';
+  variant?: "default" | "ai" | "alert";
   badge?: number;
 }
 
@@ -17,7 +33,7 @@ interface SmartFABProps {
   open: boolean;
   onToggle: () => void;
   actions?: FABAction[]; // Legacy - not used anymore
-  activeSection: 'hoy' | 'recetario' | 'hogar' | 'ajustes';
+  activeSection: "hoy" | "recetario" | "hogar" | "ajustes";
   onOpenAICommandCenter?: () => void;
   pendingProposals?: number;
 }
@@ -36,167 +52,171 @@ export default function SmartFAB({
   onToggle,
   activeSection,
   onOpenAICommandCenter,
-  pendingProposals = 0
+  pendingProposals = 0,
 }: SmartFABProps) {
   const [showQuickActions, setShowQuickActions] = useState(false);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const isLongPress = useRef(false);
   const LONG_PRESS_DURATION = 500; // ms
 
+  // Store actions for navigation and modals
+  const navigateTo = useAppStore((state) => state.navigateTo);
+  const storeOpenModal = useAppStore((state) => state.openModal);
+
   // Get contextual quick actions based on active section
   const getQuickActions = (): QuickAction[] => {
     switch (activeSection) {
-      case 'hoy':
+      case "hoy":
         return [
           {
-            id: 'suggestions',
+            id: "suggestions",
             icon: <Sparkles size={20} />,
-            label: 'Sugerencias IA',
+            label: "Sugerencias IA",
             onClick: () => {
-              window.dispatchEvent(new CustomEvent('appNavigate', { detail: { section: 'recetario', tab: 'suggestions' } }));
+              navigateTo("recetario", "suggestions");
             },
-            color: 'from-purple-500 to-indigo-500'
+            color: "from-purple-500 to-indigo-500",
           },
           {
-            id: 'calendar',
+            id: "calendar",
             icon: <Calendar size={20} />,
-            label: 'Ver menú',
+            label: "Ver menú",
             onClick: () => {
-              window.dispatchEvent(new CustomEvent('appNavigate', { detail: { section: 'recetario', tab: 'calendar' } }));
+              navigateTo("recetario", "calendar");
             },
-            color: 'from-blue-500 to-cyan-500'
+            color: "from-blue-500 to-cyan-500",
           },
           {
-            id: 'market',
+            id: "market",
             icon: <ShoppingCart size={20} />,
-            label: 'Mercado',
+            label: "Mercado",
             onClick: () => {
-              window.dispatchEvent(new CustomEvent('appNavigate', { detail: { section: 'recetario', tab: 'market' } }));
+              navigateTo("recetario", "market");
             },
-            color: 'from-green-500 to-emerald-500'
+            color: "from-green-500 to-emerald-500",
           },
           {
-            id: 'hogar',
+            id: "hogar",
             icon: <Home size={20} />,
-            label: 'Tareas hogar',
+            label: "Tareas hogar",
             onClick: () => {
-              window.dispatchEvent(new CustomEvent('appNavigate', { detail: { section: 'hogar' } }));
+              navigateTo("hogar");
             },
-            color: 'from-orange-500 to-amber-500'
-          }
+            color: "from-orange-500 to-amber-500",
+          },
         ];
 
-      case 'recetario':
+      case "recetario":
         return [
           {
-            id: 'ai-suggestion',
+            id: "ai-suggestion",
             icon: <Sparkles size={20} />,
-            label: 'Sugerencia IA',
+            label: "Sugerencia IA",
             onClick: () => {
-              window.dispatchEvent(new CustomEvent('appNavigate', { detail: { section: 'recetario', tab: 'suggestions' } }));
+              navigateTo("recetario", "suggestions");
             },
-            color: 'from-purple-500 to-indigo-500'
+            color: "from-purple-500 to-indigo-500",
           },
           {
-            id: 'new-recipe',
+            id: "new-recipe",
             icon: <BookOpen size={20} />,
-            label: 'Nueva receta',
+            label: "Nueva receta",
             onClick: () => {
-              window.dispatchEvent(new CustomEvent('appNavigate', { detail: { section: 'recetario', tab: 'recipes' } }));
-              setTimeout(() => window.dispatchEvent(new CustomEvent('openNewRecipe')), 100);
+              navigateTo("recetario", "recipes");
+              setTimeout(() => storeOpenModal("newRecipe"), 100);
             },
-            color: 'from-green-500 to-emerald-500'
+            color: "from-green-500 to-emerald-500",
           },
           {
-            id: 'add-market',
+            id: "add-market",
             icon: <ShoppingCart size={20} />,
-            label: 'Al mercado',
+            label: "Al mercado",
             onClick: () => {
-              window.dispatchEvent(new CustomEvent('appNavigate', { detail: { section: 'recetario', tab: 'market' } }));
-              setTimeout(() => window.dispatchEvent(new CustomEvent('openAddMarketItem')), 100);
+              navigateTo("recetario", "market");
+              setTimeout(() => storeOpenModal("addMarketItem"), 100);
             },
-            color: 'from-blue-500 to-cyan-500'
+            color: "from-blue-500 to-cyan-500",
           },
           {
-            id: 'calendar',
+            id: "calendar",
             icon: <Calendar size={20} />,
-            label: 'Calendario',
+            label: "Calendario",
             onClick: () => {
-              window.dispatchEvent(new CustomEvent('appNavigate', { detail: { section: 'recetario', tab: 'calendar' } }));
+              navigateTo("recetario", "calendar");
             },
-            color: 'from-orange-500 to-amber-500'
-          }
+            color: "from-orange-500 to-amber-500",
+          },
         ];
 
-      case 'hogar':
+      case "hogar":
         return [
           {
-            id: 'quick-routine',
+            id: "quick-routine",
             icon: <Zap size={20} />,
-            label: 'Rutina rápida',
+            label: "Rutina rápida",
             onClick: () => {
-              window.dispatchEvent(new CustomEvent('openRoutinePanel'));
+              storeOpenModal("routinePanel");
             },
-            color: 'from-purple-500 to-indigo-500'
+            color: "from-purple-500 to-indigo-500",
           },
           {
-            id: 'new-space',
+            id: "new-space",
             icon: <Home size={20} />,
-            label: 'Nuevo espacio',
+            label: "Nuevo espacio",
             onClick: () => {
-              window.dispatchEvent(new CustomEvent('openSpacesPanel'));
+              storeOpenModal("spacesPanel");
             },
-            color: 'from-blue-500 to-cyan-500'
+            color: "from-blue-500 to-cyan-500",
           },
           {
-            id: 'new-employee',
+            id: "new-employee",
             icon: <Users size={20} />,
-            label: 'Empleado',
+            label: "Empleado",
             onClick: () => {
-              window.dispatchEvent(new CustomEvent('openEmployeesPanel'));
+              storeOpenModal("employeesPanel");
             },
-            color: 'from-green-500 to-emerald-500'
+            color: "from-green-500 to-emerald-500",
           },
           {
-            id: 'new-task',
+            id: "new-task",
             icon: <ClipboardList size={20} />,
-            label: 'Nueva tarea',
+            label: "Nueva tarea",
             onClick: () => {
-              window.dispatchEvent(new CustomEvent('openTaskModal'));
+              storeOpenModal("taskModal");
             },
-            color: 'from-orange-500 to-amber-500'
-          }
+            color: "from-orange-500 to-amber-500",
+          },
         ];
 
-      case 'ajustes':
+      case "ajustes":
         return [
           {
-            id: 'suggestions',
+            id: "suggestions",
             icon: <Sparkles size={20} />,
-            label: 'Sugerencias IA',
+            label: "Sugerencias IA",
             onClick: () => {
-              window.dispatchEvent(new CustomEvent('appNavigate', { detail: { section: 'recetario', tab: 'suggestions' } }));
+              navigateTo("recetario", "suggestions");
             },
-            color: 'from-purple-500 to-indigo-500'
+            color: "from-purple-500 to-indigo-500",
           },
           {
-            id: 'recipes',
+            id: "recipes",
             icon: <BookOpen size={20} />,
-            label: 'Recetas',
+            label: "Recetas",
             onClick: () => {
-              window.dispatchEvent(new CustomEvent('appNavigate', { detail: { section: 'recetario', tab: 'recipes' } }));
+              navigateTo("recetario", "recipes");
             },
-            color: 'from-green-500 to-emerald-500'
+            color: "from-green-500 to-emerald-500",
           },
           {
-            id: 'hogar',
+            id: "hogar",
             icon: <Home size={20} />,
-            label: 'Tareas hogar',
+            label: "Tareas hogar",
             onClick: () => {
-              window.dispatchEvent(new CustomEvent('appNavigate', { detail: { section: 'hogar' } }));
+              navigateTo("hogar");
             },
-            color: 'from-blue-500 to-cyan-500'
-          }
+            color: "from-blue-500 to-cyan-500",
+          },
         ];
 
       default:
@@ -276,7 +296,7 @@ export default function SmartFAB({
             absolute bottom-20 left-1/2 -translate-x-1/2
             flex flex-col-reverse gap-2.5 items-center w-max
             transition-all duration-300 ease-out
-            ${showQuickActions ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none translate-y-4'}
+            ${showQuickActions ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none translate-y-4"}
           `}
         >
           {/* Context Quick Actions */}
@@ -291,10 +311,10 @@ export default function SmartFAB({
                 shadow-lg
                 transition-all duration-200 ease-out
                 hover:scale-[1.02] active:scale-[0.98]
-                ${showQuickActions ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}
+                ${showQuickActions ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"}
               `}
               style={{
-                transitionDelay: showQuickActions ? `${index * 50}ms` : '0ms',
+                transitionDelay: showQuickActions ? `${index * 50}ms` : "0ms",
               }}
             >
               <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
@@ -305,11 +325,13 @@ export default function SmartFAB({
           ))}
 
           {/* Hint text */}
-          <div className={`
+          <div
+            className={`
             text-white/80 text-xs text-center py-2 px-4 bg-black/20 rounded-full backdrop-blur-sm
             transition-all duration-200
-            ${showQuickActions ? 'opacity-100' : 'opacity-0'}
-          `}>
+            ${showQuickActions ? "opacity-100" : "opacity-0"}
+          `}
+          >
             Accesos rápidos
           </div>
         </div>
@@ -331,13 +353,16 @@ export default function SmartFAB({
             transition-all duration-300 ease-out
             bg-gradient-to-br from-emerald-500 to-green-600
             shadow-[0_4px_20px_rgba(16,185,129,0.5)]
-            ${showQuickActions
-              ? 'scale-110 shadow-[0_4px_30px_rgba(16,185,129,0.6)]'
-              : 'hover:scale-105 hover:shadow-[0_4px_25px_rgba(16,185,129,0.6)]'}
+            ${
+              showQuickActions
+                ? "scale-110 shadow-[0_4px_30px_rgba(16,185,129,0.6)]"
+                : "hover:scale-105 hover:shadow-[0_4px_25px_rgba(16,185,129,0.6)]"
+            }
             active:scale-95
           `}
           style={{
-            boxShadow: '0 4px 20px rgba(16,185,129,0.5), 0 0 40px rgba(16,185,129,0.2)'
+            boxShadow:
+              "0 4px 20px rgba(16,185,129,0.5), 0 0 40px rgba(16,185,129,0.2)",
           }}
         >
           {showQuickActions ? (
@@ -354,7 +379,7 @@ export default function SmartFAB({
           {/* Badge for pending proposals */}
           {!showQuickActions && pendingProposals > 0 && (
             <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold animate-bounce shadow-lg border-2 border-white">
-              {pendingProposals > 9 ? '9+' : pendingProposals}
+              {pendingProposals > 9 ? "9+" : pendingProposals}
             </span>
           )}
 

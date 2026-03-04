@@ -1,25 +1,30 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { Bell, Wifi, WifiOff } from 'lucide-react';
-import { initNotificationChecks } from '@/lib/notifications';
+import { useEffect, useState } from "react";
+import { Bell, Wifi, WifiOff } from "lucide-react";
+import {
+  initNotificationChecks,
+  stopNotificationChecks,
+} from "@/lib/notifications";
+import logger from "@/lib/logger";
 
 export default function ServiceWorkerRegistration() {
   const [isOnline, setIsOnline] = useState(true);
   const [showOfflineToast, setShowOfflineToast] = useState(false);
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | null>(null);
+  const [notificationPermission, setNotificationPermission] =
+    useState<NotificationPermission | null>(null);
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
 
   useEffect(() => {
     // Registrar service worker
-    if ('serviceWorker' in navigator) {
+    if ("serviceWorker" in navigator) {
       navigator.serviceWorker
-        .register('/sw.js')
+        .register("/sw.js")
         .then((registration) => {
-          console.log('SW registered:', registration);
+          logger.info("SW registered", { scope: registration.scope });
         })
         .catch((error) => {
-          console.log('SW registration failed:', error);
+          logger.warn("SW registration failed", { error: String(error) });
         });
     }
 
@@ -36,45 +41,48 @@ export default function ServiceWorkerRegistration() {
       setShowOfflineToast(true);
     };
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
     // Verificar permiso de notificaciones
-    if ('Notification' in window) {
+    let promptTimer: ReturnType<typeof setTimeout> | undefined;
+
+    if ("Notification" in window) {
       setNotificationPermission(Notification.permission);
 
       // Si ya están permitidas, inicializar checks
-      if (Notification.permission === 'granted') {
+      if (Notification.permission === "granted") {
         initNotificationChecks();
       }
 
       // Mostrar prompt solo si no se ha decidido
-      if (Notification.permission === 'default') {
+      if (Notification.permission === "default") {
         // Esperar un poco antes de mostrar
-        const timer = setTimeout(() => {
+        promptTimer = setTimeout(() => {
           setShowNotificationPrompt(true);
         }, 5000);
-        return () => clearTimeout(timer);
       }
     }
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+      stopNotificationChecks();
+      if (promptTimer) clearTimeout(promptTimer);
     };
   }, []);
 
   const requestNotificationPermission = async () => {
-    if ('Notification' in window) {
+    if ("Notification" in window) {
       const permission = await Notification.requestPermission();
       setNotificationPermission(permission);
       setShowNotificationPrompt(false);
 
-      if (permission === 'granted') {
+      if (permission === "granted") {
         // Mostrar notificación de prueba
-        new Notification('Notificaciones activadas', {
-          body: 'Recibirás recordatorios del recetario.',
-          icon: '/icon.svg',
+        new Notification("Notificaciones activadas", {
+          body: "Recibirás recordatorios del recetario.",
+          icon: "/icon.svg",
         });
 
         // Inicializar verificaciones de notificaciones
@@ -124,7 +132,9 @@ export default function ServiceWorkerRegistration() {
                 <Bell size={20} className="text-green-700" />
               </div>
               <div className="flex-1">
-                <p className="font-medium text-gray-800">¿Activar notificaciones?</p>
+                <p className="font-medium text-gray-800">
+                  ¿Activar notificaciones?
+                </p>
                 <p className="text-sm text-gray-600 mt-1">
                   Recibe recordatorios de comidas y alertas de stock bajo.
                 </p>

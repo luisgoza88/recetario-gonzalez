@@ -1,15 +1,34 @@
-'use client';
+"use client";
 
-import { useState, useRef, useEffect, useCallback } from 'react';
-import ReactMarkdown from 'react-markdown';
+import { useState, useRef, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import {
-  Send, Bot, User, Sparkles, Loader2,
-  Calendar, ShoppingCart, Home, UtensilsCrossed,
-  CheckCircle2, ListTodo, ChefHat, RefreshCw,
-  Clock, AlertTriangle, ChevronRight,
-  AlertCircle, TrendingUp, Mic, MicOff, Volume2, VolumeX,
-  Camera, Image as ImageIcon, X
-} from 'lucide-react';
+  Send,
+  Bot,
+  User,
+  Sparkles,
+  Loader2,
+  Calendar,
+  ShoppingCart,
+  Home,
+  UtensilsCrossed,
+  CheckCircle2,
+  ListTodo,
+  ChefHat,
+  RefreshCw,
+  Clock,
+  AlertTriangle,
+  ChevronRight,
+  AlertCircle,
+  TrendingUp,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
+  Camera,
+  Image as ImageIcon,
+  X,
+} from "lucide-react";
 import {
   saveMessage,
   loadConversationHistory,
@@ -17,15 +36,15 @@ import {
   getAIContext,
   updateContextFromMessage,
   resetSession,
-  type ConversationMessage
-} from '@/lib/ai-memory';
+  type ConversationMessage,
+} from "@/lib/ai-memory";
 import {
   generateProactiveAlerts,
   getActiveAlerts,
   dismissAlert,
   requestNotificationPermission,
-  type ProactiveAlert
-} from '@/lib/ai-notifications';
+  type ProactiveAlert,
+} from "@/lib/ai-notifications";
 import {
   getVoiceManager,
   isSpeechRecognitionSupported,
@@ -33,21 +52,25 @@ import {
   speak,
   stopSpeaking,
   formatForSpeech,
-  type VoiceManager
-} from '@/lib/voice-commands';
-import { useToast } from '@/components/ui/Toast';
+  type VoiceManager,
+} from "@/lib/voice-commands";
+import { useToast } from "@/components/ui/Toast";
+import logger from "@/lib/logger";
+
+// Lazy load react-markdown to reduce initial bundle
+const ReactMarkdown = dynamic(() => import("react-markdown"), { ssr: false });
 
 // Types for rich messages
 interface MessageAction {
   id: string;
   label: string;
   action: string;
-  variant?: 'primary' | 'secondary' | 'danger';
+  variant?: "primary" | "secondary" | "danger";
 }
 
 interface Message {
   id: string;
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   timestamp: Date;
   isLoading?: boolean;
@@ -65,41 +88,41 @@ interface QuickAction {
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
-    id: 'menu-today',
-    label: 'Menu de la semana',
+    id: "menu-today",
+    label: "Menu de la semana",
     icon: <Calendar size={16} />,
-    prompt: '¿Cuál es el menú para esta semana?',
-    color: 'bg-green-50 text-green-700 hover:bg-green-100'
+    prompt: "¿Cuál es el menú para esta semana?",
+    color: "bg-green-50 text-green-700 hover:bg-green-100",
   },
   {
-    id: 'suggest-recipe',
-    label: 'Sugerir receta',
+    id: "suggest-recipe",
+    label: "Sugerir receta",
     icon: <ChefHat size={16} />,
-    prompt: 'Sugiere una receta con los ingredientes que tengo disponibles',
-    color: 'bg-orange-50 text-orange-700 hover:bg-orange-100'
+    prompt: "Sugiere una receta con los ingredientes que tengo disponibles",
+    color: "bg-orange-50 text-orange-700 hover:bg-orange-100",
   },
   {
-    id: 'tasks-status',
-    label: 'Estado tareas',
+    id: "tasks-status",
+    label: "Estado tareas",
     icon: <Home size={16} />,
-    prompt: '¿Cómo va el progreso de las tareas de hoy?',
-    color: 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+    prompt: "¿Cómo va el progreso de las tareas de hoy?",
+    color: "bg-blue-50 text-blue-700 hover:bg-blue-100",
   },
   {
-    id: 'shopping-list',
-    label: 'Lista de compras',
+    id: "shopping-list",
+    label: "Lista de compras",
     icon: <ShoppingCart size={16} />,
-    prompt: '¿Qué necesito comprar?',
-    color: 'bg-purple-50 text-purple-700 hover:bg-purple-100'
+    prompt: "¿Qué necesito comprar?",
+    color: "bg-purple-50 text-purple-700 hover:bg-purple-100",
   },
 ];
 
 const SUGGESTION_CHIPS = [
-  '¿Qué hay para almorzar hoy?',
-  '¿Qué ingredientes me faltan para hoy?',
-  'Dame el reporte semanal',
-  '¿Qué ingredientes tengo bajos?',
-  'Consejos de preparación para hoy',
+  "¿Qué hay para almorzar hoy?",
+  "¿Qué ingredientes me faltan para hoy?",
+  "Dame el reporte semanal",
+  "¿Qué ingredientes tengo bajos?",
+  "Consejos de preparación para hoy",
 ];
 
 // Action Button Component
@@ -111,9 +134,9 @@ interface ActionButtonProps {
 
 function ActionButton({ action, onAction, disabled }: ActionButtonProps) {
   const variants = {
-    primary: 'bg-purple-600 text-white hover:bg-purple-700',
-    secondary: 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-    danger: 'bg-red-100 text-red-700 hover:bg-red-200',
+    primary: "bg-purple-600 text-white hover:bg-purple-700",
+    secondary: "bg-gray-100 text-gray-700 hover:bg-gray-200",
+    danger: "bg-red-100 text-red-700 hover:bg-red-200",
   };
 
   return (
@@ -123,7 +146,7 @@ function ActionButton({ action, onAction, disabled }: ActionButtonProps) {
       className={`
         px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
         flex items-center gap-1.5 disabled:opacity-50
-        ${variants[action.variant || 'secondary']}
+        ${variants[action.variant || "secondary"]}
       `}
     >
       {action.label}
@@ -133,53 +156,58 @@ function ActionButton({ action, onAction, disabled }: ActionButtonProps) {
 }
 
 // Parse message content for special formatting
-function parseMessageContent(content: string): { text: string; actions: MessageAction[] } {
+function parseMessageContent(content: string): {
+  text: string;
+  actions: MessageAction[];
+} {
   const actions: MessageAction[] = [];
 
   // Detect patterns for suggested actions
-  if (content.includes('¿Quieres que') || content.includes('¿Los agrego')) {
+  if (content.includes("¿Quieres que") || content.includes("¿Los agrego")) {
     actions.push({
-      id: 'confirm-yes',
-      label: 'Sí, agregar',
-      action: 'confirm:yes',
-      variant: 'primary'
+      id: "confirm-yes",
+      label: "Sí, agregar",
+      action: "confirm:yes",
+      variant: "primary",
     });
     actions.push({
-      id: 'confirm-no',
-      label: 'No, gracias',
-      action: 'confirm:no',
-      variant: 'secondary'
+      id: "confirm-no",
+      label: "No, gracias",
+      action: "confirm:no",
+      variant: "secondary",
     });
   }
 
   // Detect recipe mentions for "ver receta" action
-  const recipeMatch = content.match(/(?:preparar|cocinar|receta[s]?[:]?\s*)[""]?([^"".\n]+)[""]?/i);
+  const recipeMatch = content.match(
+    /(?:preparar|cocinar|receta[s]?[:]?\s*)[""]?([^"".\n]+)[""]?/i,
+  );
   if (recipeMatch) {
     actions.push({
-      id: 'view-recipe',
-      label: 'Ver receta completa',
+      id: "view-recipe",
+      label: "Ver receta completa",
       action: `view_recipe:${recipeMatch[1].trim()}`,
-      variant: 'secondary'
+      variant: "secondary",
     });
   }
 
   // Detect low inventory alerts
-  if (content.includes('bajo') && content.includes('inventario')) {
+  if (content.includes("bajo") && content.includes("inventario")) {
     actions.push({
-      id: 'add-to-list',
-      label: 'Agregar todos a lista',
-      action: 'add_low_to_shopping',
-      variant: 'primary'
+      id: "add-to-list",
+      label: "Agregar todos a lista",
+      action: "add_low_to_shopping",
+      variant: "primary",
     });
   }
 
   // Detect missing ingredients
-  if (content.includes('faltan') || content.includes('faltantes')) {
+  if (content.includes("faltan") || content.includes("faltantes")) {
     actions.push({
-      id: 'add-missing',
-      label: 'Agregar faltantes a compras',
-      action: 'add_missing_to_shopping',
-      variant: 'primary'
+      id: "add-missing",
+      label: "Agregar faltantes a compras",
+      action: "add_missing_to_shopping",
+      variant: "primary",
     });
   }
 
@@ -193,10 +221,16 @@ function FormattedMessage({ content }: { content: string }) {
       <ReactMarkdown
         components={{
           p: ({ children }) => <p className="my-1">{children}</p>,
-          ul: ({ children }) => <ul className="list-disc pl-4 my-1">{children}</ul>,
-          ol: ({ children }) => <ol className="list-decimal pl-4 my-1">{children}</ol>,
+          ul: ({ children }) => (
+            <ul className="list-disc pl-4 my-1">{children}</ul>
+          ),
+          ol: ({ children }) => (
+            <ol className="list-decimal pl-4 my-1">{children}</ol>
+          ),
           li: ({ children }) => <li className="my-0">{children}</li>,
-          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+          strong: ({ children }) => (
+            <strong className="font-semibold">{children}</strong>
+          ),
         }}
       >
         {content}
@@ -208,7 +242,7 @@ function FormattedMessage({ content }: { content: string }) {
 export default function AIChat() {
   const toast = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
@@ -218,7 +252,7 @@ export default function AIChat() {
   const [isListening, setIsListening] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(false);
-  const [interimTranscript, setInterimTranscript] = useState('');
+  const [interimTranscript, setInterimTranscript] = useState("");
   // Image state
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showImageOptions, setShowImageOptions] = useState(false);
@@ -229,7 +263,7 @@ export default function AIChat() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
   // Load conversation history and alerts on mount
@@ -238,12 +272,14 @@ export default function AIChat() {
       try {
         const history = await loadConversationHistory(20);
         if (history.length > 0) {
-          const loadedMessages: Message[] = history.map((msg: ConversationMessage) => ({
-            id: msg.id,
-            role: msg.role,
-            content: msg.content,
-            timestamp: new Date(msg.created_at),
-          }));
+          const loadedMessages: Message[] = history.map(
+            (msg: ConversationMessage) => ({
+              id: msg.id,
+              role: msg.role,
+              content: msg.content,
+              timestamp: new Date(msg.created_at),
+            }),
+          );
           setMessages(loadedMessages);
           setShowWelcome(false);
         }
@@ -255,7 +291,7 @@ export default function AIChat() {
         // Request notification permission
         requestNotificationPermission();
       } catch (error) {
-        console.error('Error loading conversation history:', error);
+        console.error("Error loading conversation history:", error);
       } finally {
         setIsLoadingHistory(false);
       }
@@ -266,10 +302,13 @@ export default function AIChat() {
 
   // Refresh alerts periodically
   useEffect(() => {
-    const interval = setInterval(async () => {
-      const activeAlerts = getActiveAlerts();
-      setAlerts(activeAlerts);
-    }, 5 * 60 * 1000); // Every 5 minutes
+    const interval = setInterval(
+      async () => {
+        const activeAlerts = getActiveAlerts();
+        setAlerts(activeAlerts);
+      },
+      5 * 60 * 1000,
+    ); // Every 5 minutes
 
     return () => clearInterval(interval);
   }, []);
@@ -306,7 +345,7 @@ export default function AIChat() {
       onResult: (transcript, isFinal) => {
         if (isFinal) {
           setInput(transcript);
-          setInterimTranscript('');
+          setInterimTranscript("");
           setIsListening(false);
           // Auto-send after brief delay
           setTimeout(() => {
@@ -319,25 +358,25 @@ export default function AIChat() {
         }
       },
       onError: (error) => {
-        console.error('Voice error:', error);
+        console.error("Voice error:", error);
         setIsListening(false);
-        setInterimTranscript('');
+        setInterimTranscript("");
       },
       onEnd: () => {
         setIsListening(false);
-      }
+      },
     });
 
     if (started) {
       setIsListening(true);
-      setInterimTranscript('');
+      setInterimTranscript("");
     }
   };
 
   const stopListening = () => {
     voiceManagerRef.current?.stop();
     setIsListening(false);
-    setInterimTranscript('');
+    setInterimTranscript("");
   };
 
   const toggleListening = () => {
@@ -368,7 +407,7 @@ export default function AIChat() {
     if (file) {
       // Check file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        toast.warning('La imagen es muy grande. Máximo 5MB.');
+        toast.warning("La imagen es muy grande. Máximo 5MB.");
         return;
       }
 
@@ -380,7 +419,7 @@ export default function AIChat() {
       reader.readAsDataURL(file);
     }
     // Reset input
-    e.target.value = '';
+    e.target.value = "";
   };
 
   const removeSelectedImage = () => {
@@ -398,8 +437,8 @@ export default function AIChat() {
 
     const userMessage: Message = {
       id: generateId(),
-      role: 'user',
-      content: content.trim() || (imageToSend ? '📷 Imagen enviada' : ''),
+      role: "user",
+      content: content.trim() || (imageToSend ? "📷 Imagen enviada" : ""),
       timestamp: new Date(),
       image: imageToSend || undefined,
     };
@@ -407,30 +446,30 @@ export default function AIChat() {
     // Agregar mensaje del usuario y placeholder de loading
     const loadingMessage: Message = {
       id: generateId(),
-      role: 'assistant',
-      content: '',
+      role: "assistant",
+      content: "",
       timestamp: new Date(),
       isLoading: true,
     };
 
-    setMessages(prev => [...prev, userMessage, loadingMessage]);
-    setInput('');
+    setMessages((prev) => [...prev, userMessage, loadingMessage]);
+    setInput("");
     setSelectedImage(null); // Clear image after capturing
     setIsLoading(true);
 
     // Save user message to database (don't await)
-    saveMessage('user', userMessage.content).catch(console.error);
-    updateContextFromMessage(userMessage.content, 'user').catch(console.error);
+    saveMessage("user", userMessage.content).catch(console.error);
+    updateContextFromMessage(userMessage.content, "user").catch(console.error);
 
     try {
       // Preparar historial para la API (últimos 10 mensajes)
       // Note: Images are only sent for the current message, not history
       const historyMessages = [...messages]
-        .filter(m => !m.isLoading)
+        .filter((m) => !m.isLoading)
         .slice(-9) // -9 to leave room for current message with image
-        .map(m => ({
+        .map((m) => ({
           role: m.role,
-          content: m.content
+          content: m.content,
           // Don't include images from history to save bandwidth
         }));
 
@@ -438,7 +477,7 @@ export default function AIChat() {
       const currentMessage = {
         role: userMessage.role,
         content: userMessage.content,
-        image: imageToSend || undefined
+        image: imageToSend || undefined,
       };
 
       const history = [...historyMessages, currentMessage];
@@ -446,24 +485,24 @@ export default function AIChat() {
       // Get conversation context for enhanced prompt
       const conversationContext = await getAIContext();
 
-      const response = await fetch('/api/ai-assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/ai-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: history,
           conversationContext,
-          stream: true  // Habilitar streaming
+          stream: true, // Habilitar streaming
         }),
       });
 
       // Verificar si es streaming (text/event-stream) o JSON normal
-      const contentType = response.headers.get('content-type') || '';
+      const contentType = response.headers.get("content-type") || "";
 
-      if (contentType.includes('text/event-stream')) {
+      if (contentType.includes("text/event-stream")) {
         // Procesar respuesta en streaming
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
-        let fullContent = '';
+        let fullContent = "";
 
         if (reader) {
           while (true) {
@@ -471,21 +510,21 @@ export default function AIChat() {
             if (done) break;
 
             const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n');
+            const lines = chunk.split("\n");
 
             for (const line of lines) {
-              if (line.startsWith('data: ')) {
+              if (line.startsWith("data: ")) {
                 try {
                   const data = JSON.parse(line.slice(6));
                   if (data.content && !data.done) {
                     fullContent += data.content;
                     // Actualizar mensaje en tiempo real
-                    setMessages(prev =>
-                      prev.map(m =>
+                    setMessages((prev) =>
+                      prev.map((m) =>
                         m.isLoading
                           ? { ...m, content: fullContent, isLoading: true }
-                          : m
-                      )
+                          : m,
+                      ),
                     );
                   }
                 } catch {
@@ -497,27 +536,30 @@ export default function AIChat() {
         }
 
         // Finalizar el mensaje
-        const assistantContent = fullContent || 'No pude procesar tu solicitud.';
+        const assistantContent =
+          fullContent || "No pude procesar tu solicitud.";
 
         // Save assistant message to database (don't await)
-        saveMessage('assistant', assistantContent).catch(console.error);
-        updateContextFromMessage(assistantContent, 'assistant').catch(console.error);
+        saveMessage("assistant", assistantContent).catch(console.error);
+        updateContextFromMessage(assistantContent, "assistant").catch(
+          console.error,
+        );
 
         // Speak the response if TTS is enabled
         speakResponse(assistantContent);
 
         // Marcar mensaje como completado (quitar isLoading)
-        setMessages(prev =>
-          prev.map(m =>
+        setMessages((prev) =>
+          prev.map((m) =>
             m.isLoading
               ? {
                   id: m.id,
-                  role: 'assistant',
+                  role: "assistant",
                   content: assistantContent,
                   timestamp: new Date(),
                 }
-              : m
-          )
+              : m,
+          ),
         );
       } else {
         // Fallback: respuesta JSON normal (sin streaming)
@@ -527,43 +569,47 @@ export default function AIChat() {
           throw new Error(data.error);
         }
 
-        const assistantContent = data.content || 'No pude procesar tu solicitud.';
+        const assistantContent =
+          data.content || "No pude procesar tu solicitud.";
 
         // Save assistant message to database (don't await)
-        saveMessage('assistant', assistantContent).catch(console.error);
-        updateContextFromMessage(assistantContent, 'assistant').catch(console.error);
+        saveMessage("assistant", assistantContent).catch(console.error);
+        updateContextFromMessage(assistantContent, "assistant").catch(
+          console.error,
+        );
 
         // Speak the response if TTS is enabled
         speakResponse(assistantContent);
 
         // Reemplazar mensaje de loading con respuesta real
-        setMessages(prev =>
-          prev.map(m =>
+        setMessages((prev) =>
+          prev.map((m) =>
             m.isLoading
               ? {
                   id: m.id,
-                  role: 'assistant',
+                  role: "assistant",
                   content: assistantContent,
                   timestamp: new Date(),
                 }
-              : m
-          )
+              : m,
+          ),
         );
       }
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error("Error sending message:", error);
       // Reemplazar loading con mensaje de error
-      setMessages(prev =>
-        prev.map(m =>
+      setMessages((prev) =>
+        prev.map((m) =>
           m.isLoading
             ? {
                 id: m.id,
-                role: 'assistant',
-                content: 'Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta de nuevo.',
+                role: "assistant",
+                content:
+                  "Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta de nuevo.",
                 timestamp: new Date(),
               }
-            : m
-        )
+            : m,
+        ),
       );
     } finally {
       setIsLoading(false);
@@ -579,7 +625,7 @@ export default function AIChat() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage(input);
     }
@@ -594,49 +640,54 @@ export default function AIChat() {
   };
 
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString("es-ES", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   // Handle action button clicks
   const handleAction = async (action: string) => {
-    const [actionType, ...params] = action.split(':');
-    const param = params.join(':');
+    const [actionType, ...params] = action.split(":");
+    const param = params.join(":");
 
     switch (actionType) {
-      case 'confirm':
-        if (param === 'yes') {
+      case "confirm":
+        if (param === "yes") {
           // Find the last assistant message mentioning items
-          const lastMsg = messages.filter(m => m.role === 'assistant').pop();
-          if (lastMsg?.content.includes('Huevos')) {
-            sendMessage('Sí, agrega los huevos a la lista');
+          const lastMsg = messages.filter((m) => m.role === "assistant").pop();
+          if (lastMsg?.content.includes("Huevos")) {
+            sendMessage("Sí, agrega los huevos a la lista");
           } else {
-            sendMessage('Sí, agrégalo');
+            sendMessage("Sí, agrégalo");
           }
         }
         break;
 
-      case 'view_recipe':
+      case "view_recipe":
         sendMessage(`Muéstrame los detalles de la receta ${param}`);
         break;
 
-      case 'add_low_to_shopping':
-        sendMessage('Agrega todos los ingredientes bajos a la lista de compras');
+      case "add_low_to_shopping":
+        sendMessage(
+          "Agrega todos los ingredientes bajos a la lista de compras",
+        );
         break;
 
-      case 'add_missing_to_shopping':
-        sendMessage('Agrega los ingredientes faltantes a la lista de compras');
+      case "add_missing_to_shopping":
+        sendMessage("Agrega los ingredientes faltantes a la lista de compras");
         break;
 
-      case 'view_tasks':
-        sendMessage('¿Cómo van las tareas de hoy?');
+      case "view_tasks":
+        sendMessage("¿Cómo van las tareas de hoy?");
         break;
 
-      case 'view_inventory':
-        sendMessage('Muéstrame el estado del inventario');
+      case "view_inventory":
+        sendMessage("Muéstrame el estado del inventario");
         break;
 
       default:
-        console.log('Unknown action:', action);
+        logger.warn("Unknown action", { action });
     }
   };
 
@@ -652,26 +703,34 @@ export default function AIChat() {
   // Dismiss alert
   const handleDismissAlert = (alertId: string) => {
     dismissAlert(alertId);
-    setAlerts(prev => prev.filter(a => a.id !== alertId));
+    setAlerts((prev) => prev.filter((a) => a.id !== alertId));
   };
 
   // Get priority color
-  const getPriorityColor = (priority: ProactiveAlert['priority']) => {
+  const getPriorityColor = (priority: ProactiveAlert["priority"]) => {
     switch (priority) {
-      case 'high': return 'bg-red-50 border-red-200 text-red-800';
-      case 'medium': return 'bg-amber-50 border-amber-200 text-amber-800';
-      case 'low': return 'bg-blue-50 border-blue-200 text-blue-800';
+      case "high":
+        return "bg-red-50 border-red-200 text-red-800";
+      case "medium":
+        return "bg-amber-50 border-amber-200 text-amber-800";
+      case "low":
+        return "bg-blue-50 border-blue-200 text-blue-800";
     }
   };
 
   // Get priority icon
-  const getPriorityIcon = (type: ProactiveAlert['type']) => {
+  const getPriorityIcon = (type: ProactiveAlert["type"]) => {
     switch (type) {
-      case 'inventory_alert': return <AlertTriangle size={16} className="text-red-500" />;
-      case 'meal_reminder': return <UtensilsCrossed size={16} className="text-amber-500" />;
-      case 'task_reminder': return <ListTodo size={16} className="text-blue-500" />;
-      case 'prep_tip': return <Clock size={16} className="text-green-500" />;
-      case 'weekly_summary': return <TrendingUp size={16} className="text-purple-500" />;
+      case "inventory_alert":
+        return <AlertTriangle size={16} className="text-red-500" />;
+      case "meal_reminder":
+        return <UtensilsCrossed size={16} className="text-amber-500" />;
+      case "task_reminder":
+        return <ListTodo size={16} className="text-blue-500" />;
+      case "prep_tip":
+        return <Clock size={16} className="text-green-500" />;
+      case "weekly_summary":
+        return <TrendingUp size={16} className="text-purple-500" />;
     }
   };
 
@@ -686,7 +745,9 @@ export default function AIChat() {
             </div>
             <div>
               <h1 className="font-semibold">Asistente IA</h1>
-              <p className="text-sm text-purple-200">Tu ayudante para el hogar</p>
+              <p className="text-sm text-purple-200">
+                Tu ayudante para el hogar
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -721,7 +782,9 @@ export default function AIChat() {
       {showAlerts && alerts.length > 0 && (
         <div className="absolute top-16 right-2 left-2 z-50 bg-white rounded-xl shadow-xl border max-h-80 overflow-y-auto">
           <div className="p-3 border-b flex items-center justify-between sticky top-0 bg-white">
-            <h3 className="font-semibold text-gray-800">Alertas inteligentes</h3>
+            <h3 className="font-semibold text-gray-800">
+              Alertas inteligentes
+            </h3>
             <button
               onClick={() => setShowAlerts(false)}
               className="text-gray-400 hover:text-gray-600"
@@ -730,7 +793,7 @@ export default function AIChat() {
             </button>
           </div>
           <div className="p-2 space-y-2">
-            {alerts.map(alert => (
+            {alerts.map((alert) => (
               <div
                 key={alert.id}
                 className={`p-3 rounded-lg border ${getPriorityColor(alert.priority)}`}
@@ -739,7 +802,9 @@ export default function AIChat() {
                   {getPriorityIcon(alert.type)}
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm">{alert.title}</p>
-                    <p className="text-xs mt-0.5 whitespace-pre-line">{alert.body}</p>
+                    <p className="text-xs mt-0.5 whitespace-pre-line">
+                      {alert.body}
+                    </p>
                     <div className="flex items-center gap-2 mt-2">
                       {alert.actionable && (
                         <button
@@ -767,7 +832,7 @@ export default function AIChat() {
       {/* Quick Actions - Scroll horizontal */}
       <div className="flex-shrink-0 bg-white border-b">
         <div className="flex gap-2 p-3 overflow-x-auto scrollbar-hide">
-          {QUICK_ACTIONS.map(action => (
+          {QUICK_ACTIONS.map((action) => (
             <button
               key={action.id}
               onClick={() => handleQuickAction(action)}
@@ -800,7 +865,8 @@ export default function AIChat() {
               ¿En qué puedo ayudarte?
             </h2>
             <p className="text-gray-500 text-center mb-4 text-sm max-w-xs">
-              Puedo consultar el menú, sugerir recetas, gestionar tareas del hogar y mucho más.
+              Puedo consultar el menú, sugerir recetas, gestionar tareas del
+              hogar y mucho más.
             </p>
 
             {/* Suggestion Chips */}
@@ -819,11 +885,17 @@ export default function AIChat() {
             {/* Capabilities */}
             <div className="grid grid-cols-2 gap-2 w-full max-w-xs">
               <div className="bg-white p-2.5 rounded-xl border text-center">
-                <UtensilsCrossed size={20} className="mx-auto mb-1 text-green-600" />
+                <UtensilsCrossed
+                  size={20}
+                  className="mx-auto mb-1 text-green-600"
+                />
                 <p className="text-xs text-gray-600">Recetas y Menú</p>
               </div>
               <div className="bg-white p-2.5 rounded-xl border text-center">
-                <ShoppingCart size={20} className="mx-auto mb-1 text-purple-600" />
+                <ShoppingCart
+                  size={20}
+                  className="mx-auto mb-1 text-purple-600"
+                />
                 <p className="text-xs text-gray-600">Lista de Compras</p>
               </div>
               <div className="bg-white p-2.5 rounded-xl border text-center">
@@ -831,7 +903,10 @@ export default function AIChat() {
                 <p className="text-xs text-gray-600">Tareas del Hogar</p>
               </div>
               <div className="bg-white p-2.5 rounded-xl border text-center">
-                <CheckCircle2 size={20} className="mx-auto mb-1 text-amber-600" />
+                <CheckCircle2
+                  size={20}
+                  className="mx-auto mb-1 text-amber-600"
+                />
                 <p className="text-xs text-gray-600">Progreso Diario</p>
               </div>
             </div>
@@ -839,30 +914,36 @@ export default function AIChat() {
         ) : (
           // Messages List
           <div className="p-4 space-y-4">
-            {messages.map(message => (
+            {messages.map((message) => (
               <div
                 key={message.id}
-                className={`flex gap-3 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
+                className={`flex gap-3 ${message.role === "user" ? "flex-row-reverse" : ""}`}
               >
                 {/* Avatar */}
-                <div className={`
+                <div
+                  className={`
                   w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0
-                  ${message.role === 'user' ? 'bg-green-100' : 'bg-purple-100'}
-                `}>
-                  {message.role === 'user'
-                    ? <User size={18} className="text-green-600" />
-                    : <Sparkles size={18} className="text-purple-600" />
-                  }
+                  ${message.role === "user" ? "bg-green-100" : "bg-purple-100"}
+                `}
+                >
+                  {message.role === "user" ? (
+                    <User size={18} className="text-green-600" />
+                  ) : (
+                    <Sparkles size={18} className="text-purple-600" />
+                  )}
                 </div>
 
                 {/* Message Bubble */}
-                <div className={`
+                <div
+                  className={`
                   max-w-[85%] rounded-2xl
-                  ${message.role === 'user'
-                    ? 'bg-green-600 text-white rounded-br-md p-3'
-                    : 'bg-white shadow-sm border rounded-bl-md'
+                  ${
+                    message.role === "user"
+                      ? "bg-green-600 text-white rounded-br-md p-3"
+                      : "bg-white shadow-sm border rounded-bl-md"
                   }
-                `}>
+                `}
+                >
                   {message.isLoading && !message.content ? (
                     // Still thinking - no content yet
                     <div className="flex items-center gap-2 text-purple-600 p-3">
@@ -874,12 +955,21 @@ export default function AIChat() {
                     <div className="p-3">
                       <FormattedMessage content={message.content} />
                       <div className="flex items-center gap-1 mt-2 text-purple-400">
-                        <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        <span
+                          className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce"
+                          style={{ animationDelay: "0ms" }}
+                        />
+                        <span
+                          className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce"
+                          style={{ animationDelay: "150ms" }}
+                        />
+                        <span
+                          className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce"
+                          style={{ animationDelay: "300ms" }}
+                        />
                       </div>
                     </div>
-                  ) : message.role === 'user' ? (
+                  ) : message.role === "user" ? (
                     // User message - text + optional image
                     <>
                       {/* Show image if present */}
@@ -893,11 +983,16 @@ export default function AIChat() {
                         </div>
                       )}
                       {/* Only show text if it's not just the placeholder */}
-                      {message.content && message.content !== '📷 Imagen enviada' && (
-                        <p className="text-sm whitespace-pre-line">{message.content}</p>
-                      )}
-                      {message.content === '📷 Imagen enviada' && (
-                        <p className="text-sm text-green-200 italic">Analiza esta imagen</p>
+                      {message.content &&
+                        message.content !== "📷 Imagen enviada" && (
+                          <p className="text-sm whitespace-pre-line">
+                            {message.content}
+                          </p>
+                        )}
+                      {message.content === "📷 Imagen enviada" && (
+                        <p className="text-sm text-green-200 italic">
+                          Analiza esta imagen
+                        </p>
                       )}
                       <p className="text-xs mt-1 text-green-200">
                         {formatTime(message.timestamp)}
@@ -906,7 +1001,9 @@ export default function AIChat() {
                   ) : (
                     // Assistant message - formatted with potential actions
                     (() => {
-                      const { text, actions } = parseMessageContent(message.content);
+                      const { text, actions } = parseMessageContent(
+                        message.content,
+                      );
                       return (
                         <div className="p-3">
                           <FormattedMessage content={text} />
@@ -914,7 +1011,7 @@ export default function AIChat() {
                           {/* Action Buttons */}
                           {actions.length > 0 && (
                             <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100">
-                              {actions.map(action => (
+                              {actions.map((action) => (
                                 <ActionButton
                                   key={action.id}
                                   action={action}
@@ -945,7 +1042,7 @@ export default function AIChat() {
         <div className="px-4 py-2 bg-purple-50 border-t flex items-center gap-2">
           <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
           <span className="text-sm text-purple-700">
-            {interimTranscript || 'Escuchando...'}
+            {interimTranscript || "Escuchando..."}
           </span>
           <button
             onClick={stopListening}
@@ -1028,8 +1125,8 @@ export default function AIChat() {
             disabled={isLoading || isListening}
             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
               selectedImage
-                ? 'bg-purple-100 text-purple-600'
-                : 'bg-gray-100 text-gray-500 hover:bg-purple-50 hover:text-purple-600'
+                ? "bg-purple-100 text-purple-600"
+                : "bg-gray-100 text-gray-500 hover:bg-purple-50 hover:text-purple-600"
             }`}
             title="Enviar imagen"
           >
@@ -1042,10 +1139,10 @@ export default function AIChat() {
               onClick={toggleTTS}
               className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
                 ttsEnabled
-                  ? 'bg-purple-100 text-purple-600'
-                  : 'bg-gray-100 text-gray-400'
+                  ? "bg-purple-100 text-purple-600"
+                  : "bg-gray-100 text-gray-400"
               }`}
-              title={ttsEnabled ? 'Desactivar voz' : 'Activar voz'}
+              title={ttsEnabled ? "Desactivar voz" : "Activar voz"}
             >
               {ttsEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
             </button>
@@ -1057,7 +1154,13 @@ export default function AIChat() {
             value={isListening ? interimTranscript : input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={selectedImage ? 'Describe la imagen (opcional)...' : (isListening ? 'Escuchando...' : 'Escribe tu pregunta...')}
+            placeholder={
+              selectedImage
+                ? "Describe la imagen (opcional)..."
+                : isListening
+                  ? "Escuchando..."
+                  : "Escribe tu pregunta..."
+            }
             disabled={isLoading || isListening}
             className="flex-1 px-4 py-3 bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
           />
@@ -1069,12 +1172,13 @@ export default function AIChat() {
               disabled={isLoading}
               className={`
                 w-12 h-12 rounded-full flex items-center justify-center transition-all
-                ${isListening
-                  ? 'bg-red-500 text-white animate-pulse shadow-lg'
-                  : 'bg-gray-100 text-gray-600 hover:bg-purple-100 hover:text-purple-600'
+                ${
+                  isListening
+                    ? "bg-red-500 text-white animate-pulse shadow-lg"
+                    : "bg-gray-100 text-gray-600 hover:bg-purple-100 hover:text-purple-600"
                 }
               `}
-              title={isListening ? 'Detener' : 'Hablar'}
+              title={isListening ? "Detener" : "Hablar"}
             >
               {isListening ? <MicOff size={20} /> : <Mic size={20} />}
             </button>
@@ -1083,12 +1187,15 @@ export default function AIChat() {
           {/* Send Button */}
           <button
             onClick={() => sendMessage(input)}
-            disabled={(!input.trim() && !selectedImage) || isLoading || isListening}
+            disabled={
+              (!input.trim() && !selectedImage) || isLoading || isListening
+            }
             className={`
               w-12 h-12 rounded-full flex items-center justify-center transition-all
-              ${(input.trim() || selectedImage) && !isLoading && !isListening
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg hover:shadow-xl'
-                : 'bg-gray-200 text-gray-400'
+              ${
+                (input.trim() || selectedImage) && !isLoading && !isListening
+                  ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg hover:shadow-xl"
+                  : "bg-gray-200 text-gray-400"
               }
             `}
           >

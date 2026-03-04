@@ -1,149 +1,162 @@
-'use client'
+"use client";
 
-import { useState, useRef } from 'react'
-import { Upload, X, Image as ImageIcon, Loader2 } from 'lucide-react'
-import { supabase } from '@/lib/supabase/client'
+import { useState, useRef } from "react";
+import { Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase/client";
 
 interface ImageUploadProps {
-  currentImageUrl?: string | null
-  onImageUploaded: (url: string | null) => void
-  bucket?: string
-  folder?: string
+  currentImageUrl?: string | null;
+  onImageUploaded: (url: string | null) => void;
+  bucket?: string;
+  folder?: string;
 }
 
 // Comprimir imagen antes de subir
-async function compressImage(file: File, maxWidth = 1200, quality = 0.8): Promise<Blob> {
+async function compressImage(
+  file: File,
+  maxWidth = 1200,
+  quality = 0.8,
+): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    const img = new Image()
+    const img = new Image();
     img.onload = () => {
-      const canvas = document.createElement('canvas')
-      let { width, height } = img
+      const canvas = document.createElement("canvas");
+      let { width, height } = img;
 
       // Redimensionar si es necesario
       if (width > maxWidth) {
-        height = (height * maxWidth) / width
-        width = maxWidth
+        height = (height * maxWidth) / width;
+        width = maxWidth;
       }
 
-      canvas.width = width
-      canvas.height = height
+      canvas.width = width;
+      canvas.height = height;
 
-      const ctx = canvas.getContext('2d')
+      const ctx = canvas.getContext("2d");
       if (!ctx) {
-        reject(new Error('No canvas context'))
-        return
+        reject(new Error("No canvas context"));
+        return;
       }
 
-      ctx.drawImage(img, 0, 0, width, height)
+      ctx.drawImage(img, 0, 0, width, height);
 
       canvas.toBlob(
         (blob) => {
           if (blob) {
-            resolve(blob)
+            resolve(blob);
           } else {
-            reject(new Error('No blob created'))
+            reject(new Error("No blob created"));
           }
         },
-        'image/jpeg',
-        quality
-      )
-    }
-    img.onerror = reject
-    img.src = URL.createObjectURL(file)
-  })
+        "image/jpeg",
+        quality,
+      );
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
 }
 
 export default function ImageUpload({
   currentImageUrl,
   onImageUploaded,
-  bucket = 'recipe-images',
-  folder = 'recipes'
+  bucket = "recipe-images",
+  folder = "recipes",
 }: ImageUploadProps) {
-  const [isUploading, setIsUploading] = useState(false)
-  const [preview, setPreview] = useState<string | null>(currentImageUrl || null)
-  const [error, setError] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isUploading, setIsUploading] = useState(false);
+  const [preview, setPreview] = useState<string | null>(
+    currentImageUrl || null,
+  );
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
+  const handleFileSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
     // Validar tipo de archivo
-    if (!file.type.startsWith('image/')) {
-      setError('Por favor selecciona una imagen')
-      return
+    if (!file.type.startsWith("image/")) {
+      setError("Por favor selecciona una imagen");
+      return;
     }
 
     // Validar tamaño (max 10MB antes de compresión)
     if (file.size > 10 * 1024 * 1024) {
-      setError('La imagen es muy grande (máximo 10MB)')
-      return
+      setError("La imagen es muy grande (máximo 10MB)");
+      return;
     }
 
-    setError(null)
-    setIsUploading(true)
+    setError(null);
+    setIsUploading(true);
 
     try {
       // Mostrar preview inmediato
-      const previewUrl = URL.createObjectURL(file)
-      setPreview(previewUrl)
+      const previewUrl = URL.createObjectURL(file);
+      setPreview(previewUrl);
 
       // Comprimir imagen
-      const compressedBlob = await compressImage(file)
+      const compressedBlob = await compressImage(file);
 
       // Generar nombre único
-      const timestamp = Date.now()
-      const randomId = Math.random().toString(36).substring(2, 8)
-      const fileName = `${folder}/${timestamp}-${randomId}.jpg`
+      const timestamp = Date.now();
+      const randomId = Math.random().toString(36).substring(2, 8);
+      const fileName = `${folder}/${timestamp}-${randomId}.jpg`;
 
       // Subir a Supabase Storage
       const { data, error: uploadError } = await supabase.storage
         .from(bucket)
         .upload(fileName, compressedBlob, {
-          contentType: 'image/jpeg',
-          upsert: false
-        })
+          contentType: "image/jpeg",
+          upsert: false,
+        });
 
       if (uploadError) {
-        console.error('Upload error:', uploadError)
+        console.error("Upload error:", uploadError);
         // Si el bucket no existe, mostrar mensaje amigable
-        if (uploadError.message.includes('not found') || uploadError.message.includes('Bucket')) {
-          setError('El storage no está configurado. Contacta al administrador.')
+        if (
+          uploadError.message.includes("not found") ||
+          uploadError.message.includes("Bucket")
+        ) {
+          setError(
+            "El storage no está configurado. Contacta al administrador.",
+          );
         } else {
-          setError('Error al subir la imagen')
+          setError("Error al subir la imagen");
         }
-        setPreview(currentImageUrl || null)
-        return
+        setPreview(currentImageUrl || null);
+        return;
       }
 
       // Obtener URL pública
       const { data: urlData } = supabase.storage
         .from(bucket)
-        .getPublicUrl(data.path)
+        .getPublicUrl(data.path);
 
-      onImageUploaded(urlData.publicUrl)
-      setPreview(urlData.publicUrl)
+      onImageUploaded(urlData.publicUrl);
+      setPreview(urlData.publicUrl);
     } catch (err) {
-      console.error('Upload error:', err)
-      setError('Error al procesar la imagen')
-      setPreview(currentImageUrl || null)
+      console.error("Upload error:", err);
+      setError("Error al procesar la imagen");
+      setPreview(currentImageUrl || null);
     } finally {
-      setIsUploading(false)
+      setIsUploading(false);
       // Limpiar input
       if (fileInputRef.current) {
-        fileInputRef.current.value = ''
+        fileInputRef.current.value = "";
       }
     }
-  }
+  };
 
   const handleRemoveImage = () => {
-    setPreview(null)
-    onImageUploaded(null)
-  }
+    setPreview(null);
+    onImageUploaded(null);
+  };
 
   const handleClick = () => {
-    fileInputRef.current?.click()
-  }
+    fileInputRef.current?.click();
+  };
 
   return (
     <div className="space-y-2">
@@ -195,7 +208,9 @@ export default function ImageUpload({
               </div>
               <div className="text-center">
                 <span className="text-sm text-gray-600">Agregar foto</span>
-                <p className="text-xs text-gray-400 mt-1">JPG, PNG (máx. 10MB)</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  JPG, PNG (máx. 10MB)
+                </p>
               </div>
               <Upload className="w-4 h-4 text-gray-400" />
             </>
@@ -203,9 +218,7 @@ export default function ImageUpload({
         </button>
       )}
 
-      {error && (
-        <p className="text-sm text-red-500">{error}</p>
-      )}
+      {error && <p className="text-sm text-red-500">{error}</p>}
     </div>
-  )
+  );
 }

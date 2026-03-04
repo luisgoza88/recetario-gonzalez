@@ -3,9 +3,9 @@
  * Considera inventario disponible, preferencias y tags dietéticos
  */
 
-import { createClient } from '@supabase/supabase-js';
-import { INGREDIENT_SUBSTITUTIONS } from '@/data/substitutions';
-import { DietaryTag } from '@/types';
+import { createClient } from "@supabase/supabase-js";
+import { INGREDIENT_SUBSTITUTIONS } from "@/data/substitutions";
+import { DietaryTag } from "@/types";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -14,12 +14,12 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 export interface SmartSubstitution {
   original: string;
   substitute: string;
-  isAvailable: boolean;      // Está en inventario
+  isAvailable: boolean; // Está en inventario
   availableQuantity?: string; // Cantidad disponible
-  reason: string;            // Por qué se sugiere
+  reason: string; // Por qué se sugiere
   dietaryCompatible: boolean; // Compatible con restricciones
-  usageCount: number;        // Veces que se ha usado esta sustitución
-  rating?: number;           // Rating promedio (1-5)
+  usageCount: number; // Veces que se ha usado esta sustitución
+  rating?: number; // Rating promedio (1-5)
 }
 
 export interface SubstitutionResult {
@@ -29,38 +29,80 @@ export interface SubstitutionResult {
 }
 
 // Cache del inventario
-let inventoryCache: Map<string, { quantity: string; number: number }> | null = null;
+let inventoryCache: Map<string, { quantity: string; number: number }> | null =
+  null;
 let inventoryCacheTime = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 
 // Mapa de sustitutos que NO son compatibles con ciertos tags
 const DIETARY_INCOMPATIBLE: Record<DietaryTag, string[]> = {
-  'vegetariano': ['pollo', 'carne', 'tocino', 'jamón', 'cerdo', 'res', 'pescado', 'mariscos'],
-  'vegano': ['pollo', 'carne', 'tocino', 'jamón', 'cerdo', 'res', 'pescado', 'mariscos', 'huevo', 'leche', 'queso', 'crema', 'mantequilla', 'yogurt', 'miel'],
-  'sin-gluten': ['pan', 'harina de trigo', 'pasta', 'galletas', 'pan rallado'],
-  'sin-lactosa': ['leche', 'queso', 'crema', 'mantequilla', 'yogurt', 'queso crema'],
-  'bajo-carbohidrato': ['azúcar', 'papa', 'arroz', 'pasta', 'pan', 'harina'],
-  'alto-proteina': [], // No restringe nada
-  'bajo-sodio': ['salsa de soya', 'caldo concentrado', 'tocino', 'jamón'],
-  'bajo-azucar': ['azúcar', 'miel', 'jarabe', 'panela'],
-  'keto': ['azúcar', 'papa', 'arroz', 'pasta', 'pan', 'harina', 'frijoles', 'maíz'],
-  'paleo': ['lácteos', 'granos', 'legumbres', 'azúcar refinada'],
+  vegetariano: [
+    "pollo",
+    "carne",
+    "tocino",
+    "jamón",
+    "cerdo",
+    "res",
+    "pescado",
+    "mariscos",
+  ],
+  vegano: [
+    "pollo",
+    "carne",
+    "tocino",
+    "jamón",
+    "cerdo",
+    "res",
+    "pescado",
+    "mariscos",
+    "huevo",
+    "leche",
+    "queso",
+    "crema",
+    "mantequilla",
+    "yogurt",
+    "miel",
+  ],
+  "sin-gluten": ["pan", "harina de trigo", "pasta", "galletas", "pan rallado"],
+  "sin-lactosa": [
+    "leche",
+    "queso",
+    "crema",
+    "mantequilla",
+    "yogurt",
+    "queso crema",
+  ],
+  "bajo-carbohidrato": ["azúcar", "papa", "arroz", "pasta", "pan", "harina"],
+  "alto-proteina": [], // No restringe nada
+  "bajo-sodio": ["salsa de soya", "caldo concentrado", "tocino", "jamón"],
+  "bajo-azucar": ["azúcar", "miel", "jarabe", "panela"],
+  keto: [
+    "azúcar",
+    "papa",
+    "arroz",
+    "pasta",
+    "pan",
+    "harina",
+    "frijoles",
+    "maíz",
+  ],
+  paleo: ["lácteos", "granos", "legumbres", "azúcar refinada"],
 };
 
 /**
  * Cargar inventario actual
  */
-async function loadInventory(): Promise<Map<string, { quantity: string; number: number }>> {
+async function loadInventory(): Promise<
+  Map<string, { quantity: string; number: number }>
+> {
   const now = Date.now();
 
-  if (inventoryCache && (now - inventoryCacheTime) < CACHE_TTL) {
+  if (inventoryCache && now - inventoryCacheTime < CACHE_TTL) {
     return inventoryCache;
   }
 
   try {
-    const { data } = await supabase
-      .from('market_items')
-      .select(`
+    const { data } = await supabase.from("market_items").select(`
         id,
         name,
         quantity,
@@ -71,12 +113,14 @@ async function loadInventory(): Promise<Map<string, { quantity: string; number: 
 
     if (data) {
       for (const item of data) {
-        const inv = item.inventory as { current_quantity: string; current_number: number }[] | null;
+        const inv = item.inventory as
+          | { current_quantity: string; current_number: number }[]
+          | null;
         if (inv && inv.length > 0 && inv[0].current_number > 0) {
-          inventoryCache.set(
-            item.name.toLowerCase(),
-            { quantity: inv[0].current_quantity, number: inv[0].current_number }
-          );
+          inventoryCache.set(item.name.toLowerCase(), {
+            quantity: inv[0].current_quantity,
+            number: inv[0].current_number,
+          });
         }
       }
     }
@@ -84,7 +128,7 @@ async function loadInventory(): Promise<Map<string, { quantity: string; number: 
     inventoryCacheTime = now;
     return inventoryCache;
   } catch (error) {
-    console.error('Error loading inventory for substitutions:', error);
+    console.error("Error loading inventory for substitutions:", error);
     return new Map();
   }
 }
@@ -92,11 +136,13 @@ async function loadInventory(): Promise<Map<string, { quantity: string; number: 
 /**
  * Cargar historial de uso de sustituciones
  */
-async function loadSubstitutionHistory(): Promise<Map<string, { count: number; rating: number }>> {
+async function loadSubstitutionHistory(): Promise<
+  Map<string, { count: number; rating: number }>
+> {
   try {
     const { data } = await supabase
-      .from('substitution_history')
-      .select('original, substitute, rating');
+      .from("substitution_history")
+      .select("original, substitute, rating");
 
     const history = new Map<string, { count: number; totalRating: number }>();
 
@@ -106,7 +152,7 @@ async function loadSubstitutionHistory(): Promise<Map<string, { count: number; r
         const existing = history.get(key) || { count: 0, totalRating: 0 };
         history.set(key, {
           count: existing.count + 1,
-          totalRating: existing.totalRating + (record.rating || 3)
+          totalRating: existing.totalRating + (record.rating || 3),
         });
       }
     }
@@ -116,7 +162,7 @@ async function loadSubstitutionHistory(): Promise<Map<string, { count: number; r
     for (const [key, value] of history) {
       result.set(key, {
         count: value.count,
-        rating: value.count > 0 ? value.totalRating / value.count : 0
+        rating: value.count > 0 ? value.totalRating / value.count : 0,
       });
     }
 
@@ -130,7 +176,10 @@ async function loadSubstitutionHistory(): Promise<Map<string, { count: number; r
 /**
  * Verificar si un sustituto es compatible con los tags dietéticos
  */
-function isDietaryCompatible(substitute: string, dietaryTags: DietaryTag[]): boolean {
+function isDietaryCompatible(
+  substitute: string,
+  dietaryTags: DietaryTag[],
+): boolean {
   if (!dietaryTags || dietaryTags.length === 0) return true;
 
   const subLower = substitute.toLowerCase();
@@ -152,14 +201,14 @@ function isDietaryCompatible(substitute: string, dietaryTags: DietaryTag[]): boo
  */
 export async function findSmartSubstitutions(
   ingredientName: string,
-  dietaryTags: DietaryTag[] = []
+  dietaryTags: DietaryTag[] = [],
 ): Promise<SubstitutionResult> {
   const nameLower = ingredientName.toLowerCase();
 
   // Cargar datos en paralelo
   const [inventory, history] = await Promise.all([
     loadInventory(),
-    loadSubstitutionHistory()
+    loadSubstitutionHistory(),
   ]);
 
   // Buscar sustituciones base
@@ -179,9 +228,9 @@ export async function findSmartSubstitutions(
   }
 
   // Enriquecer con información inteligente
-  const smartSubs: SmartSubstitution[] = baseSubstitutions.map(sub => {
+  const smartSubs: SmartSubstitution[] = baseSubstitutions.map((sub) => {
     // Extraer el nombre base del sustituto (sin paréntesis)
-    const subName = sub.split('(')[0].trim().toLowerCase();
+    const subName = sub.split("(")[0].trim().toLowerCase();
 
     // Verificar disponibilidad en inventario
     let isAvailable = false;
@@ -203,15 +252,15 @@ export async function findSmartSubstitutions(
     const usageData = history.get(historyKey) || { count: 0, rating: 0 };
 
     // Generar razón de sugerencia
-    let reason = 'Sustituto estándar';
+    let reason = "Sustituto estándar";
     if (isAvailable && dietaryCompatible) {
-      reason = '✓ Disponible en tu despensa';
+      reason = "✓ Disponible en tu despensa";
     } else if (isAvailable && !dietaryCompatible) {
-      reason = '⚠ Disponible pero no compatible con tu dieta';
+      reason = "⚠ Disponible pero no compatible con tu dieta";
     } else if (!isAvailable && dietaryCompatible) {
-      reason = 'Compatible con tu dieta';
+      reason = "Compatible con tu dieta";
     } else {
-      reason = '⚠ No compatible con restricciones dietéticas';
+      reason = "⚠ No compatible con restricciones dietéticas";
     }
 
     if (usageData.count > 0) {
@@ -226,15 +275,25 @@ export async function findSmartSubstitutions(
       reason,
       dietaryCompatible,
       usageCount: usageData.count,
-      rating: usageData.rating > 0 ? usageData.rating : undefined
+      rating: usageData.rating > 0 ? usageData.rating : undefined,
     };
   });
 
   // Ordenar: disponibles primero, luego por rating y uso
   smartSubs.sort((a, b) => {
     // Disponibles y compatibles primero
-    if (a.isAvailable && a.dietaryCompatible && !(b.isAvailable && b.dietaryCompatible)) return -1;
-    if (b.isAvailable && b.dietaryCompatible && !(a.isAvailable && a.dietaryCompatible)) return 1;
+    if (
+      a.isAvailable &&
+      a.dietaryCompatible &&
+      !(b.isAvailable && b.dietaryCompatible)
+    )
+      return -1;
+    if (
+      b.isAvailable &&
+      b.dietaryCompatible &&
+      !(a.isAvailable && a.dietaryCompatible)
+    )
+      return 1;
 
     // Luego disponibles (aunque no compatibles)
     if (a.isAvailable && !b.isAvailable) return -1;
@@ -253,7 +312,9 @@ export async function findSmartSubstitutions(
   return {
     ingredient: ingredientName,
     substitutions: smartSubs,
-    hasAvailableOption: smartSubs.some(s => s.isAvailable && s.dietaryCompatible)
+    hasAvailableOption: smartSubs.some(
+      (s) => s.isAvailable && s.dietaryCompatible,
+    ),
   };
 }
 
@@ -262,14 +323,14 @@ export async function findSmartSubstitutions(
  */
 export async function findSmartSubstitutionsForMany(
   ingredients: string[],
-  dietaryTags: DietaryTag[] = []
+  dietaryTags: DietaryTag[] = [],
 ): Promise<SubstitutionResult[]> {
   const results = await Promise.all(
-    ingredients.map(ing => findSmartSubstitutions(ing, dietaryTags))
+    ingredients.map((ing) => findSmartSubstitutions(ing, dietaryTags)),
   );
 
   // Filtrar solo los que tienen sustituciones
-  return results.filter(r => r.substitutions.length > 0);
+  return results.filter((r) => r.substitutions.length > 0);
 }
 
 /**
@@ -278,17 +339,17 @@ export async function findSmartSubstitutionsForMany(
 export async function recordSubstitutionUse(
   original: string,
   substitute: string,
-  rating?: number
+  rating?: number,
 ): Promise<void> {
   try {
-    await supabase.from('substitution_history').insert({
+    await supabase.from("substitution_history").insert({
       original: original.toLowerCase(),
       substitute: substitute.toLowerCase(),
       rating: rating || 3,
-      used_at: new Date().toISOString()
+      used_at: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('Error recording substitution use:', error);
+    console.error("Error recording substitution use:", error);
   }
 }
 
@@ -306,7 +367,7 @@ export function clearSubstitutionCache(): void {
  */
 export async function suggestShoppingBasedOnSubstitutions(
   missingIngredients: string[],
-  dietaryTags: DietaryTag[] = []
+  dietaryTags: DietaryTag[] = [],
 ): Promise<{ canSubstitute: string[]; needToBuy: string[] }> {
   const canSubstitute: string[] = [];
   const needToBuy: string[] = [];

@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { Component, type ReactNode } from 'react';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { Component, type ReactNode } from "react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -14,7 +14,10 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+export default class ErrorBoundary extends Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -25,7 +28,11 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error(`ErrorBoundary [${this.props.sectionName || 'unknown'}]:`, error, errorInfo);
+    console.error(
+      `ErrorBoundary [${this.props.sectionName || "unknown"}]:`,
+      error,
+      errorInfo,
+    );
   }
 
   handleRetry = () => {
@@ -42,10 +49,11 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
         <div className="rounded-xl bg-red-50 border border-red-200 p-6 text-center m-4">
           <AlertTriangle size={40} className="mx-auto text-red-400 mb-3" />
           <h3 className="font-semibold text-red-800 mb-1">
-            Algo salió mal{this.props.sectionName ? ` en ${this.props.sectionName}` : ''}
+            Algo salió mal
+            {this.props.sectionName ? ` en ${this.props.sectionName}` : ""}
           </h3>
           <p className="text-sm text-red-600 mb-4">
-            {this.state.error?.message || 'Error inesperado'}
+            {this.state.error?.message || "Error inesperado"}
           </p>
           <button
             onClick={this.handleRetry}

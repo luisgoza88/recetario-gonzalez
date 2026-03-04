@@ -1,16 +1,16 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase/client';
-import type { Household, Space, HomeEmployee, ScheduledTask } from '@/types';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase/client";
+import type { Household, Space, HomeEmployee, ScheduledTask } from "@/types";
 
 // ============================================
 // QUERY KEYS
 // ============================================
 export const homeQueryKeys = {
-  household: (id?: string) => ['household', id] as const,
-  spaces: (householdId: string) => ['spaces', householdId] as const,
-  employees: (householdId: string) => ['employees', householdId] as const,
-  todayTasks: (householdId: string) => ['todayTasks', householdId] as const,
-  pendingTasks: (householdId: string) => ['pendingTasks', householdId] as const,
+  household: (id?: string) => ["household", id] as const,
+  spaces: (householdId: string) => ["spaces", householdId] as const,
+  employees: (householdId: string) => ["employees", householdId] as const,
+  todayTasks: (householdId: string) => ["todayTasks", householdId] as const,
+  pendingTasks: (householdId: string) => ["pendingTasks", householdId] as const,
 };
 
 // ============================================
@@ -18,9 +18,9 @@ export const homeQueryKeys = {
 // ============================================
 async function fetchHousehold() {
   const { data, error } = await supabase
-    .from('households')
-    .select('*')
-    .order('created_at', { ascending: false })
+    .from("households")
+    .select("*")
+    .order("created_at", { ascending: false })
     .limit(1);
 
   if (error) throw error;
@@ -29,9 +29,9 @@ async function fetchHousehold() {
 
 async function fetchSpaces(householdId: string) {
   const { data, error } = await supabase
-    .from('spaces')
-    .select('*, space_type:space_types(*)')
-    .eq('household_id', householdId);
+    .from("spaces")
+    .select("*, space_type:space_types(*)")
+    .eq("household_id", householdId);
 
   if (error) throw error;
   return data as Space[];
@@ -39,35 +39,37 @@ async function fetchSpaces(householdId: string) {
 
 async function fetchEmployees(householdId: string) {
   const { data, error } = await supabase
-    .from('home_employees')
-    .select('*')
-    .eq('household_id', householdId)
-    .eq('active', true);
+    .from("home_employees")
+    .select("*")
+    .eq("household_id", householdId)
+    .eq("active", true);
 
   if (error) throw error;
   return data as HomeEmployee[];
 }
 
 async function fetchTodayTasks(householdId: string) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split("T")[0];
   const { data, error } = await supabase
-    .from('scheduled_tasks')
-    .select('*, task_template:task_templates(*), space:spaces(*, space_type:space_types(*)), employee:home_employees!scheduled_tasks_employee_id_fkey(*)')
-    .eq('household_id', householdId)
-    .eq('scheduled_date', today);
+    .from("scheduled_tasks")
+    .select(
+      "*, task_template:task_templates(*), space:spaces(*, space_type:space_types(*)), employee:home_employees!scheduled_tasks_employee_id_fkey(*)",
+    )
+    .eq("household_id", householdId)
+    .eq("scheduled_date", today);
 
   if (error) throw error;
   return data as ScheduledTask[];
 }
 
 async function fetchPendingTasksCount(householdId: string) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split("T")[0];
   const { count, error } = await supabase
-    .from('scheduled_tasks')
-    .select('*', { count: 'exact', head: true })
-    .eq('household_id', householdId)
-    .eq('status', 'pendiente')
-    .lte('scheduled_date', today);
+    .from("scheduled_tasks")
+    .select("*", { count: "exact", head: true })
+    .eq("household_id", householdId)
+    .eq("status", "pendiente")
+    .lte("scheduled_date", today);
 
   if (error) throw error;
   return count || 0;
@@ -140,22 +142,28 @@ export function useToggleTaskStatus() {
 
   return useMutation({
     mutationFn: async ({ task }: { task: ScheduledTask }) => {
-      const newStatus = task.status === 'completada' ? 'pendiente' : 'completada';
+      const newStatus =
+        task.status === "completada" ? "pendiente" : "completada";
 
       const { error } = await supabase
-        .from('scheduled_tasks')
+        .from("scheduled_tasks")
         .update({
           status: newStatus,
-          completed_at: newStatus === 'completada' ? new Date().toISOString() : null,
+          completed_at:
+            newStatus === "completada" ? new Date().toISOString() : null,
         })
-        .eq('id', task.id);
+        .eq("id", task.id);
 
       if (error) throw error;
       return { task, newStatus };
     },
     onSuccess: (_, { task }) => {
-      queryClient.invalidateQueries({ queryKey: homeQueryKeys.todayTasks(task.household_id) });
-      queryClient.invalidateQueries({ queryKey: homeQueryKeys.pendingTasks(task.household_id) });
+      queryClient.invalidateQueries({
+        queryKey: homeQueryKeys.todayTasks(task.household_id),
+      });
+      queryClient.invalidateQueries({
+        queryKey: homeQueryKeys.pendingTasks(task.household_id),
+      });
     },
   });
 }
@@ -169,9 +177,17 @@ export function useRefreshHomeData(householdId: string | undefined) {
   return () => {
     if (!householdId) return;
     queryClient.invalidateQueries({ queryKey: homeQueryKeys.household() });
-    queryClient.invalidateQueries({ queryKey: homeQueryKeys.spaces(householdId) });
-    queryClient.invalidateQueries({ queryKey: homeQueryKeys.employees(householdId) });
-    queryClient.invalidateQueries({ queryKey: homeQueryKeys.todayTasks(householdId) });
-    queryClient.invalidateQueries({ queryKey: homeQueryKeys.pendingTasks(householdId) });
+    queryClient.invalidateQueries({
+      queryKey: homeQueryKeys.spaces(householdId),
+    });
+    queryClient.invalidateQueries({
+      queryKey: homeQueryKeys.employees(householdId),
+    });
+    queryClient.invalidateQueries({
+      queryKey: homeQueryKeys.todayTasks(householdId),
+    });
+    queryClient.invalidateQueries({
+      queryKey: homeQueryKeys.pendingTasks(householdId),
+    });
   };
 }

@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { openDB, DBSchema, IDBPDatabase } from 'idb';
+import { openDB, DBSchema, IDBPDatabase } from "idb";
 
 // Schema for our IndexedDB database
 interface GroceryPreferencesDB extends DBSchema {
@@ -15,8 +15,8 @@ interface GroceryPreferencesDB extends DBSchema {
       lastUsed: number; // timestamp
     };
     indexes: {
-      'by-count': number;
-      'by-lastUsed': number;
+      "by-count": number;
+      "by-lastUsed": number;
     };
   };
   recentSearches: {
@@ -43,37 +43,37 @@ interface GroceryPreferencesDB extends DBSchema {
 let dbPromise: Promise<IDBPDatabase<GroceryPreferencesDB>> | null = null;
 
 function getDB(): Promise<IDBPDatabase<GroceryPreferencesDB>> {
-  if (typeof window === 'undefined') {
-    return Promise.reject(new Error('IndexedDB not available on server'));
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("IndexedDB not available on server"));
   }
 
   if (!dbPromise) {
-    dbPromise = openDB<GroceryPreferencesDB>('recetario-preferences', 1, {
+    dbPromise = openDB<GroceryPreferencesDB>("recetario-preferences", 1, {
       upgrade(db) {
         // Frequent items store
-        if (!db.objectStoreNames.contains('frequentItems')) {
-          const frequentStore = db.createObjectStore('frequentItems', {
-            keyPath: 'productId'
+        if (!db.objectStoreNames.contains("frequentItems")) {
+          const frequentStore = db.createObjectStore("frequentItems", {
+            keyPath: "productId",
           });
-          frequentStore.createIndex('by-count', 'count');
-          frequentStore.createIndex('by-lastUsed', 'lastUsed');
+          frequentStore.createIndex("by-count", "count");
+          frequentStore.createIndex("by-lastUsed", "lastUsed");
         }
 
         // Recent searches
-        if (!db.objectStoreNames.contains('recentSearches')) {
-          db.createObjectStore('recentSearches', {
-            keyPath: 'id',
-            autoIncrement: true
+        if (!db.objectStoreNames.contains("recentSearches")) {
+          db.createObjectStore("recentSearches", {
+            keyPath: "id",
+            autoIncrement: true,
           });
         }
 
         // Custom products added by user
-        if (!db.objectStoreNames.contains('customProducts')) {
-          db.createObjectStore('customProducts', {
-            keyPath: 'id'
+        if (!db.objectStoreNames.contains("customProducts")) {
+          db.createObjectStore("customProducts", {
+            keyPath: "id",
           });
         }
-      }
+      },
     });
   }
   return dbPromise;
@@ -94,33 +94,33 @@ export async function recordProductUsage(
   productId: string,
   productName: string,
   category?: string,
-  categoryId?: string
+  categoryId?: string,
 ): Promise<void> {
   try {
     const db = await getDB();
-    const existing = await db.get('frequentItems', productId);
+    const existing = await db.get("frequentItems", productId);
 
-    await db.put('frequentItems', {
+    await db.put("frequentItems", {
       productId,
       productName,
       category,
       categoryId,
       count: (existing?.count || 0) + 1,
-      lastUsed: Date.now()
+      lastUsed: Date.now(),
     });
   } catch (error) {
-    console.error('Error recording product usage:', error);
+    console.error("Error recording product usage:", error);
   }
 }
 
 export async function getFrequentItems(limit = 10): Promise<FrequentItem[]> {
   try {
     const db = await getDB();
-    const items = await db.getAllFromIndex('frequentItems', 'by-count');
+    const items = await db.getAllFromIndex("frequentItems", "by-count");
     // Sort by count descending and take top N
     return items.sort((a, b) => b.count - a.count).slice(0, limit);
   } catch (error) {
-    console.error('Error getting frequent items:', error);
+    console.error("Error getting frequent items:", error);
     return [];
   }
 }
@@ -128,11 +128,11 @@ export async function getFrequentItems(limit = 10): Promise<FrequentItem[]> {
 export async function getRecentItems(limit = 5): Promise<FrequentItem[]> {
   try {
     const db = await getDB();
-    const items = await db.getAllFromIndex('frequentItems', 'by-lastUsed');
+    const items = await db.getAllFromIndex("frequentItems", "by-lastUsed");
     // Sort by lastUsed descending and take top N
     return items.sort((a, b) => b.lastUsed - a.lastUsed).slice(0, limit);
   } catch (error) {
-    console.error('Error getting recent items:', error);
+    console.error("Error getting recent items:", error);
     return [];
   }
 }
@@ -142,36 +142,36 @@ export async function getRecentItems(limit = 5): Promise<FrequentItem[]> {
 export async function saveRecentSearch(query: string): Promise<void> {
   try {
     const db = await getDB();
-    await db.add('recentSearches', {
+    await db.add("recentSearches", {
       query,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     // Keep only last 20 searches
-    const all = await db.getAll('recentSearches');
+    const all = await db.getAll("recentSearches");
     if (all.length > 20) {
       const toDelete = all.slice(0, all.length - 20);
       for (const item of toDelete) {
         if (item.id) {
-          await db.delete('recentSearches', item.id);
+          await db.delete("recentSearches", item.id);
         }
       }
     }
   } catch (error) {
-    console.error('Error saving recent search:', error);
+    console.error("Error saving recent search:", error);
   }
 }
 
 export async function getRecentSearches(limit = 5): Promise<string[]> {
   try {
     const db = await getDB();
-    const all = await db.getAll('recentSearches');
+    const all = await db.getAll("recentSearches");
     return all
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, limit)
-      .map(s => s.query);
+      .map((s) => s.query);
   } catch (error) {
-    console.error('Error getting recent searches:', error);
+    console.error("Error getting recent searches:", error);
     return [];
   }
 }
@@ -187,24 +187,26 @@ export interface CustomProduct {
   createdAt: number;
 }
 
-export async function saveCustomProduct(product: Omit<CustomProduct, 'createdAt'>): Promise<void> {
+export async function saveCustomProduct(
+  product: Omit<CustomProduct, "createdAt">,
+): Promise<void> {
   try {
     const db = await getDB();
-    await db.put('customProducts', {
+    await db.put("customProducts", {
       ...product,
-      createdAt: Date.now()
+      createdAt: Date.now(),
     });
   } catch (error) {
-    console.error('Error saving custom product:', error);
+    console.error("Error saving custom product:", error);
   }
 }
 
 export async function getCustomProducts(): Promise<CustomProduct[]> {
   try {
     const db = await getDB();
-    return await db.getAll('customProducts');
+    return await db.getAll("customProducts");
   } catch (error) {
-    console.error('Error getting custom products:', error);
+    console.error("Error getting custom products:", error);
     return [];
   }
 }
@@ -219,24 +221,29 @@ interface ProductInfo {
 }
 
 // Open Food Facts API for barcode lookup
-export async function lookupBarcode(barcode: string): Promise<ProductInfo | null> {
+export async function lookupBarcode(
+  barcode: string,
+): Promise<ProductInfo | null> {
   try {
     const response = await fetch(
-      `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`
+      `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`,
     );
     const data = await response.json();
 
     if (data.status === 1 && data.product) {
       return {
-        name: data.product.product_name || data.product.product_name_es || 'Producto desconocido',
+        name:
+          data.product.product_name ||
+          data.product.product_name_es ||
+          "Producto desconocido",
         brand: data.product.brands,
         category: data.product.categories,
-        quantity: data.product.quantity
+        quantity: data.product.quantity,
       };
     }
     return null;
   } catch (error) {
-    console.error('Error looking up barcode:', error);
+    console.error("Error looking up barcode:", error);
     return null;
   }
 }
@@ -244,7 +251,9 @@ export async function lookupBarcode(barcode: string): Promise<ProductInfo | null
 // Cache barcode results locally
 const barcodeCache = new Map<string, ProductInfo | null>();
 
-export async function lookupBarcodeWithCache(barcode: string): Promise<ProductInfo | null> {
+export async function lookupBarcodeWithCache(
+  barcode: string,
+): Promise<ProductInfo | null> {
   // Check memory cache first
   if (barcodeCache.has(barcode)) {
     return barcodeCache.get(barcode) || null;

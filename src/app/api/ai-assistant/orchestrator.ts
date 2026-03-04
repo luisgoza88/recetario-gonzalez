@@ -15,8 +15,8 @@ import {
   generateProposalSummary,
   AI_RISK_LEVELS,
   recordActionOutcome,
-} from '@/lib/ai/ai-command-service';
-import { AIProposedAction, AIRiskLevel } from '@/types';
+} from "@/lib/ai/ai-command-service";
+import { AIProposedAction, AIRiskLevel } from "@/types";
 import {
   ExecutionContext,
   ExecutionResult,
@@ -24,38 +24,72 @@ import {
   RecipeIngredient,
   InventoryUpdate,
   ReceiptItem,
-} from '@/lib/ai-assistant/types';
-import { createAIClient } from '@/lib/ai-assistant/db';
-import { logger } from '@/lib/logger';
+} from "@/lib/ai-assistant/types";
+import { createAIClient } from "@/lib/ai-assistant/db";
+import { logger } from "@/lib/logger";
 
 // Import all function implementations
 import {
   // Recetario Queries
-  getTodayMenu, getWeekMenu, searchRecipes, getRecipeDetails,
-  getMissingIngredients, getInventory, getShoppingList, suggestRecipe,
+  getTodayMenu,
+  getWeekMenu,
+  searchRecipes,
+  getRecipeDetails,
+  getMissingIngredients,
+  getInventory,
+  getShoppingList,
+  suggestRecipe,
   // Recetario Mutations
-  addToShoppingList, markShoppingItem, addMissingToShopping,
-  swapMenuRecipe, updateInventory, bulkUpdateInventory,
-  scanReceiptItems, resetInventoryToDefault,
-  createRecipe, updateRecipe, deleteRecipe,
+  addToShoppingList,
+  markShoppingItem,
+  addMissingToShopping,
+  swapMenuRecipe,
+  updateInventory,
+  bulkUpdateInventory,
+  scanReceiptItems,
+  resetInventoryToDefault,
+  createRecipe,
+  updateRecipe,
+  deleteRecipe,
   // Home Queries
-  getTodayTasks, getEmployeeSchedule, getTasksSummary,
-  listSpaces, getSpaceDetails, listEmployees, getEmployeeDetails, listTaskTemplates,
+  getTodayTasks,
+  getEmployeeSchedule,
+  getTasksSummary,
+  listSpaces,
+  getSpaceDetails,
+  listEmployees,
+  getEmployeeDetails,
+  listTaskTemplates,
   // Home Mutations
-  completeTask, addQuickTask,
-  createSpace, updateSpace, deleteSpace,
-  createEmployee, updateEmployee, deleteEmployee,
-  createTaskTemplate, updateTaskTemplate, deleteTaskTemplate,
-  rescheduleTask, generateTasksForDate,
+  completeTask,
+  addQuickTask,
+  createSpace,
+  updateSpace,
+  deleteSpace,
+  createEmployee,
+  updateEmployee,
+  deleteEmployee,
+  createTaskTemplate,
+  updateTaskTemplate,
+  deleteTaskTemplate,
+  rescheduleTask,
+  generateTasksForDate,
   // Reports
-  getCurrentDateInfo, getWeeklyReport, getLowInventoryAlerts,
-  getUpcomingMeals, calculatePortions, getPreparationTips, smartShoppingList,
+  getCurrentDateInfo,
+  getWeeklyReport,
+  getLowInventoryAlerts,
+  getUpcomingMeals,
+  calculatePortions,
+  getPreparationTips,
+  smartShoppingList,
   // Multi-step
   executeMultiStepTask,
-} from './functions';
+} from "./functions";
 
 // Lazy-evaluated authenticated Supabase client (for state capture)
-async function getSupabase() { return createAIClient(); }
+async function getSupabase() {
+  return createAIClient();
+}
 
 // ============================================
 // STATE CAPTURE (for audit logging)
@@ -66,68 +100,74 @@ async function getSupabase() { return createAIClient(); }
  */
 async function capturePreState(
   functionName: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
 ): Promise<Record<string, unknown> | null> {
   try {
     const supabase = await getSupabase();
     switch (functionName) {
-      case 'swap_menu_recipe': {
+      case "swap_menu_recipe": {
         const dayNumber = args.day_number as number;
         const mealType = args.meal_type as string;
         const { data } = await supabase
-          .from('day_menu')
-          .select(`
+          .from("day_menu")
+          .select(
+            `
             *,
             breakfast:recipes!day_menu_breakfast_id_fkey(id, name),
             lunch:recipes!day_menu_lunch_id_fkey(id, name),
             dinner:recipes!day_menu_dinner_id_fkey(id, name)
-          `)
-          .eq('day_number', dayNumber)
+          `,
+          )
+          .eq("day_number", dayNumber)
           .single();
         return data ? { day_menu: data, mealType, dayNumber } : null;
       }
-      case 'update_inventory': {
+      case "update_inventory": {
         const itemName = args.item_name as string;
         const { data: item } = await supabase
-          .from('market_items')
-          .select('id, name')
-          .ilike('name', `%${itemName}%`)
+          .from("market_items")
+          .select("id, name")
+          .ilike("name", `%${itemName}%`)
           .single();
         if (!item) return null;
         const { data: inv } = await supabase
-          .from('inventory')
-          .select('*')
-          .eq('item_id', item.id)
+          .from("inventory")
+          .select("*")
+          .eq("item_id", item.id)
           .single();
         return inv ? { inventory: inv, item } : { item, inventory: null };
       }
-      case 'mark_shopping_item': {
+      case "mark_shopping_item": {
         const itemName = args.item_name as string;
         const { data: item } = await supabase
-          .from('market_items')
-          .select('id, name')
-          .ilike('name', `%${itemName}%`)
+          .from("market_items")
+          .select("id, name")
+          .ilike("name", `%${itemName}%`)
           .single();
         if (!item) return null;
         const { data: checklist } = await supabase
-          .from('market_checklist')
-          .select('*')
-          .eq('item_id', item.id)
+          .from("market_checklist")
+          .select("*")
+          .eq("item_id", item.id)
           .single();
         return checklist ? { market_checklist: checklist, item } : null;
       }
-      case 'complete_task': {
+      case "complete_task": {
         const taskName = args.task_name as string;
-        const today = new Date().toISOString().split('T')[0];
+        const today = new Date().toISOString().split("T")[0];
         const { data: tasks } = await supabase
-          .from('scheduled_tasks')
-          .select('*, task_template:task_templates(name)')
-          .eq('scheduled_date', today)
-          .neq('status', 'completada');
+          .from("scheduled_tasks")
+          .select("*, task_template:task_templates(name)")
+          .eq("scheduled_date", today)
+          .neq("status", "completada");
 
-        const matched = tasks?.find(task => {
-          const template = task.task_template as unknown as { name?: string } | null;
-          return (template?.name || '').toLowerCase().includes(taskName.toLowerCase());
+        const matched = tasks?.find((task) => {
+          const template = task.task_template as unknown as {
+            name?: string;
+          } | null;
+          return (template?.name || "")
+            .toLowerCase()
+            .includes(taskName.toLowerCase());
         });
 
         return matched ? { scheduled_tasks: matched } : null;
@@ -136,7 +176,9 @@ async function capturePreState(
         return null;
     }
   } catch (error) {
-    logger.error(`Error capturing pre-state for ${functionName}:`, { error: error instanceof Error ? error.message : String(error) });
+    logger.error(`Error capturing pre-state for ${functionName}:`, {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 }
@@ -147,7 +189,7 @@ async function capturePreState(
 async function capturePostState(
   functionName: string,
   args: Record<string, unknown>,
-  _preState: Record<string, unknown> | null
+  _preState: Record<string, unknown> | null,
 ): Promise<Record<string, unknown> | null> {
   return capturePreState(functionName, args);
 }
@@ -157,13 +199,13 @@ async function capturePostState(
  */
 function getAffectedTables(functionName: string): string[] {
   const tableMap: Record<string, string[]> = {
-    swap_menu_recipe: ['day_menu'],
-    update_inventory: ['inventory'],
-    mark_shopping_item: ['market_checklist'],
-    add_to_shopping_list: ['market_checklist', 'market_items'],
-    add_missing_to_shopping: ['market_checklist', 'market_items'],
-    complete_task: ['scheduled_tasks'],
-    add_quick_task: ['task_templates', 'scheduled_tasks'],
+    swap_menu_recipe: ["day_menu"],
+    update_inventory: ["inventory"],
+    mark_shopping_item: ["market_checklist"],
+    add_to_shopping_list: ["market_checklist", "market_items"],
+    add_missing_to_shopping: ["market_checklist", "market_items"],
+    complete_task: ["scheduled_tasks"],
+    add_quick_task: ["task_templates", "scheduled_tasks"],
   };
   return tableMap[functionName] || [];
 }
@@ -175,118 +217,156 @@ function getAffectedTables(functionName: string): string[] {
 /**
  * Main function dispatcher - routes function names to implementations
  */
-export async function executeFunction(name: string, args: Record<string, unknown>) {
+export async function executeFunction(
+  name: string,
+  args: Record<string, unknown>,
+) {
   switch (name) {
     // Consultas - Recetario
-    case 'get_today_menu':
+    case "get_today_menu":
       return await getTodayMenu();
-    case 'get_week_menu':
+    case "get_week_menu":
       return await getWeekMenu();
-    case 'get_recipe_details':
+    case "get_recipe_details":
       return await getRecipeDetails(args.recipe_name as string);
-    case 'search_recipes':
+    case "search_recipes":
       return await searchRecipes(args.query as string);
-    case 'get_inventory':
+    case "get_inventory":
       return await getInventory();
-    case 'get_shopping_list':
+    case "get_shopping_list":
       return await getShoppingList();
-    case 'get_missing_ingredients':
+    case "get_missing_ingredients":
       return await getMissingIngredients(args.recipe_name as string);
-    case 'suggest_recipe':
+    case "suggest_recipe":
       return await suggestRecipe(args.preferences as string);
 
     // Consultas - Hogar
-    case 'get_today_tasks':
+    case "get_today_tasks":
       return await getTodayTasks();
-    case 'get_employee_schedule':
-      return await getEmployeeSchedule(args.employee_name as string, args.period as string);
-    case 'get_tasks_summary':
+    case "get_employee_schedule":
+      return await getEmployeeSchedule(
+        args.employee_name as string,
+        args.period as string,
+      );
+    case "get_tasks_summary":
       return await getTasksSummary();
 
     // Acciones - Recetario
-    case 'add_to_shopping_list':
-      return await addToShoppingList(args.item_name as string, args.quantity as string);
-    case 'add_missing_to_shopping':
+    case "add_to_shopping_list":
+      return await addToShoppingList(
+        args.item_name as string,
+        args.quantity as string,
+      );
+    case "add_missing_to_shopping":
       return await addMissingToShopping(args.recipe_name as string);
-    case 'mark_shopping_item':
-      return await markShoppingItem(args.item_name as string, args.checked as boolean);
-    case 'swap_menu_recipe':
-      return await swapMenuRecipe(args.day_number as number, args.meal_type as string, args.new_recipe_name as string);
-    case 'update_inventory':
-      return await updateInventory(args.item_name as string, args.quantity as number, args.action as string);
+    case "mark_shopping_item":
+      return await markShoppingItem(
+        args.item_name as string,
+        args.checked as boolean,
+      );
+    case "swap_menu_recipe":
+      return await swapMenuRecipe(
+        args.day_number as number,
+        args.meal_type as string,
+        args.new_recipe_name as string,
+      );
+    case "update_inventory":
+      return await updateInventory(
+        args.item_name as string,
+        args.quantity as number,
+        args.action as string,
+      );
 
     // Acciones - Hogar
-    case 'complete_task':
-      return await completeTask(args.task_name as string, args.employee_name as string);
-    case 'add_quick_task':
+    case "complete_task":
+      return await completeTask(
+        args.task_name as string,
+        args.employee_name as string,
+      );
+    case "add_quick_task":
       return await addQuickTask(
         args.task_name as string,
         args.employee_name as string,
         args.category as string,
-        args.household_id as string
+        args.household_id as string,
       );
 
     // Reportes y análisis
-    case 'get_weekly_report':
+    case "get_weekly_report":
       return await getWeeklyReport();
-    case 'get_low_inventory_alerts':
+    case "get_low_inventory_alerts":
       return await getLowInventoryAlerts(args.threshold as number);
-    case 'get_upcoming_meals':
+    case "get_upcoming_meals":
       return await getUpcomingMeals(args.days as number);
 
     // Utilidades
-    case 'get_current_date_info':
+    case "get_current_date_info":
       return getCurrentDateInfo();
-    case 'calculate_portions':
-      return await calculatePortions(args.recipe_name as string, args.portions as number);
-    case 'get_preparation_tips':
+    case "calculate_portions":
+      return await calculatePortions(
+        args.recipe_name as string,
+        args.portions as number,
+      );
+    case "get_preparation_tips":
       return await getPreparationTips();
 
     // Agente Multi-paso
-    case 'execute_multi_step_task':
+    case "execute_multi_step_task":
       return await executeMultiStepTask(
         args.task_type as string,
-        (args.params as Record<string, unknown>) || {}
+        (args.params as Record<string, unknown>) || {},
       );
-    case 'smart_shopping_list':
+    case "smart_shopping_list":
       return await smartShoppingList(args.days_ahead as number);
 
     // CRUD - Espacios
-    case 'list_spaces':
+    case "list_spaces":
       return await listSpaces(args.household_id as string);
-    case 'get_space_details':
-      return await getSpaceDetails(args.space_id as string, args.space_name as string);
-    case 'create_space':
+    case "get_space_details":
+      return await getSpaceDetails(
+        args.space_id as string,
+        args.space_name as string,
+      );
+    case "create_space":
       return await createSpace(
-        args.household_id as string || 'default-household',
+        (args.household_id as string) || "default-household",
         args.name as string,
         args.space_type as string,
         args.category as string,
         args.usage_level as string,
         args.has_bathroom as boolean,
         args.area_sqm as number,
-        args.notes as string
+        args.notes as string,
       );
-    case 'update_space':
+    case "update_space":
       return await updateSpace(args.space_id as string, {
         name: args.name as string,
         category: args.category as string,
         usageLevel: args.usage_level as string,
         hasBathroom: args.has_bathroom as boolean,
         areaSqm: args.area_sqm as number,
-        notes: args.notes as string
+        notes: args.notes as string,
       });
-    case 'delete_space':
-      return await deleteSpace(args.space_id as string, args.confirm as boolean);
+    case "delete_space":
+      return await deleteSpace(
+        args.space_id as string,
+        args.confirm as boolean,
+      );
 
     // CRUD - Empleados
-    case 'list_employees':
-      return await listEmployees(args.household_id as string, args.active_only as boolean ?? true);
-    case 'get_employee_details':
-      return await getEmployeeDetails(args.employee_id as string, args.employee_name as string);
-    case 'create_employee':
+    case "list_employees":
+      return await listEmployees(
+        args.household_id as string,
+        (args.active_only as boolean) ?? true,
+      );
+    case "get_employee_details":
+      return await getEmployeeDetails(
+        args.employee_id as string,
+        args.employee_name as string,
+      );
+    case "create_employee":
       return await createEmployee(
-        args.household_id as string || 'default-household',
+        (args.household_id as string) || "default-household",
         args.name as string,
         args.role as string,
         args.zone as string,
@@ -294,9 +374,9 @@ export async function executeFunction(name: string, args: Record<string, unknown
         args.hours_per_day as number,
         args.schedule as string,
         args.phone as string,
-        args.notes as string
+        args.notes as string,
       );
-    case 'update_employee':
+    case "update_employee":
       return await updateEmployee(args.employee_id as string, {
         name: args.name as string,
         role: args.role as string,
@@ -306,23 +386,23 @@ export async function executeFunction(name: string, args: Record<string, unknown
         schedule: args.schedule as string,
         phone: args.phone as string,
         notes: args.notes as string,
-        active: args.active as boolean
+        active: args.active as boolean,
       });
-    case 'delete_employee':
+    case "delete_employee":
       return await deleteEmployee(
         args.employee_id as string,
         args.hard_delete as boolean,
-        args.confirm as boolean
+        args.confirm as boolean,
       );
 
     // CRUD - Tareas
-    case 'list_task_templates':
+    case "list_task_templates":
       return await listTaskTemplates(
         args.employee_id as string,
         args.week_number as number,
-        args.category as string
+        args.category as string,
       );
-    case 'create_task_template':
+    case "create_task_template":
       return await createTaskTemplate(
         args.employee_name as string,
         args.task_name as string,
@@ -334,12 +414,12 @@ export async function executeFunction(name: string, args: Record<string, unknown
         args.is_special as boolean,
         args.description as string,
         args.household_id as string,
-        (args.frequency as string) || 'semanal',
+        (args.frequency as string) || "semanal",
         (args.estimated_minutes as number) || 30,
-        (args.priority as string) || 'normal',
-        args.space_id as string
+        (args.priority as string) || "normal",
+        args.space_id as string,
       );
-    case 'update_task_template':
+    case "update_task_template":
       return await updateTaskTemplate(args.template_id as string, {
         taskName: args.task_name as string,
         employeeName: args.employee_name as string,
@@ -351,38 +431,44 @@ export async function executeFunction(name: string, args: Record<string, unknown
         spaceId: args.space_id as string,
         isActive: args.is_active as boolean,
       });
-    case 'delete_task_template':
-      return await deleteTaskTemplate(args.template_id as string, args.confirm as boolean);
-    case 'reschedule_task':
+    case "delete_task_template":
+      return await deleteTaskTemplate(
+        args.template_id as string,
+        args.confirm as boolean,
+      );
+    case "reschedule_task":
       return await rescheduleTask(
         args.task_id as string,
         args.new_date as string,
         args.new_time_start as string,
         args.new_time_end as string,
-        args.new_employee_name as string
+        args.new_employee_name as string,
       );
-    case 'generate_tasks_for_date':
-      return await generateTasksForDate(args.date as string, args.household_id as string);
+    case "generate_tasks_for_date":
+      return await generateTasksForDate(
+        args.date as string,
+        args.household_id as string,
+      );
 
     // CRUD - Recetas
-    case 'create_recipe':
+    case "create_recipe":
       return await createRecipe(
         args.name as string,
-        args.type as 'breakfast' | 'lunch' | 'dinner',
+        args.type as "breakfast" | "lunch" | "dinner",
         args.ingredients as RecipeIngredient[],
         args.steps as string[],
         args.prep_time as number,
         args.cook_time as number,
         args.difficulty as string,
         args.description as string,
-        args.tips as string
+        args.tips as string,
       );
-    case 'update_recipe':
+    case "update_recipe":
       return await updateRecipe(
         args.recipe_id as string,
         args.updates as Partial<{
           name: string;
-          type: 'breakfast' | 'lunch' | 'dinner';
+          type: "breakfast" | "lunch" | "dinner";
           ingredients: RecipeIngredient[];
           steps: string[];
           prep_time: number;
@@ -390,20 +476,23 @@ export async function executeFunction(name: string, args: Record<string, unknown
           difficulty: string;
           description: string;
           tips: string;
-        }>
+        }>,
       );
-    case 'delete_recipe':
-      return await deleteRecipe(args.recipe_id as string, args.confirm as boolean);
+    case "delete_recipe":
+      return await deleteRecipe(
+        args.recipe_id as string,
+        args.confirm as boolean,
+      );
 
     // Inventario avanzado
-    case 'bulk_update_inventory':
+    case "bulk_update_inventory":
       return await bulkUpdateInventory(
         args.updates as InventoryUpdate[],
-        args.confirm as boolean
+        args.confirm as boolean,
       );
-    case 'scan_receipt_items':
+    case "scan_receipt_items":
       return await scanReceiptItems(args.items as ReceiptItem[]);
-    case 'reset_inventory_to_default':
+    case "reset_inventory_to_default":
       return await resetInventoryToDefault(args.confirm as boolean);
 
     default:
@@ -421,12 +510,17 @@ export async function executeFunction(name: string, args: Record<string, unknown
 export async function executeFunctionWithLogging(
   name: string,
   args: Record<string, unknown>,
-  context: ExecutionContext
+  context: ExecutionContext,
 ): Promise<ExecutionResult> {
   const riskLevel = await getFunctionRiskLevel(name);
 
   // Read-only functions don't need full logging
-  if (name.startsWith('get_') || name.startsWith('search_') || name.startsWith('suggest_') || name === 'calculate_portions') {
+  if (
+    name.startsWith("get_") ||
+    name.startsWith("search_") ||
+    name.startsWith("suggest_") ||
+    name === "calculate_portions"
+  ) {
     const result = await executeFunction(name, args);
     return {
       result,
@@ -455,7 +549,7 @@ export async function executeFunctionWithLogging(
     if (auditLogId) {
       await completeAuditLog({
         logId: auditLogId,
-        status: 'completed',
+        status: "completed",
         result: result as Record<string, unknown>,
         previousState: previousState || undefined,
         newState: newState || undefined,
@@ -464,7 +558,11 @@ export async function executeFunctionWithLogging(
     }
 
     // Record successful action for trust scoring
-    await recordActionOutcome(context.householdId, true).catch((error) => logger.error('Failed to record successful action outcome', { error: error instanceof Error ? error.message : String(error) }));
+    await recordActionOutcome(context.householdId, true).catch((error) =>
+      logger.error("Failed to record successful action outcome", {
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
 
     return {
       result,
@@ -474,12 +572,16 @@ export async function executeFunctionWithLogging(
     };
   } catch (error) {
     // Record failed action for trust scoring
-    await recordActionOutcome(context.householdId, false).catch((error) => logger.error('Failed to record failed action outcome', { error: error instanceof Error ? error.message : String(error) }));
+    await recordActionOutcome(context.householdId, false).catch((error) =>
+      logger.error("Failed to record failed action outcome", {
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
 
     if (auditLogId) {
       await completeAuditLog({
         logId: auditLogId,
-        status: 'failed',
+        status: "failed",
         errorMessage: error instanceof Error ? error.message : String(error),
       });
     }
@@ -496,7 +598,7 @@ export async function executeFunctionWithLogging(
  */
 export async function createFunctionProposal(
   functionCalls: Array<{ name: string; args: Record<string, unknown> }>,
-  context: ExecutionContext
+  context: ExecutionContext,
 ): Promise<ProposalResponse> {
   const actions: AIProposedAction[] = [];
 
@@ -504,7 +606,7 @@ export async function createFunctionProposal(
     const action = await functionCallToProposedAction(
       fc.name,
       fc.args,
-      generateActionDescription(fc.name, fc.args)
+      generateActionDescription(fc.name, fc.args),
     );
     actions.push(action);
   }
@@ -518,11 +620,11 @@ export async function createFunctionProposal(
   });
 
   if (!proposal) {
-    throw new Error('No se pudo crear la propuesta');
+    throw new Error("No se pudo crear la propuesta");
   }
 
   return {
-    type: 'proposal',
+    type: "proposal",
     proposalId: proposal.proposal_id,
     summary: proposal.summary,
     actions: proposal.actions,
@@ -534,22 +636,36 @@ export async function createFunctionProposal(
 /**
  * Generates a human-readable description for a function call
  */
-export function generateActionDescription(functionName: string, args: Record<string, unknown>): string {
-  const descriptions: Record<string, (args: Record<string, unknown>) => string> = {
+export function generateActionDescription(
+  functionName: string,
+  args: Record<string, unknown>,
+): string {
+  const descriptions: Record<
+    string,
+    (args: Record<string, unknown>) => string
+  > = {
     // Recetas y menú
-    swap_menu_recipe: (a) => `Cambiar ${a.meal_type} del día ${a.day_number} a "${a.new_recipe_name}"`,
+    swap_menu_recipe: (a) =>
+      `Cambiar ${a.meal_type} del día ${a.day_number} a "${a.new_recipe_name}"`,
     // Inventario y compras
-    update_inventory: (a) => `Actualizar inventario de "${a.item_name}" a ${a.quantity}`,
-    mark_shopping_item: (a) => `${a.checked ? 'Marcar' : 'Desmarcar'} "${a.item_name}" en la lista de compras`,
-    add_to_shopping_list: (a) => `Agregar "${a.item_name}" a la lista de compras`,
-    add_missing_to_shopping: (a) => `Agregar ingredientes faltantes de "${a.recipe_name}" a la lista`,
+    update_inventory: (a) =>
+      `Actualizar inventario de "${a.item_name}" a ${a.quantity}`,
+    mark_shopping_item: (a) =>
+      `${a.checked ? "Marcar" : "Desmarcar"} "${a.item_name}" en la lista de compras`,
+    add_to_shopping_list: (a) =>
+      `Agregar "${a.item_name}" a la lista de compras`,
+    add_missing_to_shopping: (a) =>
+      `Agregar ingredientes faltantes de "${a.recipe_name}" a la lista`,
     // Tareas
     complete_task: (a) => `Marcar como completada la tarea "${a.task_name}"`,
     add_quick_task: (a) => `Crear tarea rápida "${a.task_name}"`,
-    create_task_template: (a) => `Crear plantilla de tarea "${a.task_name}" para ${a.employee_name}`,
-    update_task_template: (a) => `Actualizar plantilla de tarea ${a.template_id}`,
+    create_task_template: (a) =>
+      `Crear plantilla de tarea "${a.task_name}" para ${a.employee_name}`,
+    update_task_template: (a) =>
+      `Actualizar plantilla de tarea ${a.template_id}`,
     delete_task_template: (a) => `Eliminar plantilla de tarea ${a.template_id}`,
-    reschedule_task: (a) => `Reprogramar tarea ${a.task_id}${a.new_date ? ` para ${a.new_date}` : ''}`,
+    reschedule_task: (a) =>
+      `Reprogramar tarea ${a.task_id}${a.new_date ? ` para ${a.new_date}` : ""}`,
     generate_tasks_for_date: (a) => `Generar tareas para ${a.date}`,
     // Espacios
     create_space: (a) => `Crear espacio "${a.name}" (${a.space_type})`,
@@ -558,10 +674,12 @@ export function generateActionDescription(functionName: string, args: Record<str
     // Empleados
     create_employee: (a) => `Registrar empleado "${a.name}" (${a.role})`,
     update_employee: (a) => `Actualizar empleado ${a.employee_id}`,
-    delete_employee: (a) => `${a.hard_delete ? 'Eliminar' : 'Desactivar'} empleado ${a.employee_id}`,
+    delete_employee: (a) =>
+      `${a.hard_delete ? "Eliminar" : "Desactivar"} empleado ${a.employee_id}`,
     // Multi-paso
     execute_multi_step_task: (a) => `Ejecutar plan: ${a.task_type}`,
-    smart_shopping_list: (a) => `Generar lista de compras para ${a.days_ahead || 7} días`,
+    smart_shopping_list: (a) =>
+      `Generar lista de compras para ${a.days_ahead || 7} días`,
   };
 
   const generator = descriptions[functionName];
@@ -577,7 +695,7 @@ export function generateActionDescription(functionName: string, args: Record<str
  */
 export async function shouldCreateProposal(
   functionNames: string[],
-  householdId: string
+  householdId: string,
 ): Promise<boolean> {
   for (const name of functionNames) {
     const riskLevel = await getFunctionRiskLevel(name);

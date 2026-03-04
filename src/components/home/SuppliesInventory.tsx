@@ -1,11 +1,20 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
-  X, Package, Plus, Minus, AlertTriangle, ShoppingCart,
-  Search, Edit2, Trash2, Check
-} from 'lucide-react';
-import { supabase } from '@/lib/supabase/client';
+  X,
+  Package,
+  Plus,
+  Minus,
+  AlertTriangle,
+  ShoppingCart,
+  Search,
+  Edit2,
+  Trash2,
+  Check,
+} from "lucide-react";
+import { supabase } from "@/lib/supabase/client";
+import Spinner from "@/components/ui/Spinner";
 
 interface SuppliesInventoryProps {
   householdId: string;
@@ -26,52 +35,122 @@ interface SupplyItem {
 }
 
 const SUPPLY_CATEGORIES = [
-  { id: 'cleaning', name: 'Limpieza', icon: '🧹', color: 'blue' },
-  { id: 'laundry', name: 'Lavandería', icon: '👕', color: 'purple' },
-  { id: 'kitchen', name: 'Cocina', icon: '🍳', color: 'orange' },
-  { id: 'bathroom', name: 'Baño', icon: '🚿', color: 'cyan' },
-  { id: 'garden', name: 'Jardín', icon: '🌱', color: 'green' },
-  { id: 'other', name: 'Otros', icon: '📦', color: 'gray' }
+  { id: "cleaning", name: "Limpieza", icon: "🧹", color: "blue" },
+  { id: "laundry", name: "Lavandería", icon: "👕", color: "purple" },
+  { id: "kitchen", name: "Cocina", icon: "🍳", color: "orange" },
+  { id: "bathroom", name: "Baño", icon: "🚿", color: "cyan" },
+  { id: "garden", name: "Jardín", icon: "🌱", color: "green" },
+  { id: "other", name: "Otros", icon: "📦", color: "gray" },
 ];
 
 const DEFAULT_SUPPLIES: Partial<SupplyItem>[] = [
-  { name: 'Detergente multiusos', category: 'cleaning', unit: 'litros', min_quantity: 1 },
-  { name: 'Cloro', category: 'cleaning', unit: 'litros', min_quantity: 1 },
-  { name: 'Desinfectante', category: 'cleaning', unit: 'litros', min_quantity: 1 },
-  { name: 'Limpiavidrios', category: 'cleaning', unit: 'unidades', min_quantity: 1 },
-  { name: 'Bolsas de basura grandes', category: 'cleaning', unit: 'unidades', min_quantity: 10 },
-  { name: 'Bolsas de basura pequeñas', category: 'cleaning', unit: 'unidades', min_quantity: 10 },
-  { name: 'Esponjas', category: 'cleaning', unit: 'unidades', min_quantity: 3 },
-  { name: 'Guantes de limpieza', category: 'cleaning', unit: 'pares', min_quantity: 2 },
-  { name: 'Trapos/paños', category: 'cleaning', unit: 'unidades', min_quantity: 5 },
-  { name: 'Detergente ropa', category: 'laundry', unit: 'kg', min_quantity: 1 },
-  { name: 'Suavizante', category: 'laundry', unit: 'litros', min_quantity: 1 },
-  { name: 'Jabón en barra', category: 'laundry', unit: 'unidades', min_quantity: 2 },
-  { name: 'Jabón lavavajillas', category: 'kitchen', unit: 'litros', min_quantity: 1 },
-  { name: 'Esponja cocina', category: 'kitchen', unit: 'unidades', min_quantity: 2 },
-  { name: 'Papel toalla', category: 'kitchen', unit: 'rollos', min_quantity: 2 },
-  { name: 'Papel higiénico', category: 'bathroom', unit: 'rollos', min_quantity: 6 },
-  { name: 'Jabón de manos', category: 'bathroom', unit: 'unidades', min_quantity: 2 },
-  { name: 'Limpiador sanitarios', category: 'bathroom', unit: 'litros', min_quantity: 1 },
+  {
+    name: "Detergente multiusos",
+    category: "cleaning",
+    unit: "litros",
+    min_quantity: 1,
+  },
+  { name: "Cloro", category: "cleaning", unit: "litros", min_quantity: 1 },
+  {
+    name: "Desinfectante",
+    category: "cleaning",
+    unit: "litros",
+    min_quantity: 1,
+  },
+  {
+    name: "Limpiavidrios",
+    category: "cleaning",
+    unit: "unidades",
+    min_quantity: 1,
+  },
+  {
+    name: "Bolsas de basura grandes",
+    category: "cleaning",
+    unit: "unidades",
+    min_quantity: 10,
+  },
+  {
+    name: "Bolsas de basura pequeñas",
+    category: "cleaning",
+    unit: "unidades",
+    min_quantity: 10,
+  },
+  { name: "Esponjas", category: "cleaning", unit: "unidades", min_quantity: 3 },
+  {
+    name: "Guantes de limpieza",
+    category: "cleaning",
+    unit: "pares",
+    min_quantity: 2,
+  },
+  {
+    name: "Trapos/paños",
+    category: "cleaning",
+    unit: "unidades",
+    min_quantity: 5,
+  },
+  { name: "Detergente ropa", category: "laundry", unit: "kg", min_quantity: 1 },
+  { name: "Suavizante", category: "laundry", unit: "litros", min_quantity: 1 },
+  {
+    name: "Jabón en barra",
+    category: "laundry",
+    unit: "unidades",
+    min_quantity: 2,
+  },
+  {
+    name: "Jabón lavavajillas",
+    category: "kitchen",
+    unit: "litros",
+    min_quantity: 1,
+  },
+  {
+    name: "Esponja cocina",
+    category: "kitchen",
+    unit: "unidades",
+    min_quantity: 2,
+  },
+  {
+    name: "Papel toalla",
+    category: "kitchen",
+    unit: "rollos",
+    min_quantity: 2,
+  },
+  {
+    name: "Papel higiénico",
+    category: "bathroom",
+    unit: "rollos",
+    min_quantity: 6,
+  },
+  {
+    name: "Jabón de manos",
+    category: "bathroom",
+    unit: "unidades",
+    min_quantity: 2,
+  },
+  {
+    name: "Limpiador sanitarios",
+    category: "bathroom",
+    unit: "litros",
+    min_quantity: 1,
+  },
 ];
 
 export default function SuppliesInventory({
   householdId,
   onClose,
-  onAddToShoppingList
+  onAddToShoppingList,
 }: SuppliesInventoryProps) {
   const [supplies, setSupplies] = useState<SupplyItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingItem, setEditingItem] = useState<SupplyItem | null>(null);
   const [newItem, setNewItem] = useState({
-    name: '',
-    category: 'cleaning',
+    name: "",
+    category: "cleaning",
     current_quantity: 0,
     min_quantity: 1,
-    unit: 'unidades'
+    unit: "unidades",
   });
 
   useEffect(() => {
@@ -82,14 +161,14 @@ export default function SuppliesInventory({
     setLoading(true);
 
     const { data, error } = await supabase
-      .from('cleaning_supplies')
-      .select('*')
-      .eq('household_id', householdId)
-      .order('category', { ascending: true });
+      .from("cleaning_supplies")
+      .select("*")
+      .eq("household_id", householdId)
+      .order("category", { ascending: true });
 
     if (data) {
       setSupplies(data);
-    } else if (error && error.code === 'PGRST116') {
+    } else if (error && error.code === "PGRST116") {
       // Table doesn't exist or is empty, initialize with defaults
       await initializeDefaults();
     }
@@ -98,32 +177,35 @@ export default function SuppliesInventory({
   };
 
   const initializeDefaults = async () => {
-    const defaultItems = DEFAULT_SUPPLIES.map(item => ({
+    const defaultItems = DEFAULT_SUPPLIES.map((item) => ({
       ...item,
       household_id: householdId,
-      current_quantity: 0
+      current_quantity: 0,
     }));
 
-    await supabase.from('cleaning_supplies').insert(defaultItems);
+    await supabase.from("cleaning_supplies").insert(defaultItems);
     loadSupplies();
   };
 
   const updateQuantity = async (itemId: string, change: number) => {
-    const item = supplies.find(s => s.id === itemId);
+    const item = supplies.find((s) => s.id === itemId);
     if (!item) return;
 
     const newQuantity = Math.max(0, item.current_quantity + change);
 
     await supabase
-      .from('cleaning_supplies')
+      .from("cleaning_supplies")
       .update({
         current_quantity: newQuantity,
-        last_restocked: change > 0 ? new Date().toISOString() : item.last_restocked
+        last_restocked:
+          change > 0 ? new Date().toISOString() : item.last_restocked,
       })
-      .eq('id', itemId);
+      .eq("id", itemId);
 
-    setSupplies(prev =>
-      prev.map(s => s.id === itemId ? { ...s, current_quantity: newQuantity } : s)
+    setSupplies((prev) =>
+      prev.map((s) =>
+        s.id === itemId ? { ...s, current_quantity: newQuantity } : s,
+      ),
     );
   };
 
@@ -131,41 +213,47 @@ export default function SuppliesInventory({
     if (!newItem.name.trim()) return;
 
     const { data } = await supabase
-      .from('cleaning_supplies')
+      .from("cleaning_supplies")
       .insert({
         household_id: householdId,
         ...newItem,
-        current_quantity: newItem.current_quantity
+        current_quantity: newItem.current_quantity,
       })
       .select()
       .single();
 
     if (data) {
-      setSupplies(prev => [...prev, data]);
+      setSupplies((prev) => [...prev, data]);
       setNewItem({
-        name: '',
-        category: 'cleaning',
+        name: "",
+        category: "cleaning",
         current_quantity: 0,
         min_quantity: 1,
-        unit: 'unidades'
+        unit: "unidades",
       });
       setShowAddForm(false);
     }
   };
 
   const deleteItem = async (itemId: string) => {
-    await supabase.from('cleaning_supplies').delete().eq('id', itemId);
-    setSupplies(prev => prev.filter(s => s.id !== itemId));
+    await supabase.from("cleaning_supplies").delete().eq("id", itemId);
+    setSupplies((prev) => prev.filter((s) => s.id !== itemId));
   };
 
-  const filteredSupplies = supplies.filter(s => {
-    const matchesCategory = selectedCategory === 'all' || s.category === selectedCategory;
-    const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredSupplies = supplies.filter((s) => {
+    const matchesCategory =
+      selectedCategory === "all" || s.category === selectedCategory;
+    const matchesSearch = s.name
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 
-  const lowStockItems = supplies.filter(s => s.current_quantity <= s.min_quantity);
-  const getCategoryInfo = (catId: string) => SUPPLY_CATEGORIES.find(c => c.id === catId);
+  const lowStockItems = supplies.filter(
+    (s) => s.current_quantity <= s.min_quantity,
+  );
+  const getCategoryInfo = (catId: string) =>
+    SUPPLY_CATEGORIES.find((c) => c.id === catId);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -176,7 +264,10 @@ export default function SuppliesInventory({
             <Package size={20} />
             <span className="font-semibold">Inventario de Productos</span>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg">
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-white/20 rounded-lg"
+          >
             <X size={20} />
           </button>
         </div>
@@ -187,7 +278,8 @@ export default function SuppliesInventory({
             <div className="flex items-center gap-2 text-amber-800">
               <AlertTriangle size={18} />
               <span className="text-sm font-medium">
-                {lowStockItems.length} producto{lowStockItems.length > 1 ? 's' : ''} con stock bajo
+                {lowStockItems.length} producto
+                {lowStockItems.length > 1 ? "s" : ""} con stock bajo
               </span>
               {onAddToShoppingList && (
                 <button
@@ -205,7 +297,10 @@ export default function SuppliesInventory({
         {/* Search & Filter */}
         <div className="p-4 border-b space-y-3">
           <div className="relative">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search
+              size={18}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
             <input
               type="text"
               value={searchQuery}
@@ -217,23 +312,23 @@ export default function SuppliesInventory({
 
           <div className="flex gap-2 overflow-x-auto pb-1">
             <button
-              onClick={() => setSelectedCategory('all')}
+              onClick={() => setSelectedCategory("all")}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap ${
-                selectedCategory === 'all'
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-gray-100 text-gray-600'
+                selectedCategory === "all"
+                  ? "bg-emerald-600 text-white"
+                  : "bg-gray-100 text-gray-600"
               }`}
             >
               Todos
             </button>
-            {SUPPLY_CATEGORIES.map(cat => (
+            {SUPPLY_CATEGORIES.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap flex items-center gap-1 ${
                   selectedCategory === cat.id
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-gray-100 text-gray-600'
+                    ? "bg-emerald-600 text-white"
+                    : "bg-gray-100 text-gray-600"
                 }`}
               >
                 <span>{cat.icon}</span>
@@ -246,7 +341,7 @@ export default function SuppliesInventory({
         <div className="flex-1 overflow-y-auto p-4">
           {loading ? (
             <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto" />
+              <Spinner size="lg" color="emerald" className="mx-auto" />
             </div>
           ) : filteredSupplies.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
@@ -255,7 +350,7 @@ export default function SuppliesInventory({
             </div>
           ) : (
             <div className="space-y-2">
-              {filteredSupplies.map(item => {
+              {filteredSupplies.map((item) => {
                 const cat = getCategoryInfo(item.category);
                 const isLowStock = item.current_quantity <= item.min_quantity;
 
@@ -263,7 +358,9 @@ export default function SuppliesInventory({
                   <div
                     key={item.id}
                     className={`rounded-xl p-4 border ${
-                      isLowStock ? 'border-amber-300 bg-amber-50' : 'border-gray-200'
+                      isLowStock
+                        ? "border-amber-300 bg-amber-50"
+                        : "border-gray-200"
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -283,9 +380,11 @@ export default function SuppliesInventory({
                         >
                           <Minus size={16} />
                         </button>
-                        <span className={`w-12 text-center font-bold ${
-                          isLowStock ? 'text-amber-600' : ''
-                        }`}>
+                        <span
+                          className={`w-12 text-center font-bold ${
+                            isLowStock ? "text-amber-600" : ""
+                          }`}
+                        >
                           {item.current_quantity}
                         </span>
                         <button
@@ -322,44 +421,66 @@ export default function SuppliesInventory({
               <input
                 type="text"
                 value={newItem.name}
-                onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+                onChange={(e) =>
+                  setNewItem({ ...newItem, name: e.target.value })
+                }
                 placeholder="Nombre del producto"
                 className="w-full p-3 border rounded-xl"
               />
               <div className="grid grid-cols-2 gap-3">
                 <select
                   value={newItem.category}
-                  onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
+                  onChange={(e) =>
+                    setNewItem({ ...newItem, category: e.target.value })
+                  }
                   className="p-3 border rounded-xl"
                 >
-                  {SUPPLY_CATEGORIES.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>
+                  {SUPPLY_CATEGORIES.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.icon} {cat.name}
+                    </option>
                   ))}
                 </select>
                 <input
                   type="text"
                   value={newItem.unit}
-                  onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
+                  onChange={(e) =>
+                    setNewItem({ ...newItem, unit: e.target.value })
+                  }
                   placeholder="Unidad (ej: litros)"
                   className="p-3 border rounded-xl"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-gray-500">Cantidad actual</label>
+                  <label className="text-xs text-gray-500">
+                    Cantidad actual
+                  </label>
                   <input
                     type="number"
                     value={newItem.current_quantity}
-                    onChange={(e) => setNewItem({ ...newItem, current_quantity: parseInt(e.target.value) || 0 })}
+                    onChange={(e) =>
+                      setNewItem({
+                        ...newItem,
+                        current_quantity: parseInt(e.target.value) || 0,
+                      })
+                    }
                     className="w-full p-3 border rounded-xl"
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500">Cantidad mínima</label>
+                  <label className="text-xs text-gray-500">
+                    Cantidad mínima
+                  </label>
                   <input
                     type="number"
                     value={newItem.min_quantity}
-                    onChange={(e) => setNewItem({ ...newItem, min_quantity: parseInt(e.target.value) || 1 })}
+                    onChange={(e) =>
+                      setNewItem({
+                        ...newItem,
+                        min_quantity: parseInt(e.target.value) || 1,
+                      })
+                    }
                     className="w-full p-3 border rounded-xl"
                   />
                 </div>
@@ -395,7 +516,7 @@ export default function SuppliesInventory({
           )}
           <button
             onClick={onClose}
-            className={`py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold ${showAddForm ? 'flex-1' : 'px-6'}`}
+            className={`py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold ${showAddForm ? "flex-1" : "px-6"}`}
           >
             Cerrar
           </button>

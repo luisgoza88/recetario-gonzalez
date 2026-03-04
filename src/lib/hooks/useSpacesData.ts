@@ -1,15 +1,15 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase/client';
-import type { Space, SpaceType } from '@/types';
-import type { TaskConfig, SpaceForm } from '@/lib/config/spaceConfig';
-import { homeQueryKeys } from './useHomeData';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase/client";
+import type { Space, SpaceType } from "@/types";
+import type { TaskConfig, SpaceForm } from "@/lib/config/spaceConfig";
+import { homeQueryKeys } from "./useHomeData";
 
 // ============================================
 // QUERY KEYS
 // ============================================
 export const spacesQueryKeys = {
-  spaceTypes: ['spaceTypes'] as const,
-  spaceTasks: (spaceId: string) => ['spaceTasks', spaceId] as const,
+  spaceTypes: ["spaceTypes"] as const,
+  spaceTasks: (spaceId: string) => ["spaceTasks", spaceId] as const,
 };
 
 // ============================================
@@ -18,9 +18,9 @@ export const spacesQueryKeys = {
 
 async function fetchSpaceTypes(): Promise<SpaceType[]> {
   const { data, error } = await supabase
-    .from('space_types')
-    .select('*')
-    .order('sort_order');
+    .from("space_types")
+    .select("*")
+    .order("sort_order");
 
   if (error) throw error;
   return (data ?? []) as SpaceType[];
@@ -28,17 +28,17 @@ async function fetchSpaceTypes(): Promise<SpaceType[]> {
 
 async function fetchSpaceTasks(spaceId: string): Promise<TaskConfig[]> {
   const { data, error } = await supabase
-    .from('task_templates')
-    .select('*')
-    .eq('space_id', spaceId);
+    .from("task_templates")
+    .select("*")
+    .eq("space_id", spaceId);
 
   if (error) throw error;
 
   if (data && data.length > 0) {
-    return data.map(t => ({
+    return data.map((t) => ({
       id: t.id,
       name: t.name,
-      frequency: t.frequency as TaskConfig['frequency'],
+      frequency: t.frequency as TaskConfig["frequency"],
       enabled: t.is_active,
       estimatedMinutes: t.estimated_minutes,
       isCustom: false,
@@ -92,7 +92,7 @@ export function useSaveSpace() {
       space: SpaceForm;
     }) => {
       if (!space.spaceTypeId) {
-        throw new Error('Se requiere un tipo de espacio');
+        throw new Error("Se requiere un tipo de espacio");
       }
 
       const spaceData = {
@@ -111,16 +111,16 @@ export function useSaveSpace() {
       if (space.id) {
         // Update existing space
         const { error } = await supabase
-          .from('spaces')
+          .from("spaces")
           .update(spaceData)
-          .eq('id', space.id);
+          .eq("id", space.id);
         if (error) throw error;
       } else {
         // Insert new space
         const { data, error } = await supabase
-          .from('spaces')
+          .from("spaces")
           .insert(spaceData)
-          .select('id')
+          .select("id")
           .single();
         if (error) throw error;
         spaceId = data.id;
@@ -129,27 +129,24 @@ export function useSaveSpace() {
       // Save task templates
       if (spaceId) {
         // Delete existing task_templates for this space
-        await supabase
-          .from('task_templates')
-          .delete()
-          .eq('space_id', spaceId);
+        await supabase.from("task_templates").delete().eq("space_id", spaceId);
 
         // Insert new enabled task_templates
         const tasksToInsert = space.tasks
-          .filter(t => t.enabled)
-          .map(t => ({
+          .filter((t) => t.enabled)
+          .map((t) => ({
             household_id: householdId,
             space_id: spaceId,
             name: t.name,
             frequency: t.frequency,
             estimated_minutes: t.estimatedMinutes,
-            priority: 'normal',
+            priority: "normal",
             is_active: true,
           }));
 
         if (tasksToInsert.length > 0) {
           const { error: tasksError } = await supabase
-            .from('task_templates')
+            .from("task_templates")
             .insert(tasksToInsert);
           if (tasksError) throw tasksError;
         }
@@ -176,31 +173,31 @@ export function useDeleteSpace() {
     mutationFn: async ({ spaceId }: { spaceId: string }) => {
       // Fetch the space first to get the household_id for cache invalidation
       const { data: space, error: fetchError } = await supabase
-        .from('spaces')
-        .select('household_id')
-        .eq('id', spaceId)
+        .from("spaces")
+        .select("household_id")
+        .eq("id", spaceId)
         .single();
       if (fetchError) throw fetchError;
 
-      const householdId = (space as Pick<Space, 'household_id'>).household_id;
+      const householdId = (space as Pick<Space, "household_id">).household_id;
 
       // Cascade delete: scheduled_tasks -> task_templates -> space
       const { error: scheduledError } = await supabase
-        .from('scheduled_tasks')
+        .from("scheduled_tasks")
         .delete()
-        .eq('space_id', spaceId);
+        .eq("space_id", spaceId);
       if (scheduledError) throw scheduledError;
 
       const { error: templatesError } = await supabase
-        .from('task_templates')
+        .from("task_templates")
         .delete()
-        .eq('space_id', spaceId);
+        .eq("space_id", spaceId);
       if (templatesError) throw templatesError;
 
       const { error: spaceError } = await supabase
-        .from('spaces')
+        .from("spaces")
         .delete()
-        .eq('id', spaceId);
+        .eq("id", spaceId);
       if (spaceError) throw spaceError;
 
       return { householdId };

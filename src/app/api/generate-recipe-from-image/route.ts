@@ -1,22 +1,29 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
-import { getGeminiClient, GEMINI_MODELS, GEMINI_CONFIG, cleanJsonResponse, base64ToGeminiFormat } from '@/lib/gemini/client';
-import { requireAuth } from '@/lib/api/auth';
-import { logger } from '@/lib/logger';
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import {
+  getGeminiClient,
+  GEMINI_MODELS,
+  GEMINI_CONFIG,
+  cleanJsonResponse,
+  base64ToGeminiFormat,
+} from "@/lib/gemini/client";
+import { requireAuth } from "@/lib/api/auth";
+import { logger } from "@/lib/logger";
 
 // Zod schema for input validation
-const GenerateRecipeFromImageSchema = z.object({
-  image: z.string().max(20_000_000).optional(), // base64-encoded image, ~15 MB max raw
-  description: z.string().min(1).max(2000).optional(),
-  type: z.enum(['breakfast', 'lunch', 'dinner']).optional(),
-}).refine(
-  (data) => data.image || data.description,
-  { message: 'Se requiere una imagen o descripción' }
-);
+const GenerateRecipeFromImageSchema = z
+  .object({
+    image: z.string().max(20_000_000).optional(), // base64-encoded image, ~15 MB max raw
+    description: z.string().min(1).max(2000).optional(),
+    type: z.enum(["breakfast", "lunch", "dinner"]).optional(),
+  })
+  .refine((data) => data.image || data.description, {
+    message: "Se requiere una imagen o descripción",
+  });
 
 interface GeneratedRecipe {
   name: string;
-  type: 'breakfast' | 'lunch' | 'dinner';
+  type: "breakfast" | "lunch" | "dinner";
   description: string;
   total: string;
   portions: {
@@ -45,8 +52,8 @@ export async function POST(request: NextRequest) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Datos inválidos', details: parsed.error.flatten() },
-        { status: 400 }
+        { error: "Datos inválidos", details: parsed.error.flatten() },
+        { status: 400 },
       );
     }
 
@@ -105,7 +112,9 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura:
 }`;
 
     // Build content parts
-    const contentParts: Array<{ text: string } | { inlineData: { data: string; mimeType: string } }> = [];
+    const contentParts: Array<
+      { text: string } | { inlineData: { data: string; mimeType: string } }
+    > = [];
 
     // Add system prompt
     contentParts.push({ text: systemPrompt });
@@ -117,35 +126,37 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura:
 
       if (description) {
         contentParts.push({
-          text: `Genera una receta basada en esta imagen. Información adicional del usuario: "${description}". ${type ? `Tipo de comida: ${type}` : ''}`
+          text: `Genera una receta basada en esta imagen. Información adicional del usuario: "${description}". ${type ? `Tipo de comida: ${type}` : ""}`,
         });
       } else {
         contentParts.push({
-          text: `Genera una receta completa basada en esta imagen del plato. ${type ? `Tipo de comida: ${type}` : 'Determina si es desayuno, almuerzo o cena.'}`
+          text: `Genera una receta completa basada en esta imagen del plato. ${type ? `Tipo de comida: ${type}` : "Determina si es desayuno, almuerzo o cena."}`,
         });
       }
     } else {
       // Text only
       contentParts.push({
-        text: `Genera una receta completa para: "${description}". ${type ? `Tipo de comida: ${type}` : 'Determina si es desayuno, almuerzo o cena basándote en el tipo de plato.'}`
+        text: `Genera una receta completa para: "${description}". ${type ? `Tipo de comida: ${type}` : "Determina si es desayuno, almuerzo o cena basándote en el tipo de plato."}`,
       });
     }
 
     // Call Gemini
     const response = await gemini.models.generateContent({
       model: GEMINI_MODELS.FLASH,
-      contents: [{
-        role: 'user',
-        parts: contentParts
-      }],
+      contents: [
+        {
+          role: "user",
+          parts: contentParts,
+        },
+      ],
       config: {
         temperature: GEMINI_CONFIG.vision.temperature,
         maxOutputTokens: GEMINI_CONFIG.vision.maxOutputTokens,
-        responseMimeType: 'application/json',
+        responseMimeType: "application/json",
       },
     });
 
-    const content = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const content = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
     // Extract JSON from response
     let recipeData: GeneratedRecipe;
@@ -155,29 +166,32 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura:
     } catch {
       logger.error(`Error parsing recipe response: ${content}`);
       return NextResponse.json(
-        { error: 'No se pudo generar la receta. Intenta con otra descripción.' },
-        { status: 400 }
+        {
+          error: "No se pudo generar la receta. Intenta con otra descripción.",
+        },
+        { status: 400 },
       );
     }
 
     // Validate required fields
     if (!recipeData.name || !recipeData.ingredients || !recipeData.steps) {
       return NextResponse.json(
-        { error: 'La receta generada está incompleta. Intenta de nuevo.' },
-        { status: 400 }
+        { error: "La receta generada está incompleta. Intenta de nuevo." },
+        { status: 400 },
       );
     }
 
     return NextResponse.json({
       success: true,
-      recipe: recipeData
+      recipe: recipeData,
     });
-
   } catch (error) {
-    logger.error('Error generating recipe', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error generating recipe", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
-      { error: 'Error al generar la receta' },
-      { status: 500 }
+      { error: "Error al generar la receta" },
+      { status: 500 },
     );
   }
 }

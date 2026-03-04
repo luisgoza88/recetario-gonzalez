@@ -4,14 +4,20 @@
  */
 
 // Base message types
-export type RichMessageType = 'text' | 'card' | 'list' | 'recipe_card' | 'inventory_alert' | 'task_summary';
+export type RichMessageType =
+  | "text"
+  | "card"
+  | "list"
+  | "recipe_card"
+  | "inventory_alert"
+  | "task_summary";
 
 // Action that can be triggered from a button
 export interface MessageAction {
   id: string;
   label: string;
   action: string; // Action identifier (e.g., 'add_to_cart:leche', 'show_recipe:carbonara')
-  variant?: 'primary' | 'secondary' | 'danger';
+  variant?: "primary" | "secondary" | "danger";
   icon?: string; // Lucide icon name
 }
 
@@ -23,12 +29,12 @@ export interface RichMessage {
 
 // Text message (standard)
 export interface TextMessage extends RichMessage {
-  type: 'text';
+  type: "text";
 }
 
 // Card message for recipes, items, etc.
 export interface CardMessage extends RichMessage {
-  type: 'card';
+  type: "card";
   title: string;
   subtitle?: string;
   image?: string;
@@ -39,7 +45,7 @@ export interface CardMessage extends RichMessage {
 
 // Recipe card with specific fields
 export interface RecipeCardMessage extends RichMessage {
-  type: 'recipe_card';
+  type: "recipe_card";
   recipe: {
     name: string;
     prepTime: number;
@@ -54,11 +60,11 @@ export interface RecipeCardMessage extends RichMessage {
 
 // List message for shopping lists, inventory, etc.
 export interface ListMessage extends RichMessage {
-  type: 'list';
+  type: "list";
   title: string;
   items: Array<{
     text: string;
-    status?: 'available' | 'missing' | 'low' | 'normal';
+    status?: "available" | "missing" | "low" | "normal";
     icon?: string;
   }>;
   actions?: MessageAction[];
@@ -66,7 +72,7 @@ export interface ListMessage extends RichMessage {
 
 // Inventory alert message
 export interface InventoryAlertMessage extends RichMessage {
-  type: 'inventory_alert';
+  type: "inventory_alert";
   alerts: {
     critical: string[];
     low: string[];
@@ -76,7 +82,7 @@ export interface InventoryAlertMessage extends RichMessage {
 
 // Task summary message
 export interface TaskSummaryMessage extends RichMessage {
-  type: 'task_summary';
+  type: "task_summary";
   summary: {
     total: number;
     completed: number;
@@ -98,7 +104,7 @@ export type AIRichMessage =
 // Message with potential rich content
 export interface AIMessage {
   id: string;
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   richContent?: AIRichMessage;
   timestamp: Date;
@@ -109,7 +115,7 @@ export interface AIMessage {
 export function hasRichContent(content: string): boolean {
   try {
     const parsed = JSON.parse(content);
-    return parsed && typeof parsed === 'object' && 'type' in parsed;
+    return parsed && typeof parsed === "object" && "type" in parsed;
   } catch {
     return false;
   }
@@ -119,7 +125,7 @@ export function hasRichContent(content: string): boolean {
 export function parseRichContent(content: string): AIRichMessage | null {
   try {
     const parsed = JSON.parse(content);
-    if (parsed && typeof parsed === 'object' && 'type' in parsed) {
+    if (parsed && typeof parsed === "object" && "type" in parsed) {
       return parsed as AIRichMessage;
     }
     return null;
@@ -129,4 +135,7 @@ export function parseRichContent(content: string): AIRichMessage | null {
 }
 
 // Action handlers registry type
-export type ActionHandler = (action: string, params?: string) => void | Promise<void>;
+export type ActionHandler = (
+  action: string,
+  params?: string,
+) => void | Promise<void>;

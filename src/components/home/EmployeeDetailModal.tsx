@@ -1,17 +1,34 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
-  X, User, Edit2, Check, Clock, Home, MapPin, Plus, Trash2,
-  Calendar, CheckCircle2, ChevronRight, Save, ArrowLeft,
-  Building, TreeDeciduous, Settings, Star, AlertCircle
-} from 'lucide-react';
-import { supabase } from '@/lib/supabase/client';
-import { useToast } from '@/components/ui/Toast';
-import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import { HomeEmployee, Space, ScheduledTask } from '@/types';
-import { useEscapeKey } from '@/hooks/useEscapeKey';
-import FocusTrap from '@/components/ui/FocusTrap';
+  X,
+  User,
+  Edit2,
+  Check,
+  Clock,
+  Home,
+  MapPin,
+  Plus,
+  Trash2,
+  Calendar,
+  CheckCircle2,
+  ChevronRight,
+  Save,
+  ArrowLeft,
+  Building,
+  TreeDeciduous,
+  Settings,
+  Star,
+  AlertCircle,
+} from "lucide-react";
+import { supabase } from "@/lib/supabase/client";
+import { useToast } from "@/components/ui/Toast";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { HomeEmployee, Space, ScheduledTask } from "@/types";
+import { useEscapeKey } from "@/hooks/useEscapeKey";
+import FocusTrap from "@/components/ui/FocusTrap";
+import Spinner from "@/components/ui/Spinner";
 
 interface EmployeeDetailModalProps {
   employee: HomeEmployee;
@@ -37,32 +54,34 @@ interface EmployeeSpaceAssignment {
   space?: Space;
 }
 
-type TabType = 'info' | 'spaces' | 'tasks' | 'schedule';
+type TabType = "info" | "spaces" | "tasks" | "schedule";
 
 const DAYS = [
-  { key: 'lunes', label: 'Lunes', short: 'L' },
-  { key: 'martes', label: 'Martes', short: 'M' },
-  { key: 'miercoles', label: 'Miércoles', short: 'X' },
-  { key: 'jueves', label: 'Jueves', short: 'J' },
-  { key: 'viernes', label: 'Viernes', short: 'V' },
-  { key: 'sabado', label: 'Sábado', short: 'S' },
+  { key: "lunes", label: "Lunes", short: "L" },
+  { key: "martes", label: "Martes", short: "M" },
+  { key: "miercoles", label: "Miércoles", short: "X" },
+  { key: "jueves", label: "Jueves", short: "J" },
+  { key: "viernes", label: "Viernes", short: "V" },
+  { key: "sabado", label: "Sábado", short: "S" },
 ];
 
 const defaultSchedule: Record<string, DaySchedule> = {
-  lunes: { enabled: true, startTime: '08:00', endTime: '17:00' },
-  martes: { enabled: true, startTime: '08:00', endTime: '17:00' },
-  miercoles: { enabled: true, startTime: '08:00', endTime: '17:00' },
-  jueves: { enabled: true, startTime: '08:00', endTime: '17:00' },
-  viernes: { enabled: true, startTime: '08:00', endTime: '17:00' },
-  sabado: { enabled: false, startTime: '08:00', endTime: '12:00' },
+  lunes: { enabled: true, startTime: "08:00", endTime: "17:00" },
+  martes: { enabled: true, startTime: "08:00", endTime: "17:00" },
+  miercoles: { enabled: true, startTime: "08:00", endTime: "17:00" },
+  jueves: { enabled: true, startTime: "08:00", endTime: "17:00" },
+  viernes: { enabled: true, startTime: "08:00", endTime: "17:00" },
+  sabado: { enabled: false, startTime: "08:00", endTime: "12:00" },
 };
 
-const calculateWeeklyHours = (schedule: Record<string, DaySchedule>): number => {
+const calculateWeeklyHours = (
+  schedule: Record<string, DaySchedule>,
+): number => {
   let total = 0;
   for (const day of Object.values(schedule)) {
     if (day.enabled) {
-      const start = day.startTime.split(':').map(Number);
-      const end = day.endTime.split(':').map(Number);
+      const start = day.startTime.split(":").map(Number);
+      const end = day.endTime.split(":").map(Number);
       const startMinutes = start[0] * 60 + start[1];
       const endMinutes = end[0] * 60 + end[1];
       total += (endMinutes - startMinutes) / 60;
@@ -77,25 +96,29 @@ export default function EmployeeDetailModal({
   spaces,
   onClose,
   onUpdate,
-  onDelete
+  onDelete,
 }: EmployeeDetailModalProps) {
   const toast = useToast();
   useEscapeKey(onClose);
-  const [activeTab, setActiveTab] = useState<TabType>('info');
+  const [activeTab, setActiveTab] = useState<TabType>("info");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Form state
   const [name, setName] = useState(employee.name);
-  const [zone, setZone] = useState<'interior' | 'exterior' | 'ambos'>(employee.zone);
-  const [phone, setPhone] = useState(employee.phone || '');
-  const [notes, setNotes] = useState(employee.notes || '');
+  const [zone, setZone] = useState<"interior" | "exterior" | "ambos">(
+    employee.zone,
+  );
+  const [phone, setPhone] = useState(employee.phone || "");
+  const [notes, setNotes] = useState(employee.notes || "");
   const [schedule, setSchedule] = useState<Record<string, DaySchedule>>(
-    (employee.schedule as Record<string, DaySchedule>) || defaultSchedule
+    (employee.schedule as Record<string, DaySchedule>) || defaultSchedule,
   );
 
   // Space assignments
-  const [spaceAssignments, setSpaceAssignments] = useState<EmployeeSpaceAssignment[]>([]);
+  const [spaceAssignments, setSpaceAssignments] = useState<
+    EmployeeSpaceAssignment[]
+  >([]);
   const [loadingSpaces, setLoadingSpaces] = useState(true);
   const [showAddSpace, setShowAddSpace] = useState(false);
 
@@ -103,7 +126,7 @@ export default function EmployeeDetailModal({
   const [recentTasks, setRecentTasks] = useState<ScheduledTask[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
   const [confirmAction, setConfirmAction] = useState<{
-    type: 'remove-space' | 'delete-employee';
+    type: "remove-space" | "delete-employee";
     id: string;
   } | null>(null);
 
@@ -116,15 +139,15 @@ export default function EmployeeDetailModal({
     setLoadingSpaces(true);
     try {
       const { data } = await supabase
-        .from('employee_space_assignments')
-        .select('*, space:spaces(*, space_type:space_types(*))')
-        .eq('employee_id', employee.id);
+        .from("employee_space_assignments")
+        .select("*, space:spaces(*, space_type:space_types(*))")
+        .eq("employee_id", employee.id);
 
       if (data) {
         setSpaceAssignments(data);
       }
     } catch (error) {
-      console.error('Error loading space assignments:', error);
+      console.error("Error loading space assignments:", error);
       // If table doesn't exist, just set empty array
       setSpaceAssignments([]);
     } finally {
@@ -136,17 +159,19 @@ export default function EmployeeDetailModal({
     setLoadingTasks(true);
     try {
       const { data } = await supabase
-        .from('scheduled_tasks')
-        .select('*, task_template:task_templates(*), space:spaces(*, space_type:space_types(*))')
-        .eq('employee_id', employee.id)
-        .order('scheduled_date', { ascending: false })
+        .from("scheduled_tasks")
+        .select(
+          "*, task_template:task_templates(*), space:spaces(*, space_type:space_types(*))",
+        )
+        .eq("employee_id", employee.id)
+        .order("scheduled_date", { ascending: false })
         .limit(10);
 
       if (data) {
         setRecentTasks(data);
       }
     } catch (error) {
-      console.error('Error loading tasks:', error);
+      console.error("Error loading tasks:", error);
     } finally {
       setLoadingTasks(false);
     }
@@ -160,42 +185,46 @@ export default function EmployeeDetailModal({
         .map(([day]) => day);
 
       const totalHours = calculateWeeklyHours(schedule);
-      const hoursPerDay = workDays.length > 0 ? Math.round(totalHours / workDays.length) : 8;
+      const hoursPerDay =
+        workDays.length > 0 ? Math.round(totalHours / workDays.length) : 8;
 
       const { error } = await supabase
-        .from('home_employees')
+        .from("home_employees")
         .update({
           name: name.trim(),
           zone,
           phone: phone.trim() || null,
           notes: notes.trim() || null,
           work_days: workDays,
-          hours_per_day: hoursPerDay
+          hours_per_day: hoursPerDay,
         })
-        .eq('id', employee.id);
+        .eq("id", employee.id);
 
       if (error) throw error;
 
       setEditing(false);
       onUpdate();
     } catch (error) {
-      console.error('Error saving employee:', error);
-      toast.error('Error al guardar los cambios');
+      console.error("Error saving employee:", error);
+      toast.error("Error al guardar los cambios");
     } finally {
       setSaving(false);
     }
   };
 
-  const addSpaceAssignment = async (spaceId: string, isPrimary: boolean = false) => {
+  const addSpaceAssignment = async (
+    spaceId: string,
+    isPrimary: boolean = false,
+  ) => {
     try {
       // First try to create the table if it doesn't exist
       const { error } = await supabase
-        .from('employee_space_assignments')
+        .from("employee_space_assignments")
         .insert({
           employee_id: employee.id,
           space_id: spaceId,
           is_primary: isPrimary,
-          can_substitute: true
+          can_substitute: true,
         });
 
       if (error) throw error;
@@ -203,35 +232,38 @@ export default function EmployeeDetailModal({
       setShowAddSpace(false);
       loadSpaceAssignments();
     } catch (error) {
-      console.error('Error adding space assignment:', error);
+      console.error("Error adding space assignment:", error);
       // If table doesn't exist, show helpful message
-      toast.error('Error al asignar espacio. Verifica la configuración.');
+      toast.error("Error al asignar espacio. Verifica la configuración.");
     }
   };
 
   const removeSpaceAssignment = async (assignmentId: string) => {
     try {
       await supabase
-        .from('employee_space_assignments')
+        .from("employee_space_assignments")
         .delete()
-        .eq('id', assignmentId);
+        .eq("id", assignmentId);
 
       loadSpaceAssignments();
     } catch (error) {
-      console.error('Error removing assignment:', error);
+      console.error("Error removing assignment:", error);
     }
   };
 
-  const togglePrimarySpace = async (assignmentId: string, currentValue: boolean) => {
+  const togglePrimarySpace = async (
+    assignmentId: string,
+    currentValue: boolean,
+  ) => {
     try {
       await supabase
-        .from('employee_space_assignments')
+        .from("employee_space_assignments")
         .update({ is_primary: !currentValue })
-        .eq('id', assignmentId);
+        .eq("id", assignmentId);
 
       loadSpaceAssignments();
     } catch (error) {
-      console.error('Error updating assignment:', error);
+      console.error("Error updating assignment:", error);
     }
   };
 
@@ -240,66 +272,88 @@ export default function EmployeeDetailModal({
       ...schedule,
       [dayKey]: {
         ...schedule[dayKey],
-        enabled: !schedule[dayKey].enabled
-      }
+        enabled: !schedule[dayKey].enabled,
+      },
     });
   };
 
-  const updateDayTime = (dayKey: string, field: 'startTime' | 'endTime', value: string) => {
+  const updateDayTime = (
+    dayKey: string,
+    field: "startTime" | "endTime",
+    value: string,
+  ) => {
     setSchedule({
       ...schedule,
       [dayKey]: {
         ...schedule[dayKey],
-        [field]: value
-      }
+        [field]: value,
+      },
     });
   };
 
   const handleDelete = async () => {
     try {
       await supabase
-        .from('home_employees')
+        .from("home_employees")
         .update({ active: false })
-        .eq('id', employee.id);
+        .eq("id", employee.id);
 
       onDelete?.();
       onClose();
     } catch (error) {
-      console.error('Error deleting employee:', error);
+      console.error("Error deleting employee:", error);
     }
   };
 
   // Get spaces not yet assigned
   const availableSpaces = spaces.filter(
-    s => !spaceAssignments.some(a => a.space_id === s.id)
+    (s) => !spaceAssignments.some((a) => a.space_id === s.id),
   );
 
-  const interiorSpaces = availableSpaces.filter(s => s.category === 'interior');
-  const exteriorSpaces = availableSpaces.filter(s => s.category === 'exterior');
+  const interiorSpaces = availableSpaces.filter(
+    (s) => s.category === "interior",
+  );
+  const exteriorSpaces = availableSpaces.filter(
+    (s) => s.category === "exterior",
+  );
 
   const getZoneColor = (z: string) => {
     switch (z) {
-      case 'interior': return 'bg-blue-500';
-      case 'exterior': return 'bg-green-500';
-      default: return 'bg-purple-500';
+      case "interior":
+        return "bg-blue-500";
+      case "exterior":
+        return "bg-green-500";
+      default:
+        return "bg-purple-500";
     }
   };
 
   const getZoneIcon = (z: string) => {
     switch (z) {
-      case 'interior': return <Building size={16} />;
-      case 'exterior': return <TreeDeciduous size={16} />;
-      default: return <Home size={16} />;
+      case "interior":
+        return <Building size={16} />;
+      case "exterior":
+        return <TreeDeciduous size={16} />;
+      default:
+        return <Home size={16} />;
     }
   };
 
   return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-6 pb-24 overflow-y-auto">
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-6 pb-24 overflow-y-auto"
+    >
       <div className="bg-white rounded-2xl w-full max-w-lg">
         {/* Header with employee info */}
         <div className={`${getZoneColor(zone)} text-white p-4 rounded-t-2xl`}>
           <div className="flex items-center justify-between mb-3">
-            <button onClick={onClose} aria-label="Cerrar" className="p-2 hover:bg-white/20 rounded-lg">
+            <button
+              onClick={onClose}
+              aria-label="Cerrar"
+              className="p-2 hover:bg-white/20 rounded-lg"
+            >
               <ArrowLeft size={20} />
             </button>
             <div className="flex items-center gap-2">
@@ -317,14 +371,16 @@ export default function EmployeeDetailModal({
                   className="p-2 hover:bg-white/20 rounded-lg"
                 >
                   {saving ? (
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                    <Spinner size="md" color="white" />
                   ) : (
                     <Save size={18} />
                   )}
                 </button>
               )}
               <button
-                onClick={() => setConfirmAction({ type: 'delete-employee', id: employee.id })}
+                onClick={() =>
+                  setConfirmAction({ type: "delete-employee", id: employee.id })
+                }
                 className="p-2 hover:bg-red-500/50 rounded-lg"
               >
                 <Trash2 size={18} />
@@ -353,7 +409,9 @@ export default function EmployeeDetailModal({
                 <span className="text-sm capitalize">{zone}</span>
                 <span className="text-white/50">•</span>
                 <Clock size={14} />
-                <span className="text-sm">{calculateWeeklyHours(schedule)}h/sem</span>
+                <span className="text-sm">
+                  {calculateWeeklyHours(schedule)}h/sem
+                </span>
               </div>
             </div>
           </div>
@@ -362,18 +420,18 @@ export default function EmployeeDetailModal({
         {/* Tabs */}
         <div className="flex border-b">
           {[
-            { id: 'info', label: 'Info', icon: <User size={16} /> },
-            { id: 'spaces', label: 'Espacios', icon: <MapPin size={16} /> },
-            { id: 'tasks', label: 'Tareas', icon: <CheckCircle2 size={16} /> },
-            { id: 'schedule', label: 'Horario', icon: <Calendar size={16} /> },
-          ].map(tab => (
+            { id: "info", label: "Info", icon: <User size={16} /> },
+            { id: "spaces", label: "Espacios", icon: <MapPin size={16} /> },
+            { id: "tasks", label: "Tareas", icon: <CheckCircle2 size={16} /> },
+            { id: "schedule", label: "Horario", icon: <Calendar size={16} /> },
+          ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as TabType)}
               className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-1.5 border-b-2 transition-colors ${
                 activeTab === tab.id
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? "border-blue-600 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
               }`}
             >
               {tab.icon}
@@ -385,7 +443,7 @@ export default function EmployeeDetailModal({
         {/* Tab Content */}
         <div className="p-4">
           {/* INFO TAB */}
-          {activeTab === 'info' && (
+          {activeTab === "info" && (
             <div className="space-y-4">
               {/* Zone Selection */}
               <div>
@@ -394,28 +452,33 @@ export default function EmployeeDetailModal({
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { value: 'interior', label: '🏠 Interior', color: 'blue' },
-                    { value: 'exterior', label: '🌳 Exterior', color: 'green' },
-                    { value: 'ambos', label: '🏡 Ambos', color: 'purple' }
-                  ].map(option => (
+                    { value: "interior", label: "🏠 Interior", color: "blue" },
+                    { value: "exterior", label: "🌳 Exterior", color: "green" },
+                    { value: "ambos", label: "🏡 Ambos", color: "purple" },
+                  ].map((option) => (
                     <button
                       key={option.value}
-                      onClick={() => editing && setZone(option.value as typeof zone)}
+                      onClick={() =>
+                        editing && setZone(option.value as typeof zone)
+                      }
                       disabled={!editing}
                       className={`py-3 rounded-xl text-sm font-medium transition-colors ${
                         zone === option.value
-                          ? option.color === 'blue' ? 'bg-blue-600 text-white' :
-                            option.color === 'green' ? 'bg-green-600 text-white' :
-                            'bg-purple-600 text-white'
-                          : 'bg-gray-100 text-gray-700'
-                      } ${!editing ? 'cursor-default' : 'hover:opacity-90'}`}
+                          ? option.color === "blue"
+                            ? "bg-blue-600 text-white"
+                            : option.color === "green"
+                              ? "bg-green-600 text-white"
+                              : "bg-purple-600 text-white"
+                          : "bg-gray-100 text-gray-700"
+                      } ${!editing ? "cursor-default" : "hover:opacity-90"}`}
                     >
                       {option.label}
                     </button>
                   ))}
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  Nota: Puedes asignar espacios de cualquier zona en la pestaña "Espacios"
+                  Nota: Puedes asignar espacios de cualquier zona en la pestaña
+                  "Espacios"
                 </p>
               </div>
 
@@ -434,7 +497,7 @@ export default function EmployeeDetailModal({
                   />
                 ) : (
                   <p className="px-4 py-3 bg-gray-50 rounded-xl text-gray-700">
-                    {phone || 'Sin teléfono registrado'}
+                    {phone || "Sin teléfono registrado"}
                   </p>
                 )}
               </div>
@@ -453,7 +516,7 @@ export default function EmployeeDetailModal({
                   />
                 ) : (
                   <p className="px-4 py-3 bg-gray-50 rounded-xl text-gray-700 min-h-[60px]">
-                    {notes || 'Sin notas'}
+                    {notes || "Sin notas"}
                   </p>
                 )}
               </div>
@@ -461,18 +524,23 @@ export default function EmployeeDetailModal({
               {/* Quick Stats */}
               <div className="grid grid-cols-3 gap-3 pt-2">
                 <div className="bg-blue-50 rounded-xl p-3 text-center">
-                  <p className="text-2xl font-bold text-blue-600">{spaceAssignments.length}</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {spaceAssignments.length}
+                  </p>
                   <p className="text-xs text-blue-700">Espacios</p>
                 </div>
                 <div className="bg-green-50 rounded-xl p-3 text-center">
                   <p className="text-2xl font-bold text-green-600">
-                    {recentTasks.filter(t => t.status === 'completada').length}
+                    {
+                      recentTasks.filter((t) => t.status === "completada")
+                        .length
+                    }
                   </p>
                   <p className="text-xs text-green-700">Completadas</p>
                 </div>
                 <div className="bg-purple-50 rounded-xl p-3 text-center">
                   <p className="text-2xl font-bold text-purple-600">
-                    {Object.values(schedule).filter(s => s.enabled).length}
+                    {Object.values(schedule).filter((s) => s.enabled).length}
                   </p>
                   <p className="text-xs text-purple-700">Días/sem</p>
                 </div>
@@ -481,10 +549,12 @@ export default function EmployeeDetailModal({
           )}
 
           {/* SPACES TAB */}
-          {activeTab === 'spaces' && (
+          {activeTab === "spaces" && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-gray-700">Espacios asignados</h3>
+                <h3 className="font-semibold text-gray-700">
+                  Espacios asignados
+                </h3>
                 <button
                   onClick={() => setShowAddSpace(true)}
                   className="text-blue-600 text-sm font-medium flex items-center gap-1"
@@ -496,7 +566,7 @@ export default function EmployeeDetailModal({
 
               {loadingSpaces ? (
                 <div className="text-center py-8 text-gray-500">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2" />
+                  <Spinner size="lg" color="blue" className="mx-auto mb-2" />
                   Cargando...
                 </div>
               ) : spaceAssignments.length === 0 ? (
@@ -512,31 +582,42 @@ export default function EmployeeDetailModal({
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {spaceAssignments.map(assignment => (
+                  {spaceAssignments.map((assignment) => (
                     <div
                       key={assignment.id}
                       className={`p-3 rounded-xl border-2 flex items-center gap-3 ${
-                        assignment.space?.category === 'interior'
-                          ? 'bg-blue-50 border-blue-200'
-                          : 'bg-green-50 border-green-200'
+                        assignment.space?.category === "interior"
+                          ? "bg-blue-50 border-blue-200"
+                          : "bg-green-50 border-green-200"
                       }`}
                     >
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        assignment.space?.category === 'interior'
-                          ? 'bg-blue-100'
-                          : 'bg-green-100'
-                      }`}>
+                      <div
+                        className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                          assignment.space?.category === "interior"
+                            ? "bg-blue-100"
+                            : "bg-green-100"
+                        }`}
+                      >
                         <span className="text-lg">
-                          {assignment.space?.space_type?.icon || '📍'}
+                          {assignment.space?.space_type?.icon || "📍"}
                         </span>
                       </div>
                       <div className="flex-1">
                         <p className="font-medium text-gray-800">
-                          {assignment.space?.custom_name || assignment.space?.space_type?.name}
+                          {assignment.space?.custom_name ||
+                            assignment.space?.space_type?.name}
                         </p>
                         <div className="flex items-center gap-2 text-xs text-gray-500">
-                          <span className={assignment.space?.category === 'interior' ? 'text-blue-600' : 'text-green-600'}>
-                            {assignment.space?.category === 'interior' ? '🏠 Interior' : '🌳 Exterior'}
+                          <span
+                            className={
+                              assignment.space?.category === "interior"
+                                ? "text-blue-600"
+                                : "text-green-600"
+                            }
+                          >
+                            {assignment.space?.category === "interior"
+                              ? "🏠 Interior"
+                              : "🌳 Exterior"}
                           </span>
                           {assignment.is_primary && (
                             <span className="bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">
@@ -547,18 +628,37 @@ export default function EmployeeDetailModal({
                       </div>
                       <div className="flex items-center gap-1">
                         <button
-                          onClick={() => togglePrimarySpace(assignment.id, assignment.is_primary)}
+                          onClick={() =>
+                            togglePrimarySpace(
+                              assignment.id,
+                              assignment.is_primary,
+                            )
+                          }
                           className={`p-2 rounded-lg ${
                             assignment.is_primary
-                              ? 'text-yellow-600 bg-yellow-100'
-                              : 'text-gray-400 hover:bg-gray-100'
+                              ? "text-yellow-600 bg-yellow-100"
+                              : "text-gray-400 hover:bg-gray-100"
                           }`}
-                          title={assignment.is_primary ? 'Quitar como principal' : 'Marcar como principal'}
+                          title={
+                            assignment.is_primary
+                              ? "Quitar como principal"
+                              : "Marcar como principal"
+                          }
                         >
-                          <Star size={16} fill={assignment.is_primary ? 'currentColor' : 'none'} />
+                          <Star
+                            size={16}
+                            fill={
+                              assignment.is_primary ? "currentColor" : "none"
+                            }
+                          />
                         </button>
                         <button
-                          onClick={() => setConfirmAction({ type: 'remove-space', id: assignment.id })}
+                          onClick={() =>
+                            setConfirmAction({
+                              type: "remove-space",
+                              id: assignment.id,
+                            })
+                          }
                           className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
                         >
                           <Trash2 size={16} />
@@ -575,7 +675,10 @@ export default function EmployeeDetailModal({
                   <div className="bg-white rounded-2xl w-full max-w-md max-h-[80vh] overflow-hidden">
                     <div className="p-4 border-b flex items-center justify-between">
                       <h3 className="font-semibold">Asignar espacio</h3>
-                      <button onClick={() => setShowAddSpace(false)} className="p-1 hover:bg-gray-100 rounded-lg">
+                      <button
+                        onClick={() => setShowAddSpace(false)}
+                        className="p-1 hover:bg-gray-100 rounded-lg"
+                      >
                         <X size={20} />
                       </button>
                     </div>
@@ -588,14 +691,18 @@ export default function EmployeeDetailModal({
                             Interiores
                           </h4>
                           <div className="space-y-2">
-                            {interiorSpaces.map(space => (
+                            {interiorSpaces.map((space) => (
                               <button
                                 key={space.id}
                                 onClick={() => addSpaceAssignment(space.id)}
                                 className="w-full p-3 bg-blue-50 hover:bg-blue-100 rounded-xl flex items-center gap-3 text-left transition-colors"
                               >
-                                <span className="text-xl">{space.space_type?.icon}</span>
-                                <span className="font-medium">{space.custom_name || space.space_type?.name}</span>
+                                <span className="text-xl">
+                                  {space.space_type?.icon}
+                                </span>
+                                <span className="font-medium">
+                                  {space.custom_name || space.space_type?.name}
+                                </span>
                               </button>
                             ))}
                           </div>
@@ -610,26 +717,31 @@ export default function EmployeeDetailModal({
                             Exteriores
                           </h4>
                           <div className="space-y-2">
-                            {exteriorSpaces.map(space => (
+                            {exteriorSpaces.map((space) => (
                               <button
                                 key={space.id}
                                 onClick={() => addSpaceAssignment(space.id)}
                                 className="w-full p-3 bg-green-50 hover:bg-green-100 rounded-xl flex items-center gap-3 text-left transition-colors"
                               >
-                                <span className="text-xl">{space.space_type?.icon}</span>
-                                <span className="font-medium">{space.custom_name || space.space_type?.name}</span>
+                                <span className="text-xl">
+                                  {space.space_type?.icon}
+                                </span>
+                                <span className="font-medium">
+                                  {space.custom_name || space.space_type?.name}
+                                </span>
                               </button>
                             ))}
                           </div>
                         </div>
                       )}
 
-                      {interiorSpaces.length === 0 && exteriorSpaces.length === 0 && (
-                        <div className="text-center py-8 text-gray-500">
-                          <AlertCircle size={32} className="mx-auto mb-2" />
-                          <p>Todos los espacios ya están asignados</p>
-                        </div>
-                      )}
+                      {interiorSpaces.length === 0 &&
+                        exteriorSpaces.length === 0 && (
+                          <div className="text-center py-8 text-gray-500">
+                            <AlertCircle size={32} className="mx-auto mb-2" />
+                            <p>Todos los espacios ya están asignados</p>
+                          </div>
+                        )}
                     </div>
                   </div>
                 </div>
@@ -638,40 +750,45 @@ export default function EmployeeDetailModal({
           )}
 
           {/* TASKS TAB */}
-          {activeTab === 'tasks' && (
+          {activeTab === "tasks" && (
             <div className="space-y-4">
               <h3 className="font-semibold text-gray-700">Tareas recientes</h3>
 
               {loadingTasks ? (
                 <div className="text-center py-8 text-gray-500">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2" />
+                  <Spinner size="lg" color="blue" className="mx-auto mb-2" />
                   Cargando...
                 </div>
               ) : recentTasks.length === 0 ? (
                 <div className="text-center py-8 bg-gray-50 rounded-xl">
-                  <CheckCircle2 size={32} className="mx-auto mb-2 text-gray-400" />
+                  <CheckCircle2
+                    size={32}
+                    className="mx-auto mb-2 text-gray-400"
+                  />
                   <p className="text-gray-500">Sin tareas registradas</p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {recentTasks.map(task => (
+                  {recentTasks.map((task) => (
                     <div
                       key={task.id}
                       className={`p-3 rounded-xl border flex items-center gap-3 ${
-                        task.status === 'completada'
-                          ? 'bg-green-50 border-green-200'
-                          : task.status === 'pendiente'
-                          ? 'bg-yellow-50 border-yellow-200'
-                          : 'bg-gray-50 border-gray-200'
+                        task.status === "completada"
+                          ? "bg-green-50 border-green-200"
+                          : task.status === "pendiente"
+                            ? "bg-yellow-50 border-yellow-200"
+                            : "bg-gray-50 border-gray-200"
                       }`}
                     >
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        task.status === 'completada'
-                          ? 'bg-green-500 text-white'
-                          : task.status === 'pendiente'
-                          ? 'bg-yellow-500 text-white'
-                          : 'bg-gray-300 text-white'
-                      }`}>
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                          task.status === "completada"
+                            ? "bg-green-500 text-white"
+                            : task.status === "pendiente"
+                              ? "bg-yellow-500 text-white"
+                              : "bg-gray-300 text-white"
+                        }`}
+                      >
                         <CheckCircle2 size={16} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -679,9 +796,18 @@ export default function EmployeeDetailModal({
                           {task.task_template?.name}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {task.space?.space_type?.icon} {task.space?.custom_name || task.space?.space_type?.name}
+                          {task.space?.space_type?.icon}{" "}
+                          {task.space?.custom_name ||
+                            task.space?.space_type?.name}
                           <span className="text-gray-300 mx-1">•</span>
-                          {new Date(task.scheduled_date).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' })}
+                          {new Date(task.scheduled_date).toLocaleDateString(
+                            "es-CO",
+                            {
+                              weekday: "short",
+                              day: "numeric",
+                              month: "short",
+                            },
+                          )}
                         </p>
                       </div>
                       <ChevronRight size={16} className="text-gray-400" />
@@ -693,7 +819,7 @@ export default function EmployeeDetailModal({
           )}
 
           {/* SCHEDULE TAB */}
-          {activeTab === 'schedule' && (
+          {activeTab === "schedule" && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-gray-700">Horario semanal</h3>
@@ -708,15 +834,19 @@ export default function EmployeeDetailModal({
               </div>
 
               <div className="space-y-2">
-                {DAYS.map(day => {
-                  const daySchedule = schedule[day.key] || { enabled: false, startTime: '08:00', endTime: '17:00' };
+                {DAYS.map((day) => {
+                  const daySchedule = schedule[day.key] || {
+                    enabled: false,
+                    startTime: "08:00",
+                    endTime: "17:00",
+                  };
                   return (
                     <div
                       key={day.key}
                       className={`rounded-xl border-2 transition-colors ${
                         daySchedule.enabled
-                          ? 'border-blue-200 bg-blue-50'
-                          : 'border-gray-200 bg-gray-50'
+                          ? "border-blue-200 bg-blue-50"
+                          : "border-gray-200 bg-gray-50"
                       }`}
                     >
                       <div className="p-3">
@@ -724,16 +854,22 @@ export default function EmployeeDetailModal({
                           <button
                             onClick={() => editing && toggleDay(day.key)}
                             disabled={!editing}
-                            className={`flex items-center gap-2 ${!editing ? 'cursor-default' : ''}`}
+                            className={`flex items-center gap-2 ${!editing ? "cursor-default" : ""}`}
                           >
-                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                              daySchedule.enabled
-                                ? 'bg-blue-600 border-blue-600'
-                                : 'border-gray-300'
-                            }`}>
-                              {daySchedule.enabled && <Check size={12} className="text-white" />}
+                            <div
+                              className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                                daySchedule.enabled
+                                  ? "bg-blue-600 border-blue-600"
+                                  : "border-gray-300"
+                              }`}
+                            >
+                              {daySchedule.enabled && (
+                                <Check size={12} className="text-white" />
+                              )}
                             </div>
-                            <span className={`font-medium ${daySchedule.enabled ? 'text-blue-800' : 'text-gray-500'}`}>
+                            <span
+                              className={`font-medium ${daySchedule.enabled ? "text-blue-800" : "text-gray-500"}`}
+                            >
                               {day.label}
                             </span>
                           </button>
@@ -746,20 +882,33 @@ export default function EmployeeDetailModal({
                                   <input
                                     type="time"
                                     value={daySchedule.startTime}
-                                    onChange={(e) => updateDayTime(day.key, 'startTime', e.target.value)}
+                                    onChange={(e) =>
+                                      updateDayTime(
+                                        day.key,
+                                        "startTime",
+                                        e.target.value,
+                                      )
+                                    }
                                     className="px-2 py-1 border rounded-lg text-sm w-24 bg-white"
                                   />
                                   <span className="text-gray-400">-</span>
                                   <input
                                     type="time"
                                     value={daySchedule.endTime}
-                                    onChange={(e) => updateDayTime(day.key, 'endTime', e.target.value)}
+                                    onChange={(e) =>
+                                      updateDayTime(
+                                        day.key,
+                                        "endTime",
+                                        e.target.value,
+                                      )
+                                    }
                                     className="px-2 py-1 border rounded-lg text-sm w-24 bg-white"
                                   />
                                 </>
                               ) : (
                                 <span className="text-sm text-blue-700">
-                                  {daySchedule.startTime} - {daySchedule.endTime}
+                                  {daySchedule.startTime} -{" "}
+                                  {daySchedule.endTime}
                                 </span>
                               )}
                             </div>
@@ -783,7 +932,10 @@ export default function EmployeeDetailModal({
                 <div className="flex gap-3 pt-2">
                   <button
                     onClick={() => {
-                      setSchedule((employee.schedule as Record<string, DaySchedule>) || defaultSchedule);
+                      setSchedule(
+                        (employee.schedule as Record<string, DaySchedule>) ||
+                          defaultSchedule,
+                      );
                       setEditing(false);
                     }}
                     className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold"
@@ -796,7 +948,7 @@ export default function EmployeeDetailModal({
                     className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2"
                   >
                     {saving ? (
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                      <Spinner size="md" color="white" />
                     ) : (
                       <>
                         <Check size={20} />
@@ -824,18 +976,22 @@ export default function EmployeeDetailModal({
       <ConfirmDialog
         isOpen={!!confirmAction}
         onConfirm={() => {
-          if (confirmAction?.type === 'remove-space') {
+          if (confirmAction?.type === "remove-space") {
             removeSpaceAssignment(confirmAction.id);
-          } else if (confirmAction?.type === 'delete-employee') {
+          } else if (confirmAction?.type === "delete-employee") {
             handleDelete();
           }
           setConfirmAction(null);
         }}
         onCancel={() => setConfirmAction(null)}
-        title={confirmAction?.type === 'remove-space' ? 'Quitar espacio' : 'Eliminar empleado'}
+        title={
+          confirmAction?.type === "remove-space"
+            ? "Quitar espacio"
+            : "Eliminar empleado"
+        }
         message={
-          confirmAction?.type === 'remove-space'
-            ? '¿Quitar este espacio asignado?'
+          confirmAction?.type === "remove-space"
+            ? "¿Quitar este espacio asignado?"
             : `¿Estás seguro de eliminar a ${employee.name}? Esta acción no se puede deshacer.`
         }
         confirmText="Eliminar"

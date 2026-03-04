@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * UndoToast Component
@@ -7,8 +7,8 @@
  * permitiendo al usuario deshacer la acción dentro de un tiempo límite.
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import { Undo2, X, Check, Loader2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from "react";
+import { Undo2, X, Check, Loader2 } from "lucide-react";
 
 interface UndoToastProps {
   message: string;
@@ -65,7 +65,7 @@ export function UndoToast({
       // Auto dismiss after showing success
       setTimeout(onDismiss, 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al deshacer');
+      setError(err instanceof Error ? err.message : "Error al deshacer");
       setIsUndoing(false);
     }
   }, [auditLogId, onUndo, onDismiss]);

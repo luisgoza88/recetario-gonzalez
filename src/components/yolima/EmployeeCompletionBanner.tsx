@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { CheckCircle2, Camera } from 'lucide-react';
-import { useHouseholdId } from '@/lib/stores/useHouseholdStore';
+import { useState, useEffect } from "react";
+import { CheckCircle2, Camera } from "lucide-react";
+import { useHouseholdId } from "@/lib/stores/useHouseholdStore";
 
 interface CompletionData {
   meals_completed: { breakfast?: boolean; lunch?: boolean; dinner?: boolean };
@@ -25,7 +25,7 @@ export default function EmployeeCompletionBanner() {
   useEffect(() => {
     if (!householdId) return;
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = new Date().toISOString().split("T")[0];
 
     const fetchCompletion = async () => {
       try {
@@ -39,7 +39,7 @@ export default function EmployeeCompletionBanner() {
           setData(json.data);
         }
       } catch (err) {
-        console.error('Error fetching completion banner data:', err);
+        console.error("Error fetching completion banner data:", err);
       }
     };
 
@@ -49,7 +49,9 @@ export default function EmployeeCompletionBanner() {
   if (!data) return null;
 
   const meals = data.meals_completed || {};
-  const mealsCompleted = [meals.breakfast, meals.lunch, meals.dinner].filter(Boolean).length;
+  const mealsCompleted = [meals.breakfast, meals.lunch, meals.dinner].filter(
+    Boolean,
+  ).length;
   const mealsTotal = 3;
   const tasksCompleted = data.tasks_completed?.length || 0;
   const prepsCompleted = data.preparations_completed?.length || 0;
@@ -66,8 +68,8 @@ export default function EmployeeCompletionBanner() {
       <div
         className={`rounded-2xl p-4 border-2 shadow-sm ${
           isFullyComplete
-            ? 'bg-green-50 border-green-300'
-            : 'bg-amber-50 border-amber-200'
+            ? "bg-green-50 border-green-300"
+            : "bg-amber-50 border-amber-200"
         }`}
       >
         <div className="flex items-center gap-3 mb-2">
@@ -76,12 +78,14 @@ export default function EmployeeCompletionBanner() {
           ) : (
             <span className="text-xl">👩‍🍳</span>
           )}
-          <h3 className={`font-semibold text-lg ${
-            isFullyComplete ? 'text-green-800' : 'text-amber-800'
-          }`}>
+          <h3
+            className={`font-semibold text-lg ${
+              isFullyComplete ? "text-green-800" : "text-amber-800"
+            }`}
+          >
             {isFullyComplete
-              ? '✅ Yolima completó su día'
-              : '🏃‍♀️ Yolima está trabajando...'}
+              ? "✅ Yolima completó su día"
+              : "🏃‍♀️ Yolima está trabajando..."}
           </h3>
         </div>
 
@@ -113,7 +117,11 @@ export default function EmployeeCompletionBanner() {
                   className="w-12 h-12 rounded-lg overflow-hidden border border-gray-200 hover:border-blue-400"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
+                  <img
+                    src={url}
+                    alt={`Foto ${i + 1}`}
+                    className="w-full h-full object-cover"
+                  />
                 </button>
               ))}
               {data.photo_urls.length > 3 && (

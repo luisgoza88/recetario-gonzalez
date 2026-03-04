@@ -1,13 +1,22 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 import {
-  Settings, Bell, Database, Info, ChevronRight,
-  Moon, Globe, Shield, HelpCircle, Smartphone, Brain
-} from 'lucide-react';
-import AICommandCenter from '@/components/ai/AICommandCenter';
-import { AdminOnly } from '@/components/auth/RoleGate';
-import { useHouseholdId } from '@/lib/stores/useHouseholdStore';
+  Settings,
+  Bell,
+  Database,
+  Info,
+  ChevronRight,
+  Moon,
+  Globe,
+  Shield,
+  HelpCircle,
+  Smartphone,
+  Brain,
+} from "lucide-react";
+import AICommandCenter from "@/components/ai/AICommandCenter";
+import { AdminOnly } from "@/components/auth/RoleGate";
+import { useHouseholdId } from "@/lib/stores/useHouseholdStore";
 
 interface SettingsSectionProps {
   icon: React.ReactNode;
@@ -18,27 +27,37 @@ interface SettingsSectionProps {
   danger?: boolean;
 }
 
-function SettingsSection({ icon, title, description, onClick, rightContent, danger }: SettingsSectionProps) {
+function SettingsSection({
+  icon,
+  title,
+  description,
+  onClick,
+  rightContent,
+  danger,
+}: SettingsSectionProps) {
   return (
     <button
       onClick={onClick}
       className={`
         w-full flex items-center gap-4 p-4 bg-white rounded-xl
-        ${onClick ? 'hover:bg-gray-50 active:bg-gray-100' : ''}
+        ${onClick ? "hover:bg-gray-50 active:bg-gray-100" : ""}
         transition-colors text-left
       `}
     >
-      <div className={`
+      <div
+        className={`
         w-10 h-10 rounded-full flex items-center justify-center
-        ${danger ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'}
-      `}>
+        ${danger ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-600"}
+      `}
+      >
         {icon}
       </div>
       <div className="flex-1">
-        <p className={`font-medium ${danger ? 'text-red-600' : ''}`}>{title}</p>
+        <p className={`font-medium ${danger ? "text-red-600" : ""}`}>{title}</p>
         {description && <p className="text-sm text-gray-500">{description}</p>}
       </div>
-      {rightContent || (onClick && <ChevronRight size={20} className="text-gray-400" />)}
+      {rightContent ||
+        (onClick && <ChevronRight size={20} className="text-gray-400" />)}
     </button>
   );
 }
@@ -144,22 +163,26 @@ export default function SettingsView() {
 
       {/* Preferencias */}
       <div className="mb-6">
-        <p className="text-sm font-medium text-gray-500 mb-2 px-1">PREFERENCIAS</p>
+        <p className="text-sm font-medium text-gray-500 mb-2 px-1">
+          PREFERENCIAS
+        </p>
         <div className="space-y-2">
           <SettingsSection
             icon={<Bell size={20} />}
             title="Notificaciones"
-            description={notifications ? 'Activadas' : 'Desactivadas'}
+            description={notifications ? "Activadas" : "Desactivadas"}
             rightContent={
               <button
                 onClick={() => setNotifications(!notifications)}
                 className={`w-12 h-7 rounded-full transition-colors ${
-                  notifications ? 'bg-green-500' : 'bg-gray-300'
+                  notifications ? "bg-green-500" : "bg-gray-300"
                 }`}
               >
-                <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
-                  notifications ? 'translate-x-6' : 'translate-x-1'
-                }`} />
+                <div
+                  className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
+                    notifications ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
               </button>
             }
           />
@@ -200,7 +223,9 @@ export default function SettingsView() {
 
       {/* Información */}
       <div className="mb-6">
-        <p className="text-sm font-medium text-gray-500 mb-2 px-1">INFORMACIÓN</p>
+        <p className="text-sm font-medium text-gray-500 mb-2 px-1">
+          INFORMACIÓN
+        </p>
         <div className="space-y-2">
           <SettingsSection
             icon={<Smartphone size={20} />}

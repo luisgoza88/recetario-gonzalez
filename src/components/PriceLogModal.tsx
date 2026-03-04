@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { X, DollarSign, Store } from 'lucide-react';
-import { STORE_OPTIONS } from '@/types';
+import { useState } from "react";
+import { X, DollarSign, Store } from "lucide-react";
+import { STORE_OPTIONS } from "@/types";
 
 interface PriceLogModalProps {
   itemName: string;
@@ -10,9 +10,13 @@ interface PriceLogModalProps {
   onSkip: () => void;
 }
 
-export default function PriceLogModal({ itemName, onSave, onSkip }: PriceLogModalProps) {
-  const [price, setPrice] = useState('');
-  const [store, setStore] = useState('');
+export default function PriceLogModal({
+  itemName,
+  onSave,
+  onSkip,
+}: PriceLogModalProps) {
+  const [price, setPrice] = useState("");
+  const [store, setStore] = useState("");
 
   const handleSave = () => {
     const numPrice = parseFloat(price);
@@ -31,12 +35,16 @@ export default function PriceLogModal({ itemName, onSave, onSkip }: PriceLogModa
         </div>
 
         <p className="text-sm text-gray-500 mb-4">
-          Registra el precio de <span className="font-semibold text-gray-700">{itemName}</span>
+          Registra el precio de{" "}
+          <span className="font-semibold text-gray-700">{itemName}</span>
         </p>
 
         {/* Price input */}
         <div className="relative mb-4">
-          <DollarSign size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <DollarSign
+            size={18}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+          />
           <input
             type="number"
             inputMode="numeric"
@@ -61,8 +69,8 @@ export default function PriceLogModal({ itemName, onSave, onSkip }: PriceLogModa
                 onClick={() => setStore(s)}
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   store === s
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? "bg-green-600 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
               >
                 {s}

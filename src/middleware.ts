@@ -1,5 +1,5 @@
-import { NextResponse, type NextRequest } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
+import { NextResponse, type NextRequest } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 
 /**
  * Middleware de autenticación
@@ -10,45 +10,44 @@ import { createServerClient } from '@supabase/ssr';
 
 // Rutas que no requieren autenticación
 const PUBLIC_PATHS = [
-  '/auth',
-  '/join',
-  '/_next',
-  '/favicon',
-  '/manifest',
-  '/sw.js',
-  '/icon',
-  '/apple-icon',
-  '/api/auth', // Endpoints de auth de Supabase
+  "/auth",
+  "/join",
+  "/_next",
+  "/favicon",
+  "/manifest",
+  "/sw.js",
+  "/icon",
+  "/apple-icon",
+  "/api/auth", // Endpoints de auth de Supabase
 ];
 
 // Rutas de API públicas (no requieren auth)
-const PUBLIC_API_PATHS = [
-  '/api/auth',
-  '/api/validate-invitation',
-];
+const PUBLIC_API_PATHS = ["/api/auth", "/api/validate-invitation"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Permitir rutas públicas sin verificación
-  if (PUBLIC_PATHS.some(path => pathname.startsWith(path))) {
+  if (PUBLIC_PATHS.some((path) => pathname.startsWith(path))) {
     return NextResponse.next();
   }
 
   // Permitir la página principal sin auth (para mostrar landing/login)
-  if (pathname === '/') {
+  if (pathname === "/") {
     return NextResponse.next();
   }
 
   // Solo verificar autenticación para rutas de API protegidas
-  if (pathname.startsWith('/api')) {
+  if (pathname.startsWith("/api")) {
     // Permitir APIs públicas
-    if (PUBLIC_API_PATHS.some(path => pathname.startsWith(path))) {
+    if (PUBLIC_API_PATHS.some((path) => pathname.startsWith(path))) {
       return NextResponse.next();
     }
 
     const requestHeaders = new Headers(request.headers);
-    type ResponseCookieOptions = Parameters<ReturnType<typeof NextResponse.next>['cookies']['set']>[2];
+    type ResponseCookieOptions = Parameters<
+      ReturnType<typeof NextResponse.next>["cookies"]["set"]
+    >[2];
     type CookieToSet = {
       name: string;
       value: string;
@@ -71,21 +70,26 @@ export async function middleware(request: NextRequest) {
             });
           },
         },
-      }
+      },
     );
 
     // Verificar usuario autenticado (getUser() es más seguro que getSession())
-    const { data: { user }, error } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
 
     if (error || !user) {
       // Log para debugging (en desarrollo)
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[Middleware] Auth required for ${pathname} - no valid user`);
+      if (process.env.NODE_ENV === "development") {
+        console.warn(
+          `[Middleware] Auth required for ${pathname} - no valid user`,
+        );
       }
 
       const unauthorizedResponse = NextResponse.json(
-        { error: 'Authentication required', code: 'UNAUTHORIZED' },
-        { status: 401 }
+        { error: "Authentication required", code: "UNAUTHORIZED" },
+        { status: 401 },
       );
       mutableCookiesToSet.forEach(({ name, value, options }) => {
         unauthorizedResponse.cookies.set(name, value, options);
@@ -94,7 +98,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // Usuario autenticado: inyectar user ID en request headers para API routes.
-    requestHeaders.set('x-user-id', user.id);
+    requestHeaders.set("x-user-id", user.id);
 
     const response = NextResponse.next({
       request: {
@@ -121,6 +125,6 @@ export const config = {
      * - favicon.ico, sitemap.xml, robots.txt (metadata files)
      * - public folder files
      */
-    '/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+    "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

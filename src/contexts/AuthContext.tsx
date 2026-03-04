@@ -1,17 +1,25 @@
-'use client';
+"use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { supabase } from '@/lib/supabase/client';
-import type { User, Session } from '@supabase/supabase-js';
-import analytics from '@/lib/analytics';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
+import { supabase } from "@/lib/supabase/client";
+import type { User, Session } from "@supabase/supabase-js";
+import analytics from "@/lib/analytics";
+import logger from "@/lib/logger";
+import Spinner from "@/components/ui/Spinner";
 import type {
   UserProfile,
   HouseholdMembership,
   Household,
   Permission,
   UserRole,
-  DEFAULT_PERMISSIONS
-} from '@/types';
+  DEFAULT_PERMISSIONS,
+} from "@/types";
 
 // =====================================================
 // Tipos del Contexto
@@ -31,7 +39,11 @@ interface AuthContextType {
 
   // Acciones de autenticación
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error?: string }>;
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string,
+  ) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error?: string }>;
   updatePassword: (newPassword: string) => Promise<{ error?: string }>;
@@ -57,7 +69,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth debe usarse dentro de un AuthProvider');
+    throw new Error("useAuth debe usarse dentro de un AuthProvider");
   }
   return context;
 }
@@ -73,20 +85,41 @@ export function useOptionalAuth() {
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   admin: [
-    'view_menu', 'view_shopping_list', 'view_tasks', 'view_inventory',
-    'complete_tasks', 'update_inventory', 'check_in',
-    'edit_menu', 'edit_recipes', 'edit_shopping_list',
-    'manage_employees', 'manage_spaces', 'manage_tasks',
-    'manage_members', 'manage_invitations', 'delete_data'
+    "view_menu",
+    "view_shopping_list",
+    "view_tasks",
+    "view_inventory",
+    "complete_tasks",
+    "update_inventory",
+    "check_in",
+    "edit_menu",
+    "edit_recipes",
+    "edit_shopping_list",
+    "manage_employees",
+    "manage_spaces",
+    "manage_tasks",
+    "manage_members",
+    "manage_invitations",
+    "delete_data",
   ],
   familia: [
-    'view_menu', 'view_shopping_list', 'view_tasks', 'view_inventory',
-    'edit_menu', 'edit_recipes', 'edit_shopping_list'
+    "view_menu",
+    "view_shopping_list",
+    "view_tasks",
+    "view_inventory",
+    "edit_menu",
+    "edit_recipes",
+    "edit_shopping_list",
   ],
   empleado: [
-    'view_menu', 'view_shopping_list', 'view_tasks', 'view_inventory',
-    'complete_tasks', 'update_inventory', 'check_in'
-  ]
+    "view_menu",
+    "view_shopping_list",
+    "view_tasks",
+    "view_inventory",
+    "complete_tasks",
+    "update_inventory",
+    "check_in",
+  ],
 };
 
 // =====================================================
@@ -102,55 +135,65 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [memberships, setMemberships] = useState<HouseholdMembership[]>([]);
-  const [currentHouseholdId, setCurrentHouseholdId] = useState<string | null>(null);
+  const [currentHouseholdId, setCurrentHouseholdId] = useState<string | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Cargar perfil de usuario
-  const loadUserProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
-    try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+  const loadUserProfile = useCallback(
+    async (userId: string): Promise<UserProfile | null> => {
+      try {
+        const { data, error } = await supabase
+          .from("user_profiles")
+          .select("*")
+          .eq("id", userId)
+          .single();
 
-      if (error) {
-        console.error('Error cargando perfil:', error);
+        if (error) {
+          console.error("Error cargando perfil:", error);
+          return null;
+        }
+
+        return data as UserProfile;
+      } catch (err) {
+        console.error("Error cargando perfil:", err);
         return null;
       }
-
-      return data as UserProfile;
-    } catch (err) {
-      console.error('Error cargando perfil:', err);
-      return null;
-    }
-  }, []);
+    },
+    [],
+  );
 
   // Cargar membresías del usuario
-  const loadMemberships = useCallback(async (userId: string): Promise<HouseholdMembership[]> => {
-    try {
-      const { data, error } = await supabase
-        .from('household_memberships')
-        .select(`
+  const loadMemberships = useCallback(
+    async (userId: string): Promise<HouseholdMembership[]> => {
+      try {
+        const { data, error } = await supabase
+          .from("household_memberships")
+          .select(
+            `
           *,
           household:households(*)
-        `)
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .order('joined_at', { ascending: false });
+        `,
+          )
+          .eq("user_id", userId)
+          .eq("is_active", true)
+          .order("joined_at", { ascending: false });
 
-      if (error) {
-        console.error('Error cargando membresías:', error);
+        if (error) {
+          console.error("Error cargando membresías:", error);
+          return [];
+        }
+
+        return (data || []) as HouseholdMembership[];
+      } catch (err) {
+        console.error("Error cargando membresías:", err);
         return [];
       }
-
-      return (data || []) as HouseholdMembership[];
-    } catch (err) {
-      console.error('Error cargando membresías:', err);
-      return [];
-    }
-  }, []);
+    },
+    [],
+  );
 
   // Refrescar membresías
   const refreshMemberships = useCallback(async () => {
@@ -161,10 +204,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     // Si el hogar actual ya no está en las membresías, cambiar al primero
     if (currentHouseholdId) {
-      const stillMember = loadedMemberships.some(m => m.household_id === currentHouseholdId);
+      const stillMember = loadedMemberships.some(
+        (m) => m.household_id === currentHouseholdId,
+      );
       if (!stillMember && loadedMemberships.length > 0) {
         setCurrentHouseholdId(loadedMemberships[0].household_id);
-        localStorage.setItem('currentHouseholdId', loadedMemberships[0].household_id);
+        localStorage.setItem(
+          "currentHouseholdId",
+          loadedMemberships[0].household_id,
+        );
       }
     }
   }, [supabaseUser, currentHouseholdId, loadMemberships]);
@@ -174,7 +222,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const initSession = async () => {
       try {
         // Obtener sesión actual
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        const {
+          data: { session: currentSession },
+        } = await supabase.auth.getSession();
 
         if (currentSession?.user) {
           setSession(currentSession);
@@ -183,24 +233,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
           // Cargar perfil y membresías
           const [profile, userMemberships] = await Promise.all([
             loadUserProfile(currentSession.user.id),
-            loadMemberships(currentSession.user.id)
+            loadMemberships(currentSession.user.id),
           ]);
 
           setUser(profile);
           setMemberships(userMemberships);
 
           // Restaurar hogar seleccionado o usar el primero
-          const savedHouseholdId = localStorage.getItem('currentHouseholdId');
-          if (savedHouseholdId && userMemberships.some(m => m.household_id === savedHouseholdId)) {
+          const savedHouseholdId = localStorage.getItem("currentHouseholdId");
+          if (
+            savedHouseholdId &&
+            userMemberships.some((m) => m.household_id === savedHouseholdId)
+          ) {
             setCurrentHouseholdId(savedHouseholdId);
           } else if (userMemberships.length > 0) {
             setCurrentHouseholdId(userMemberships[0].household_id);
-            localStorage.setItem('currentHouseholdId', userMemberships[0].household_id);
+            localStorage.setItem(
+              "currentHouseholdId",
+              userMemberships[0].household_id,
+            );
           }
         }
       } catch (err) {
-        console.error('Error inicializando sesión:', err);
-        setError('Error al inicializar la sesión');
+        console.error("Error inicializando sesión:", err);
+        setError("Error al inicializar la sesión");
       } finally {
         setIsLoading(false);
       }
@@ -209,43 +265,49 @@ export function AuthProvider({ children }: AuthProviderProps) {
     initSession();
 
     // Suscribirse a cambios de autenticación
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
-        console.log('Auth state changed:', event);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      logger.info("Auth state changed", { event });
 
-        if (event === 'SIGNED_IN' && newSession?.user) {
-          setSession(newSession);
-          setSupabaseUser(newSession.user);
+      if (event === "SIGNED_IN" && newSession?.user) {
+        setSession(newSession);
+        setSupabaseUser(newSession.user);
 
-          const [profile, userMemberships] = await Promise.all([
-            loadUserProfile(newSession.user.id),
-            loadMemberships(newSession.user.id)
-          ]);
+        const [profile, userMemberships] = await Promise.all([
+          loadUserProfile(newSession.user.id),
+          loadMemberships(newSession.user.id),
+        ]);
 
-          setUser(profile);
-          setMemberships(userMemberships);
+        setUser(profile);
+        setMemberships(userMemberships);
 
-          if (userMemberships.length > 0) {
-            const savedHouseholdId = localStorage.getItem('currentHouseholdId');
-            if (savedHouseholdId && userMemberships.some(m => m.household_id === savedHouseholdId)) {
-              setCurrentHouseholdId(savedHouseholdId);
-            } else {
-              setCurrentHouseholdId(userMemberships[0].household_id);
-              localStorage.setItem('currentHouseholdId', userMemberships[0].household_id);
-            }
+        if (userMemberships.length > 0) {
+          const savedHouseholdId = localStorage.getItem("currentHouseholdId");
+          if (
+            savedHouseholdId &&
+            userMemberships.some((m) => m.household_id === savedHouseholdId)
+          ) {
+            setCurrentHouseholdId(savedHouseholdId);
+          } else {
+            setCurrentHouseholdId(userMemberships[0].household_id);
+            localStorage.setItem(
+              "currentHouseholdId",
+              userMemberships[0].household_id,
+            );
           }
-        } else if (event === 'SIGNED_OUT') {
-          setSession(null);
-          setSupabaseUser(null);
-          setUser(null);
-          setMemberships([]);
-          setCurrentHouseholdId(null);
-          localStorage.removeItem('currentHouseholdId');
         }
-
-        setIsLoading(false);
+      } else if (event === "SIGNED_OUT") {
+        setSession(null);
+        setSupabaseUser(null);
+        setUser(null);
+        setMemberships([]);
+        setCurrentHouseholdId(null);
+        localStorage.removeItem("currentHouseholdId");
       }
-    );
+
+      setIsLoading(false);
+    });
 
     return () => {
       subscription.unsubscribe();
@@ -253,22 +315,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [loadUserProfile, loadMemberships]);
 
   // Calcular hogar y membresía actuales
-  const currentMembership = memberships.find(m => m.household_id === currentHouseholdId) || null;
+  const currentMembership =
+    memberships.find((m) => m.household_id === currentHouseholdId) || null;
   const currentHousehold = currentMembership?.household || null;
 
   // =====================================================
   // Acciones de autenticación
   // =====================================================
 
-  const signIn = async (email: string, password: string): Promise<{ error?: string }> => {
+  const signIn = async (
+    email: string,
+    password: string,
+  ): Promise<{ error?: string }> => {
     try {
       setError(null);
       setIsLoading(true);
 
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
+      const { data, error: signInError } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
 
       if (signInError) {
         setError(signInError.message);
@@ -282,7 +349,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       return {};
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Error al iniciar sesión';
+      const message =
+        err instanceof Error ? err.message : "Error al iniciar sesión";
       setError(message);
       return { error: message };
     } finally {
@@ -293,7 +361,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signUp = async (
     email: string,
     password: string,
-    fullName: string
+    fullName: string,
   ): Promise<{ error?: string }> => {
     try {
       setError(null);
@@ -307,9 +375,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         password,
         options: {
           data: {
-            full_name: fullName
-          }
-        }
+            full_name: fullName,
+          },
+        },
       });
 
       if (signUpError) {
@@ -324,7 +392,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       return {};
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Error al registrarse';
+      const message =
+        err instanceof Error ? err.message : "Error al registrarse";
       setError(message);
       return { error: message };
     } finally {
@@ -338,9 +407,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Track logout
       analytics.auth.logout();
       await supabase.auth.signOut();
-      localStorage.removeItem('currentHouseholdId');
+      localStorage.removeItem("currentHouseholdId");
     } catch (err) {
-      console.error('Error al cerrar sesión:', err);
+      console.error("Error al cerrar sesión:", err);
     } finally {
       setIsLoading(false);
     }
@@ -349,7 +418,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const resetPassword = async (email: string): Promise<{ error?: string }> => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`
+        redirectTo: `${window.location.origin}/auth/reset-password`,
       });
 
       if (error) {
@@ -358,15 +427,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       return {};
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Error al enviar email';
+      const message =
+        err instanceof Error ? err.message : "Error al enviar email";
       return { error: message };
     }
   };
 
-  const updatePassword = async (newPassword: string): Promise<{ error?: string }> => {
+  const updatePassword = async (
+    newPassword: string,
+  ): Promise<{ error?: string }> => {
     try {
       const { error } = await supabase.auth.updateUser({
-        password: newPassword
+        password: newPassword,
       });
 
       if (error) {
@@ -375,7 +447,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       return {};
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Error al actualizar contraseña';
+      const message =
+        err instanceof Error ? err.message : "Error al actualizar contraseña";
       return { error: message };
     }
   };
@@ -385,10 +458,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // =====================================================
 
   const switchHousehold = (householdId: string) => {
-    const membership = memberships.find(m => m.household_id === householdId);
+    const membership = memberships.find((m) => m.household_id === householdId);
     if (membership) {
       setCurrentHouseholdId(householdId);
-      localStorage.setItem('currentHouseholdId', householdId);
+      localStorage.setItem("currentHouseholdId", householdId);
     }
   };
 
@@ -404,7 +477,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (!currentMembership) return false;
 
     // Verificar permisos personalizados primero
-    if (currentMembership.permissions && permission in currentMembership.permissions) {
+    if (
+      currentMembership.permissions &&
+      permission in currentMembership.permissions
+    ) {
       return currentMembership.permissions[permission];
     }
 
@@ -413,9 +489,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return rolePermissions.includes(permission);
   };
 
-  const isAdmin = (): boolean => currentMembership?.role === 'admin';
-  const isEmployee = (): boolean => currentMembership?.role === 'empleado';
-  const isFamily = (): boolean => currentMembership?.role === 'familia';
+  const isAdmin = (): boolean => currentMembership?.role === "admin";
+  const isEmployee = (): boolean => currentMembership?.role === "empleado";
+  const isFamily = (): boolean => currentMembership?.role === "familia";
 
   // =====================================================
   // Valor del contexto
@@ -445,14 +521,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isAdmin,
     isEmployee,
     isFamily,
-    getRole
+    getRole,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 // =====================================================
@@ -470,14 +542,14 @@ export function ProtectedRoute({
   children,
   requiredPermission,
   requiredRole,
-  fallback
+  fallback,
 }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading, hasPermission, getRole } = useAuth();
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600" />
+        <Spinner size="xl" />
       </div>
     );
   }
@@ -485,19 +557,25 @@ export function ProtectedRoute({
   if (!isAuthenticated) {
     // Redirigir a login o mostrar fallback
     if (fallback) return <>{fallback}</>;
-    if (typeof window !== 'undefined') {
-      window.location.href = '/auth/login';
+    if (typeof window !== "undefined") {
+      window.location.href = "/auth/login";
     }
     return null;
   }
 
   // Verificar permiso específico
   if (requiredPermission && !hasPermission(requiredPermission)) {
-    return fallback ? <>{fallback}</> : (
+    return fallback ? (
+      <>{fallback}</>
+    ) : (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-800">Acceso denegado</h2>
-          <p className="text-gray-600 mt-2">No tienes permiso para ver esta página</p>
+          <h2 className="text-xl font-semibold text-gray-800">
+            Acceso denegado
+          </h2>
+          <p className="text-gray-600 mt-2">
+            No tienes permiso para ver esta página
+          </p>
         </div>
       </div>
     );
@@ -506,14 +584,22 @@ export function ProtectedRoute({
   // Verificar rol requerido
   if (requiredRole) {
     const currentRole = getRole();
-    const allowedRoles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+    const allowedRoles = Array.isArray(requiredRole)
+      ? requiredRole
+      : [requiredRole];
 
     if (!currentRole || !allowedRoles.includes(currentRole)) {
-      return fallback ? <>{fallback}</> : (
+      return fallback ? (
+        <>{fallback}</>
+      ) : (
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
-            <h2 className="text-xl font-semibold text-gray-800">Acceso denegado</h2>
-            <p className="text-gray-600 mt-2">Tu rol no tiene acceso a esta sección</p>
+            <h2 className="text-xl font-semibold text-gray-800">
+              Acceso denegado
+            </h2>
+            <p className="text-gray-600 mt-2">
+              Tu rol no tiene acceso a esta sección
+            </p>
           </div>
         </div>
       );

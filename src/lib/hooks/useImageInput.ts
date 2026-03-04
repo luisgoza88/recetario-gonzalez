@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback } from "react";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -11,23 +11,26 @@ export function useImageInput() {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > MAX_FILE_SIZE) {
-        alert('La imagen es muy grande. Máximo 5MB.');
-        return;
-      }
+  const handleImageSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        if (file.size > MAX_FILE_SIZE) {
+          alert("La imagen es muy grande. Máximo 5MB.");
+          return;
+        }
 
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSelectedImage(reader.result as string);
-        setShowImageOptions(false);
-      };
-      reader.readAsDataURL(file);
-    }
-    e.target.value = '';
-  }, []);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setSelectedImage(reader.result as string);
+          setShowImageOptions(false);
+        };
+        reader.readAsDataURL(file);
+      }
+      e.target.value = "";
+    },
+    [],
+  );
 
   const removeSelectedImage = useCallback(() => {
     setSelectedImage(null);
@@ -44,7 +47,7 @@ export function useImageInput() {
   }, []);
 
   const toggleImageOptions = useCallback(() => {
-    setShowImageOptions(prev => !prev);
+    setShowImageOptions((prev) => !prev);
   }, []);
 
   const clearImage = useCallback(() => {

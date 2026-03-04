@@ -3,16 +3,22 @@
  * Generates intelligent alerts based on home context
  */
 
-import { supabase } from './supabase/client';
-import { showNotification, canNotify } from './notifications';
+import { supabase } from "./supabase/client";
+import { showNotification, canNotify } from "./notifications";
+import logger from "@/lib/logger";
 
 // Notification types
 export interface ProactiveAlert {
   id: string;
-  type: 'meal_reminder' | 'inventory_alert' | 'task_reminder' | 'prep_tip' | 'weekly_summary';
+  type:
+    | "meal_reminder"
+    | "inventory_alert"
+    | "task_reminder"
+    | "prep_tip"
+    | "weekly_summary";
   title: string;
   body: string;
-  priority: 'high' | 'medium' | 'low';
+  priority: "high" | "medium" | "low";
   actionable?: {
     action: string;
     label: string;
@@ -22,24 +28,26 @@ export interface ProactiveAlert {
 }
 
 // Storage key for alerts
-const ALERTS_KEY = 'ai_proactive_alerts';
-const LAST_CHECK_KEY = 'ai_last_notification_check';
+const ALERTS_KEY = "ai_proactive_alerts";
+const LAST_CHECK_KEY = "ai_last_notification_check";
 
 // Get stored alerts
 export function getStoredAlerts(): ProactiveAlert[] {
-  if (typeof window === 'undefined') return [];
+  if (typeof window === "undefined") return [];
   const stored = localStorage.getItem(ALERTS_KEY);
   return stored ? JSON.parse(stored) : [];
 }
 
 // Store alerts
 function storeAlerts(alerts: ProactiveAlert[]): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
   localStorage.setItem(ALERTS_KEY, JSON.stringify(alerts));
 }
 
 // Add new alert
-export function addAlert(alert: Omit<ProactiveAlert, 'id' | 'timestamp'>): ProactiveAlert {
+export function addAlert(
+  alert: Omit<ProactiveAlert, "id" | "timestamp">,
+): ProactiveAlert {
   const newAlert: ProactiveAlert = {
     ...alert,
     id: `alert_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -57,8 +65,8 @@ export function addAlert(alert: Omit<ProactiveAlert, 'id' | 'timestamp'>): Proac
 // Dismiss alert
 export function dismissAlert(alertId: string): void {
   const alerts = getStoredAlerts();
-  const updated = alerts.map(a =>
-    a.id === alertId ? { ...a, dismissed: true } : a
+  const updated = alerts.map((a) =>
+    a.id === alertId ? { ...a, dismissed: true } : a,
   );
   storeAlerts(updated);
 }
@@ -70,12 +78,12 @@ export function clearAllAlerts(): void {
 
 // Get undismissed alerts
 export function getActiveAlerts(): ProactiveAlert[] {
-  return getStoredAlerts().filter(a => !a.dismissed);
+  return getStoredAlerts().filter((a) => !a.dismissed);
 }
 
 // Check if enough time has passed since last check
 function shouldCheckAlerts(): boolean {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === "undefined") return false;
 
   const lastCheck = localStorage.getItem(LAST_CHECK_KEY);
   if (!lastCheck) return true;
@@ -89,7 +97,7 @@ function shouldCheckAlerts(): boolean {
 }
 
 function updateLastCheckTime(): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
   localStorage.setItem(LAST_CHECK_KEY, new Date().toISOString());
 }
 
@@ -143,16 +151,15 @@ export async function generateProactiveAlerts(): Promise<ProactiveAlert[]> {
       });
 
       // Show push notification for high priority
-      if (alert.priority === 'high' && canNotify()) {
+      if (alert.priority === "high" && canNotify()) {
         showNotification(alert.title, alert.body, { tag: alert.type });
       }
     }
 
     updateLastCheckTime();
     return getActiveAlerts();
-
   } catch (error) {
-    console.error('Error generating proactive alerts:', error);
+    console.error("Error generating proactive alerts:", error);
     return getActiveAlerts();
   }
 }
@@ -162,32 +169,36 @@ export async function generateProactiveAlerts(): Promise<ProactiveAlert[]> {
  */
 async function checkMorningTasks(): Promise<ProactiveAlert[]> {
   const alerts: ProactiveAlert[] = [];
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split("T")[0];
 
   const { data: tasks } = await supabase
-    .from('scheduled_tasks')
-    .select('task_template:task_templates(name), employee:home_employees!scheduled_tasks_employee_id_fkey(name)')
-    .eq('scheduled_date', today)
-    .eq('status', 'pendiente')
-    .order('created_at')
+    .from("scheduled_tasks")
+    .select(
+      "task_template:task_templates(name), employee:home_employees!scheduled_tasks_employee_id_fkey(name)",
+    )
+    .eq("scheduled_date", today)
+    .eq("status", "pendiente")
+    .order("created_at")
     .limit(5);
 
   if (tasks && tasks.length > 0) {
     const taskList = tasks
       .slice(0, 3)
-      .map((t) => (t.task_template as { name?: string } | null)?.name || 'Tarea')
-      .join(', ');
+      .map(
+        (t) => (t.task_template as { name?: string } | null)?.name || "Tarea",
+      )
+      .join(", ");
     alerts.push({
-      id: '',
-      type: 'task_reminder',
-      title: 'Tareas del día',
-      body: `Hay ${tasks.length} tareas pendientes: ${taskList}${tasks.length > 3 ? '...' : ''}`,
-      priority: 'medium',
+      id: "",
+      type: "task_reminder",
+      title: "Tareas del día",
+      body: `Hay ${tasks.length} tareas pendientes: ${taskList}${tasks.length > 3 ? "..." : ""}`,
+      priority: "medium",
       timestamp: new Date(),
       actionable: {
-        action: 'view_tasks',
-        label: 'Ver tareas'
-      }
+        action: "view_tasks",
+        label: "Ver tareas",
+      },
     });
   }
 
@@ -201,44 +212,51 @@ async function checkLunchPreparation(): Promise<ProactiveAlert | null> {
   const dayOfWeek = new Date().getDay();
   if (dayOfWeek === 0) return null; // Skip Sunday
 
-  const cycleDay = ((dayOfWeek === 0 ? 7 : dayOfWeek) - 1) % 12 + 1;
+  const cycleDay = (((dayOfWeek === 0 ? 7 : dayOfWeek) - 1) % 12) + 1;
 
   const { data: menu } = await supabase
-    .from('day_menu')
-    .select(`
+    .from("day_menu")
+    .select(
+      `
       lunch:recipes!day_menu_lunch_id_fkey(name, prep_time, ingredients)
-    `)
-    .eq('day_number', cycleDay)
+    `,
+    )
+    .eq("day_number", cycleDay)
     .single();
 
   if (!menu?.lunch) return null;
 
-  const lunch = menu.lunch as { name?: string; prep_time?: number; ingredients?: unknown[] };
+  const lunch = menu.lunch as {
+    name?: string;
+    prep_time?: number;
+    ingredients?: unknown[];
+  };
   const prepTime = lunch.prep_time || 30;
 
   // Check if any ingredients need defrosting
   const ingredients = Array.isArray(lunch.ingredients) ? lunch.ingredients : [];
   const needsDefrost = ingredients.some((ing: unknown) => {
-    const ingStr = typeof ing === 'string' ? ing : (ing as { name?: string })?.name || '';
+    const ingStr =
+      typeof ing === "string" ? ing : (ing as { name?: string })?.name || "";
     return /pollo|carne|pescado|cerdo|res|camarón/i.test(ingStr);
   });
 
   let body = `Almuerzo: ${lunch.name} (${prepTime} min)`;
   if (needsDefrost) {
-    body += '\n¡Recuerda descongelar la proteína!';
+    body += "\n¡Recuerda descongelar la proteína!";
   }
 
   return {
-    id: '',
-    type: 'prep_tip',
-    title: 'Preparación del almuerzo',
+    id: "",
+    type: "prep_tip",
+    title: "Preparación del almuerzo",
     body,
-    priority: needsDefrost ? 'high' : 'medium',
+    priority: needsDefrost ? "high" : "medium",
     timestamp: new Date(),
     actionable: {
       action: `view_recipe:${lunch.name}`,
-      label: 'Ver receta'
-    }
+      label: "Ver receta",
+    },
   };
 }
 
@@ -250,14 +268,16 @@ async function checkDinnerPreparation(): Promise<ProactiveAlert | null> {
   // Skip Sunday, Friday, Saturday
   if (dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6) return null;
 
-  const cycleDay = ((dayOfWeek === 0 ? 7 : dayOfWeek) - 1) % 12 + 1;
+  const cycleDay = (((dayOfWeek === 0 ? 7 : dayOfWeek) - 1) % 12) + 1;
 
   const { data: menu } = await supabase
-    .from('day_menu')
-    .select(`
+    .from("day_menu")
+    .select(
+      `
       dinner:recipes!day_menu_dinner_id_fkey(name, prep_time)
-    `)
-    .eq('day_number', cycleDay)
+    `,
+    )
+    .eq("day_number", cycleDay)
     .single();
 
   if (!menu?.dinner) return null;
@@ -265,16 +285,16 @@ async function checkDinnerPreparation(): Promise<ProactiveAlert | null> {
   const dinner = menu.dinner as { name?: string; prep_time?: number };
 
   return {
-    id: '',
-    type: 'meal_reminder',
-    title: 'Preparar la cena',
+    id: "",
+    type: "meal_reminder",
+    title: "Preparar la cena",
     body: `Cena de hoy: ${dinner.name} (${dinner.prep_time || 30} min)`,
-    priority: 'medium',
+    priority: "medium",
     timestamp: new Date(),
     actionable: {
       action: `view_recipe:${dinner.name}`,
-      label: 'Ver receta'
-    }
+      label: "Ver receta",
+    },
   };
 }
 
@@ -285,26 +305,26 @@ async function checkCriticalInventory(): Promise<ProactiveAlert[]> {
   const alerts: ProactiveAlert[] = [];
 
   const { data } = await supabase
-    .from('inventory')
-    .select('*, market_item:market_items(name, category)')
-    .eq('current_number', 0)
+    .from("inventory")
+    .select("*, market_item:market_items(name, category)")
+    .eq("current_number", 0)
     .limit(10);
 
   if (data && data.length > 0) {
-    const criticalItems = data.map(i => i.market_item?.name).filter(Boolean);
+    const criticalItems = data.map((i) => i.market_item?.name).filter(Boolean);
 
     if (criticalItems.length >= 3) {
       alerts.push({
-        id: '',
-        type: 'inventory_alert',
-        title: '¡Inventario crítico!',
-        body: `${criticalItems.length} items agotados: ${criticalItems.slice(0, 3).join(', ')}${criticalItems.length > 3 ? '...' : ''}`,
-        priority: 'high',
+        id: "",
+        type: "inventory_alert",
+        title: "¡Inventario crítico!",
+        body: `${criticalItems.length} items agotados: ${criticalItems.slice(0, 3).join(", ")}${criticalItems.length > 3 ? "..." : ""}`,
+        priority: "high",
         timestamp: new Date(),
         actionable: {
-          action: 'view_inventory',
-          label: 'Ver inventario'
-        }
+          action: "view_inventory",
+          label: "Ver inventario",
+        },
       });
     }
   }
@@ -316,17 +336,17 @@ async function checkCriticalInventory(): Promise<ProactiveAlert[]> {
  * Generate evening summary
  */
 async function generateEveningSummary(): Promise<ProactiveAlert | null> {
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split("T")[0];
 
   // Get today's task completion
   const { data: tasks } = await supabase
-    .from('scheduled_tasks')
-    .select('status')
-    .eq('scheduled_date', today);
+    .from("scheduled_tasks")
+    .select("status")
+    .eq("scheduled_date", today);
 
   if (!tasks || tasks.length === 0) return null;
 
-  const completed = tasks.filter(t => t.status === 'completada').length;
+  const completed = tasks.filter((t) => t.status === "completada").length;
   const total = tasks.length;
   const percent = Math.round((completed / total) * 100);
 
@@ -338,34 +358,37 @@ async function generateEveningSummary(): Promise<ProactiveAlert | null> {
   if (tomorrowDay === 0) {
     // Sunday - no menu
     return {
-      id: '',
-      type: 'weekly_summary',
-      title: 'Resumen del día',
+      id: "",
+      type: "weekly_summary",
+      title: "Resumen del día",
       body: `Tareas: ${completed}/${total} completadas (${percent}%)\nMañana es domingo - sin menú programado`,
-      priority: 'low',
-      timestamp: new Date()
+      priority: "low",
+      timestamp: new Date(),
     };
   }
 
-  const cycleDay = ((tomorrowDay === 0 ? 7 : tomorrowDay) - 1) % 12 + 1;
+  const cycleDay = (((tomorrowDay === 0 ? 7 : tomorrowDay) - 1) % 12) + 1;
 
   const { data: menu } = await supabase
-    .from('day_menu')
-    .select(`
+    .from("day_menu")
+    .select(
+      `
       lunch:recipes!day_menu_lunch_id_fkey(name)
-    `)
-    .eq('day_number', cycleDay)
+    `,
+    )
+    .eq("day_number", cycleDay)
     .single();
 
-  const lunchName = (menu?.lunch as { name?: string } | null)?.name || 'Sin programar';
+  const lunchName =
+    (menu?.lunch as { name?: string } | null)?.name || "Sin programar";
 
   return {
-    id: '',
-    type: 'weekly_summary',
-    title: 'Resumen del día',
+    id: "",
+    type: "weekly_summary",
+    title: "Resumen del día",
     body: `Tareas: ${completed}/${total} (${percent}%)\nMañana: ${lunchName}`,
-    priority: 'low',
-    timestamp: new Date()
+    priority: "low",
+    timestamp: new Date(),
   };
 }
 
@@ -373,38 +396,63 @@ async function generateEveningSummary(): Promise<ProactiveAlert | null> {
  * Request notification permission
  */
 export async function requestNotificationPermission(): Promise<boolean> {
-  if (!('Notification' in window)) {
-    console.log('Notifications not supported');
+  if (!("Notification" in window)) {
+    logger.info("Notifications not supported in this browser");
     return false;
   }
 
-  if (Notification.permission === 'granted') {
+  if (Notification.permission === "granted") {
     return true;
   }
 
-  if (Notification.permission === 'denied') {
+  if (Notification.permission === "denied") {
     return false;
   }
 
   const permission = await Notification.requestPermission();
-  return permission === 'granted';
+  return permission === "granted";
 }
+
+// Track active interval/timeout IDs for cleanup
+let proactiveInterval: ReturnType<typeof setInterval> | null = null;
+let proactiveInitialTimeout: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Initialize proactive notification system
  */
 export function initProactiveNotifications(): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
+
+  // Clean up any existing intervals before creating new ones
+  stopProactiveNotifications();
 
   // Check for alerts on load
-  setTimeout(() => {
+  proactiveInitialTimeout = setTimeout(() => {
     generateProactiveAlerts();
+    proactiveInitialTimeout = null;
   }, 3000);
 
   // Check periodically (every 30 minutes)
-  setInterval(() => {
-    generateProactiveAlerts();
-  }, 30 * 60 * 1000);
+  proactiveInterval = setInterval(
+    () => {
+      generateProactiveAlerts();
+    },
+    30 * 60 * 1000,
+  );
 
-  console.log('Proactive notifications initialized');
+  logger.info("Proactive notifications initialized");
+}
+
+/**
+ * Stop proactive notification system and clean up timers
+ */
+export function stopProactiveNotifications(): void {
+  if (proactiveInterval !== null) {
+    clearInterval(proactiveInterval);
+    proactiveInterval = null;
+  }
+  if (proactiveInitialTimeout !== null) {
+    clearTimeout(proactiveInitialTimeout);
+    proactiveInitialTimeout = null;
+  }
 }

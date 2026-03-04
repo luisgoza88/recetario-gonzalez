@@ -1,9 +1,22 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Check, X, Star, Package, AlertTriangle, ThumbsUp, ThumbsDown } from 'lucide-react';
-import { SmartSubstitution, SubstitutionResult, findSmartSubstitutionsForMany, recordSubstitutionUse } from '@/lib/smart-substitutions';
-import { DietaryTag } from '@/types';
+import { useState, useEffect } from "react";
+import {
+  Check,
+  X,
+  Star,
+  Package,
+  AlertTriangle,
+  ThumbsUp,
+  ThumbsDown,
+} from "lucide-react";
+import {
+  SmartSubstitution,
+  SubstitutionResult,
+  findSmartSubstitutionsForMany,
+  recordSubstitutionUse,
+} from "@/lib/smart-substitutions";
+import { DietaryTag } from "@/types";
 
 interface SmartSubstitutionPanelProps {
   missingIngredients: string[];
@@ -14,12 +27,16 @@ interface SmartSubstitutionPanelProps {
 export default function SmartSubstitutionPanel({
   missingIngredients,
   dietaryTags = [],
-  onSubstitutionSelect
+  onSubstitutionSelect,
 }: SmartSubstitutionPanelProps) {
   const [results, setResults] = useState<SubstitutionResult[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedIngredient, setExpandedIngredient] = useState<string | null>(null);
-  const [selectedSubs, setSelectedSubs] = useState<Map<string, string>>(new Map());
+  const [expandedIngredient, setExpandedIngredient] = useState<string | null>(
+    null,
+  );
+  const [selectedSubs, setSelectedSubs] = useState<Map<string, string>>(
+    new Map(),
+  );
 
   useEffect(() => {
     if (missingIngredients.length === 0) {
@@ -34,8 +51,11 @@ export default function SmartSubstitutionPanel({
       .finally(() => setLoading(false));
   }, [missingIngredients, dietaryTags]);
 
-  const handleSelectSubstitution = async (original: string, substitute: string) => {
-    setSelectedSubs(prev => {
+  const handleSelectSubstitution = async (
+    original: string,
+    substitute: string,
+  ) => {
+    setSelectedSubs((prev) => {
       const next = new Map(prev);
       if (next.get(original) === substitute) {
         next.delete(original);
@@ -53,7 +73,11 @@ export default function SmartSubstitutionPanel({
     }
   };
 
-  const handleRateSubstitution = async (original: string, substitute: string, isGood: boolean) => {
+  const handleRateSubstitution = async (
+    original: string,
+    substitute: string,
+    isGood: boolean,
+  ) => {
     await recordSubstitutionUse(original, substitute, isGood ? 5 : 2);
   };
 
@@ -70,7 +94,7 @@ export default function SmartSubstitutionPanel({
     return null;
   }
 
-  const availableCount = results.filter(r => r.hasAvailableOption).length;
+  const availableCount = results.filter((r) => r.hasAvailableOption).length;
 
   return (
     <div className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl overflow-hidden">
@@ -80,7 +104,8 @@ export default function SmartSubstitutionPanel({
           <div className="flex items-center gap-2">
             <AlertTriangle size={16} className="text-orange-600" />
             <span className="font-medium text-orange-800">
-              {results.length} ingrediente{results.length !== 1 ? 's' : ''} con sustitución
+              {results.length} ingrediente{results.length !== 1 ? "s" : ""} con
+              sustitución
             </span>
           </div>
           {availableCount > 0 && (
@@ -97,28 +122,39 @@ export default function SmartSubstitutionPanel({
         {results.map((result) => {
           const isExpanded = expandedIngredient === result.ingredient;
           const selectedSub = selectedSubs.get(result.ingredient);
-          const bestOption = result.substitutions.find(s => s.isAvailable && s.dietaryCompatible);
+          const bestOption = result.substitutions.find(
+            (s) => s.isAvailable && s.dietaryCompatible,
+          );
 
           return (
             <div key={result.ingredient} className="p-3">
               {/* Ingrediente faltante */}
               <button
-                onClick={() => setExpandedIngredient(isExpanded ? null : result.ingredient)}
+                onClick={() =>
+                  setExpandedIngredient(isExpanded ? null : result.ingredient)
+                }
                 className="w-full flex items-center justify-between text-left"
               >
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-orange-900">{result.ingredient}</span>
+                  <span className="font-medium text-orange-900">
+                    {result.ingredient}
+                  </span>
                   {result.hasAvailableOption && (
-                    <span className="w-2 h-2 bg-green-500 rounded-full" title="Sustituto disponible" />
+                    <span
+                      className="w-2 h-2 bg-green-500 rounded-full"
+                      title="Sustituto disponible"
+                    />
                   )}
                 </div>
                 <div className="flex items-center gap-2">
                   {selectedSub && (
                     <span className="text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
-                      → {selectedSub.split('(')[0].trim()}
+                      → {selectedSub.split("(")[0].trim()}
                     </span>
                   )}
-                  <span className="text-orange-400">{isExpanded ? '▲' : '▼'}</span>
+                  <span className="text-orange-400">
+                    {isExpanded ? "▲" : "▼"}
+                  </span>
                 </div>
               </button>
 
@@ -126,12 +162,18 @@ export default function SmartSubstitutionPanel({
               {!isExpanded && bestOption && !selectedSub && (
                 <div className="mt-2 flex items-center justify-between text-sm">
                   <span className="text-gray-600">
-                    Sugerido: <span className="text-green-700 font-medium">{bestOption.substitute}</span>
+                    Sugerido:{" "}
+                    <span className="text-green-700 font-medium">
+                      {bestOption.substitute}
+                    </span>
                   </span>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleSelectSubstitution(result.ingredient, bestOption.substitute);
+                      handleSelectSubstitution(
+                        result.ingredient,
+                        bestOption.substitute,
+                      );
                     }}
                     className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
                   >
@@ -148,8 +190,19 @@ export default function SmartSubstitutionPanel({
                       key={idx}
                       substitution={sub}
                       isSelected={selectedSub === sub.substitute}
-                      onSelect={() => handleSelectSubstitution(result.ingredient, sub.substitute)}
-                      onRate={(isGood) => handleRateSubstitution(result.ingredient, sub.substitute, isGood)}
+                      onSelect={() =>
+                        handleSelectSubstitution(
+                          result.ingredient,
+                          sub.substitute,
+                        )
+                      }
+                      onRate={(isGood) =>
+                        handleRateSubstitution(
+                          result.ingredient,
+                          sub.substitute,
+                          isGood,
+                        )
+                      }
                     />
                   ))}
                 </div>
@@ -163,7 +216,11 @@ export default function SmartSubstitutionPanel({
       {selectedSubs.size > 0 && (
         <div className="p-3 bg-green-50 border-t border-green-200">
           <div className="text-sm text-green-800">
-            <strong>{selectedSubs.size} sustitución{selectedSubs.size !== 1 ? 'es' : ''}</strong> seleccionada{selectedSubs.size !== 1 ? 's' : ''}
+            <strong>
+              {selectedSubs.size} sustitución
+              {selectedSubs.size !== 1 ? "es" : ""}
+            </strong>{" "}
+            seleccionada{selectedSubs.size !== 1 ? "s" : ""}
           </div>
         </div>
       )}
@@ -178,27 +235,36 @@ interface SubstitutionOptionProps {
   onRate: (isGood: boolean) => void;
 }
 
-function SubstitutionOption({ substitution, isSelected, onSelect, onRate }: SubstitutionOptionProps) {
+function SubstitutionOption({
+  substitution,
+  isSelected,
+  onSelect,
+  onRate,
+}: SubstitutionOptionProps) {
   const [showRating, setShowRating] = useState(false);
 
   return (
     <div
       className={`p-2 rounded-lg border transition-all ${
         isSelected
-          ? 'border-green-400 bg-green-50'
+          ? "border-green-400 bg-green-50"
           : substitution.isAvailable && substitution.dietaryCompatible
-          ? 'border-green-200 bg-white hover:border-green-300'
-          : !substitution.dietaryCompatible
-          ? 'border-red-100 bg-red-50/30'
-          : 'border-gray-200 bg-white hover:border-gray-300'
+            ? "border-green-200 bg-white hover:border-green-300"
+            : !substitution.dietaryCompatible
+              ? "border-red-100 bg-red-50/30"
+              : "border-gray-200 bg-white hover:border-gray-300"
       }`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className={`font-medium text-sm ${
-              !substitution.dietaryCompatible ? 'text-gray-400 line-through' : 'text-gray-900'
-            }`}>
+            <span
+              className={`font-medium text-sm ${
+                !substitution.dietaryCompatible
+                  ? "text-gray-400 line-through"
+                  : "text-gray-900"
+              }`}
+            >
               {substitution.substitute}
             </span>
 
@@ -228,8 +294,8 @@ function SubstitutionOption({ substitution, isSelected, onSelect, onRate }: Subs
               disabled={!substitution.dietaryCompatible}
               className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
                 substitution.dietaryCompatible
-                  ? 'border-gray-300 hover:border-green-400 hover:bg-green-50'
-                  : 'border-gray-200 bg-gray-100 cursor-not-allowed'
+                  ? "border-gray-300 hover:border-green-400 hover:bg-green-50"
+                  : "border-gray-200 bg-gray-100 cursor-not-allowed"
               }`}
             />
           )}

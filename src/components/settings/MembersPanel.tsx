@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
   Users,
   UserPlus,
@@ -14,12 +14,13 @@ import {
   Briefcase,
   Clock,
   Link as LinkIcon,
-  AlertCircle
-} from 'lucide-react';
-import { supabase } from '@/lib/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import { AdminOnly } from '@/components/auth/RoleGate';
+  AlertCircle,
+} from "lucide-react";
+import Spinner from "@/components/ui/Spinner";
+import { supabase } from "@/lib/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { AdminOnly } from "@/components/auth/RoleGate";
 import {
   createInvitation,
   getHouseholdInvitations,
@@ -30,9 +31,13 @@ import {
   getInvitationTimeRemaining,
   getRoleName,
   getRoleColor,
-  getRoleDescription
-} from '@/lib/invitation-service';
-import type { HouseholdMembership, HouseholdInvitation, UserRole } from '@/types';
+  getRoleDescription,
+} from "@/lib/invitation-service";
+import type {
+  HouseholdMembership,
+  HouseholdInvitation,
+  UserRole,
+} from "@/types";
 
 interface MembersPanelProps {
   householdId: string;
@@ -40,9 +45,11 @@ interface MembersPanelProps {
 
 export default function MembersPanel({ householdId }: MembersPanelProps) {
   const { user, hasPermission } = useAuth();
-  const canManage = hasPermission('manage_members');
+  const canManage = hasPermission("manage_members");
 
-  const [activeTab, setActiveTab] = useState<'members' | 'invitations'>('members');
+  const [activeTab, setActiveTab] = useState<"members" | "invitations">(
+    "members",
+  );
   const [members, setMembers] = useState<HouseholdMembership[]>([]);
   const [invitations, setInvitations] = useState<HouseholdInvitation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,15 +62,16 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
     email: string;
     suggestedName: string;
   }>({
-    role: 'familia',
-    email: '',
-    suggestedName: ''
+    role: "familia",
+    email: "",
+    suggestedName: "",
   });
   const [isCreating, setIsCreating] = useState(false);
-  const [createdInvitation, setCreatedInvitation] = useState<HouseholdInvitation | null>(null);
+  const [createdInvitation, setCreatedInvitation] =
+    useState<HouseholdInvitation | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{
-    type: 'cancel-invitation' | 'remove-member';
+    type: "cancel-invitation" | "remove-member";
     id: string;
     name?: string;
   } | null>(null);
@@ -81,24 +89,27 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
     try {
       // Cargar miembros
       const { data: membersData, error: membersError } = await supabase
-        .from('household_memberships')
-        .select(`
+        .from("household_memberships")
+        .select(
+          `
           *,
           user:user_profiles(*)
-        `)
-        .eq('household_id', householdId)
-        .eq('is_active', true)
-        .order('role', { ascending: true });
+        `,
+        )
+        .eq("household_id", householdId)
+        .eq("is_active", true)
+        .order("role", { ascending: true });
 
       if (membersError) throw membersError;
       setMembers(membersData || []);
 
       // Cargar invitaciones activas
-      const { invitations: invitationsData } = await getHouseholdInvitations(householdId);
-      setInvitations(invitationsData.filter(inv => inv.is_active));
+      const { invitations: invitationsData } =
+        await getHouseholdInvitations(householdId);
+      setInvitations(invitationsData.filter((inv) => inv.is_active));
     } catch (err) {
-      console.error('Error cargando datos:', err);
-      setError('Error al cargar los datos');
+      console.error("Error cargando datos:", err);
+      setError("Error al cargar los datos");
     } finally {
       setIsLoading(false);
     }
@@ -112,7 +123,7 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
       householdId,
       role: newInvitation.role,
       email: newInvitation.email || undefined,
-      suggestedName: newInvitation.suggestedName || undefined
+      suggestedName: newInvitation.suggestedName || undefined,
     });
 
     if (result.error) {
@@ -151,11 +162,14 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
     }
   };
 
-  const handleRemoveMember = async (membershipId: string, _memberName: string) => {
+  const handleRemoveMember = async (
+    membershipId: string,
+    _memberName: string,
+  ) => {
     const { error } = await supabase
-      .from('household_memberships')
+      .from("household_memberships")
       .update({ is_active: false })
-      .eq('id', membershipId);
+      .eq("id", membershipId);
 
     if (error) {
       setError(error.message);
@@ -167,16 +181,16 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
   const closeCreateModal = () => {
     setShowCreateModal(false);
     setCreatedInvitation(null);
-    setNewInvitation({ role: 'familia', email: '', suggestedName: '' });
+    setNewInvitation({ role: "familia", email: "", suggestedName: "" });
   };
 
   const getRoleIcon = (role: UserRole) => {
     switch (role) {
-      case 'admin':
+      case "admin":
         return <Shield className="w-4 h-4" />;
-      case 'empleado':
+      case "empleado":
         return <Briefcase className="w-4 h-4" />;
-      case 'familia':
+      case "familia":
         return <Home className="w-4 h-4" />;
     }
   };
@@ -184,7 +198,7 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600" />
+        <Spinner size="lg" />
       </div>
     );
   }
@@ -195,11 +209,11 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
       <div className="flex items-center justify-between">
         <div className="flex gap-2">
           <button
-            onClick={() => setActiveTab('members')}
+            onClick={() => setActiveTab("members")}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'members'
-                ? 'bg-green-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              activeTab === "members"
+                ? "bg-green-600 text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
             <span className="flex items-center gap-2">
@@ -208,11 +222,11 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
             </span>
           </button>
           <button
-            onClick={() => setActiveTab('invitations')}
+            onClick={() => setActiveTab("invitations")}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'invitations'
-                ? 'bg-green-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              activeTab === "invitations"
+                ? "bg-green-600 text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
             <span className="flex items-center gap-2">
@@ -245,7 +259,7 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
       )}
 
       {/* Tab content */}
-      {activeTab === 'members' ? (
+      {activeTab === "members" ? (
         <div className="space-y-3">
           {members.map((member) => (
             <div
@@ -255,12 +269,14 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
                   <span className="text-xl font-semibold text-gray-600">
-                    {(member.user?.full_name || member.display_name || '?')[0].toUpperCase()}
+                    {(member.user?.full_name ||
+                      member.display_name ||
+                      "?")[0].toUpperCase()}
                   </span>
                 </div>
                 <div>
                   <p className="font-semibold text-gray-800">
-                    {member.user?.full_name || member.display_name || 'Usuario'}
+                    {member.user?.full_name || member.display_name || "Usuario"}
                     {member.user_id === user?.id && (
                       <span className="ml-2 text-xs text-green-600">(Tu)</span>
                     )}
@@ -270,21 +286,31 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
               </div>
 
               <div className="flex items-center gap-3">
-                <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${getRoleColor(member.role)}`}>
+                <span
+                  className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${getRoleColor(member.role)}`}
+                >
                   {getRoleIcon(member.role)}
                   {getRoleName(member.role)}
                 </span>
 
                 <AdminOnly>
-                  {canManage && member.user_id !== user?.id && member.role !== 'admin' && (
-                    <button
-                      onClick={() => setConfirmAction({ type: 'remove-member', id: member.id, name: member.user?.full_name || 'este usuario' })}
-                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Remover miembro"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
+                  {canManage &&
+                    member.user_id !== user?.id &&
+                    member.role !== "admin" && (
+                      <button
+                        onClick={() =>
+                          setConfirmAction({
+                            type: "remove-member",
+                            id: member.id,
+                            name: member.user?.full_name || "este usuario",
+                          })
+                        }
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Remover miembro"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                 </AdminOnly>
               </div>
             </div>
@@ -308,7 +334,9 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
                   <code className="text-lg font-mono bg-gray-100 px-3 py-1 rounded">
                     {formatInvitationCode(invitation.code)}
                   </code>
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${getRoleColor(invitation.role)}`}>
+                  <span
+                    className={`px-2 py-1 rounded text-xs font-medium ${getRoleColor(invitation.role)}`}
+                  >
                     {getRoleName(invitation.role)}
                   </span>
                 </div>
@@ -338,7 +366,12 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
                   </button>
                   {canManage && (
                     <button
-                      onClick={() => setConfirmAction({ type: 'cancel-invitation', id: invitation.id })}
+                      onClick={() =>
+                        setConfirmAction({
+                          type: "cancel-invitation",
+                          id: invitation.id,
+                        })
+                      }
                       className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                       title="Cancelar invitacion"
                     >
@@ -353,11 +386,7 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
                   <Clock className="w-4 h-4" />
                   Expira en {getInvitationTimeRemaining(invitation.expires_at)}
                 </span>
-                {invitation.email && (
-                  <span>
-                    Para: {invitation.email}
-                  </span>
-                )}
+                {invitation.email && <span>Para: {invitation.email}</span>}
                 <span>
                   Usos: {invitation.current_uses}/{invitation.max_uses}
                 </span>
@@ -380,7 +409,7 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-800">
-                  {createdInvitation ? 'Invitacion Creada' : 'Nueva Invitacion'}
+                  {createdInvitation ? "Invitacion Creada" : "Nueva Invitacion"}
                 </h3>
                 <button
                   onClick={closeCreateModal}
@@ -395,7 +424,9 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
               {createdInvitation ? (
                 <div className="text-center space-y-6">
                   <div className="p-4 bg-green-50 rounded-xl">
-                    <p className="text-sm text-gray-600 mb-2">Codigo de invitacion:</p>
+                    <p className="text-sm text-gray-600 mb-2">
+                      Codigo de invitacion:
+                    </p>
                     <code className="text-3xl font-mono font-bold text-green-700">
                       {formatInvitationCode(createdInvitation.code)}
                     </code>
@@ -448,13 +479,13 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
                       Rol del invitado
                     </label>
                     <div className="space-y-2">
-                      {(['familia', 'empleado'] as UserRole[]).map((role) => (
+                      {(["familia", "empleado"] as UserRole[]).map((role) => (
                         <label
                           key={role}
                           className={`flex items-start gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${
                             newInvitation.role === role
-                              ? 'border-green-500 bg-green-50'
-                              : 'border-gray-200 hover:border-gray-300'
+                              ? "border-green-500 bg-green-50"
+                              : "border-gray-200 hover:border-gray-300"
                           }`}
                         >
                           <input
@@ -462,11 +493,15 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
                             name="role"
                             value={role}
                             checked={newInvitation.role === role}
-                            onChange={() => setNewInvitation(prev => ({ ...prev, role }))}
+                            onChange={() =>
+                              setNewInvitation((prev) => ({ ...prev, role }))
+                            }
                             className="mt-1"
                           />
                           <div>
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm font-medium ${getRoleColor(role)}`}>
+                            <span
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm font-medium ${getRoleColor(role)}`}
+                            >
                               {getRoleIcon(role)}
                               {getRoleName(role)}
                             </span>
@@ -487,7 +522,12 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
                     <input
                       type="email"
                       value={newInvitation.email}
-                      onChange={(e) => setNewInvitation(prev => ({ ...prev, email: e.target.value }))}
+                      onChange={(e) =>
+                        setNewInvitation((prev) => ({
+                          ...prev,
+                          email: e.target.value,
+                        }))
+                      }
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
                       placeholder="solo@este-email.com"
                     />
@@ -504,7 +544,12 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
                     <input
                       type="text"
                       value={newInvitation.suggestedName}
-                      onChange={(e) => setNewInvitation(prev => ({ ...prev, suggestedName: e.target.value }))}
+                      onChange={(e) =>
+                        setNewInvitation((prev) => ({
+                          ...prev,
+                          suggestedName: e.target.value,
+                        }))
+                      }
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
                       placeholder="Maria Garcia"
                     />
@@ -518,7 +563,7 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
                   >
                     {isCreating ? (
                       <>
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <Spinner size="md" color="white" />
                         Creando...
                       </>
                     ) : (
@@ -538,21 +583,29 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
       <ConfirmDialog
         isOpen={!!confirmAction}
         onConfirm={() => {
-          if (confirmAction?.type === 'cancel-invitation') {
+          if (confirmAction?.type === "cancel-invitation") {
             handleCancelInvitation(confirmAction.id);
-          } else if (confirmAction?.type === 'remove-member') {
-            handleRemoveMember(confirmAction.id, confirmAction.name || '');
+          } else if (confirmAction?.type === "remove-member") {
+            handleRemoveMember(confirmAction.id, confirmAction.name || "");
           }
           setConfirmAction(null);
         }}
         onCancel={() => setConfirmAction(null)}
-        title={confirmAction?.type === 'cancel-invitation' ? 'Cancelar invitación' : 'Remover miembro'}
-        message={
-          confirmAction?.type === 'cancel-invitation'
-            ? '¿Deseas cancelar esta invitación?'
-            : `¿Deseas remover a ${confirmAction?.name || 'este usuario'} del hogar?`
+        title={
+          confirmAction?.type === "cancel-invitation"
+            ? "Cancelar invitación"
+            : "Remover miembro"
         }
-        confirmText={confirmAction?.type === 'cancel-invitation' ? 'Cancelar invitación' : 'Remover'}
+        message={
+          confirmAction?.type === "cancel-invitation"
+            ? "¿Deseas cancelar esta invitación?"
+            : `¿Deseas remover a ${confirmAction?.name || "este usuario"} del hogar?`
+        }
+        confirmText={
+          confirmAction?.type === "cancel-invitation"
+            ? "Cancelar invitación"
+            : "Remover"
+        }
         variant="danger"
       />
     </div>

@@ -5,8 +5,8 @@
  * All database operations respect RLS policies.
  */
 
-import { SupabaseClient } from '@supabase/supabase-js';
-import { createAuthenticatedClient } from '@/lib/supabase/server';
+import { SupabaseClient } from "@supabase/supabase-js";
+import { createAuthenticatedClient } from "@/lib/supabase/server";
 
 /**
  * Creates an authenticated Supabase client for AI Assistant operations.
@@ -36,13 +36,17 @@ export interface RecipeRef {
 /**
  * Helper to safely extract name from a market item reference.
  */
-export function getMarketItemName(item: MarketItemRef | null | undefined): string | null {
+export function getMarketItemName(
+  item: MarketItemRef | null | undefined,
+): string | null {
   return item?.name ?? null;
 }
 
 /**
  * Helper to safely extract recipe name from a recipe reference.
  */
-export function getRecipeName(recipe: RecipeRef | null | undefined): string | null {
+export function getRecipeName(
+  recipe: RecipeRef | null | undefined,
+): string | null {
   return recipe?.name ?? null;
 }

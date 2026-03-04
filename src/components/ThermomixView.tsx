@@ -1,33 +1,66 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  X, Play, Pause, RotateCcw, ChevronLeft, ChevronRight,
-  Volume2, Clock, Zap, Thermometer, Timer, ChefHat, Maximize2, Minimize2
-} from 'lucide-react';
-import type { ThermomixRecipe, ThermomixStep } from '@/types';
+  X,
+  Play,
+  Pause,
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
+  Volume2,
+  Clock,
+  Zap,
+  Thermometer,
+  Timer,
+  ChefHat,
+  Maximize2,
+  Minimize2,
+} from "lucide-react";
+import type { ThermomixRecipe, ThermomixStep } from "@/types";
 
 // =====================================================
 // Accessory emoji map
 // =====================================================
-const ACCESSORY_INFO: Record<string, { emoji: string; name: string; color: string }> = {
-  cuchilla: { emoji: '🔪', name: 'Cuchilla', color: 'bg-red-100 text-red-700' },
-  mariposa: { emoji: '🦋', name: 'Mariposa', color: 'bg-purple-100 text-purple-700' },
-  cestillo: { emoji: '🧺', name: 'Cestillo', color: 'bg-amber-100 text-amber-700' },
-  varoma:   { emoji: '🫕', name: 'Varoma', color: 'bg-orange-100 text-orange-700' },
-  ninguno:  { emoji: '✋', name: 'Sin accesorio', color: 'bg-gray-100 text-gray-600' },
+const ACCESSORY_INFO: Record<
+  string,
+  { emoji: string; name: string; color: string }
+> = {
+  cuchilla: { emoji: "🔪", name: "Cuchilla", color: "bg-red-100 text-red-700" },
+  mariposa: {
+    emoji: "🦋",
+    name: "Mariposa",
+    color: "bg-purple-100 text-purple-700",
+  },
+  cestillo: {
+    emoji: "🧺",
+    name: "Cestillo",
+    color: "bg-amber-100 text-amber-700",
+  },
+  varoma: {
+    emoji: "🫕",
+    name: "Varoma",
+    color: "bg-orange-100 text-orange-700",
+  },
+  ninguno: {
+    emoji: "✋",
+    name: "Sin accesorio",
+    color: "bg-gray-100 text-gray-600",
+  },
 };
 
 // =====================================================
 // Timer hook
 // =====================================================
 function useCountdownTimer() {
-  const [timers, setTimers] = useState<Map<number, { total: number; remaining: number; running: boolean }>>(new Map());
+  const [timers, setTimers] = useState<
+    Map<number, { total: number; remaining: number; running: boolean }>
+  >(new Map());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     intervalRef.current = setInterval(() => {
-      setTimers(prev => {
+      setTimers((prev) => {
         const next = new Map(prev);
         let changed = false;
         for (const [key, timer] of next) {
@@ -37,11 +70,16 @@ function useCountdownTimer() {
 
             // Alarm at 0
             if (timer.remaining - 1 === 0) {
-              if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+              if (navigator.vibrate)
+                navigator.vibrate([200, 100, 200, 100, 200]);
               try {
-                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdW+Onp2SfGlqgYyZoZiGcWRtfouZoJaEb2FsfoqXnpWEb2BsfYqXnpWDb19rfImWnZSCbl5qfIiVnJOBbV1pe4eUm5KAbFxoeYaTmpF/a1tnd4SSl5B+altmdoORlY99aVpldIGQlI58aFlkc4CPk4x7Z1hjcoGOkot6ZsijkoqAaF1meoaPkIl4ZlsA');
+                const audio = new Audio(
+                  "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdW+Onp2SfGlqgYyZoZiGcWRtfouZoJaEb2FsfoqXnpWEb2BsfYqXnpWDb19rfImWnZSCbl5qfIiVnJOBbV1pe4eUm5KAbFxoeYaTmpF/a1tnd4SSl5B+altmdoORlY99aVpldIGQlI58aFlkc4CPk4x7Z1hjcoGOkot6ZsijkoqAaF1meoaPkIl4ZlsA",
+                );
                 audio.play().catch(() => {});
-              } catch { /* ignore audio errors */ }
+              } catch {
+                /* ignore audio errors */
+              }
             }
           }
         }
@@ -55,24 +93,32 @@ function useCountdownTimer() {
   }, []);
 
   const startTimer = useCallback((stepNum: number, seconds: number) => {
-    setTimers(prev => {
+    setTimers((prev) => {
       const next = new Map(prev);
       const existing = next.get(stepNum);
       if (existing) {
         next.set(stepNum, { ...existing, running: !existing.running });
       } else {
-        next.set(stepNum, { total: seconds, remaining: seconds, running: true });
+        next.set(stepNum, {
+          total: seconds,
+          remaining: seconds,
+          running: true,
+        });
       }
       return next;
     });
   }, []);
 
   const resetTimer = useCallback((stepNum: number) => {
-    setTimers(prev => {
+    setTimers((prev) => {
       const next = new Map(prev);
       const existing = next.get(stepNum);
       if (existing) {
-        next.set(stepNum, { ...existing, remaining: existing.total, running: false });
+        next.set(stepNum, {
+          ...existing,
+          remaining: existing.total,
+          running: false,
+        });
       }
       return next;
     });
@@ -102,8 +148,8 @@ function parseTimeToSeconds(timeStr: string): number {
 function formatSeconds(s: number): string {
   const mins = Math.floor(s / 60);
   const secs = s % 60;
-  if (mins > 0) return `${mins}:${secs.toString().padStart(2, '0')}`;
-  return `0:${secs.toString().padStart(2, '0')}`;
+  if (mins > 0) return `${mins}:${secs.toString().padStart(2, "0")}`;
+  return `0:${secs.toString().padStart(2, "0")}`;
 }
 
 // =====================================================
@@ -130,8 +176,8 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
 
     const requestWakeLock = async () => {
       try {
-        if ('wakeLock' in navigator) {
-          wakeLock = await navigator.wakeLock.request('screen');
+        if ("wakeLock" in navigator) {
+          wakeLock = await navigator.wakeLock.request("screen");
         }
       } catch {
         // Wake lock not supported or denied
@@ -147,13 +193,17 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
   // Scroll to current step in list mode
   useEffect(() => {
     if (!cookingMode && stepsContainerRef.current) {
-      const stepEl = stepsContainerRef.current.querySelector(`[data-step="${currentStep}"]`);
-      if (stepEl) stepEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const stepEl = stepsContainerRef.current.querySelector(
+        `[data-step="${currentStep}"]`,
+      );
+      if (stepEl)
+        stepEl.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, [currentStep, cookingMode]);
 
-  const goNext = () => setCurrentStep(prev => Math.min(prev + 1, totalSteps - 1));
-  const goPrev = () => setCurrentStep(prev => Math.max(prev - 1, 0));
+  const goNext = () =>
+    setCurrentStep((prev) => Math.min(prev + 1, totalSteps - 1));
+  const goPrev = () => setCurrentStep((prev) => Math.max(prev - 1, 0));
 
   // =====================================================
   // Cooking Mode (fullscreen, one step at a time)
@@ -169,7 +219,10 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
       <div className="fixed inset-0 bg-gray-900 z-[300] flex flex-col text-white select-none">
         {/* Top bar */}
         <div className="flex justify-between items-center p-4 bg-black/30">
-          <button onClick={() => setCookingMode(false)} className="flex items-center gap-2 text-white/80 hover:text-white">
+          <button
+            onClick={() => setCookingMode(false)}
+            className="flex items-center gap-2 text-white/80 hover:text-white"
+          >
             <Minimize2 size={20} />
             <span className="text-sm">Salir</span>
           </button>
@@ -194,7 +247,9 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
         {/* Main content */}
         <div className="flex-1 flex flex-col items-center justify-center p-6 space-y-6">
           {/* Accessory badge */}
-          <div className={`px-4 py-2 rounded-full text-lg font-medium ${accessory.color}`}>
+          <div
+            className={`px-4 py-2 rounded-full text-lg font-medium ${accessory.color}`}
+          >
             {accessory.emoji} {accessory.name}
           </div>
 
@@ -207,7 +262,9 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
           <div className="flex gap-6 text-lg">
             <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl">
               <Zap size={20} className="text-yellow-400" />
-              <span>Vel: <strong>{step.speed}</strong></span>
+              <span>
+                Vel: <strong>{step.speed}</strong>
+              </span>
             </div>
             <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl">
               <Thermometer size={20} className="text-red-400" />
@@ -222,24 +279,34 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
           {/* Timer */}
           {timerSeconds > 0 && (
             <div className="flex flex-col items-center gap-3">
-              <div className={`text-6xl font-mono font-bold tabular-nums ${
-                timer?.remaining === 0 ? 'text-red-400 animate-pulse' : 'text-white'
-              }`}>
-                {timer ? formatSeconds(timer.remaining) : formatSeconds(timerSeconds)}
+              <div
+                className={`text-6xl font-mono font-bold tabular-nums ${
+                  timer?.remaining === 0
+                    ? "text-red-400 animate-pulse"
+                    : "text-white"
+                }`}
+              >
+                {timer
+                  ? formatSeconds(timer.remaining)
+                  : formatSeconds(timerSeconds)}
               </div>
               <div className="flex gap-3">
                 <button
                   onClick={() => startTimer(step.stepNumber, timerSeconds)}
                   className={`px-6 py-3 rounded-xl font-semibold text-lg transition-colors ${
                     timer?.running
-                      ? 'bg-red-500 hover:bg-red-600'
-                      : 'bg-emerald-500 hover:bg-emerald-600'
+                      ? "bg-red-500 hover:bg-red-600"
+                      : "bg-emerald-500 hover:bg-emerald-600"
                   }`}
                 >
                   {timer?.running ? (
-                    <span className="flex items-center gap-2"><Pause size={20} /> Pausar</span>
+                    <span className="flex items-center gap-2">
+                      <Pause size={20} /> Pausar
+                    </span>
                   ) : (
-                    <span className="flex items-center gap-2"><Play size={20} /> {timer ? 'Continuar' : 'Iniciar'}</span>
+                    <span className="flex items-center gap-2">
+                      <Play size={20} /> {timer ? "Continuar" : "Iniciar"}
+                    </span>
                   )}
                 </button>
                 {timer && (
@@ -278,17 +345,23 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
             <ChevronLeft size={24} /> Anterior
           </button>
           <button
-            onClick={currentStep === totalSteps - 1 ? () => setCookingMode(false) : goNext}
+            onClick={
+              currentStep === totalSteps - 1
+                ? () => setCookingMode(false)
+                : goNext
+            }
             className={`flex-1 py-4 rounded-xl font-semibold flex items-center justify-center gap-2 text-lg transition-colors ${
               currentStep === totalSteps - 1
-                ? 'bg-emerald-500 hover:bg-emerald-600'
-                : 'bg-teal-500 hover:bg-teal-600'
+                ? "bg-emerald-500 hover:bg-emerald-600"
+                : "bg-teal-500 hover:bg-teal-600"
             }`}
           >
             {currentStep === totalSteps - 1 ? (
               <>✅ Finalizar</>
             ) : (
-              <>Siguiente <ChevronRight size={24} /></>
+              <>
+                Siguiente <ChevronRight size={24} />
+              </>
             )}
           </button>
         </div>
@@ -303,7 +376,7 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
     <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4">
       <div
         className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col"
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="bg-gradient-to-r from-teal-600 to-emerald-600 text-white p-4">
@@ -311,11 +384,16 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <ChefHat size={20} />
-                <span className="text-sm font-medium bg-white/20 px-2 py-0.5 rounded-full">TM6 Adaptado</span>
+                <span className="text-sm font-medium bg-white/20 px-2 py-0.5 rounded-full">
+                  TM6 Adaptado
+                </span>
               </div>
               <h3 className="font-bold text-lg">{recipe.name}</h3>
             </div>
-            <button onClick={onClose} className="text-white/80 hover:text-white p-1">
+            <button
+              onClick={onClose}
+              className="text-white/80 hover:text-white p-1"
+            >
               <X size={24} />
             </button>
           </div>
@@ -324,12 +402,16 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
           <div className="mt-3 flex items-center gap-3 bg-white/10 rounded-xl p-3">
             <div className="text-center flex-1">
               <div className="text-white/60 text-xs">Manual</div>
-              <div className="font-bold text-lg">{recipe.manualTimeMinutes} min</div>
+              <div className="font-bold text-lg">
+                {recipe.manualTimeMinutes} min
+              </div>
             </div>
             <div className="text-2xl">→</div>
             <div className="text-center flex-1">
               <div className="text-white/60 text-xs">Thermomix</div>
-              <div className="font-bold text-lg text-emerald-200">{recipe.totalTimeMinutes} min</div>
+              <div className="font-bold text-lg text-emerald-200">
+                {recipe.totalTimeMinutes} min
+              </div>
             </div>
             <div className="bg-emerald-400 text-emerald-900 px-3 py-1 rounded-lg text-sm font-bold">
               {recipe.timeSaved}
@@ -343,24 +425,39 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
             const key = acc.toLowerCase() as keyof typeof ACCESSORY_INFO;
             const info = ACCESSORY_INFO[key] || ACCESSORY_INFO.ninguno;
             return (
-              <span key={i} className={`text-xs px-2 py-1 rounded-full font-medium ${info.color}`}>
+              <span
+                key={i}
+                className={`text-xs px-2 py-1 rounded-full font-medium ${info.color}`}
+              >
                 {info.emoji} {acc}
               </span>
             );
           })}
-          <span className={`text-xs px-2 py-1 rounded-full font-medium ml-auto ${
-            recipe.difficulty === 'fácil' ? 'bg-green-100 text-green-700' :
-            recipe.difficulty === 'media' ? 'bg-yellow-100 text-yellow-700' :
-            'bg-red-100 text-red-700'
-          }`}>
-            {recipe.difficulty === 'fácil' ? '⭐' : recipe.difficulty === 'media' ? '⭐⭐' : '⭐⭐⭐'} {recipe.difficulty}
+          <span
+            className={`text-xs px-2 py-1 rounded-full font-medium ml-auto ${
+              recipe.difficulty === "fácil"
+                ? "bg-green-100 text-green-700"
+                : recipe.difficulty === "media"
+                  ? "bg-yellow-100 text-yellow-700"
+                  : "bg-red-100 text-red-700"
+            }`}
+          >
+            {recipe.difficulty === "fácil"
+              ? "⭐"
+              : recipe.difficulty === "media"
+                ? "⭐⭐"
+                : "⭐⭐⭐"}{" "}
+            {recipe.difficulty}
           </span>
         </div>
 
         {/* Cooking Mode Button */}
         <div className="px-4 py-3 border-b">
           <button
-            onClick={() => { setCookingMode(true); setCurrentStep(0); }}
+            onClick={() => {
+              setCookingMode(true);
+              setCurrentStep(0);
+            }}
             className="w-full bg-gradient-to-r from-teal-500 to-emerald-500 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:from-teal-600 hover:to-emerald-600 transition-all shadow-md"
           >
             <Maximize2 size={18} />
@@ -369,11 +466,15 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
         </div>
 
         {/* Steps list */}
-        <div className="overflow-y-auto flex-1 p-4 space-y-3" ref={stepsContainerRef}>
+        <div
+          className="overflow-y-auto flex-1 p-4 space-y-3"
+          ref={stepsContainerRef}
+        >
           {steps.map((step, i) => {
             const timerSeconds = parseTimeToSeconds(step.time);
             const timer = timers.get(step.stepNumber);
-            const accessory = ACCESSORY_INFO[step.accessory] || ACCESSORY_INFO.ninguno;
+            const accessory =
+              ACCESSORY_INFO[step.accessory] || ACCESSORY_INFO.ninguno;
             const isActive = i === currentStep;
 
             return (
@@ -383,23 +484,31 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
                 onClick={() => setCurrentStep(i)}
                 className={`p-3 rounded-xl border-2 transition-all cursor-pointer ${
                   isActive
-                    ? 'border-teal-400 bg-teal-50 shadow-md'
-                    : 'border-gray-200 bg-white hover:border-gray-300'
+                    ? "border-teal-400 bg-teal-50 shadow-md"
+                    : "border-gray-200 bg-white hover:border-gray-300"
                 }`}
               >
                 {/* Step header */}
                 <div className="flex items-start gap-3">
-                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                    isActive ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-600'
-                  }`}>
+                  <div
+                    className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                      isActive
+                        ? "bg-teal-600 text-white"
+                        : "bg-gray-200 text-gray-600"
+                    }`}
+                  >
                     {step.stepNumber}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm leading-relaxed">{step.description}</p>
+                    <p className="font-medium text-sm leading-relaxed">
+                      {step.description}
+                    </p>
 
                     {/* Settings chips */}
                     <div className="flex flex-wrap gap-1.5 mt-2">
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${accessory.color}`}>
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full ${accessory.color}`}
+                      >
                         {accessory.emoji} {accessory.name}
                       </span>
                       <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">
@@ -417,20 +526,32 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
                     {timerSeconds > 0 && (
                       <div className="flex items-center gap-2 mt-2">
                         <button
-                          onClick={(e) => { e.stopPropagation(); startTimer(step.stepNumber, timerSeconds); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startTimer(step.stepNumber, timerSeconds);
+                          }}
                           className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                             timer?.running
-                              ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                              : 'bg-teal-100 text-teal-700 hover:bg-teal-200'
+                              ? "bg-red-100 text-red-700 hover:bg-red-200"
+                              : "bg-teal-100 text-teal-700 hover:bg-teal-200"
                           }`}
                         >
-                          {timer?.running ? <Pause size={12} /> : <Play size={12} />}
+                          {timer?.running ? (
+                            <Pause size={12} />
+                          ) : (
+                            <Play size={12} />
+                          )}
                           <Timer size={12} />
-                          {timer ? formatSeconds(timer.remaining) : formatSeconds(timerSeconds)}
+                          {timer
+                            ? formatSeconds(timer.remaining)
+                            : formatSeconds(timerSeconds)}
                         </button>
                         {timer && (
                           <button
-                            onClick={(e) => { e.stopPropagation(); resetTimer(step.stepNumber); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              resetTimer(step.stepNumber);
+                            }}
                             className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
                           >
                             <RotateCcw size={12} />
@@ -460,7 +581,9 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
         {/* Tips footer */}
         {recipe.tips && recipe.tips.length > 0 && (
           <div className="p-4 border-t bg-amber-50">
-            <h4 className="text-sm font-semibold text-amber-800 mb-1">💡 Tips Thermomix</h4>
+            <h4 className="text-sm font-semibold text-amber-800 mb-1">
+              💡 Tips Thermomix
+            </h4>
             <ul className="text-xs text-amber-700 space-y-1">
               {recipe.tips.map((tip, i) => (
                 <li key={i}>• {tip}</li>

@@ -1,25 +1,49 @@
-'use client';
+"use client";
 
-import { useState, useRef, useEffect, useCallback } from 'react';
-import ReactMarkdown from 'react-markdown';
+import { useState, useRef, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import {
-  Send, Bot, User, Sparkles, Loader2,
-  Calendar, ShoppingCart, Home,
-  ChefHat, RefreshCw, X, Mic, MicOff, Volume2, VolumeX,
-  Camera, Image as ImageIcon, Minimize2, Maximize2,
-  AlertCircle, ChevronRight
-} from 'lucide-react';
-import { useAIChat, parseMessageContent, type MessageAction } from '@/lib/hooks/useAIChat';
-import { useVoiceInput } from '@/lib/hooks/useVoiceInput';
-import { useImageInput } from '@/lib/hooks/useImageInput';
-import { useProactiveAlerts } from '@/lib/hooks/useProactiveAlerts';
-import { useAIProposal } from '@/lib/hooks/useAIProposal';
-import { ProposalCard } from '@/components/ai/ProposalCard';
-import { UndoToastContainer } from '@/components/ai/UndoToast';
-import { ContextPills } from '@/components/ai/ContextPills';
-import { useOptionalAuth } from '@/contexts/AuthContext';
+  Send,
+  Bot,
+  User,
+  Sparkles,
+  Loader2,
+  Calendar,
+  ShoppingCart,
+  Home,
+  ChefHat,
+  RefreshCw,
+  X,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
+  Camera,
+  Image as ImageIcon,
+  Minimize2,
+  Maximize2,
+  AlertCircle,
+  ChevronRight,
+} from "lucide-react";
+import {
+  useAIChat,
+  parseMessageContent,
+  type MessageAction,
+} from "@/lib/hooks/useAIChat";
+import { useVoiceInput } from "@/lib/hooks/useVoiceInput";
+import { useImageInput } from "@/lib/hooks/useImageInput";
+import { useProactiveAlerts } from "@/lib/hooks/useProactiveAlerts";
+import { useAIProposal } from "@/lib/hooks/useAIProposal";
+import { ProposalCard } from "@/components/ai/ProposalCard";
+import { UndoToastContainer } from "@/components/ai/UndoToast";
+import { ContextPills } from "@/components/ai/ContextPills";
+import { useOptionalAuth } from "@/contexts/AuthContext";
+import logger from "@/lib/logger";
 
-type ActiveSection = 'hoy' | 'recetario' | 'hogar' | 'ia' | 'ajustes';
+// Lazy load react-markdown to reduce initial bundle
+const ReactMarkdown = dynamic(() => import("react-markdown"), { ssr: false });
+
+type ActiveSection = "hoy" | "recetario" | "hogar" | "ia" | "ajustes";
 
 interface FloatingAIAssistantProps {
   activeSection?: ActiveSection;
@@ -35,25 +59,65 @@ interface QuickAction {
 // Contextual quick actions based on active section
 const getContextualActions = (section: ActiveSection): QuickAction[] => {
   switch (section) {
-    case 'hoy':
+    case "hoy":
       return [
-        { id: 'menu-today', label: 'Menú de hoy', icon: <Calendar size={14} />, prompt: '¿Cuál es el menú para hoy?' },
-        { id: 'tasks-today', label: 'Tareas de hoy', icon: <Home size={14} />, prompt: '¿Cómo van las tareas de hoy?' },
+        {
+          id: "menu-today",
+          label: "Menú de hoy",
+          icon: <Calendar size={14} />,
+          prompt: "¿Cuál es el menú para hoy?",
+        },
+        {
+          id: "tasks-today",
+          label: "Tareas de hoy",
+          icon: <Home size={14} />,
+          prompt: "¿Cómo van las tareas de hoy?",
+        },
       ];
-    case 'recetario':
+    case "recetario":
       return [
-        { id: 'suggest-recipe', label: 'Sugerir receta', icon: <ChefHat size={14} />, prompt: 'Sugiere una receta con los ingredientes que tengo' },
-        { id: 'menu-week', label: 'Menú semanal', icon: <Calendar size={14} />, prompt: '¿Cuál es el menú de esta semana?' },
-        { id: 'shopping', label: 'Lista compras', icon: <ShoppingCart size={14} />, prompt: '¿Qué necesito comprar?' },
+        {
+          id: "suggest-recipe",
+          label: "Sugerir receta",
+          icon: <ChefHat size={14} />,
+          prompt: "Sugiere una receta con los ingredientes que tengo",
+        },
+        {
+          id: "menu-week",
+          label: "Menú semanal",
+          icon: <Calendar size={14} />,
+          prompt: "¿Cuál es el menú de esta semana?",
+        },
+        {
+          id: "shopping",
+          label: "Lista compras",
+          icon: <ShoppingCart size={14} />,
+          prompt: "¿Qué necesito comprar?",
+        },
       ];
-    case 'hogar':
+    case "hogar":
       return [
-        { id: 'tasks-status', label: 'Estado tareas', icon: <Home size={14} />, prompt: '¿Cómo va el progreso de las tareas?' },
-        { id: 'employee-summary', label: 'Resumen empleados', icon: <User size={14} />, prompt: 'Dame un resumen de las tareas de cada empleado' },
+        {
+          id: "tasks-status",
+          label: "Estado tareas",
+          icon: <Home size={14} />,
+          prompt: "¿Cómo va el progreso de las tareas?",
+        },
+        {
+          id: "employee-summary",
+          label: "Resumen empleados",
+          icon: <User size={14} />,
+          prompt: "Dame un resumen de las tareas de cada empleado",
+        },
       ];
     default:
       return [
-        { id: 'help', label: '¿Qué puedo hacer?', icon: <Sparkles size={14} />, prompt: '¿Qué puedes hacer por mí?' },
+        {
+          id: "help",
+          label: "¿Qué puedo hacer?",
+          icon: <Sparkles size={14} />,
+          prompt: "¿Qué puedes hacer por mí?",
+        },
       ];
   }
 };
@@ -65,9 +129,13 @@ function FormattedMessage({ content }: { content: string }) {
       <ReactMarkdown
         components={{
           p: ({ children }) => <p className="my-1">{children}</p>,
-          ul: ({ children }) => <ul className="list-disc pl-4 my-1">{children}</ul>,
+          ul: ({ children }) => (
+            <ul className="list-disc pl-4 my-1">{children}</ul>
+          ),
           li: ({ children }) => <li className="my-0">{children}</li>,
-          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+          strong: ({ children }) => (
+            <strong className="font-semibold">{children}</strong>
+          ),
         }}
       >
         {content}
@@ -77,11 +145,19 @@ function FormattedMessage({ content }: { content: string }) {
 }
 
 // Action Button Component
-function ActionButton({ action, onAction, disabled }: { action: MessageAction; onAction: (action: string) => void; disabled?: boolean }) {
+function ActionButton({
+  action,
+  onAction,
+  disabled,
+}: {
+  action: MessageAction;
+  onAction: (action: string) => void;
+  disabled?: boolean;
+}) {
   const variants = {
-    primary: 'bg-purple-600 text-white hover:bg-purple-700',
-    secondary: 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-    danger: 'bg-red-100 text-red-700 hover:bg-red-200',
+    primary: "bg-purple-600 text-white hover:bg-purple-700",
+    secondary: "bg-gray-100 text-gray-700 hover:bg-gray-200",
+    danger: "bg-red-100 text-red-700 hover:bg-red-200",
   };
 
   return (
@@ -91,7 +167,7 @@ function ActionButton({ action, onAction, disabled }: { action: MessageAction; o
       className={`
         px-2 py-1 rounded-lg text-xs font-medium transition-colors
         flex items-center gap-1 disabled:opacity-50
-        ${variants[action.variant || 'secondary']}
+        ${variants[action.variant || "secondary"]}
       `}
     >
       {action.label}
@@ -100,10 +176,12 @@ function ActionButton({ action, onAction, disabled }: { action: MessageAction; o
   );
 }
 
-export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingAIAssistantProps) {
+export default function FloatingAIAssistant({
+  activeSection = "hoy",
+}: FloatingAIAssistantProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [showProposalModal, setShowProposalModal] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -111,7 +189,7 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
 
   // Auth context for household and user info
   const auth = useOptionalAuth();
-  const householdId = auth?.currentHousehold?.id || 'default-household';
+  const householdId = auth?.currentHousehold?.id || "default-household";
   const userId = auth?.user?.id;
 
   // AI Proposal hook for managing proposals and undo actions
@@ -130,7 +208,7 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
           handleSend(transcript);
         }
       }, 300);
-    }
+    },
   });
 
   const {
@@ -172,7 +250,7 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
   const alertsHook = useProactiveAlerts();
 
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
   useEffect(() => {
@@ -190,12 +268,12 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
     if ((!messageContent.trim() && !selectedImage) || chat.isLoading) return;
 
     await chat.sendMessage(messageContent, selectedImage);
-    setInput('');
+    setInput("");
     clearImage();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
@@ -206,26 +284,30 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
   };
 
   const handleAction = async (action: string) => {
-    const [actionType, ...params] = action.split(':');
-    const param = params.join(':');
+    const [actionType, ...params] = action.split(":");
+    const param = params.join(":");
 
     switch (actionType) {
-      case 'confirm':
-        if (param === 'yes') {
-          chat.sendMessage('Sí, agrégalo');
+      case "confirm":
+        if (param === "yes") {
+          chat.sendMessage("Sí, agrégalo");
         }
         break;
-      case 'view_recipe':
+      case "view_recipe":
         chat.sendMessage(`Muéstrame los detalles de la receta ${param}`);
         break;
-      case 'add_low_to_shopping':
-        chat.sendMessage('Agrega todos los ingredientes bajos a la lista de compras');
+      case "add_low_to_shopping":
+        chat.sendMessage(
+          "Agrega todos los ingredientes bajos a la lista de compras",
+        );
         break;
-      case 'add_missing_to_shopping':
-        chat.sendMessage('Agrega los ingredientes faltantes a la lista de compras');
+      case "add_missing_to_shopping":
+        chat.sendMessage(
+          "Agrega los ingredientes faltantes a la lista de compras",
+        );
         break;
       default:
-        console.log('Unknown action:', action);
+        logger.warn("Unknown action", { action });
     }
   };
 
@@ -241,7 +323,7 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
         <Bot size={24} />
         {alertsHook.alertCount > 0 && (
           <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
-            {alertsHook.alertCount > 9 ? '9+' : alertsHook.alertCount}
+            {alertsHook.alertCount > 9 ? "9+" : alertsHook.alertCount}
           </span>
         )}
       </button>
@@ -253,8 +335,8 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
     <div
       className={`fixed z-[100] bg-white rounded-2xl shadow-2xl border overflow-hidden flex flex-col transition-all duration-300 ${
         isExpanded
-          ? 'inset-4 sm:inset-8'
-          : 'bottom-24 right-4 w-[calc(100%-2rem)] max-w-sm h-[70vh] max-h-[500px]'
+          ? "inset-4 sm:inset-8"
+          : "bottom-24 right-4 w-[calc(100%-2rem)] max-w-sm h-[70vh] max-h-[500px]"
       }`}
     >
       {/* Header */}
@@ -266,9 +348,11 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
           <div>
             <h3 className="font-medium text-sm">Asistente IA</h3>
             <p className="text-xs text-purple-200">
-              {activeSection === 'recetario' ? 'Recetas y menú' :
-               activeSection === 'hogar' ? 'Tareas del hogar' :
-               'Tu ayudante'}
+              {activeSection === "recetario"
+                ? "Recetas y menú"
+                : activeSection === "hogar"
+                  ? "Tareas del hogar"
+                  : "Tu ayudante"}
             </p>
           </div>
         </div>
@@ -312,7 +396,7 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
       {/* Quick Actions */}
       <div className="flex-shrink-0 bg-gray-50 border-b p-2">
         <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
-          {quickActions.map(action => (
+          {quickActions.map((action) => (
             <button
               key={action.id}
               onClick={() => handleQuickAction(action)}
@@ -337,47 +421,60 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
             <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center mb-3">
               <Sparkles size={24} className="text-white" />
             </div>
-            <h4 className="font-medium text-gray-800 mb-1">¿En qué puedo ayudarte?</h4>
+            <h4 className="font-medium text-gray-800 mb-1">
+              ¿En qué puedo ayudarte?
+            </h4>
             <p className="text-xs text-gray-500">
               Pregúntame sobre recetas, menú, tareas o compras
             </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {chat.messages.map(message => (
+            {chat.messages.map((message) => (
               <div
                 key={message.id}
-                className={`flex gap-2 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
+                className={`flex gap-2 ${message.role === "user" ? "flex-row-reverse" : ""}`}
               >
-                <div className={`
+                <div
+                  className={`
                   w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0
-                  ${message.role === 'user' ? 'bg-green-100' : 'bg-purple-100'}
-                `}>
-                  {message.role === 'user'
-                    ? <User size={14} className="text-green-600" />
-                    : <Sparkles size={14} className="text-purple-600" />
-                  }
+                  ${message.role === "user" ? "bg-green-100" : "bg-purple-100"}
+                `}
+                >
+                  {message.role === "user" ? (
+                    <User size={14} className="text-green-600" />
+                  ) : (
+                    <Sparkles size={14} className="text-purple-600" />
+                  )}
                 </div>
 
-                <div className={`
+                <div
+                  className={`
                   max-w-[85%] rounded-xl text-sm
-                  ${message.role === 'user'
-                    ? 'bg-green-600 text-white rounded-br-sm p-2.5'
-                    : 'bg-white shadow-sm border rounded-bl-sm'
+                  ${
+                    message.role === "user"
+                      ? "bg-green-600 text-white rounded-br-sm p-2.5"
+                      : "bg-white shadow-sm border rounded-bl-sm"
                   }
-                `}>
+                `}
+                >
                   {message.isLoading && !message.content ? (
                     <div className="p-2.5 space-y-2">
                       {/* Show active tools */}
                       {chat.activeTools.length > 0 && (
-                        <ContextPills tools={chat.activeTools} className="mb-2" />
+                        <ContextPills
+                          tools={chat.activeTools}
+                          className="mb-2"
+                        />
                       )}
                       <div className="flex items-center gap-1.5 text-purple-600">
                         <Loader2 size={14} className="animate-spin" />
                         <span className="text-xs">
                           {chat.activeTools.length > 0
-                            ? chat.activeTools.find(t => t.status === 'running')?.description || 'Procesando...'
-                            : 'Pensando...'}
+                            ? chat.activeTools.find(
+                                (t) => t.status === "running",
+                              )?.description || "Procesando..."
+                            : "Pensando..."}
                         </span>
                       </div>
                     </div>
@@ -385,16 +482,25 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
                     <div className="p-2.5">
                       {/* Show active tools while streaming */}
                       {chat.activeTools.length > 0 && (
-                        <ContextPills tools={chat.activeTools} className="mb-2" />
+                        <ContextPills
+                          tools={chat.activeTools}
+                          className="mb-2"
+                        />
                       )}
                       <FormattedMessage content={message.content} />
                       <div className="flex items-center gap-0.5 mt-1.5 text-purple-400">
                         <span className="w-1 h-1 bg-purple-400 rounded-full animate-bounce" />
-                        <span className="w-1 h-1 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-1 h-1 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        <span
+                          className="w-1 h-1 bg-purple-400 rounded-full animate-bounce"
+                          style={{ animationDelay: "150ms" }}
+                        />
+                        <span
+                          className="w-1 h-1 bg-purple-400 rounded-full animate-bounce"
+                          style={{ animationDelay: "300ms" }}
+                        />
                       </div>
                     </div>
-                  ) : message.role === 'user' ? (
+                  ) : message.role === "user" ? (
                     <>
                       {message.image && (
                         <div className="mb-2 -mx-2.5 -mt-2.5">
@@ -405,19 +511,24 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
                           />
                         </div>
                       )}
-                      {message.content && message.content !== '📷 Imagen enviada' && (
-                        <p className="text-xs whitespace-pre-line">{message.content}</p>
-                      )}
+                      {message.content &&
+                        message.content !== "📷 Imagen enviada" && (
+                          <p className="text-xs whitespace-pre-line">
+                            {message.content}
+                          </p>
+                        )}
                     </>
                   ) : (
                     (() => {
-                      const { text, actions } = parseMessageContent(message.content);
+                      const { text, actions } = parseMessageContent(
+                        message.content,
+                      );
                       return (
                         <div className="p-2.5">
                           <FormattedMessage content={text} />
                           {actions.length > 0 && (
                             <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-gray-100">
-                              {actions.map(action => (
+                              {actions.map((action) => (
                                 <ActionButton
                                   key={action.id}
                                   action={action}
@@ -444,7 +555,7 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
         <div className="px-3 py-1.5 bg-purple-50 border-t flex items-center gap-2">
           <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
           <span className="text-xs text-purple-700 flex-1">
-            {voice.interimTranscript || 'Escuchando...'}
+            {voice.interimTranscript || "Escuchando..."}
           </span>
           <button
             onClick={voice.stopListening}
@@ -520,8 +631,8 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
             disabled={chat.isLoading || voice.isListening}
             className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
               selectedImage
-                ? 'bg-purple-100 text-purple-600'
-                : 'bg-gray-100 text-gray-500 hover:bg-purple-50 hover:text-purple-600'
+                ? "bg-purple-100 text-purple-600"
+                : "bg-gray-100 text-gray-500 hover:bg-purple-50 hover:text-purple-600"
             }`}
           >
             <Camera size={16} />
@@ -533,8 +644,8 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
               onClick={voice.toggleTTS}
               className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
                 voice.ttsEnabled
-                  ? 'bg-purple-100 text-purple-600'
-                  : 'bg-gray-100 text-gray-400'
+                  ? "bg-purple-100 text-purple-600"
+                  : "bg-gray-100 text-gray-400"
               }`}
             >
               {voice.ttsEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
@@ -547,7 +658,13 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
             value={voice.isListening ? voice.interimTranscript : input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={selectedImage ? 'Describe...' : (voice.isListening ? 'Escuchando...' : 'Escribe...')}
+            placeholder={
+              selectedImage
+                ? "Describe..."
+                : voice.isListening
+                  ? "Escuchando..."
+                  : "Escribe..."
+            }
             disabled={chat.isLoading || voice.isListening}
             className="flex-1 px-3 py-2 bg-gray-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
           />
@@ -559,9 +676,10 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
               disabled={chat.isLoading}
               className={`
                 w-9 h-9 rounded-full flex items-center justify-center transition-all
-                ${voice.isListening
-                  ? 'bg-red-500 text-white animate-pulse'
-                  : 'bg-gray-100 text-gray-600 hover:bg-purple-100 hover:text-purple-600'
+                ${
+                  voice.isListening
+                    ? "bg-red-500 text-white animate-pulse"
+                    : "bg-gray-100 text-gray-600 hover:bg-purple-100 hover:text-purple-600"
                 }
               `}
             >
@@ -572,12 +690,19 @@ export default function FloatingAIAssistant({ activeSection = 'hoy' }: FloatingA
           {/* Send Button */}
           <button
             onClick={() => handleSend()}
-            disabled={(!input.trim() && !selectedImage) || chat.isLoading || voice.isListening}
+            disabled={
+              (!input.trim() && !selectedImage) ||
+              chat.isLoading ||
+              voice.isListening
+            }
             className={`
               w-9 h-9 rounded-full flex items-center justify-center transition-all
-              ${(input.trim() || selectedImage) && !chat.isLoading && !voice.isListening
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg'
-                : 'bg-gray-200 text-gray-400'
+              ${
+                (input.trim() || selectedImage) &&
+                !chat.isLoading &&
+                !voice.isListening
+                  ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg"
+                  : "bg-gray-200 text-gray-400"
               }
             `}
           >

@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/api/auth';
-import { smartShoppingList } from '@/app/api/ai-assistant/functions/reports';
-import logger from '@/lib/logger';
+import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/api/auth";
+import { smartShoppingList } from "@/app/api/ai-assistant/functions/reports";
+import logger from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
   const auth = requireAuth(request);
@@ -11,10 +11,12 @@ export async function GET(request: NextRequest) {
     const result = await smartShoppingList(7);
     return NextResponse.json(result);
   } catch (error) {
-    logger.error('Error generating smart shopping list', { error: String(error) });
+    logger.error("Error generating smart shopping list", {
+      error: String(error),
+    });
     return NextResponse.json(
-      { error: 'Error generando lista de compras' },
-      { status: 500 }
+      { error: "Error generando lista de compras" },
+      { status: 500 },
     );
   }
 }

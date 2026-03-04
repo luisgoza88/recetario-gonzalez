@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from "react";
 
 // Web Speech API types provided by src/types/speech.d.ts
 
@@ -22,10 +22,10 @@ interface UseSpeechRecognitionReturn {
 }
 
 export function useSpeechRecognition(
-  options: UseSpeechRecognitionOptions = {}
+  options: UseSpeechRecognitionOptions = {},
 ): UseSpeechRecognitionReturn {
-  const [transcript, setTranscript] = useState('');
-  const [interimTranscript, setInterimTranscript] = useState('');
+  const [transcript, setTranscript] = useState("");
+  const [interimTranscript, setInterimTranscript] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSupported, setIsSupported] = useState(false);
@@ -35,7 +35,7 @@ export function useSpeechRecognition(
   useEffect(() => {
     // Check for browser support
     const SpeechRecognition =
-      typeof window !== 'undefined'
+      typeof window !== "undefined"
         ? window.SpeechRecognition || window.webkitSpeechRecognition
         : null;
 
@@ -49,12 +49,12 @@ export function useSpeechRecognition(
     const recognition = new SpeechRecognition();
     recognition.continuous = options.continuous ?? false;
     recognition.interimResults = options.interimResults ?? true;
-    recognition.lang = options.language ?? 'es-CO'; // Spanish Colombia by default
+    recognition.lang = options.language ?? "es-CO"; // Spanish Colombia by default
     recognition.maxAlternatives = 1;
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let finalTranscript = '';
-      let interim = '';
+      let finalTranscript = "";
+      let interim = "";
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
@@ -66,19 +66,19 @@ export function useSpeechRecognition(
       }
 
       if (finalTranscript) {
-        setTranscript(prev => prev + finalTranscript);
+        setTranscript((prev) => prev + finalTranscript);
       }
       setInterimTranscript(interim);
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       const errorMessages: Record<string, string> = {
-        'no-speech': 'No se detectó voz. Intenta de nuevo.',
-        'audio-capture': 'No se encontró micrófono.',
-        'not-allowed': 'Permiso de micrófono denegado.',
-        'network': 'Error de red. Verifica tu conexión.',
-        'aborted': 'Reconocimiento cancelado.',
-        'service-not-allowed': 'Servicio no disponible.',
+        "no-speech": "No se detectó voz. Intenta de nuevo.",
+        "audio-capture": "No se encontró micrófono.",
+        "not-allowed": "Permiso de micrófono denegado.",
+        network: "Error de red. Verifica tu conexión.",
+        aborted: "Reconocimiento cancelado.",
+        "service-not-allowed": "Servicio no disponible.",
       };
       setError(errorMessages[event.error] || `Error: ${event.error}`);
       setIsListening(false);
@@ -86,7 +86,7 @@ export function useSpeechRecognition(
 
     recognition.onend = () => {
       setIsListening(false);
-      setInterimTranscript('');
+      setInterimTranscript("");
     };
 
     recognition.onstart = () => {
@@ -106,12 +106,12 @@ export function useSpeechRecognition(
   const startListening = useCallback(() => {
     if (recognitionRef.current && !isListening) {
       setError(null);
-      setTranscript('');
-      setInterimTranscript('');
+      setTranscript("");
+      setInterimTranscript("");
       try {
         recognitionRef.current.start();
       } catch (err) {
-        console.error('Error starting speech recognition:', err);
+        console.error("Error starting speech recognition:", err);
       }
     }
   }, [isListening]);
@@ -123,8 +123,8 @@ export function useSpeechRecognition(
   }, [isListening]);
 
   const resetTranscript = useCallback(() => {
-    setTranscript('');
-    setInterimTranscript('');
+    setTranscript("");
+    setInterimTranscript("");
   }, []);
 
   return {
@@ -135,6 +135,6 @@ export function useSpeechRecognition(
     isSupported,
     startListening,
     stopListening,
-    resetTranscript
+    resetTranscript,
   };
 }

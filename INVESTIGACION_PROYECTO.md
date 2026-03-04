@@ -2,24 +2,24 @@
 
 ## Resumen Ejecutivo
 
-| Atributo | Valor |
-|----------|-------|
-| **Nombre** | Recetario App / Hogar Inteligente |
-| **Usuarios** | Familia González (Luis y Mariana) |
-| **Estado** | Producción activa |
-| **URL** | https://recetario-app-self.vercel.app |
-| **GitHub** | https://github.com/luisgoza88/recetario-gonzalez |
-| **Supabase ID** | snyelpbcfbzaxadrtxpa |
+| Atributo        | Valor                                            |
+| --------------- | ------------------------------------------------ |
+| **Nombre**      | Recetario App / Hogar Inteligente                |
+| **Usuarios**    | Familia González (Luis y Mariana)                |
+| **Estado**      | Producción activa                                |
+| **URL**         | https://recetario-app-self.vercel.app            |
+| **GitHub**      | https://github.com/luisgoza88/recetario-gonzalez |
+| **Supabase ID** | snyelpbcfbzaxadrtxpa                             |
 
 ### Estadísticas del Proyecto
 
-| Métrica | Valor |
-|---------|-------|
-| Componentes React | 66 archivos |
-| Líneas de código UI | 22,731+ líneas |
-| API Endpoints | 11 rutas |
-| Tablas en DB | 40+ tablas |
-| Archivos totales src/ | 119 archivos |
+| Métrica               | Valor          |
+| --------------------- | -------------- |
+| Componentes React     | 66 archivos    |
+| Líneas de código UI   | 22,731+ líneas |
+| API Endpoints         | 11 rutas       |
+| Tablas en DB          | 40+ tablas     |
+| Archivos totales src/ | 119 archivos   |
 
 ---
 
@@ -30,6 +30,7 @@
 La aplicación combina **dos módulos principales**:
 
 **Módulo Recetario:**
+
 - Planificación de comidas en ciclo de 12 días (excluyendo domingos)
 - Control de porciones diferenciadas (Luis: 3, Mariana: 2 = 5 total)
 - Gestión de lista de mercado sincronizada con menú
@@ -38,6 +39,7 @@ La aplicación combina **dos módulos principales**:
 - Sistema de feedback y aprendizaje automático
 
 **Módulo Hogar:**
+
 - Administración de espacios del hogar (24+ espacios)
 - Gestión de empleados domésticos (horarios, zonas, tareas)
 - Programación inteligente de limpieza con IA
@@ -46,12 +48,12 @@ La aplicación combina **dos módulos principales**:
 
 ### 1.2 Usuarios del Sistema
 
-| Usuario | Rol | Porciones | Descripción |
-|---------|-----|-----------|-------------|
-| **Luis** | Admin | 3 de 5 | Porciones grandes, comida sustanciosa |
-| **Mariana** | Admin | 2 de 5 | Porciones medianas, preferencias ligeras |
-| **Empleados** | Empleado | N/A | Ven tareas, hacen check-in/out |
-| **Familia** | Familia | N/A | Ven menú, lista de compras |
+| Usuario       | Rol      | Porciones | Descripción                              |
+| ------------- | -------- | --------- | ---------------------------------------- |
+| **Luis**      | Admin    | 3 de 5    | Porciones grandes, comida sustanciosa    |
+| **Mariana**   | Admin    | 2 de 5    | Porciones medianas, preferencias ligeras |
+| **Empleados** | Empleado | N/A       | Ven tareas, hacen check-in/out           |
+| **Familia**   | Familia  | N/A       | Ven menú, lista de compras               |
 
 ### 1.3 Filosofía de Diseño
 
@@ -66,28 +68,28 @@ La aplicación combina **dos módulos principales**:
 
 ### 2.1 Tecnologías Core
 
-| Capa | Tecnología | Versión | Propósito |
-|------|------------|---------|-----------|
-| Frontend | Next.js | 16.1.2 | Framework React |
-| UI | React | 19.2.3 | Componentes |
-| Lenguaje | TypeScript | 5.x | Type safety |
-| Estilos | Tailwind CSS | 4.x | Styling |
-| Backend/DB | Supabase | PostgreSQL | Base de datos + Auth |
-| **IA** | **Google Gemini** | 2.0/2.5 | Generación, visión, chat |
-| State | Zustand | 5.0.10 | Estado global |
-| Data | TanStack Query | 5.90.19 | Fetching + cache |
-| PWA | Serwist | 9.5.0 | Service Worker |
-| Iconos | Lucide React | 0.562.0 | Iconografía |
-| Deploy | Vercel | Auto | CI/CD |
+| Capa       | Tecnología        | Versión    | Propósito                |
+| ---------- | ----------------- | ---------- | ------------------------ |
+| Frontend   | Next.js           | 16.1.2     | Framework React          |
+| UI         | React             | 19.2.3     | Componentes              |
+| Lenguaje   | TypeScript        | 5.x        | Type safety              |
+| Estilos    | Tailwind CSS      | 4.x        | Styling                  |
+| Backend/DB | Supabase          | PostgreSQL | Base de datos + Auth     |
+| **IA**     | **Google Gemini** | 2.0/2.5    | Generación, visión, chat |
+| State      | Zustand           | 5.0.10     | Estado global            |
+| Data       | TanStack Query    | 5.90.19    | Fetching + cache         |
+| PWA        | Serwist           | 9.5.0      | Service Worker           |
+| Iconos     | Lucide React      | 0.562.0    | Iconografía              |
+| Deploy     | Vercel            | Auto       | CI/CD                    |
 
 ### 2.2 Modelos de IA (Google Gemini)
 
-| Modelo | Uso |
-|--------|-----|
-| `gemini-2.0-flash` | Generación rápida (recetas, parsing) |
-| `gemini-2.0-flash-exp` | Con soporte de imágenes |
-| `gemini-2.5-flash` | Chat y asistente |
-| `imagen-3.0-generate-002` | Generación de imágenes de platos |
+| Modelo                    | Uso                                  |
+| ------------------------- | ------------------------------------ |
+| `gemini-2.0-flash`        | Generación rápida (recetas, parsing) |
+| `gemini-2.0-flash-exp`    | Con soporte de imágenes              |
+| `gemini-2.5-flash`        | Chat y asistente                     |
+| `imagen-3.0-generate-002` | Generación de imágenes de platos     |
 
 ---
 
@@ -297,65 +299,65 @@ src/
 
 ### 4.1 Módulo Recetario
 
-| Tabla | Registros | Descripción |
-|-------|-----------|-------------|
-| `recipes` | 28 | Catálogo de recetas con ingredientes (JSONB) |
-| `day_menu` | 12 | Menú por día del ciclo (desayuno/almuerzo/cena) |
-| `market_items` | 82 | Items del mercado con categorías |
-| `inventory` | ~70 | Estado actual del inventario |
-| `market_checklist` | ~68 | Estado de compras (checked) |
-| `ingredient_categories` | 10 | Categorías de ingredientes |
-| `ingredient_aliases` | 51+ | Mapeo nombres (receta → mercado) |
-| `preparations` | 17 | Preparaciones base (hogao, guacamole, etc.) |
-| `meal_feedback` | variable | Feedback de comidas |
-| `adjustment_suggestions` | variable | Sugerencias automáticas |
-| `completed_days` | variable | Días completados del menú |
+| Tabla                    | Registros | Descripción                                     |
+| ------------------------ | --------- | ----------------------------------------------- |
+| `recipes`                | 28        | Catálogo de recetas con ingredientes (JSONB)    |
+| `day_menu`               | 12        | Menú por día del ciclo (desayuno/almuerzo/cena) |
+| `market_items`           | 82        | Items del mercado con categorías                |
+| `inventory`              | ~70       | Estado actual del inventario                    |
+| `market_checklist`       | ~68       | Estado de compras (checked)                     |
+| `ingredient_categories`  | 10        | Categorías de ingredientes                      |
+| `ingredient_aliases`     | 51+       | Mapeo nombres (receta → mercado)                |
+| `preparations`           | 17        | Preparaciones base (hogao, guacamole, etc.)     |
+| `meal_feedback`          | variable  | Feedback de comidas                             |
+| `adjustment_suggestions` | variable  | Sugerencias automáticas                         |
+| `completed_days`         | variable  | Días completados del menú                       |
 
 ### 4.2 Módulo Presupuesto
 
-| Tabla | Descripción |
-|-------|-------------|
-| `budgets` | Presupuestos semanales/mensuales |
-| `purchases` | Historial de compras |
-| `price_history` | Tracking de precios |
+| Tabla           | Descripción                      |
+| --------------- | -------------------------------- |
+| `budgets`       | Presupuestos semanales/mensuales |
+| `purchases`     | Historial de compras             |
+| `price_history` | Tracking de precios              |
 
 ### 4.3 Módulo Hogar
 
-| Tabla | Registros | Descripción |
-|-------|-----------|-------------|
-| `households` | 1+ | Configuración del hogar |
-| `space_types` | 22 | Tipos de espacio predefinidos |
-| `spaces` | 24+ | Espacios reales del hogar |
-| `home_employees` | 2+ | Empleados domésticos |
-| `task_templates` | 88+ | Plantillas de tareas |
-| `scheduled_tasks` | variable | Tareas programadas |
-| `cleaning_history` | variable | Historial de limpieza |
-| `employee_checkins` | variable | Registros check-in/out |
-| `cleaning_ratings` | variable | Calificaciones |
-| `cleaning_supplies` | variable | Inventario limpieza |
-| `inspection_reports` | variable | Reportes inspección |
-| `quick_routine_logs` | variable | Log de rutinas |
+| Tabla                | Registros | Descripción                   |
+| -------------------- | --------- | ----------------------------- |
+| `households`         | 1+        | Configuración del hogar       |
+| `space_types`        | 22        | Tipos de espacio predefinidos |
+| `spaces`             | 24+       | Espacios reales del hogar     |
+| `home_employees`     | 2+        | Empleados domésticos          |
+| `task_templates`     | 88+       | Plantillas de tareas          |
+| `scheduled_tasks`    | variable  | Tareas programadas            |
+| `cleaning_history`   | variable  | Historial de limpieza         |
+| `employee_checkins`  | variable  | Registros check-in/out        |
+| `cleaning_ratings`   | variable  | Calificaciones                |
+| `cleaning_supplies`  | variable  | Inventario limpieza           |
+| `inspection_reports` | variable  | Reportes inspección           |
+| `quick_routine_logs` | variable  | Log de rutinas                |
 
 ### 4.4 Sistema Multi-Tenant (Autenticación)
 
-| Tabla | Descripción |
-|-------|-------------|
-| `user_profiles` | Perfiles de usuario (extiende auth.users) |
-| `household_memberships` | Membresías usuario → hogar con roles |
-| `household_invitations` | Códigos de invitación (8 caracteres) |
+| Tabla                   | Descripción                               |
+| ----------------------- | ----------------------------------------- |
+| `user_profiles`         | Perfiles de usuario (extiende auth.users) |
+| `household_memberships` | Membresías usuario → hogar con roles      |
+| `household_invitations` | Códigos de invitación (8 caracteres)      |
 
 ### 4.5 Programación Inteligente
 
-| Tabla | Descripción |
-|-------|-------------|
-| `schedule_templates` | Templates de horarios |
-| `daily_task_instances` | Instancias diarias |
-| `schedule_config` | Configuración global |
-| `task_categories` | Categorías de tareas |
-| `employee_space_assignments` | Asignaciones empleado-espacio |
-| `learned_task_durations` | Duraciones aprendidas (ML) |
-| `employee_performance_scores` | Métricas de rendimiento |
-| `workload_predictions_log` | Predicciones de carga |
+| Tabla                         | Descripción                   |
+| ----------------------------- | ----------------------------- |
+| `schedule_templates`          | Templates de horarios         |
+| `daily_task_instances`        | Instancias diarias            |
+| `schedule_config`             | Configuración global          |
+| `task_categories`             | Categorías de tareas          |
+| `employee_space_assignments`  | Asignaciones empleado-espacio |
+| `learned_task_durations`      | Duraciones aprendidas (ML)    |
+| `employee_performance_scores` | Métricas de rendimiento       |
+| `workload_predictions_log`    | Predicciones de carga         |
 
 **Total: 40+ tablas con Row-Level Security (RLS)**
 
@@ -397,22 +399,22 @@ src/
 
 ### 5.3 APIs de Visión
 
-| Endpoint | Input | Output |
-|----------|-------|--------|
-| `/api/generate-recipe-image` | Recipe object | URL imagen |
-| `/api/generate-recipe-from-image` | Foto de receta | Recipe object |
-| `/api/match-recipe-image` | Foto de plato | Matching recipes |
-| `/api/scan-pantry` | Foto de despensa | InventoryItem[] |
-| `/api/scan-receipt` | Foto de recibo | MarketItem[] |
+| Endpoint                          | Input            | Output           |
+| --------------------------------- | ---------------- | ---------------- |
+| `/api/generate-recipe-image`      | Recipe object    | URL imagen       |
+| `/api/generate-recipe-from-image` | Foto de receta   | Recipe object    |
+| `/api/match-recipe-image`         | Foto de plato    | Matching recipes |
+| `/api/scan-pantry`                | Foto de despensa | InventoryItem[]  |
+| `/api/scan-receipt`               | Foto de recibo   | MarketItem[]     |
 
 ### 5.4 Utilidades
 
-| Endpoint | Propósito |
-|----------|-----------|
-| `/api/parse-market-items` | Texto libre → items estructurados |
-| `/api/analyze-room` | Descripción → tareas sugeridas |
-| `/api/seed-schedule` | Inicializar datos |
-| `/api/generate-library-images` | Batch de imágenes |
+| Endpoint                       | Propósito                         |
+| ------------------------------ | --------------------------------- |
+| `/api/parse-market-items`      | Texto libre → items estructurados |
+| `/api/analyze-room`            | Descripción → tareas sugeridas    |
+| `/api/seed-schedule`           | Inicializar datos                 |
+| `/api/generate-library-images` | Batch de imágenes                 |
 
 ---
 
@@ -438,24 +440,28 @@ src/
 
 ### 6.2 Roles y Permisos
 
-| Rol | Descripción | Permisos |
-|-----|-------------|----------|
-| `admin` | Administrador del hogar | Control total |
-| `familia` | Miembro de familia | Ver/editar menú, recetas, compras |
-| `empleado` | Empleado doméstico | Ver tareas, check-in, completar |
+| Rol        | Descripción             | Permisos                          |
+| ---------- | ----------------------- | --------------------------------- |
+| `admin`    | Administrador del hogar | Control total                     |
+| `familia`  | Miembro de familia      | Ver/editar menú, recetas, compras |
+| `empleado` | Empleado doméstico      | Ver tareas, check-in, completar   |
 
 ### 6.3 Permisos Detallados
 
 **Lectura:**
+
 - `view_menu`, `view_shopping_list`, `view_tasks`, `view_inventory`
 
 **Empleado:**
+
 - `complete_tasks`, `update_inventory`, `check_in`
 
 **Edición (admin + familia):**
+
 - `edit_menu`, `edit_recipes`, `edit_shopping_list`
 
 **Gestión (solo admin):**
+
 - `manage_employees`, `manage_spaces`, `manage_tasks`
 - `manage_members`, `manage_invitations`, `delete_data`
 
@@ -472,14 +478,14 @@ src/
 
 ### 6.5 Funciones RPC en Supabase
 
-| Función | Propósito |
-|---------|-----------|
-| `generate_invitation_code()` | Genera código único |
-| `create_invitation()` | Crea invitación (solo admins) |
-| `use_invitation_code()` | Usa código para unirse |
-| `get_my_memberships()` | Obtiene hogares del usuario |
-| `check_user_permission()` | Verifica permiso específico |
-| `handle_new_user_profile()` | Trigger: crea perfil en registro |
+| Función                      | Propósito                        |
+| ---------------------------- | -------------------------------- |
+| `generate_invitation_code()` | Genera código único              |
+| `create_invitation()`        | Crea invitación (solo admins)    |
+| `use_invitation_code()`      | Usa código para unirse           |
+| `get_my_memberships()`       | Obtiene hogares del usuario      |
+| `check_user_permission()`    | Verifica permiso específico      |
+| `handle_new_user_profile()`  | Trigger: crea perfil en registro |
 
 ---
 
@@ -663,12 +669,12 @@ market_items    parse AI        inventory
 
 ### 9.2 Datos Cacheados
 
-| Store | Datos |
-|-------|-------|
-| `dayMenus` | Menú de 12 días |
-| `recipes` | Catálogo completo |
-| `inventory` | Estado de despensa |
-| `marketItems` | Lista de mercado |
+| Store         | Datos              |
+| ------------- | ------------------ |
+| `dayMenus`    | Menú de 12 días    |
+| `recipes`     | Catálogo completo  |
+| `inventory`   | Estado de despensa |
+| `marketItems` | Lista de mercado   |
 
 ### 9.3 Hooks de Sincronización
 
@@ -721,13 +727,13 @@ interface HouseholdState {
 // src/lib/hooks/useAppData.ts
 
 // Hooks disponibles:
-useRecipes()          // Todas las recetas
-useMarketItems()      // Items del mercado
-useInventory()        // Estado de inventario
-useDayMenus()         // Menú del ciclo
-useSuggestionsCount() // Conteo de sugerencias pendientes
-useSpaces()           // Espacios del hogar
-useEmployees()        // Empleados
+useRecipes(); // Todas las recetas
+useMarketItems(); // Items del mercado
+useInventory(); // Estado de inventario
+useDayMenus(); // Menú del ciclo
+useSuggestionsCount(); // Conteo de sugerencias pendientes
+useSpaces(); // Espacios del hogar
+useEmployees(); // Empleados
 // ...
 ```
 
@@ -737,29 +743,29 @@ useEmployees()        // Empleados
 
 ### 11.1 Activas
 
-| Servicio | Uso | Configuración |
-|----------|-----|---------------|
-| **Google Gemini** | IA completa | GOOGLE_GEMINI_API_KEY |
-| **Supabase** | DB + Auth | NEXT_PUBLIC_SUPABASE_* |
-| **Vercel** | Deploy + Edge | Automático desde GitHub |
+| Servicio          | Uso           | Configuración           |
+| ----------------- | ------------- | ----------------------- |
+| **Google Gemini** | IA completa   | GOOGLE_GEMINI_API_KEY   |
+| **Supabase**      | DB + Auth     | NEXT*PUBLIC_SUPABASE*\* |
+| **Vercel**        | Deploy + Edge | Automático desde GitHub |
 
 ### 11.2 Preparadas (Código Existe)
 
-| Servicio | Estado | Archivo |
-|----------|--------|---------|
-| WhatsApp Share | Listo | src/lib/whatsapp-share.ts |
-| Speech Recognition | Listo | src/hooks/useSpeechRecognition.ts |
-| Push Notifications | Parcial | src/lib/notifications.ts |
+| Servicio           | Estado  | Archivo                           |
+| ------------------ | ------- | --------------------------------- |
+| WhatsApp Share     | Listo   | src/lib/whatsapp-share.ts         |
+| Speech Recognition | Listo   | src/hooks/useSpeechRecognition.ts |
+| Push Notifications | Parcial | src/lib/notifications.ts          |
 
 ### 11.3 Potenciales
 
-| Servicio | Caso de Uso |
-|----------|-------------|
-| Google Calendar | Sincronizar menú |
-| Rappi/Merqueo | Compras directas |
-| Apple Health | Tracking nutricional |
-| Alexa/Google Home | Control por voz |
-| Stripe | Monetización |
+| Servicio          | Caso de Uso          |
+| ----------------- | -------------------- |
+| Google Calendar   | Sincronizar menú     |
+| Rappi/Merqueo     | Compras directas     |
+| Apple Health      | Tracking nutricional |
+| Alexa/Google Home | Control por voz      |
+| Stripe            | Monetización         |
 
 ---
 
@@ -767,53 +773,53 @@ useEmployees()        // Empleados
 
 ### 12.1 Técnicas
 
-| Fortaleza | Descripción |
-|-----------|-------------|
-| **TypeScript 100%** | Type safety en todo el código |
-| **IA Avanzada** | Gemini 2.0/2.5 para texto, visión, imágenes |
-| **PWA Completa** | Funciona offline, instalable |
-| **Multi-tenant** | Sistema de roles y permisos robusto |
-| **State Moderno** | Zustand + React Query |
-| **DB Optimizada** | 40+ tablas con RLS |
-| **Tests** | Vitest configurado |
+| Fortaleza           | Descripción                                 |
+| ------------------- | ------------------------------------------- |
+| **TypeScript 100%** | Type safety en todo el código               |
+| **IA Avanzada**     | Gemini 2.0/2.5 para texto, visión, imágenes |
+| **PWA Completa**    | Funciona offline, instalable                |
+| **Multi-tenant**    | Sistema de roles y permisos robusto         |
+| **State Moderno**   | Zustand + React Query                       |
+| **DB Optimizada**   | 40+ tablas con RLS                          |
+| **Tests**           | Vitest configurado                          |
 
 ### 12.2 Funcionales
 
-| Fortaleza | Descripción |
-|-----------|-------------|
-| **Ciclo de Menú** | 12 días rotativos bien definido |
-| **Porciones** | Diferenciadas por persona |
-| **Feedback Loop** | Aprende de preferencias |
-| **Matching Inteligente** | 4 niveles de búsqueda |
-| **Sustituciones** | 90+ alternativas |
-| **Preparaciones** | 17 bases caseras reconocidas |
-| **Gestión Hogar** | 22 tipos de espacio, 88+ plantillas |
+| Fortaleza                | Descripción                         |
+| ------------------------ | ----------------------------------- |
+| **Ciclo de Menú**        | 12 días rotativos bien definido     |
+| **Porciones**            | Diferenciadas por persona           |
+| **Feedback Loop**        | Aprende de preferencias             |
+| **Matching Inteligente** | 4 niveles de búsqueda               |
+| **Sustituciones**        | 90+ alternativas                    |
+| **Preparaciones**        | 17 bases caseras reconocidas        |
+| **Gestión Hogar**        | 22 tipos de espacio, 88+ plantillas |
 
 ### 12.3 UX
 
-| Fortaleza | Descripción |
-|-----------|-------------|
-| **Mobile-first** | Optimizado para teléfono |
+| Fortaleza          | Descripción                  |
+| ------------------ | ---------------------------- |
+| **Mobile-first**   | Optimizado para teléfono     |
 | **FAB Contextual** | Acciones rápidas por sección |
-| **Chat IA Rico** | Cards, recetas, alertas |
-| **Onboarding** | Wizard guiado |
-| **Offline** | Funciona sin internet |
+| **Chat IA Rico**   | Cards, recetas, alertas      |
+| **Onboarding**     | Wizard guiado                |
+| **Offline**        | Funciona sin internet        |
 
 ---
 
 ## 13. Constantes del Sistema
 
-| Constante | Valor | Propósito |
-|-----------|-------|-----------|
-| `CYCLE_START` | 2026-01-06 (Lunes) | Inicio del ciclo de menú |
-| `CYCLE_LENGTH` | 12 días | Duración del ciclo (sin domingos) |
-| `LUIS_PORTIONS` | 3 de 5 | Porciones grandes |
-| `MARIANA_PORTIONS` | 2 de 5 | Porciones medianas |
-| `PREP_THRESHOLD` | 70% | Mínimo para preparación disponible |
-| `INGREDIENT_THRESHOLD` | 80% | Mínimo para receta "posible" |
-| `RECIPE_STYLES` | 8 tipos | Opciones de generación |
-| `INVITATION_CODE_LENGTH` | 8 caracteres | Formato: XXXX-XXXX |
-| `INVITATION_EXPIRY` | 7 días | Default de expiración |
+| Constante                | Valor              | Propósito                          |
+| ------------------------ | ------------------ | ---------------------------------- |
+| `CYCLE_START`            | 2026-01-06 (Lunes) | Inicio del ciclo de menú           |
+| `CYCLE_LENGTH`           | 12 días            | Duración del ciclo (sin domingos)  |
+| `LUIS_PORTIONS`          | 3 de 5             | Porciones grandes                  |
+| `MARIANA_PORTIONS`       | 2 de 5             | Porciones medianas                 |
+| `PREP_THRESHOLD`         | 70%                | Mínimo para preparación disponible |
+| `INGREDIENT_THRESHOLD`   | 80%                | Mínimo para receta "posible"       |
+| `RECIPE_STYLES`          | 8 tipos            | Opciones de generación             |
+| `INVITATION_CODE_LENGTH` | 8 caracteres       | Formato: XXXX-XXXX                 |
+| `INVITATION_EXPIRY`      | 7 días             | Default de expiración              |
 
 ---
 
@@ -860,18 +866,21 @@ git push origin main  # Auto-deploy a Vercel
 ## 16. Próximos Pasos Recomendados
 
 ### Corto Plazo (1-2 semanas)
+
 - [ ] Fotos de recetas (Vercel Blob)
 - [ ] Timer de cocción con notificaciones
 - [ ] Dark mode
 - [ ] Mejorar UI de escaneo de recibos
 
 ### Mediano Plazo (1-2 meses)
+
 - [ ] Invitaciones funcionando end-to-end
 - [ ] Notificaciones push configuradas
 - [ ] Gráficas de gasto/nutrición
 - [ ] Voz para seguir recetas
 
 ### Largo Plazo (3-6 meses)
+
 - [ ] App nativa (React Native/Expo)
 - [ ] Integración con supermercados
 - [ ] Marketplace de recetas
@@ -901,6 +910,6 @@ A: `createInvitation()` genera código, invitado usa `/join?code=XXXX-XXXX`.
 
 ---
 
-*Documento actualizado: 2026-01-19*
-*Versión: 2.0*
-*Para uso con Claude Code y análisis de proyecto*
+_Documento actualizado: 2026-01-19_
+_Versión: 2.0_
+_Para uso con Claude Code y análisis de proyecto_

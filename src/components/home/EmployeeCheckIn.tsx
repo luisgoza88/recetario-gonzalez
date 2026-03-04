@@ -1,12 +1,20 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
-  X, LogIn, LogOut, Clock, User, Calendar,
-  CheckCircle2, MapPin, Timer
-} from 'lucide-react';
-import { supabase } from '@/lib/supabase/client';
-import { HomeEmployee } from '@/types';
+  X,
+  LogIn,
+  LogOut,
+  Clock,
+  User,
+  Calendar,
+  CheckCircle2,
+  MapPin,
+  Timer,
+} from "lucide-react";
+import { supabase } from "@/lib/supabase/client";
+import { HomeEmployee } from "@/types";
+import Spinner from "@/components/ui/Spinner";
 
 interface EmployeeCheckInProps {
   householdId: string;
@@ -29,12 +37,12 @@ export default function EmployeeCheckIn({
   householdId,
   employees,
   onClose,
-  onUpdate
+  onUpdate,
 }: EmployeeCheckInProps) {
   const [todayRecords, setTodayRecords] = useState<CheckInRecord[]>([]);
   const [weekRecords, setWeekRecords] = useState<CheckInRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'today' | 'week'>('today');
+  const [activeTab, setActiveTab] = useState<"today" | "week">("today");
 
   useEffect(() => {
     loadRecords();
@@ -42,28 +50,28 @@ export default function EmployeeCheckIn({
 
   const loadRecords = async () => {
     setLoading(true);
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split("T")[0];
 
     // Registros de hoy
     const { data: todayData } = await supabase
-      .from('employee_checkins')
-      .select('*')
-      .eq('household_id', householdId)
-      .eq('date', today);
+      .from("employee_checkins")
+      .select("*")
+      .eq("household_id", householdId)
+      .eq("date", today);
 
     if (todayData) setTodayRecords(todayData);
 
     // Registros de la semana
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-    const weekStartStr = weekStart.toISOString().split('T')[0];
+    const weekStartStr = weekStart.toISOString().split("T")[0];
 
     const { data: weekData } = await supabase
-      .from('employee_checkins')
-      .select('*')
-      .eq('household_id', householdId)
-      .gte('date', weekStartStr)
-      .order('date', { ascending: false });
+      .from("employee_checkins")
+      .select("*")
+      .eq("household_id", householdId)
+      .gte("date", weekStartStr)
+      .order("date", { ascending: false });
 
     if (weekData) setWeekRecords(weekData);
 
@@ -71,14 +79,17 @@ export default function EmployeeCheckIn({
   };
 
   const checkIn = async (employeeId: string) => {
-    const today = new Date().toISOString().split('T')[0];
-    const now = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const today = new Date().toISOString().split("T")[0];
+    const now = new Date().toLocaleTimeString("es-ES", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
 
-    await supabase.from('employee_checkins').insert({
+    await supabase.from("employee_checkins").insert({
       household_id: householdId,
       employee_id: employeeId,
       date: today,
-      check_in_time: now
+      check_in_time: now,
     });
 
     loadRecords();
@@ -86,33 +97,36 @@ export default function EmployeeCheckIn({
   };
 
   const checkOut = async (recordId: string, checkInTime: string) => {
-    const now = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const now = new Date().toLocaleTimeString("es-ES", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
 
     // Calcular horas trabajadas
-    const [inH, inM] = checkInTime.split(':').map(Number);
-    const [outH, outM] = now.split(':').map(Number);
-    const totalMinutes = (outH * 60 + outM) - (inH * 60 + inM);
-    const totalHours = Math.round(totalMinutes / 60 * 10) / 10;
+    const [inH, inM] = checkInTime.split(":").map(Number);
+    const [outH, outM] = now.split(":").map(Number);
+    const totalMinutes = outH * 60 + outM - (inH * 60 + inM);
+    const totalHours = Math.round((totalMinutes / 60) * 10) / 10;
 
     await supabase
-      .from('employee_checkins')
+      .from("employee_checkins")
       .update({
         check_out_time: now,
-        total_hours: totalHours
+        total_hours: totalHours,
       })
-      .eq('id', recordId);
+      .eq("id", recordId);
 
     loadRecords();
     onUpdate();
   };
 
   const getEmployeeRecord = (employeeId: string) => {
-    return todayRecords.find(r => r.employee_id === employeeId);
+    return todayRecords.find((r) => r.employee_id === employeeId);
   };
 
   const getWeeklyHours = (employeeId: string) => {
     return weekRecords
-      .filter(r => r.employee_id === employeeId && r.total_hours)
+      .filter((r) => r.employee_id === employeeId && r.total_hours)
       .reduce((sum, r) => sum + (r.total_hours || 0), 0);
   };
 
@@ -129,7 +143,10 @@ export default function EmployeeCheckIn({
             <Clock size={20} />
             <span className="font-semibold">Control de Asistencia</span>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg">
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-white/20 rounded-lg"
+          >
             <X size={20} />
           </button>
         </div>
@@ -137,21 +154,21 @@ export default function EmployeeCheckIn({
         {/* Tabs */}
         <div className="flex border-b">
           <button
-            onClick={() => setActiveTab('today')}
+            onClick={() => setActiveTab("today")}
             className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'today'
-                ? 'border-teal-600 text-teal-600'
-                : 'border-transparent text-gray-500'
+              activeTab === "today"
+                ? "border-teal-600 text-teal-600"
+                : "border-transparent text-gray-500"
             }`}
           >
             Hoy
           </button>
           <button
-            onClick={() => setActiveTab('week')}
+            onClick={() => setActiveTab("week")}
             className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'week'
-                ? 'border-teal-600 text-teal-600'
-                : 'border-transparent text-gray-500'
+              activeTab === "week"
+                ? "border-teal-600 text-teal-600"
+                : "border-transparent text-gray-500"
             }`}
           >
             Esta Semana
@@ -161,12 +178,12 @@ export default function EmployeeCheckIn({
         <div className="flex-1 overflow-y-auto p-4">
           {loading ? (
             <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto" />
+              <Spinner size="lg" color="teal" className="mx-auto" />
             </div>
-          ) : activeTab === 'today' ? (
+          ) : activeTab === "today" ? (
             // Today's Check-ins
             <div className="space-y-3">
-              {employees.map(emp => {
+              {employees.map((emp) => {
                 const record = getEmployeeRecord(emp.id);
                 const isCheckedIn = record && !record.check_out_time;
                 const isCheckedOut = record && record.check_out_time;
@@ -176,21 +193,32 @@ export default function EmployeeCheckIn({
                     key={emp.id}
                     className={`rounded-xl p-4 border-2 ${
                       isCheckedIn
-                        ? 'border-green-300 bg-green-50'
+                        ? "border-green-300 bg-green-50"
                         : isCheckedOut
-                        ? 'border-gray-200 bg-gray-50'
-                        : 'border-gray-200'
+                          ? "border-gray-200 bg-gray-50"
+                          : "border-gray-200"
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                        emp.zone === 'interior' ? 'bg-blue-100' :
-                        emp.zone === 'exterior' ? 'bg-green-100' : 'bg-purple-100'
-                      }`}>
-                        <User size={24} className={
-                          emp.zone === 'interior' ? 'text-blue-600' :
-                          emp.zone === 'exterior' ? 'text-green-600' : 'text-purple-600'
-                        } />
+                      <div
+                        className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                          emp.zone === "interior"
+                            ? "bg-blue-100"
+                            : emp.zone === "exterior"
+                              ? "bg-green-100"
+                              : "bg-purple-100"
+                        }`}
+                      >
+                        <User
+                          size={24}
+                          className={
+                            emp.zone === "interior"
+                              ? "text-blue-600"
+                              : emp.zone === "exterior"
+                                ? "text-green-600"
+                                : "text-purple-600"
+                          }
+                        />
                       </div>
 
                       <div className="flex-1">
@@ -206,7 +234,8 @@ export default function EmployeeCheckIn({
                         {record && (
                           <p className="text-sm text-gray-500">
                             Entrada: {formatTime(record.check_in_time)}
-                            {record.check_out_time && ` • Salida: ${formatTime(record.check_out_time)}`}
+                            {record.check_out_time &&
+                              ` • Salida: ${formatTime(record.check_out_time)}`}
                             {record.total_hours && ` • ${record.total_hours}h`}
                           </p>
                         )}
@@ -223,7 +252,9 @@ export default function EmployeeCheckIn({
                         </button>
                       ) : isCheckedIn ? (
                         <button
-                          onClick={() => checkOut(record.id, record.check_in_time)}
+                          onClick={() =>
+                            checkOut(record.id, record.check_in_time)
+                          }
                           className="px-4 py-2 bg-red-500 text-white rounded-lg font-medium flex items-center gap-2 hover:bg-red-600"
                         >
                           <LogOut size={18} />
@@ -247,7 +278,10 @@ export default function EmployeeCheckIn({
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-teal-50 rounded-xl p-4">
                   <div className="text-2xl font-bold text-teal-700">
-                    {weekRecords.reduce((sum, r) => sum + (r.total_hours || 0), 0).toFixed(1)}h
+                    {weekRecords
+                      .reduce((sum, r) => sum + (r.total_hours || 0), 0)
+                      .toFixed(1)}
+                    h
                   </div>
                   <p className="text-sm text-teal-600">Total horas</p>
                 </div>
@@ -262,23 +296,36 @@ export default function EmployeeCheckIn({
               {/* Per Employee */}
               <h4 className="font-semibold text-gray-700 mt-4">Por Empleado</h4>
               <div className="space-y-2">
-                {employees.map(emp => {
+                {employees.map((emp) => {
                   const weeklyHours = getWeeklyHours(emp.id);
-                  const expectedHours = (emp.work_days?.length || 0) * emp.hours_per_day;
-                  const progress = expectedHours > 0 ? (weeklyHours / expectedHours) * 100 : 0;
+                  const expectedHours =
+                    (emp.work_days?.length || 0) * emp.hours_per_day;
+                  const progress =
+                    expectedHours > 0 ? (weeklyHours / expectedHours) * 100 : 0;
 
                   return (
                     <div key={emp.id} className="bg-gray-50 rounded-xl p-4">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                            emp.zone === 'interior' ? 'bg-blue-100' :
-                            emp.zone === 'exterior' ? 'bg-green-100' : 'bg-purple-100'
-                          }`}>
-                            <User size={16} className={
-                              emp.zone === 'interior' ? 'text-blue-600' :
-                              emp.zone === 'exterior' ? 'text-green-600' : 'text-purple-600'
-                            } />
+                          <div
+                            className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                              emp.zone === "interior"
+                                ? "bg-blue-100"
+                                : emp.zone === "exterior"
+                                  ? "bg-green-100"
+                                  : "bg-purple-100"
+                            }`}
+                          >
+                            <User
+                              size={16}
+                              className={
+                                emp.zone === "interior"
+                                  ? "text-blue-600"
+                                  : emp.zone === "exterior"
+                                    ? "text-green-600"
+                                    : "text-purple-600"
+                              }
+                            />
                           </div>
                           <span className="font-medium">{emp.name}</span>
                         </div>
@@ -301,24 +348,37 @@ export default function EmployeeCheckIn({
               </div>
 
               {/* Daily Breakdown */}
-              <h4 className="font-semibold text-gray-700 mt-4">Detalle por Día</h4>
+              <h4 className="font-semibold text-gray-700 mt-4">
+                Detalle por Día
+              </h4>
               <div className="space-y-2">
-                {weekRecords.map(record => {
-                  const emp = employees.find(e => e.id === record.employee_id);
+                {weekRecords.map((record) => {
+                  const emp = employees.find(
+                    (e) => e.id === record.employee_id,
+                  );
                   return (
-                    <div key={record.id} className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                    <div
+                      key={record.id}
+                      className="flex items-center justify-between p-3 bg-white rounded-lg border"
+                    >
                       <div>
                         <p className="font-medium text-sm">{emp?.name}</p>
                         <p className="text-xs text-gray-500">
-                          {new Date(record.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' })}
+                          {new Date(record.date).toLocaleDateString("es-ES", {
+                            weekday: "short",
+                            day: "numeric",
+                          })}
                         </p>
                       </div>
                       <div className="text-right">
                         <p className="text-sm">
-                          {record.check_in_time} - {record.check_out_time || '...'}
+                          {record.check_in_time} -{" "}
+                          {record.check_out_time || "..."}
                         </p>
                         {record.total_hours && (
-                          <p className="text-xs text-teal-600 font-medium">{record.total_hours}h</p>
+                          <p className="text-xs text-teal-600 font-medium">
+                            {record.total_hours}h
+                          </p>
                         )}
                       </div>
                     </div>

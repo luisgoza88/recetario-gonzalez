@@ -1,18 +1,27 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
-  AlertTriangle, ShoppingCart, Calendar, Lightbulb,
-  ChevronRight, X, Clock, Sparkles
-} from 'lucide-react';
-import { supabase } from '@/lib/supabase/client';
-import { Recipe, MarketItem } from '@/types';
-import { loadCurrentInventory, checkRecipeIngredients } from '@/lib/inventory-check';
+  AlertTriangle,
+  ShoppingCart,
+  Calendar,
+  Lightbulb,
+  ChevronRight,
+  X,
+  Clock,
+  Sparkles,
+} from "lucide-react";
+import { supabase } from "@/lib/supabase/client";
+import { Recipe, MarketItem } from "@/types";
+import {
+  loadCurrentInventory,
+  checkRecipeIngredients,
+} from "@/lib/inventory-check";
 
 interface Alert {
   id: string;
-  type: 'missing_ingredients' | 'low_inventory' | 'suggestion' | 'reminder';
-  priority: 'high' | 'medium' | 'low';
+  type: "missing_ingredients" | "low_inventory" | "suggestion" | "reminder";
+  priority: "high" | "medium" | "low";
   title: string;
   message: string;
   action?: {
@@ -31,11 +40,13 @@ interface ProactiveAlertsProps {
 export default function ProactiveAlerts({
   onNavigateToMarket,
   onNavigateToSuggestions,
-  compact = false
+  compact = false,
 }: ProactiveAlertsProps) {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(
+    new Set(),
+  );
 
   useEffect(() => {
     generateAlerts();
@@ -60,11 +71,13 @@ export default function ProactiveAlerts({
 
       // Ordenar por prioridad
       const priorityOrder = { high: 0, medium: 1, low: 2 };
-      newAlerts.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+      newAlerts.sort(
+        (a, b) => priorityOrder[a.priority] - priorityOrder[b.priority],
+      );
 
       setAlerts(newAlerts);
     } catch (error) {
-      console.error('Error generating alerts:', error);
+      console.error("Error generating alerts:", error);
     } finally {
       setLoading(false);
     }
@@ -83,8 +96,10 @@ export default function ProactiveAlerts({
         return alerts;
       }
 
-      const startDate = new Date('2025-01-06');
-      const diffDays = Math.floor((tomorrow.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const startDate = new Date("2025-01-06");
+      const diffDays = Math.floor(
+        (tomorrow.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+      );
 
       let sundays = 0;
       const tempDate = new Date(startDate);
@@ -98,21 +113,27 @@ export default function ProactiveAlerts({
 
       // Cargar menú de mañana
       const { data: menuData } = await supabase
-        .from('day_menu')
-        .select(`
+        .from("day_menu")
+        .select(
+          `
           *,
           breakfast:recipes!day_menu_breakfast_id_fkey(*),
           lunch:recipes!day_menu_lunch_id_fkey(*),
           dinner:recipes!day_menu_dinner_id_fkey(*)
-        `)
-        .eq('day_number', dayNumber)
+        `,
+        )
+        .eq("day_number", dayNumber)
         .single();
 
       if (!menuData) return alerts;
 
       // Usar el sistema robusto de inventory-check
       const inventory = await loadCurrentInventory();
-      const recipes = [menuData.breakfast, menuData.lunch, menuData.dinner].filter(Boolean) as Recipe[];
+      const recipes = [
+        menuData.breakfast,
+        menuData.lunch,
+        menuData.dinner,
+      ].filter(Boolean) as Recipe[];
 
       // Verificar cada receta con el sistema de matching robusto
       const allMissing: string[] = [];
@@ -121,7 +142,7 @@ export default function ProactiveAlerts({
         const availability = await checkRecipeIngredients(recipe, inventory);
 
         // Agregar ingredientes faltantes (sin duplicados)
-        availability.missingIngredients.forEach(ing => {
+        availability.missingIngredients.forEach((ing) => {
           if (!allMissing.includes(ing.name)) {
             allMissing.push(ing.name);
           }
@@ -130,20 +151,20 @@ export default function ProactiveAlerts({
 
       if (allMissing.length > 0) {
         alerts.push({
-          id: 'tomorrow-ingredients',
-          type: 'missing_ingredients',
-          priority: allMissing.length > 3 ? 'high' : 'medium',
-          title: `${allMissing.length} ingrediente${allMissing.length > 1 ? 's' : ''} para mañana`,
-          message: `Faltan: ${allMissing.slice(0, 3).join(', ')}${allMissing.length > 3 ? ` y ${allMissing.length - 3} más` : ''}`,
+          id: "tomorrow-ingredients",
+          type: "missing_ingredients",
+          priority: allMissing.length > 3 ? "high" : "medium",
+          title: `${allMissing.length} ingrediente${allMissing.length > 1 ? "s" : ""} para mañana`,
+          message: `Faltan: ${allMissing.slice(0, 3).join(", ")}${allMissing.length > 3 ? ` y ${allMissing.length - 3} más` : ""}`,
           action: {
-            label: 'Ver lista',
-            onClick: onNavigateToMarket
+            label: "Ver lista",
+            onClick: onNavigateToMarket,
           },
-          data: { missing: allMissing }
+          data: { missing: allMissing },
         });
       }
     } catch (error) {
-      console.error('Error checking tomorrow ingredients:', error);
+      console.error("Error checking tomorrow ingredients:", error);
     }
 
     return alerts;
@@ -155,14 +176,16 @@ export default function ProactiveAlerts({
     try {
       // Buscar items con inventario bajo o cero que estén marcados como frecuentes
       const { data: lowItems } = await supabase
-        .from('market_items')
-        .select(`
+        .from("market_items")
+        .select(
+          `
           id, name, category,
           inventory!left(current_number)
-        `)
-        .in('category', ['Proteínas Premium', 'Lácteos', 'Vegetales']);
+        `,
+        )
+        .in("category", ["Proteínas Premium", "Lácteos", "Vegetales"]);
 
-      const itemsNeeded = (lowItems || []).filter(item => {
+      const itemsNeeded = (lowItems || []).filter((item) => {
         const qty = item.inventory?.[0]?.current_number || 0;
         return qty === 0;
       });
@@ -170,20 +193,20 @@ export default function ProactiveAlerts({
       if (itemsNeeded.length > 0) {
         const essentialItems = itemsNeeded.slice(0, 5);
         alerts.push({
-          id: 'low-inventory',
-          type: 'low_inventory',
-          priority: itemsNeeded.length > 5 ? 'high' : 'medium',
-          title: 'Despensa con faltantes',
-          message: `${essentialItems.map(i => i.name).join(', ')}${itemsNeeded.length > 5 ? ` y ${itemsNeeded.length - 5} más` : ''}`,
+          id: "low-inventory",
+          type: "low_inventory",
+          priority: itemsNeeded.length > 5 ? "high" : "medium",
+          title: "Despensa con faltantes",
+          message: `${essentialItems.map((i) => i.name).join(", ")}${itemsNeeded.length > 5 ? ` y ${itemsNeeded.length - 5} más` : ""}`,
           action: {
-            label: 'Ir al mercado',
-            onClick: onNavigateToMarket
+            label: "Ir al mercado",
+            onClick: onNavigateToMarket,
           },
-          data: { items: itemsNeeded }
+          data: { items: itemsNeeded },
         });
       }
     } catch (error) {
-      console.error('Error checking inventory:', error);
+      console.error("Error checking inventory:", error);
     }
 
     return alerts;
@@ -194,35 +217,35 @@ export default function ProactiveAlerts({
 
     try {
       const { count } = await supabase
-        .from('adjustment_suggestions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
+        .from("adjustment_suggestions")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "pending");
 
       if (count && count > 0) {
         alerts.push({
-          id: 'pending-suggestions',
-          type: 'suggestion',
-          priority: 'low',
-          title: `${count} sugerencia${count > 1 ? 's' : ''} de ajuste`,
-          message: 'La IA tiene recomendaciones para mejorar tus porciones',
+          id: "pending-suggestions",
+          type: "suggestion",
+          priority: "low",
+          title: `${count} sugerencia${count > 1 ? "s" : ""} de ajuste`,
+          message: "La IA tiene recomendaciones para mejorar tus porciones",
           action: {
-            label: 'Ver sugerencias',
-            onClick: onNavigateToSuggestions
-          }
+            label: "Ver sugerencias",
+            onClick: onNavigateToSuggestions,
+          },
         });
       }
     } catch (error) {
-      console.error('Error checking suggestions:', error);
+      console.error("Error checking suggestions:", error);
     }
 
     return alerts;
   };
 
   const dismissAlert = (alertId: string) => {
-    setDismissedAlerts(prev => new Set(prev).add(alertId));
+    setDismissedAlerts((prev) => new Set(prev).add(alertId));
   };
 
-  const visibleAlerts = alerts.filter(a => !dismissedAlerts.has(a.id));
+  const visibleAlerts = alerts.filter((a) => !dismissedAlerts.has(a.id));
 
   if (loading) {
     return (
@@ -236,41 +259,41 @@ export default function ProactiveAlerts({
     return null;
   }
 
-  const getPriorityStyles = (priority: Alert['priority']) => {
+  const getPriorityStyles = (priority: Alert["priority"]) => {
     switch (priority) {
-      case 'high':
+      case "high":
         return {
-          bg: 'bg-red-50',
-          border: 'border-red-200',
-          icon: 'text-red-500',
-          text: 'text-red-800'
+          bg: "bg-red-50",
+          border: "border-red-200",
+          icon: "text-red-500",
+          text: "text-red-800",
         };
-      case 'medium':
+      case "medium":
         return {
-          bg: 'bg-orange-50',
-          border: 'border-orange-200',
-          icon: 'text-orange-500',
-          text: 'text-orange-800'
+          bg: "bg-orange-50",
+          border: "border-orange-200",
+          icon: "text-orange-500",
+          text: "text-orange-800",
         };
       default:
         return {
-          bg: 'bg-blue-50',
-          border: 'border-blue-200',
-          icon: 'text-blue-500',
-          text: 'text-blue-800'
+          bg: "bg-blue-50",
+          border: "border-blue-200",
+          icon: "text-blue-500",
+          text: "text-blue-800",
         };
     }
   };
 
-  const getAlertIcon = (type: Alert['type']) => {
+  const getAlertIcon = (type: Alert["type"]) => {
     switch (type) {
-      case 'missing_ingredients':
+      case "missing_ingredients":
         return <ShoppingCart size={18} />;
-      case 'low_inventory':
+      case "low_inventory":
         return <AlertTriangle size={18} />;
-      case 'suggestion':
+      case "suggestion":
         return <Lightbulb size={18} />;
-      case 'reminder':
+      case "reminder":
         return <Clock size={18} />;
       default:
         return <Sparkles size={18} />;
@@ -280,7 +303,7 @@ export default function ProactiveAlerts({
   if (compact) {
     return (
       <div className="space-y-2">
-        {visibleAlerts.slice(0, 2).map(alert => {
+        {visibleAlerts.slice(0, 2).map((alert) => {
           const styles = getPriorityStyles(alert.priority);
           return (
             <button
@@ -290,7 +313,9 @@ export default function ProactiveAlerts({
             >
               <span className={styles.icon}>{getAlertIcon(alert.type)}</span>
               <div className="flex-1 min-w-0">
-                <p className={`text-sm font-medium ${styles.text} truncate`}>{alert.title}</p>
+                <p className={`text-sm font-medium ${styles.text} truncate`}>
+                  {alert.title}
+                </p>
               </div>
               <ChevronRight size={16} className={styles.icon} />
             </button>
@@ -298,7 +323,8 @@ export default function ProactiveAlerts({
         })}
         {visibleAlerts.length > 2 && (
           <p className="text-xs text-gray-500 text-center">
-            +{visibleAlerts.length - 2} alerta{visibleAlerts.length - 2 > 1 ? 's' : ''} más
+            +{visibleAlerts.length - 2} alerta
+            {visibleAlerts.length - 2 > 1 ? "s" : ""} más
           </p>
         )}
       </div>
@@ -313,7 +339,7 @@ export default function ProactiveAlerts({
       </div>
 
       <div className="space-y-2">
-        {visibleAlerts.map(alert => {
+        {visibleAlerts.map((alert) => {
           const styles = getPriorityStyles(alert.priority);
           return (
             <div

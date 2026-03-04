@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useEffect, useRef } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
-import analytics from './index';
+import { useEffect, useRef } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import analytics from "./index";
 
 interface AnalyticsProviderProps {
   children: React.ReactNode;
@@ -12,17 +12,20 @@ interface AnalyticsProviderProps {
  * Provider que inicializa y gestiona analytics
  * Debe envolver la aplicación en el layout principal
  */
-export default function AnalyticsProvider({ children }: AnalyticsProviderProps) {
+export default function AnalyticsProvider({
+  children,
+}: AnalyticsProviderProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const initializedRef = useRef(false);
 
-  // Inicializar analytics una sola vez
+  // Inicializar analytics una sola vez (lazy: posthog se carga async)
   useEffect(() => {
     if (!initializedRef.current) {
-      analytics.init();
-      analytics.sessionStart();
       initializedRef.current = true;
+      analytics.init().then(() => {
+        analytics.sessionStart();
+      });
     }
   }, []);
 
@@ -31,20 +34,22 @@ export default function AnalyticsProvider({ children }: AnalyticsProviderProps) 
     if (!initializedRef.current) return;
 
     // Construir URL actual
-    const url = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : '');
+    const url =
+      pathname + (searchParams.toString() ? `?${searchParams.toString()}` : "");
 
     // Mapear rutas a nombres legibles
     const pageNames: Record<string, string> = {
-      '/': 'home',
-      '/onboarding': 'onboarding',
-      '/auth/login': 'login',
-      '/auth/register': 'register',
-      '/join': 'join_household',
+      "/": "home",
+      "/onboarding": "onboarding",
+      "/auth/login": "login",
+      "/auth/register": "register",
+      "/join": "join_household",
     };
 
-    const pageName = pageNames[pathname] || pathname.replace(/\//g, '_').slice(1) || 'home';
+    const pageName =
+      pageNames[pathname] || pathname.replace(/\//g, "_").slice(1) || "home";
 
-    analytics.track('feature_discovered', {
+    analytics.track("feature_discovered", {
       feature_name: `pageview_${pageName}`,
     });
   }, [pathname, searchParams]);

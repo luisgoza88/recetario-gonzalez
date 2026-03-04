@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { Mail, ChefHat, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState } from "react";
+import Link from "next/link";
+import { Mail, ChefHat, AlertCircle, CheckCircle2 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function ForgotPasswordPage() {
   const { resetPassword } = useAuth();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -17,7 +17,7 @@ export default function ForgotPasswordPage() {
     setError(null);
 
     if (!email.trim()) {
-      setError('Por favor ingresa tu email');
+      setError("Por favor ingresa tu email");
       return;
     }
 
@@ -40,8 +40,12 @@ export default function ForgotPasswordPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-green-600 rounded-full mb-4">
             <ChefHat className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">Recuperar contrasena</h1>
-          <p className="text-gray-600 mt-1">Te enviaremos un enlace para restablecerla</p>
+          <h1 className="text-2xl font-bold text-gray-800">
+            Recuperar contrasena
+          </h1>
+          <p className="text-gray-600 mt-1">
+            Te enviaremos un enlace para restablecerla
+          </p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8">
@@ -50,9 +54,12 @@ export default function ForgotPasswordPage() {
               <div className="inline-flex items-center justify-center w-14 h-14 bg-green-100 rounded-full mb-4">
                 <CheckCircle2 className="w-7 h-7 text-green-600" />
               </div>
-              <h2 className="text-xl font-semibold text-gray-800 mb-2">Email enviado</h2>
+              <h2 className="text-xl font-semibold text-gray-800 mb-2">
+                Email enviado
+              </h2>
               <p className="text-gray-600 mb-6">
-                Revisa tu bandeja de entrada y abre el enlace para cambiar tu contrasena.
+                Revisa tu bandeja de entrada y abre el enlace para cambiar tu
+                contrasena.
               </p>
               <Link
                 href="/auth/login"
@@ -92,15 +99,18 @@ export default function ForgotPasswordPage() {
                 disabled={isSubmitting}
                 className="w-full py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 focus:ring-4 focus:ring-green-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSubmitting ? 'Enviando...' : 'Enviar enlace de recuperacion'}
+                {isSubmitting ? "Enviando..." : "Enviar enlace de recuperacion"}
               </button>
             </form>
           )}
 
           {!success && (
             <p className="mt-6 text-center text-gray-600">
-              Recordaste tu contrasena?{' '}
-              <Link href="/auth/login" className="text-green-600 font-semibold hover:text-green-700">
+              Recordaste tu contrasena?{" "}
+              <Link
+                href="/auth/login"
+                className="text-green-600 font-semibold hover:text-green-700"
+              >
                 Inicia sesion
               </Link>
             </p>

@@ -5,8 +5,8 @@
  * de acciones de IA con soporte para rollback.
  */
 
-import { SupabaseClient } from '@supabase/supabase-js';
-import { createAuthenticatedClient } from '@/lib/supabase/server';
+import { SupabaseClient } from "@supabase/supabase-js";
+import { createAuthenticatedClient } from "@/lib/supabase/server";
 import {
   AIRiskLevel,
   AIFunctionConfig,
@@ -18,7 +18,7 @@ import {
   AI_RISK_LEVELS,
   ProposalExecutionResult,
   RollbackResult,
-} from '@/types';
+} from "@/types";
 import {
   checkAutoApproval,
   checkRateLimit,
@@ -29,8 +29,8 @@ import {
   getTrustStats,
   TrustDecision,
   RateLimitCheck,
-} from './trust-service';
-import { logger } from '@/lib/logger';
+} from "./trust-service";
+import { logger } from "@/lib/logger";
 
 async function getClient(): Promise<SupabaseClient> {
   return createAuthenticatedClient();
@@ -47,7 +47,9 @@ const CONFIG_CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 /**
  * Obtiene la configuración de riesgo de una función
  */
-export async function getFunctionConfig(functionName: string): Promise<AIFunctionConfig | null> {
+export async function getFunctionConfig(
+  functionName: string,
+): Promise<AIFunctionConfig | null> {
   // Verificar cache
   if (functionConfigCache && Date.now() < configCacheExpiry) {
     return functionConfigCache.get(functionName) || null;
@@ -56,12 +58,14 @@ export async function getFunctionConfig(functionName: string): Promise<AIFunctio
   // Cargar todas las configuraciones
   const db = await getClient();
   const { data, error } = await db
-    .from('ai_function_registry')
-    .select('*')
-    .eq('is_enabled', true);
+    .from("ai_function_registry")
+    .select("*")
+    .eq("is_enabled", true);
 
   if (error) {
-    logger.error('Error loading function configs', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error loading function configs", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 
@@ -80,10 +84,19 @@ export async function getFunctionConfig(functionName: string): Promise<AIFunctio
  * Las funciones de lectura (get_*, search_*, suggest_*, list_*, calculate_*) siempre son LOW
  * Retorna nivel 2 (medium) por defecto para funciones de escritura si no se encuentra config
  */
-export async function getFunctionRiskLevel(functionName: string): Promise<AIRiskLevel> {
+export async function getFunctionRiskLevel(
+  functionName: string,
+): Promise<AIRiskLevel> {
   // Funciones de solo lectura siempre son de bajo riesgo
-  const readOnlyPrefixes = ['get_', 'search_', 'suggest_', 'list_', 'calculate_', 'execute_multi_step_task'];
-  if (readOnlyPrefixes.some(prefix => functionName.startsWith(prefix))) {
+  const readOnlyPrefixes = [
+    "get_",
+    "search_",
+    "suggest_",
+    "list_",
+    "calculate_",
+    "execute_multi_step_task",
+  ];
+  if (readOnlyPrefixes.some((prefix) => functionName.startsWith(prefix))) {
     return AI_RISK_LEVELS.LOW as AIRiskLevel;
   }
 
@@ -94,7 +107,9 @@ export async function getFunctionRiskLevel(functionName: string): Promise<AIRisk
 /**
  * Verifica si una función requiere confirmación
  */
-export async function requiresConfirmation(functionName: string): Promise<boolean> {
+export async function requiresConfirmation(
+  functionName: string,
+): Promise<boolean> {
   const config = await getFunctionConfig(functionName);
   return config?.requires_confirmation ?? false;
 }
@@ -114,16 +129,20 @@ export async function isReversible(functionName: string): Promise<boolean> {
 /**
  * Obtiene la configuración de trust de un household
  */
-export async function getHouseholdTrust(householdId: string): Promise<HouseholdAITrust | null> {
+export async function getHouseholdTrust(
+  householdId: string,
+): Promise<HouseholdAITrust | null> {
   const db = await getClient();
   const { data, error } = await db
-    .from('household_ai_trust')
-    .select('*')
-    .eq('household_id', householdId)
+    .from("household_ai_trust")
+    .select("*")
+    .eq("household_id", householdId)
     .single();
 
   if (error) {
-    logger.error('Error getting household trust', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error getting household trust", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 
@@ -137,7 +156,7 @@ export async function getHouseholdTrust(householdId: string): Promise<HouseholdA
 export async function shouldAutoApprove(
   householdId: string,
   riskLevel: AIRiskLevel,
-  actionCount: number = 1
+  actionCount: number = 1,
 ): Promise<boolean> {
   // Use the enhanced trust service for decision making
   const decision = await checkAutoApproval(householdId, riskLevel, actionCount);
@@ -150,7 +169,7 @@ export async function shouldAutoApprove(
 export async function checkAutoApprovalWithDetails(
   householdId: string,
   riskLevel: AIRiskLevel,
-  actionCount: number = 1
+  actionCount: number = 1,
 ): Promise<TrustDecision> {
   return await checkAutoApproval(householdId, riskLevel, actionCount);
 }
@@ -161,7 +180,7 @@ export async function checkAutoApprovalWithDetails(
 export async function checkActionRateLimit(
   householdId: string,
   riskLevel: AIRiskLevel,
-  actionCount: number = 1
+  actionCount: number = 1,
 ): Promise<RateLimitCheck> {
   return await checkRateLimit(householdId, riskLevel, actionCount);
 }
@@ -171,7 +190,7 @@ export async function checkActionRateLimit(
  */
 export async function checkBulkOperationLimit(
   householdId: string,
-  itemCount: number
+  itemCount: number,
 ): Promise<{ allowed: boolean; reason?: string; limit?: number }> {
   return await checkBulkLimit(householdId, itemCount);
 }
@@ -181,7 +200,7 @@ export async function checkBulkOperationLimit(
  */
 export async function recordActionOutcome(
   householdId: string,
-  success: boolean
+  success: boolean,
 ): Promise<void> {
   if (success) {
     await recordSuccessfulAction(householdId);
@@ -219,7 +238,7 @@ export async function createAuditLog(params: {
   riskLevel: AIRiskLevel;
 }): Promise<string | null> {
   const db = await getClient();
-  const { data, error } = await db.rpc('create_ai_audit_log', {
+  const { data, error } = await db.rpc("create_ai_audit_log", {
     p_household_id: params.householdId,
     p_user_id: params.userId,
     p_session_id: params.sessionId,
@@ -229,7 +248,9 @@ export async function createAuditLog(params: {
   });
 
   if (error) {
-    logger.error('Error creating audit log', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error creating audit log", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 
@@ -241,7 +262,7 @@ export async function createAuditLog(params: {
  */
 export async function completeAuditLog(params: {
   logId: string;
-  status: 'completed' | 'failed';
+  status: "completed" | "failed";
   result?: Record<string, unknown>;
   previousState?: Record<string, unknown>;
   newState?: Record<string, unknown>;
@@ -250,7 +271,7 @@ export async function completeAuditLog(params: {
   errorMessage?: string;
 }): Promise<boolean> {
   const db = await getClient();
-  const { error } = await db.rpc('complete_ai_audit_log', {
+  const { error } = await db.rpc("complete_ai_audit_log", {
     p_log_id: params.logId,
     p_status: params.status,
     p_result: params.result || null,
@@ -262,7 +283,9 @@ export async function completeAuditLog(params: {
   });
 
   if (error) {
-    logger.error('Error completing audit log', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error completing audit log", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return false;
   }
 
@@ -274,20 +297,22 @@ export async function completeAuditLog(params: {
  */
 export async function getRecentAuditLogs(
   householdId: string,
-  limit: number = 10
+  limit: number = 10,
 ): Promise<AIAuditLog[]> {
   const db = await getClient();
   const { data, error } = await db
-    .from('ai_audit_log')
-    .select('*')
-    .eq('household_id', householdId)
-    .eq('status', 'completed')
-    .not('previous_state', 'is', null)
-    .order('executed_at', { ascending: false })
+    .from("ai_audit_log")
+    .select("*")
+    .eq("household_id", householdId)
+    .eq("status", "completed")
+    .not("previous_state", "is", null)
+    .order("executed_at", { ascending: false })
     .limit(limit);
 
   if (error) {
-    logger.error('Error getting recent audit logs', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error getting recent audit logs", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return [];
   }
 
@@ -310,26 +335,31 @@ export async function createProposal(params: {
 }): Promise<AIProposal | null> {
   // Calcular el nivel de riesgo máximo de las acciones
   const maxRiskLevel = Math.max(
-    ...params.actions.map(a => a.risk_level)
+    ...params.actions.map((a) => a.risk_level),
   ) as AIRiskLevel;
 
   // Calcular tablas afectadas
-  const tablesAffected = [...new Set(
-    params.actions.flatMap(a => {
-      // Inferir tablas basado en el nombre de la función
-      const fnName = a.function_name.toLowerCase();
-      if (fnName.includes('recipe') || fnName.includes('menu')) return ['recipes', 'day_menu'];
-      if (fnName.includes('inventory') || fnName.includes('shopping')) return ['inventory', 'market_checklist'];
-      if (fnName.includes('task')) return ['scheduled_tasks', 'task_templates'];
-      if (fnName.includes('employee')) return ['home_employees'];
-      if (fnName.includes('space')) return ['spaces'];
-      return ['unknown'];
-    })
-  )];
+  const tablesAffected = [
+    ...new Set(
+      params.actions.flatMap((a) => {
+        // Inferir tablas basado en el nombre de la función
+        const fnName = a.function_name.toLowerCase();
+        if (fnName.includes("recipe") || fnName.includes("menu"))
+          return ["recipes", "day_menu"];
+        if (fnName.includes("inventory") || fnName.includes("shopping"))
+          return ["inventory", "market_checklist"];
+        if (fnName.includes("task"))
+          return ["scheduled_tasks", "task_templates"];
+        if (fnName.includes("employee")) return ["home_employees"];
+        if (fnName.includes("space")) return ["spaces"];
+        return ["unknown"];
+      }),
+    ),
+  ];
 
   const db = await getClient();
   const { data, error } = await db
-    .from('ai_action_queue')
+    .from("ai_action_queue")
     .insert({
       household_id: params.householdId,
       user_id: params.userId,
@@ -339,13 +369,15 @@ export async function createProposal(params: {
       actions: params.actions,
       tables_affected: tablesAffected,
       records_affected: params.actions.length,
-      status: 'pending' as AIProposalStatus,
+      status: "pending" as AIProposalStatus,
     })
     .select()
     .single();
 
   if (error) {
-    logger.error('Error creating proposal', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error creating proposal", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 
@@ -355,16 +387,20 @@ export async function createProposal(params: {
 /**
  * Obtiene una propuesta por su ID
  */
-export async function getProposal(proposalId: string): Promise<AIProposal | null> {
+export async function getProposal(
+  proposalId: string,
+): Promise<AIProposal | null> {
   const db = await getClient();
   const { data, error } = await db
-    .from('ai_action_queue')
-    .select('*')
-    .eq('proposal_id', proposalId)
+    .from("ai_action_queue")
+    .select("*")
+    .eq("proposal_id", proposalId)
     .single();
 
   if (error) {
-    logger.error('Error getting proposal', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error getting proposal", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 
@@ -377,18 +413,20 @@ export async function getProposal(proposalId: string): Promise<AIProposal | null
 export async function approveProposal(
   proposalId: string,
   userId: string,
-  notes?: string
+  notes?: string,
 ): Promise<boolean> {
   const db = await getClient();
-  const { error } = await db.rpc('decide_ai_proposal', {
+  const { error } = await db.rpc("decide_ai_proposal", {
     p_proposal_id: proposalId,
-    p_decision: 'approved',
+    p_decision: "approved",
     p_decision_by: userId,
     p_notes: notes,
   });
 
   if (error) {
-    logger.error('Error approving proposal', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error approving proposal", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return false;
   }
 
@@ -401,18 +439,20 @@ export async function approveProposal(
 export async function rejectProposal(
   proposalId: string,
   userId: string,
-  notes?: string
+  notes?: string,
 ): Promise<boolean> {
   const db = await getClient();
-  const { error } = await db.rpc('decide_ai_proposal', {
+  const { error } = await db.rpc("decide_ai_proposal", {
     p_proposal_id: proposalId,
-    p_decision: 'rejected',
+    p_decision: "rejected",
     p_decision_by: userId,
     p_notes: notes,
   });
 
   if (error) {
-    logger.error('Error rejecting proposal', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error rejecting proposal", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return false;
   }
 
@@ -426,19 +466,21 @@ export async function partiallyApproveProposal(
   proposalId: string,
   userId: string,
   approvedActionIds: string[],
-  notes?: string
+  notes?: string,
 ): Promise<boolean> {
   const db = await getClient();
-  const { error } = await db.rpc('decide_ai_proposal', {
+  const { error } = await db.rpc("decide_ai_proposal", {
     p_proposal_id: proposalId,
-    p_decision: 'partially_approved',
+    p_decision: "partially_approved",
     p_decision_by: userId,
     p_approved_action_ids: approvedActionIds,
     p_notes: notes,
   });
 
   if (error) {
-    logger.error('Error partially approving proposal', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error partially approving proposal", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return false;
   }
 
@@ -448,18 +490,22 @@ export async function partiallyApproveProposal(
 /**
  * Obtiene propuestas pendientes de un household
  */
-export async function getPendingProposals(householdId: string): Promise<AIProposal[]> {
+export async function getPendingProposals(
+  householdId: string,
+): Promise<AIProposal[]> {
   const db = await getClient();
   const { data, error } = await db
-    .from('ai_action_queue')
-    .select('*')
-    .eq('household_id', householdId)
-    .eq('status', 'pending')
-    .gt('expires_at', new Date().toISOString())
-    .order('created_at', { ascending: false });
+    .from("ai_action_queue")
+    .select("*")
+    .eq("household_id", householdId)
+    .eq("status", "pending")
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false });
 
   if (error) {
-    logger.error('Error getting pending proposals', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error getting pending proposals", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return [];
   }
 
@@ -476,21 +522,23 @@ export async function getPendingProposals(householdId: string): Promise<AIPropos
 export async function rollbackAction(
   auditLogId: string,
   userId: string,
-  reason?: string
+  reason?: string,
 ): Promise<RollbackResult> {
   const db = await getClient();
-  const { data, error } = await db.rpc('rollback_ai_action', {
+  const { data, error } = await db.rpc("rollback_ai_action", {
     p_log_id: auditLogId,
     p_rolled_back_by: userId,
-    p_reason: reason || 'User requested rollback',
+    p_reason: reason || "User requested rollback",
   });
 
   if (error) {
-    logger.error('Error rolling back action', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error rolling back action", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return {
       success: false,
       audit_log_id: auditLogId,
-      function_name: 'unknown',
+      function_name: "unknown",
       error: error.message,
     };
   }
@@ -507,7 +555,7 @@ export async function rollbackAction(
     return {
       success: false,
       audit_log_id: auditLogId,
-      function_name: result.function_name || 'unknown',
+      function_name: result.function_name || "unknown",
       error: result.error,
     };
   }
@@ -536,7 +584,7 @@ export function generateSessionId(): string {
  */
 export async function shouldCreateProposal(
   functionNames: string[],
-  householdId: string
+  householdId: string,
 ): Promise<boolean> {
   const trust = await getHouseholdTrust(householdId);
 
@@ -563,7 +611,7 @@ export async function shouldCreateProposal(
 export async function functionCallToProposedAction(
   functionName: string,
   parameters: Record<string, unknown>,
-  description: string
+  description: string,
 ): Promise<AIProposedAction> {
   const config = await getFunctionConfig(functionName);
 
@@ -582,32 +630,33 @@ export async function functionCallToProposedAction(
  * Genera un resumen legible de las acciones propuestas
  */
 export function generateProposalSummary(actions: AIProposedAction[]): string {
-  if (actions.length === 0) return 'Sin acciones';
-  if (actions.length === 1) return actions[0].description_es || actions[0].description;
+  if (actions.length === 0) return "Sin acciones";
+  if (actions.length === 1)
+    return actions[0].description_es || actions[0].description;
 
   const actionTypes = new Map<string, number>();
   for (const action of actions) {
-    const category = action.function_name.split('_')[0];
+    const category = action.function_name.split("_")[0];
     actionTypes.set(category, (actionTypes.get(category) || 0) + 1);
   }
 
   const parts: string[] = [];
   for (const [category, count] of actionTypes) {
     const categoryNames: Record<string, string> = {
-      get: 'consultas',
-      add: 'agregados',
-      update: 'actualizaciones',
-      delete: 'eliminaciones',
-      create: 'creaciones',
-      swap: 'cambios',
-      mark: 'marcados',
-      complete: 'completados',
-      execute: 'ejecuciones',
+      get: "consultas",
+      add: "agregados",
+      update: "actualizaciones",
+      delete: "eliminaciones",
+      create: "creaciones",
+      swap: "cambios",
+      mark: "marcados",
+      complete: "completados",
+      execute: "ejecuciones",
     };
     parts.push(`${count} ${categoryNames[category] || category}`);
   }
 
-  return `Plan con ${parts.join(', ')}`;
+  return `Plan con ${parts.join(", ")}`;
 }
 
 // ============================================
@@ -617,15 +666,15 @@ export function generateProposalSummary(actions: AIProposedAction[]): string {
 export { AI_RISK_LEVELS };
 
 export const RISK_LEVEL_COLORS: Record<AIRiskLevel, string> = {
-  1: 'green',   // Low - auto
-  2: 'blue',    // Medium - with undo
-  3: 'yellow',  // High - needs confirmation
-  4: 'red',     // Critical - needs detailed confirmation
+  1: "green", // Low - auto
+  2: "blue", // Medium - with undo
+  3: "yellow", // High - needs confirmation
+  4: "red", // Critical - needs detailed confirmation
 };
 
 export const RISK_LEVEL_ICONS: Record<AIRiskLevel, string> = {
-  1: '✅',  // Auto
-  2: '↩️',  // Undo available
-  3: '⚠️',  // Warning
-  4: '🔴',  // Critical
+  1: "✅", // Auto
+  2: "↩️", // Undo available
+  3: "⚠️", // Warning
+  4: "🔴", // Critical
 };

@@ -1,17 +1,27 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { Eye, EyeOff, Mail, Lock, User, ChefHat, AlertCircle, Check } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState } from "react";
+import Link from "next/link";
+import {
+  Eye,
+  EyeOff,
+  Mail,
+  Lock,
+  User,
+  ChefHat,
+  AlertCircle,
+  Check,
+} from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import Spinner from "@/components/ui/Spinner";
 
 export default function RegisterPage() {
   const { signUp, isLoading } = useAuth();
 
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -25,24 +35,25 @@ export default function RegisterPage() {
   };
 
   const isPasswordValid = Object.values(passwordChecks).every(Boolean);
-  const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
+  const passwordsMatch =
+    password === confirmPassword && confirmPassword.length > 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
     if (!fullName || !email || !password || !confirmPassword) {
-      setError('Por favor completa todos los campos');
+      setError("Por favor completa todos los campos");
       return;
     }
 
     if (!isPasswordValid) {
-      setError('La contrasena no cumple con los requisitos');
+      setError("La contrasena no cumple con los requisitos");
       return;
     }
 
     if (!passwordsMatch) {
-      setError('Las contrasenas no coinciden');
+      setError("Las contrasenas no coinciden");
       return;
     }
 
@@ -50,8 +61,8 @@ export default function RegisterPage() {
 
     if (result.error) {
       // Traducir errores comunes
-      if (result.error.includes('already registered')) {
-        setError('Este email ya esta registrado');
+      if (result.error.includes("already registered")) {
+        setError("Este email ya esta registrado");
       } else {
         setError(result.error);
       }
@@ -68,9 +79,12 @@ export default function RegisterPage() {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
               <Check className="w-8 h-8 text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Registro exitoso!</h2>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+              Registro exitoso!
+            </h2>
             <p className="text-gray-600 mb-6">
-              Te hemos enviado un email de confirmacion. Por favor revisa tu bandeja de entrada y haz clic en el enlace para activar tu cuenta.
+              Te hemos enviado un email de confirmacion. Por favor revisa tu
+              bandeja de entrada y haz clic en el enlace para activar tu cuenta.
             </p>
             <Link
               href="/auth/login"
@@ -151,7 +165,7 @@ export default function RegisterPage() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
@@ -163,17 +177,33 @@ export default function RegisterPage() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
                 </button>
               </div>
 
               {/* Password requirements */}
               {password.length > 0 && (
                 <div className="mt-2 space-y-1">
-                  <PasswordCheck passed={passwordChecks.length} text="Minimo 8 caracteres" />
-                  <PasswordCheck passed={passwordChecks.uppercase} text="Una mayuscula" />
-                  <PasswordCheck passed={passwordChecks.lowercase} text="Una minuscula" />
-                  <PasswordCheck passed={passwordChecks.number} text="Un numero" />
+                  <PasswordCheck
+                    passed={passwordChecks.length}
+                    text="Minimo 8 caracteres"
+                  />
+                  <PasswordCheck
+                    passed={passwordChecks.uppercase}
+                    text="Una mayuscula"
+                  />
+                  <PasswordCheck
+                    passed={passwordChecks.lowercase}
+                    text="Una minuscula"
+                  />
+                  <PasswordCheck
+                    passed={passwordChecks.number}
+                    text="Un numero"
+                  />
                 </div>
               )}
             </div>
@@ -186,22 +216,24 @@ export default function RegisterPage() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all ${
                     confirmPassword.length > 0
                       ? passwordsMatch
-                        ? 'border-green-500'
-                        : 'border-red-300'
-                      : 'border-gray-300'
+                        ? "border-green-500"
+                        : "border-red-300"
+                      : "border-gray-300"
                   }`}
                   placeholder="Repite tu contrasena"
                   autoComplete="new-password"
                 />
               </div>
               {confirmPassword.length > 0 && !passwordsMatch && (
-                <p className="mt-1 text-sm text-red-600">Las contrasenas no coinciden</p>
+                <p className="mt-1 text-sm text-red-600">
+                  Las contrasenas no coinciden
+                </p>
               )}
             </div>
 
@@ -213,19 +245,22 @@ export default function RegisterPage() {
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <Spinner size="md" color="white" />
                   Creando cuenta...
                 </span>
               ) : (
-                'Crear Cuenta'
+                "Crear Cuenta"
               )}
             </button>
           </form>
 
           {/* Login link */}
           <p className="mt-6 text-center text-gray-600">
-            Ya tienes cuenta?{' '}
-            <Link href="/auth/login" className="text-green-600 font-semibold hover:text-green-700">
+            Ya tienes cuenta?{" "}
+            <Link
+              href="/auth/login"
+              className="text-green-600 font-semibold hover:text-green-700"
+            >
               Inicia sesion
             </Link>
           </p>
@@ -238,10 +273,14 @@ export default function RegisterPage() {
 // Componente para mostrar requisitos de contrasena
 function PasswordCheck({ passed, text }: { passed: boolean; text: string }) {
   return (
-    <div className={`flex items-center gap-2 text-xs ${passed ? 'text-green-600' : 'text-gray-400'}`}>
-      <div className={`w-4 h-4 rounded-full flex items-center justify-center ${
-        passed ? 'bg-green-100' : 'bg-gray-100'
-      }`}>
+    <div
+      className={`flex items-center gap-2 text-xs ${passed ? "text-green-600" : "text-gray-400"}`}
+    >
+      <div
+        className={`w-4 h-4 rounded-full flex items-center justify-center ${
+          passed ? "bg-green-100" : "bg-gray-100"
+        }`}
+      >
         {passed && <Check className="w-3 h-3" />}
       </div>
       {text}

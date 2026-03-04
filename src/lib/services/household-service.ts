@@ -3,9 +3,15 @@
  * API calls for household and user management
  */
 
-import { supabase } from '../supabase/client';
-import type { Household, User, HouseholdInvitation, PlanType, UserRole } from '../types/household';
-import { logger } from '@/lib/logger';
+import { supabase } from "../supabase/client";
+import type {
+  Household,
+  User,
+  HouseholdInvitation,
+  PlanType,
+  UserRole,
+} from "../types/household";
+import { logger } from "@/lib/logger";
 
 // ============================================
 // HOUSEHOLD OPERATIONS
@@ -14,15 +20,19 @@ import { logger } from '@/lib/logger';
 /**
  * Get household by ID
  */
-export async function getHousehold(householdId: string): Promise<Household | null> {
+export async function getHousehold(
+  householdId: string,
+): Promise<Household | null> {
   const { data, error } = await supabase
-    .from('households')
-    .select('*')
-    .eq('id', householdId)
+    .from("households")
+    .select("*")
+    .eq("id", householdId)
     .single();
 
   if (error) {
-    logger.error('Error fetching household', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error fetching household", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 
@@ -32,15 +42,19 @@ export async function getHousehold(householdId: string): Promise<Household | nul
 /**
  * Get household by slug
  */
-export async function getHouseholdBySlug(slug: string): Promise<Household | null> {
+export async function getHouseholdBySlug(
+  slug: string,
+): Promise<Household | null> {
   const { data, error } = await supabase
-    .from('households')
-    .select('*')
-    .eq('slug', slug)
+    .from("households")
+    .select("*")
+    .eq("slug", slug)
     .single();
 
   if (error) {
-    logger.error('Error fetching household by slug', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error fetching household by slug", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 
@@ -54,18 +68,20 @@ export async function createHousehold(
   name: string,
   ownerEmail: string,
   ownerName: string,
-  plan: PlanType = 'free'
+  plan: PlanType = "free",
 ): Promise<{ household: Household; user: User } | null> {
   // Generate slug from name
-  const slug = name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
-    + '-' + Date.now().toString(36);
+  const slug =
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "") +
+    "-" +
+    Date.now().toString(36);
 
   // Create household
   const { data: household, error: householdError } = await supabase
-    .from('households')
+    .from("households")
     .insert({
       name,
       slug,
@@ -77,26 +93,33 @@ export async function createHousehold(
     .single();
 
   if (householdError) {
-    logger.error('Error creating household', { error: householdError instanceof Error ? householdError.message : String(householdError) });
+    logger.error("Error creating household", {
+      error:
+        householdError instanceof Error
+          ? householdError.message
+          : String(householdError),
+    });
     return null;
   }
 
   // Create owner user
   const { data: user, error: userError } = await supabase
-    .from('users')
+    .from("users")
     .insert({
       household_id: household.id,
       email: ownerEmail,
       name: ownerName,
-      role: 'owner',
+      role: "owner",
     })
     .select()
     .single();
 
   if (userError) {
-    logger.error('Error creating user', { error: userError instanceof Error ? userError.message : String(userError) });
+    logger.error("Error creating user", {
+      error: userError instanceof Error ? userError.message : String(userError),
+    });
     // Rollback household creation
-    await supabase.from('households').delete().eq('id', household.id);
+    await supabase.from("households").delete().eq("id", household.id);
     return null;
   }
 
@@ -108,17 +131,19 @@ export async function createHousehold(
  */
 export async function updateHousehold(
   householdId: string,
-  updates: Partial<Household>
+  updates: Partial<Household>,
 ): Promise<Household | null> {
   const { data, error } = await supabase
-    .from('households')
+    .from("households")
     .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', householdId)
+    .eq("id", householdId)
     .select()
     .single();
 
   if (error) {
-    logger.error('Error updating household', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error updating household", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 
@@ -128,11 +153,13 @@ export async function updateHousehold(
 /**
  * Mark household setup as complete
  */
-export async function completeHouseholdSetup(householdId: string): Promise<boolean> {
+export async function completeHouseholdSetup(
+  householdId: string,
+): Promise<boolean> {
   const { error } = await supabase
-    .from('households')
+    .from("households")
     .update({ setup_completed: true, updated_at: new Date().toISOString() })
-    .eq('id', householdId);
+    .eq("id", householdId);
 
   return !error;
 }
@@ -146,13 +173,15 @@ export async function completeHouseholdSetup(householdId: string): Promise<boole
  */
 export async function getUserByAuthId(authId: string): Promise<User | null> {
   const { data, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('auth_id', authId)
+    .from("users")
+    .select("*")
+    .eq("auth_id", authId)
     .single();
 
   if (error) {
-    logger.error('Error fetching user', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error fetching user", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 
@@ -164,13 +193,15 @@ export async function getUserByAuthId(authId: string): Promise<User | null> {
  */
 export async function getUserByEmail(email: string): Promise<User | null> {
   const { data, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('email', email)
+    .from("users")
+    .select("*")
+    .eq("email", email)
     .single();
 
-  if (error && error.code !== 'PGRST116') {
-    logger.error('Error fetching user by email', { error: error instanceof Error ? error.message : String(error) });
+  if (error && error.code !== "PGRST116") {
+    logger.error("Error fetching user by email", {
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   return data as User | null;
@@ -181,13 +212,15 @@ export async function getUserByEmail(email: string): Promise<User | null> {
  */
 export async function getHouseholdUsers(householdId: string): Promise<User[]> {
   const { data, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('household_id', householdId)
-    .order('created_at');
+    .from("users")
+    .select("*")
+    .eq("household_id", householdId)
+    .order("created_at");
 
   if (error) {
-    logger.error('Error fetching household users', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error fetching household users", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return [];
   }
 
@@ -201,11 +234,11 @@ export async function createUser(
   householdId: string,
   email: string,
   name: string,
-  role: UserRole = 'member',
-  authId?: string
+  role: UserRole = "member",
+  authId?: string,
 ): Promise<User | null> {
   const { data, error } = await supabase
-    .from('users')
+    .from("users")
     .insert({
       household_id: householdId,
       email,
@@ -217,7 +250,9 @@ export async function createUser(
     .single();
 
   if (error) {
-    logger.error('Error creating user', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error creating user", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 
@@ -229,17 +264,19 @@ export async function createUser(
  */
 export async function updateUser(
   userId: string,
-  updates: Partial<User>
+  updates: Partial<User>,
 ): Promise<User | null> {
   const { data, error } = await supabase
-    .from('users')
+    .from("users")
     .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', userId)
+    .eq("id", userId)
     .select()
     .single();
 
   if (error) {
-    logger.error('Error updating user', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error updating user", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 
@@ -249,11 +286,14 @@ export async function updateUser(
 /**
  * Link user to Supabase Auth
  */
-export async function linkUserToAuth(userId: string, authId: string): Promise<boolean> {
+export async function linkUserToAuth(
+  userId: string,
+  authId: string,
+): Promise<boolean> {
   const { error } = await supabase
-    .from('users')
+    .from("users")
     .update({ auth_id: authId })
-    .eq('id', userId);
+    .eq("id", userId);
 
   return !error;
 }
@@ -263,19 +303,16 @@ export async function linkUserToAuth(userId: string, authId: string): Promise<bo
  */
 export async function updateUserActivity(userId: string): Promise<void> {
   await supabase
-    .from('users')
+    .from("users")
     .update({ last_active_at: new Date().toISOString() })
-    .eq('id', userId);
+    .eq("id", userId);
 }
 
 /**
  * Remove user from household
  */
 export async function removeUser(userId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('users')
-    .delete()
-    .eq('id', userId);
+  const { error } = await supabase.from("users").delete().eq("id", userId);
 
   return !error;
 }
@@ -291,17 +328,17 @@ export async function createInvitation(
   householdId: string,
   email: string,
   role: UserRole,
-  invitedBy: string
+  invitedBy: string,
 ): Promise<HouseholdInvitation | null> {
   // Generate secure token
-  const token = crypto.randomUUID() + '-' + Date.now().toString(36);
+  const token = crypto.randomUUID() + "-" + Date.now().toString(36);
 
   // Expire in 7 days
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7);
 
   const { data, error } = await supabase
-    .from('household_invitations')
+    .from("household_invitations")
     .insert({
       household_id: householdId,
       email,
@@ -314,7 +351,9 @@ export async function createInvitation(
     .single();
 
   if (error) {
-    logger.error('Error creating invitation', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error creating invitation", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 
@@ -324,17 +363,21 @@ export async function createInvitation(
 /**
  * Get invitation by token
  */
-export async function getInvitationByToken(token: string): Promise<HouseholdInvitation | null> {
+export async function getInvitationByToken(
+  token: string,
+): Promise<HouseholdInvitation | null> {
   const { data, error } = await supabase
-    .from('household_invitations')
-    .select('*')
-    .eq('token', token)
-    .is('accepted_at', null)
-    .gt('expires_at', new Date().toISOString())
+    .from("household_invitations")
+    .select("*")
+    .eq("token", token)
+    .is("accepted_at", null)
+    .gt("expires_at", new Date().toISOString())
     .single();
 
   if (error) {
-    logger.error('Error fetching invitation', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error fetching invitation", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 
@@ -347,11 +390,11 @@ export async function getInvitationByToken(token: string): Promise<HouseholdInvi
 export async function acceptInvitation(
   token: string,
   name: string,
-  authId?: string
+  authId?: string,
 ): Promise<User | null> {
   const invitation = await getInvitationByToken(token);
   if (!invitation) {
-    logger.error('Invalid or expired invitation');
+    logger.error("Invalid or expired invitation");
     return null;
   }
 
@@ -361,16 +404,16 @@ export async function acceptInvitation(
     invitation.email,
     name,
     invitation.role,
-    authId
+    authId,
   );
 
   if (!user) return null;
 
   // Mark invitation as accepted
   await supabase
-    .from('household_invitations')
+    .from("household_invitations")
     .update({ accepted_at: new Date().toISOString() })
-    .eq('id', invitation.id);
+    .eq("id", invitation.id);
 
   return user;
 }
@@ -378,17 +421,21 @@ export async function acceptInvitation(
 /**
  * Get pending invitations for a household
  */
-export async function getHouseholdInvitations(householdId: string): Promise<HouseholdInvitation[]> {
+export async function getHouseholdInvitations(
+  householdId: string,
+): Promise<HouseholdInvitation[]> {
   const { data, error } = await supabase
-    .from('household_invitations')
-    .select('*')
-    .eq('household_id', householdId)
-    .is('accepted_at', null)
-    .gt('expires_at', new Date().toISOString())
-    .order('created_at', { ascending: false });
+    .from("household_invitations")
+    .select("*")
+    .eq("household_id", householdId)
+    .is("accepted_at", null)
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false });
 
   if (error) {
-    logger.error('Error fetching invitations', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error fetching invitations", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return [];
   }
 
@@ -400,9 +447,9 @@ export async function getHouseholdInvitations(householdId: string): Promise<Hous
  */
 export async function cancelInvitation(invitationId: string): Promise<boolean> {
   const { error } = await supabase
-    .from('household_invitations')
+    .from("household_invitations")
     .delete()
-    .eq('id', invitationId);
+    .eq("id", invitationId);
 
   return !error;
 }
@@ -414,20 +461,23 @@ export async function cancelInvitation(invitationId: string): Promise<boolean> {
 /**
  * Create a default household for demo/first-time use
  */
-async function createDefaultHousehold(): Promise<{ household: Household; user: User } | null> {
-  logger.info('[Household] Creating default household...');
+async function createDefaultHousehold(): Promise<{
+  household: Household;
+  user: User;
+} | null> {
+  logger.info("[Household] Creating default household...");
 
   // Generate a unique slug
-  const slug = 'familia-gonzalez-' + Date.now().toString(36);
+  const slug = "familia-gonzalez-" + Date.now().toString(36);
 
   // Create the household
   const { data: household, error: householdError } = await supabase
-    .from('households')
+    .from("households")
     .insert({
-      name: 'Familia González',
+      name: "Familia González",
       slug,
-      owner_name: 'Familia González',
-      plan: 'premium', // Give full access for demo
+      owner_name: "Familia González",
+      plan: "premium", // Give full access for demo
       setup_completed: true,
       features: {
         ai_assistant: true,
@@ -436,42 +486,49 @@ async function createDefaultHousehold(): Promise<{ household: Household; user: U
         home_management: true,
         employee_management: true,
         analytics: true,
-      }
+      },
     })
     .select()
     .single();
 
   if (householdError) {
-    logger.error('[Household] Error creating default household', { error: householdError instanceof Error ? householdError.message : String(householdError) });
+    logger.error("[Household] Error creating default household", {
+      error:
+        householdError instanceof Error
+          ? householdError.message
+          : String(householdError),
+    });
     return null;
   }
 
-  logger.info('[Household] Created household:', household.id);
+  logger.info("[Household] Created household:", household.id);
 
   // Create the default owner user
   const { data: user, error: userError } = await supabase
-    .from('users')
+    .from("users")
     .insert({
       household_id: household.id,
-      email: 'familia@gonzalez.com',
-      name: 'Familia González',
-      role: 'owner',
+      email: "familia@gonzalez.com",
+      name: "Familia González",
+      role: "owner",
     })
     .select()
     .single();
 
   if (userError) {
-    logger.error('[Household] Error creating default user', { error: userError instanceof Error ? userError.message : String(userError) });
+    logger.error("[Household] Error creating default user", {
+      error: userError instanceof Error ? userError.message : String(userError),
+    });
     // Try to clean up the household
-    await supabase.from('households').delete().eq('id', household.id);
+    await supabase.from("households").delete().eq("id", household.id);
     return null;
   }
 
-  logger.info('[Household] Created user:', user.id);
+  logger.info("[Household] Created user:", user.id);
 
   // Also create the AI trust record for this household
   const { error: trustError } = await supabase
-    .from('household_ai_trust')
+    .from("household_ai_trust")
     .insert({
       household_id: household.id,
       trust_level: 3, // Start at "Confiable" level
@@ -484,7 +541,10 @@ async function createDefaultHousehold(): Promise<{ household: Household; user: U
     });
 
   if (trustError) {
-    logger.warn('[Household] Could not create AI trust record', { error: trustError instanceof Error ? trustError.message : String(trustError) });
+    logger.warn("[Household] Could not create AI trust record", {
+      error:
+        trustError instanceof Error ? trustError.message : String(trustError),
+    });
     // Not critical - continue anyway
   }
 
@@ -499,43 +559,49 @@ export async function initializeHouseholdContext(): Promise<{
   household: Household | null;
   user: User | null;
 }> {
-  logger.info('[Household] Initializing context...');
+  logger.info("[Household] Initializing context...");
 
   // For now, get the first/default household (no auth yet)
   // In Phase B, this will use Supabase Auth
   const { data: households, error: fetchError } = await supabase
-    .from('households')
-    .select('*')
+    .from("households")
+    .select("*")
     .limit(1);
 
   if (fetchError) {
-    logger.error('[Household] Error fetching households', { error: fetchError instanceof Error ? fetchError.message : String(fetchError) });
+    logger.error("[Household] Error fetching households", {
+      error:
+        fetchError instanceof Error ? fetchError.message : String(fetchError),
+    });
   }
 
   // If no households exist, create a default one
   if (!households || households.length === 0) {
-    logger.info('[Household] No households found, creating default...');
+    logger.info("[Household] No households found, creating default...");
     const result = await createDefaultHousehold();
     if (result) {
-      logger.info('[Household] Default household created successfully');
+      logger.info("[Household] Default household created successfully");
       return result;
     }
-    logger.error('[Household] Failed to create default household');
+    logger.error("[Household] Failed to create default household");
     return { household: null, user: null };
   }
 
   const household = households[0] as Household;
-  logger.info('[Household] Found household', { id: household.id, name: household.name });
+  logger.info("[Household] Found household", {
+    id: household.id,
+    name: household.name,
+  });
 
   // Get first user in household (temporary until auth)
   const { data: users } = await supabase
-    .from('users')
-    .select('*')
-    .eq('household_id', household.id)
+    .from("users")
+    .select("*")
+    .eq("household_id", household.id)
     .limit(1);
 
   const user = users?.[0] as User | null;
-  logger.info('[Household] Found user', { id: user?.id, name: user?.name });
+  logger.info("[Household] Found user", { id: user?.id, name: user?.name });
 
   return { household, user };
 }

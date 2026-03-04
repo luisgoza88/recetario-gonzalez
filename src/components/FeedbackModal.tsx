@@ -1,12 +1,20 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { X, MessageSquare, Check, Star } from 'lucide-react';
-import { supabase } from '@/lib/supabase/client';
-import { Recipe, MealType, PortionRating, LeftoverRating, Ingredient, MealFeedback } from '@/types';
-import { analyzeNewFeedback } from '@/lib/feedback-learning';
-import { useEscapeKey } from '@/hooks/useEscapeKey';
-import FocusTrap from '@/components/ui/FocusTrap';
+import { useState } from "react";
+import { X, MessageSquare, Check, Star } from "lucide-react";
+import { supabase } from "@/lib/supabase/client";
+import {
+  Recipe,
+  MealType,
+  PortionRating,
+  LeftoverRating,
+  Ingredient,
+  MealFeedback,
+} from "@/types";
+import { analyzeNewFeedback } from "@/lib/feedback-learning";
+import { useEscapeKey } from "@/hooks/useEscapeKey";
+import FocusTrap from "@/components/ui/FocusTrap";
+import Spinner from "@/components/ui/Spinner";
 
 interface FeedbackModalProps {
   date: string;
@@ -16,31 +24,46 @@ interface FeedbackModalProps {
   onSaved: () => void;
 }
 
-export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved }: FeedbackModalProps) {
-  const [portionRating, setPortionRating] = useState<PortionRating | null>(null);
-  const [leftoverRating, setLeftoverRating] = useState<LeftoverRating | null>(null);
+export default function FeedbackModal({
+  date,
+  mealType,
+  recipe,
+  onClose,
+  onSaved,
+}: FeedbackModalProps) {
+  const [portionRating, setPortionRating] = useState<PortionRating | null>(
+    null,
+  );
+  const [leftoverRating, setLeftoverRating] = useState<LeftoverRating | null>(
+    null,
+  );
   const [starRating, setStarRating] = useState<number>(0);
   const [wouldRepeat, setWouldRepeat] = useState<boolean | null>(null);
   const [missingIngredients, setMissingIngredients] = useState<string[]>([]);
   const [usedUpIngredients, setUsedUpIngredients] = useState<string[]>([]);
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEscapeKey(onClose);
 
   const mealLabels: Record<MealType, string> = {
-    breakfast: 'Desayuno',
-    lunch: 'Almuerzo',
-    dinner: 'Cena'
+    breakfast: "Desayuno",
+    lunch: "Almuerzo",
+    dinner: "Cena",
   };
 
-  const ingredients = (recipe.ingredients as Ingredient[]).map(i => i.name);
-  const isAIGenerated = recipe.source === 'ai_generated' || recipe.id.startsWith('generated-');
+  const ingredients = (recipe.ingredients as Ingredient[]).map((i) => i.name);
+  const isAIGenerated =
+    recipe.source === "ai_generated" || recipe.id.startsWith("generated-");
 
-  const toggleIngredient = (list: string[], setList: (v: string[]) => void, ingredient: string) => {
+  const toggleIngredient = (
+    list: string[],
+    setList: (v: string[]) => void,
+    ingredient: string,
+  ) => {
     if (list.includes(ingredient)) {
-      setList(list.filter(i => i !== ingredient));
+      setList(list.filter((i) => i !== ingredient));
     } else {
       setList([...list, ingredient]);
     }
@@ -57,18 +80,20 @@ export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved
         recipe_name: recipe.name,
         portion_rating: portionRating,
         leftover_rating: leftoverRating,
-        missing_ingredients: missingIngredients.length > 0 ? missingIngredients : null,
-        used_up_ingredients: usedUpIngredients.length > 0 ? usedUpIngredients : null,
+        missing_ingredients:
+          missingIngredients.length > 0 ? missingIngredients : null,
+        used_up_ingredients:
+          usedUpIngredients.length > 0 ? usedUpIngredients : null,
         notes: notes.trim() || null,
       };
 
       // Add star_rating and would_repeat (new columns)
       if (starRating > 0) feedbackData.star_rating = starRating;
       if (wouldRepeat !== null) feedbackData.would_repeat = wouldRepeat;
-      if (isAIGenerated) feedbackData.source = 'generated';
+      if (isAIGenerated) feedbackData.source = "generated";
 
       const { error } = await supabase
-        .from('meal_feedback')
+        .from("meal_feedback")
         .insert(feedbackData);
 
       if (error) throw error;
@@ -80,15 +105,16 @@ export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved
 
       // Analyze feedback
       await analyzeAndGenerateSuggestions({
-        id: '',
+        id: "",
         date,
         meal_type: mealType,
         recipe_id: recipe.id,
         recipe_name: recipe.name,
         portion_rating: portionRating || undefined,
         leftover_rating: leftoverRating || undefined,
-        missing_ingredients: missingIngredients.length > 0 ? missingIngredients : undefined,
-        notes: notes.trim() || undefined
+        missing_ingredients:
+          missingIngredients.length > 0 ? missingIngredients : undefined,
+        notes: notes.trim() || undefined,
       });
 
       setSaved(true);
@@ -97,7 +123,7 @@ export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved
         onClose();
       }, 1000);
     } catch (error) {
-      console.error('Error saving feedback:', error);
+      console.error("Error saving feedback:", error);
     } finally {
       setSaving(false);
     }
@@ -106,42 +132,59 @@ export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved
   const updateInventoryForUsedUp = async (ingredientNames: string[]) => {
     for (const name of ingredientNames) {
       const { data: items } = await supabase
-        .from('market_items')
-        .select('id')
-        .ilike('name', `%${name}%`)
+        .from("market_items")
+        .select("id")
+        .ilike("name", `%${name}%`)
         .limit(1);
 
       if (items && items.length > 0) {
-        await supabase
-          .from('inventory')
-          .upsert({
+        await supabase.from("inventory").upsert(
+          {
             item_id: items[0].id,
-            current_quantity: '0',
+            current_quantity: "0",
             current_number: 0,
-            last_updated: new Date().toISOString()
-          }, { onConflict: 'item_id' });
+            last_updated: new Date().toISOString(),
+          },
+          { onConflict: "item_id" },
+        );
       }
     }
   };
 
-  const analyzeAndGenerateSuggestions = async (feedbackData: Partial<MealFeedback>) => {
+  const analyzeAndGenerateSuggestions = async (
+    feedbackData: Partial<MealFeedback>,
+  ) => {
     try {
       await analyzeNewFeedback(feedbackData as MealFeedback);
     } catch (error) {
-      console.error('Error in feedback learning analysis:', error);
+      console.error("Error in feedback learning analysis:", error);
     }
   };
 
   if (saved) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
+      <div
+        className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+        role="dialog"
+        aria-modal="true"
+      >
         <div className="bg-white rounded-2xl p-8 text-center">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Check size={32} className="text-green-600" />
           </div>
-          <h3 className="text-xl font-semibold text-green-700">Feedback guardado</h3>
-          {starRating === 5 && <p className="text-sm text-yellow-600 mt-2">⭐ ¡Añadida a Favoritos!</p>}
-          {starRating <= 2 && starRating > 0 && <p className="text-sm text-red-500 mt-2">🚫 Excluida de futuros menús</p>}
+          <h3 className="text-xl font-semibold text-green-700">
+            Feedback guardado
+          </h3>
+          {starRating === 5 && (
+            <p className="text-sm text-yellow-600 mt-2">
+              ⭐ ¡Añadida a Favoritos!
+            </p>
+          )}
+          {starRating <= 2 && starRating > 0 && (
+            <p className="text-sm text-red-500 mt-2">
+              🚫 Excluida de futuros menús
+            </p>
+          )}
         </div>
       </div>
     );
@@ -149,229 +192,261 @@ export default function FeedbackModal({ date, mealType, recipe, onClose, onSaved
 
   return (
     <FocusTrap active={true}>
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-8 pb-24 overflow-y-auto" role="dialog" aria-modal="true">
-      <div className="bg-white rounded-2xl w-full max-w-md flex flex-col">
-        {/* Header */}
-        <div className="bg-green-700 text-white p-4 rounded-t-2xl flex justify-between items-center flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <MessageSquare size={20} />
-            <span className="font-semibold">Feedback - {mealLabels[mealType]}</span>
-          </div>
-          <button onClick={onClose} aria-label="Cerrar" className="p-2 hover:bg-white/20 rounded-lg">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="p-4 space-y-6">
-          {/* Recipe Name */}
-          <div className="text-center pb-4 border-b">
-            <h3 className="text-lg font-semibold">{recipe.name}</h3>
-            <p className="text-sm text-gray-500">{date}</p>
-            {isAIGenerated && (
-              <span className="inline-block mt-1 bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">
-                🤖 Generada por IA
+      <div
+        className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-8 pb-24 overflow-y-auto"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="feedback-modal-title"
+      >
+        <div className="bg-white rounded-2xl w-full max-w-md flex flex-col">
+          {/* Header */}
+          <div className="bg-green-700 text-white p-4 rounded-t-2xl flex justify-between items-center flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <MessageSquare size={20} />
+              <span id="feedback-modal-title" className="font-semibold">
+                Feedback - {mealLabels[mealType]}
               </span>
-            )}
-          </div>
-
-          {/* ⭐ Star Rating (1-5) — NEW */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              ¿Qué tal estuvo? ⭐
-            </label>
-            <div className="flex justify-center gap-2">
-              {[1, 2, 3, 4, 5].map(star => (
-                <button
-                  key={star}
-                  onClick={() => setStarRating(star)}
-                  className={`p-2 rounded-lg transition-all transform ${
-                    star <= starRating
-                      ? 'text-yellow-500 scale-110'
-                      : 'text-gray-300 hover:text-yellow-400'
-                  }`}
-                >
-                  <Star size={32} fill={star <= starRating ? 'currentColor' : 'none'} />
-                </button>
-              ))}
             </div>
-            {starRating > 0 && (
-              <p className="text-center text-sm mt-1 text-gray-500">
-                {starRating === 1 && '😕 Muy mala'}
-                {starRating === 2 && '😐 Regular'}
-                {starRating === 3 && '🙂 Aceptable'}
-                {starRating === 4 && '😋 Muy buena'}
-                {starRating === 5 && '🤩 ¡Excelente! → Favoritos'}
-              </p>
-            )}
+            <button
+              onClick={onClose}
+              aria-label="Cerrar"
+              className="p-2 hover:bg-white/20 rounded-lg"
+            >
+              <X size={20} />
+            </button>
           </div>
 
-          {/* Would Repeat? — NEW */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              ¿Repetirían esta receta?
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => setWouldRepeat(true)}
-                className={`p-3 rounded-xl border-2 transition-all text-center ${
-                  wouldRepeat === true
-                    ? 'border-green-500 bg-green-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="text-2xl mb-1">👍</div>
-                <div className="text-sm font-medium">¡Sí!</div>
-              </button>
-              <button
-                onClick={() => setWouldRepeat(false)}
-                className={`p-3 rounded-xl border-2 transition-all text-center ${
-                  wouldRepeat === false
-                    ? 'border-red-500 bg-red-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="text-2xl mb-1">👎</div>
-                <div className="text-sm font-medium">No, gracias</div>
-              </button>
+          <div className="p-4 space-y-6">
+            {/* Recipe Name */}
+            <div className="text-center pb-4 border-b">
+              <h3 className="text-lg font-semibold">{recipe.name}</h3>
+              <p className="text-sm text-gray-500">{date}</p>
+              {isAIGenerated && (
+                <span className="inline-block mt-1 bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">
+                  🤖 Generada por IA
+                </span>
+              )}
             </div>
-          </div>
 
-          {/* Portion Rating */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              ¿Cómo estuvo la porción?
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { value: 'poca', label: 'Poca', emoji: '😕' },
-                { value: 'bien', label: 'Bien', emoji: '👍' },
-                { value: 'mucha', label: 'Mucha', emoji: '😅' }
-              ].map(option => (
-                <button
-                  key={option.value}
-                  onClick={() => setPortionRating(option.value as PortionRating)}
-                  className={`p-3 rounded-xl border-2 transition-all ${
-                    portionRating === option.value
-                      ? 'border-green-500 bg-green-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="text-2xl mb-1">{option.emoji}</div>
-                  <div className="text-sm font-medium">{option.label}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Leftover Rating */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              ¿Sobró comida?
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { value: 'nada', label: 'Nada', emoji: '✨' },
-                { value: 'poco', label: 'Poco', emoji: '🍽️' },
-                { value: 'mucho', label: 'Mucho', emoji: '📦' }
-              ].map(option => (
-                <button
-                  key={option.value}
-                  onClick={() => setLeftoverRating(option.value as LeftoverRating)}
-                  className={`p-3 rounded-xl border-2 transition-all ${
-                    leftoverRating === option.value
-                      ? 'border-orange-500 bg-orange-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="text-2xl mb-1">{option.emoji}</div>
-                  <div className="text-sm font-medium">{option.label}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Missing Ingredients */}
-          {ingredients.length > 0 && (
+            {/* ⭐ Star Rating (1-5) — NEW */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                ¿Faltó algún ingrediente?
+                ¿Qué tal estuvo? ⭐
               </label>
-              <div className="flex flex-wrap gap-2">
-                {ingredients.map(ing => (
+              <div className="flex justify-center gap-2">
+                {[1, 2, 3, 4, 5].map((star) => (
                   <button
-                    key={ing}
-                    onClick={() => toggleIngredient(missingIngredients, setMissingIngredients, ing)}
-                    className={`px-3 py-1.5 rounded-full text-sm transition-all ${
-                      missingIngredients.includes(ing)
-                        ? 'bg-red-100 text-red-700 border-2 border-red-300'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    key={star}
+                    onClick={() => setStarRating(star)}
+                    className={`p-2 rounded-lg transition-all transform ${
+                      star <= starRating
+                        ? "text-yellow-500 scale-110"
+                        : "text-gray-300 hover:text-yellow-400"
                     }`}
                   >
-                    {missingIngredients.includes(ing) && '✗ '}{ing}
+                    <Star
+                      size={32}
+                      fill={star <= starRating ? "currentColor" : "none"}
+                    />
+                  </button>
+                ))}
+              </div>
+              {starRating > 0 && (
+                <p className="text-center text-sm mt-1 text-gray-500">
+                  {starRating === 1 && "😕 Muy mala"}
+                  {starRating === 2 && "😐 Regular"}
+                  {starRating === 3 && "🙂 Aceptable"}
+                  {starRating === 4 && "😋 Muy buena"}
+                  {starRating === 5 && "🤩 ¡Excelente! → Favoritos"}
+                </p>
+              )}
+            </div>
+
+            {/* Would Repeat? — NEW */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                ¿Repetirían esta receta?
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setWouldRepeat(true)}
+                  className={`p-3 rounded-xl border-2 transition-all text-center ${
+                    wouldRepeat === true
+                      ? "border-green-500 bg-green-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <div className="text-2xl mb-1">👍</div>
+                  <div className="text-sm font-medium">¡Sí!</div>
+                </button>
+                <button
+                  onClick={() => setWouldRepeat(false)}
+                  className={`p-3 rounded-xl border-2 transition-all text-center ${
+                    wouldRepeat === false
+                      ? "border-red-500 bg-red-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <div className="text-2xl mb-1">👎</div>
+                  <div className="text-sm font-medium">No, gracias</div>
+                </button>
+              </div>
+            </div>
+
+            {/* Portion Rating */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                ¿Cómo estuvo la porción?
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: "poca", label: "Poca", emoji: "😕" },
+                  { value: "bien", label: "Bien", emoji: "👍" },
+                  { value: "mucha", label: "Mucha", emoji: "😅" },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() =>
+                      setPortionRating(option.value as PortionRating)
+                    }
+                    className={`p-3 rounded-xl border-2 transition-all ${
+                      portionRating === option.value
+                        ? "border-green-500 bg-green-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">{option.emoji}</div>
+                    <div className="text-sm font-medium">{option.label}</div>
                   </button>
                 ))}
               </div>
             </div>
-          )}
 
-          {/* Used Up Ingredients */}
-          {ingredients.length > 0 && (
+            {/* Leftover Rating */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                ¿Se agotó algún ingrediente? (actualiza inventario)
+                ¿Sobró comida?
               </label>
-              <div className="flex flex-wrap gap-2">
-                {ingredients.map(ing => (
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: "nada", label: "Nada", emoji: "✨" },
+                  { value: "poco", label: "Poco", emoji: "🍽️" },
+                  { value: "mucho", label: "Mucho", emoji: "📦" },
+                ].map((option) => (
                   <button
-                    key={ing}
-                    onClick={() => toggleIngredient(usedUpIngredients, setUsedUpIngredients, ing)}
-                    className={`px-3 py-1.5 rounded-full text-sm transition-all ${
-                      usedUpIngredients.includes(ing)
-                        ? 'bg-orange-100 text-orange-700 border-2 border-orange-300'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    key={option.value}
+                    onClick={() =>
+                      setLeftoverRating(option.value as LeftoverRating)
+                    }
+                    className={`p-3 rounded-xl border-2 transition-all ${
+                      leftoverRating === option.value
+                        ? "border-orange-500 bg-orange-50"
+                        : "border-gray-200 hover:border-gray-300"
                     }`}
                   >
-                    {usedUpIngredients.includes(ing) && '⚠ '}{ing}
+                    <div className="text-2xl mb-1">{option.emoji}</div>
+                    <div className="text-sm font-medium">{option.label}</div>
                   </button>
                 ))}
               </div>
             </div>
-          )}
 
-          {/* Notes */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Comentarios adicionales
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Ej: La salsa quedó muy salada, reducir sal la próxima vez..."
-              className="w-full p-3 border rounded-xl resize-none h-24 focus:ring-2 focus:ring-green-500 focus:border-green-500"
-            />
-          </div>
-
-          {/* Save Button */}
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full bg-green-700 text-white py-4 rounded-xl font-semibold hover:bg-green-800 disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {saving ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
-                Guardando...
-              </>
-            ) : (
-              <>
-                <Check size={20} />
-                Guardar Feedback
-              </>
+            {/* Missing Ingredients */}
+            {ingredients.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  ¿Faltó algún ingrediente?
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {ingredients.map((ing) => (
+                    <button
+                      key={ing}
+                      onClick={() =>
+                        toggleIngredient(
+                          missingIngredients,
+                          setMissingIngredients,
+                          ing,
+                        )
+                      }
+                      className={`px-3 py-1.5 rounded-full text-sm transition-all ${
+                        missingIngredients.includes(ing)
+                          ? "bg-red-100 text-red-700 border-2 border-red-300"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      {missingIngredients.includes(ing) && "✗ "}
+                      {ing}
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
-          </button>
+
+            {/* Used Up Ingredients */}
+            {ingredients.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  ¿Se agotó algún ingrediente? (actualiza inventario)
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {ingredients.map((ing) => (
+                    <button
+                      key={ing}
+                      onClick={() =>
+                        toggleIngredient(
+                          usedUpIngredients,
+                          setUsedUpIngredients,
+                          ing,
+                        )
+                      }
+                      className={`px-3 py-1.5 rounded-full text-sm transition-all ${
+                        usedUpIngredients.includes(ing)
+                          ? "bg-orange-100 text-orange-700 border-2 border-orange-300"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      {usedUpIngredients.includes(ing) && "⚠ "}
+                      {ing}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Notes */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Comentarios adicionales
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Ej: La salsa quedó muy salada, reducir sal la próxima vez..."
+                className="w-full p-3 border rounded-xl resize-none h-24 focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              />
+            </div>
+
+            {/* Save Button */}
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="w-full bg-green-700 text-white py-4 rounded-xl font-semibold hover:bg-green-800 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {saving ? (
+                <>
+                  <Spinner size="md" color="white" />
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  <Check size={20} />
+                  Guardar Feedback
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
     </FocusTrap>
   );
 }

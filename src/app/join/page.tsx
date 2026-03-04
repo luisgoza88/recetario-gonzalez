@@ -1,10 +1,11 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
-import { Ticket, AlertCircle, Check, Users, ArrowRight } from 'lucide-react';
-import { useOptionalAuth } from '@/contexts/AuthContext';
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { Ticket, AlertCircle, Check, Users, ArrowRight } from "lucide-react";
+import { useOptionalAuth } from "@/contexts/AuthContext";
+import Spinner from "@/components/ui/Spinner";
 import {
   validateInvitationCode,
   redeemInvitationCode,
@@ -12,8 +13,8 @@ import {
   getRoleName,
   getRoleColor,
   getRoleDescription,
-  type InvitationValidation
-} from '@/lib/invitation-service';
+  type InvitationValidation,
+} from "@/lib/invitation-service";
 
 // Componente interno que usa useSearchParams
 function JoinPageContent() {
@@ -21,45 +22,50 @@ function JoinPageContent() {
   const searchParams = useSearchParams();
   const auth = useOptionalAuth();
 
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState("");
   const [isValidating, setIsValidating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
-  const [validation, setValidation] = useState<InvitationValidation | null>(null);
+  const [validation, setValidation] = useState<InvitationValidation | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [lastValidationTime, setLastValidationTime] = useState(0);
 
   // Define handleValidate first (before useEffects that use it)
-  const handleValidate = useCallback(async (codeToValidate: string) => {
-    if (codeToValidate.length !== 8) {
-      setError('El codigo debe tener 8 caracteres');
-      return;
-    }
+  const handleValidate = useCallback(
+    async (codeToValidate: string) => {
+      if (codeToValidate.length !== 8) {
+        setError("El codigo debe tener 8 caracteres");
+        return;
+      }
 
-    // Throttle: 2 segundos entre intentos
-    const now = Date.now();
-    if (now - lastValidationTime < 2000) {
-      setError('Espera un momento antes de intentar de nuevo');
-      return;
-    }
-    setLastValidationTime(now);
+      // Throttle: 2 segundos entre intentos
+      const now = Date.now();
+      if (now - lastValidationTime < 2000) {
+        setError("Espera un momento antes de intentar de nuevo");
+        return;
+      }
+      setLastValidationTime(now);
 
-    setIsValidating(true);
-    setError(null);
+      setIsValidating(true);
+      setError(null);
 
-    const result = await validateInvitationCode(codeToValidate);
-    setValidation(result);
+      const result = await validateInvitationCode(codeToValidate);
+      setValidation(result);
 
-    if (!result.isValid) {
-      setError(result.error || 'Codigo invalido');
-    }
+      if (!result.isValid) {
+        setError(result.error || "Codigo invalido");
+      }
 
-    setIsValidating(false);
-  }, [lastValidationTime]);
+      setIsValidating(false);
+    },
+    [lastValidationTime],
+  );
 
   // Si hay un codigo en la URL, usarlo
   useEffect(() => {
-    const codeParam = searchParams.get('code');
+    const codeParam = searchParams.get("code");
     if (codeParam) {
       const upperCode = codeParam.toUpperCase();
       setCode(upperCode);
@@ -69,7 +75,10 @@ function JoinPageContent() {
 
   const handleCodeChange = (value: string) => {
     // Solo permitir letras y numeros, maximo 8 caracteres
-    const cleaned = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+    const cleaned = value
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "")
+      .slice(0, 8);
     setCode(cleaned);
 
     // Limpiar validacion anterior si el codigo cambio
@@ -82,7 +91,7 @@ function JoinPageContent() {
   const handleJoin = async () => {
     if (!auth?.isAuthenticated) {
       // Guardar codigo y redirigir a login
-      sessionStorage.setItem('pendingInvitationCode', code);
+      sessionStorage.setItem("pendingInvitationCode", code);
       const redirectPath = `/join?code=${encodeURIComponent(code)}`;
       router.push(`/auth/login?redirect=${encodeURIComponent(redirectPath)}`);
       return;
@@ -99,10 +108,10 @@ function JoinPageContent() {
       await auth.refreshMemberships();
       // Redirigir despues de 2 segundos
       setTimeout(() => {
-        router.push('/');
+        router.push("/");
       }, 2000);
     } else {
-      setError(result.error || 'Error al unirse');
+      setError(result.error || "Error al unirse");
     }
 
     setIsJoining(false);
@@ -111,10 +120,10 @@ function JoinPageContent() {
   // Verificar si hay un codigo pendiente despues de login
   useEffect(() => {
     if (auth?.isAuthenticated) {
-      const pendingCode = sessionStorage.getItem('pendingInvitationCode');
+      const pendingCode = sessionStorage.getItem("pendingInvitationCode");
       if (pendingCode) {
         setCode(pendingCode);
-        sessionStorage.removeItem('pendingInvitationCode');
+        sessionStorage.removeItem("pendingInvitationCode");
         handleValidate(pendingCode);
       }
     }
@@ -128,9 +137,12 @@ function JoinPageContent() {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
               <Check className="w-8 h-8 text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Bienvenido!</h2>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+              Bienvenido!
+            </h2>
             <p className="text-gray-600 mb-4">
-              Te has unido exitosamente a <strong>{validation?.householdName}</strong>
+              Te has unido exitosamente a{" "}
+              <strong>{validation?.householdName}</strong>
             </p>
             <p className="text-sm text-gray-500">Redirigiendo...</p>
           </div>
@@ -147,7 +159,9 @@ function JoinPageContent() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-full mb-4">
             <Ticket className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">Unirse a un Hogar</h1>
+          <h1 className="text-2xl font-bold text-gray-800">
+            Unirse a un Hogar
+          </h1>
           <p className="text-gray-600 mt-1">Ingresa tu codigo de invitacion</p>
         </div>
 
@@ -162,7 +176,9 @@ function JoinPageContent() {
               <input
                 type="text"
                 value={formatInvitationCode(code)}
-                onChange={(e) => handleCodeChange(e.target.value.replace('-', ''))}
+                onChange={(e) =>
+                  handleCodeChange(e.target.value.replace("-", ""))
+                }
                 className="w-full text-center text-2xl font-mono tracking-widest py-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all uppercase"
                 placeholder="XXXX-XXXX"
                 maxLength={9}
@@ -189,8 +205,12 @@ function JoinPageContent() {
                   <Users className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-800">{validation.householdName}</p>
-                  <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${getRoleColor(validation.invitation.role)}`}>
+                  <p className="font-semibold text-gray-800">
+                    {validation.householdName}
+                  </p>
+                  <span
+                    className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${getRoleColor(validation.invitation.role)}`}
+                  >
                     {getRoleName(validation.invitation.role)}
                   </span>
                 </div>
@@ -200,7 +220,8 @@ function JoinPageContent() {
               </p>
               {validation.invitation.suggested_name && (
                 <p className="text-sm text-gray-500 mt-2">
-                  Seras registrado como: <strong>{validation.invitation.suggested_name}</strong>
+                  Seras registrado como:{" "}
+                  <strong>{validation.invitation.suggested_name}</strong>
                 </p>
               )}
             </div>
@@ -215,7 +236,7 @@ function JoinPageContent() {
             >
               {isValidating ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <Spinner size="md" color="white" />
                   Validando...
                 </>
               ) : (
@@ -233,12 +254,12 @@ function JoinPageContent() {
             >
               {isJoining ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <Spinner size="md" color="white" />
                   Uniendose...
                 </>
               ) : (
                 <>
-                  {auth?.isAuthenticated ? 'Unirse al hogar' : 'Continuar'}
+                  {auth?.isAuthenticated ? "Unirse al hogar" : "Continuar"}
                   <ArrowRight className="w-5 h-5" />
                 </>
               )}
@@ -291,7 +312,7 @@ function JoinPageContent() {
 function JoinPageLoading() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600" />
+      <Spinner size="xl" color="indigo" />
     </div>
   );
 }

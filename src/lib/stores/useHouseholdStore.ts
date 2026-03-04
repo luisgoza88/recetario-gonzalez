@@ -3,9 +3,9 @@
  * Manages household and user state with Zustand
  */
 
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import type { Household, User, HouseholdFeatures } from '../types/household';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import type { Household, User, HouseholdFeatures } from "../types/household";
 
 interface HouseholdState {
   // Current household
@@ -63,33 +63,33 @@ export const useHouseholdStore = create<HouseholdState>()(
 
       isOwner: () => {
         const { user } = get();
-        return user?.role === 'owner';
+        return user?.role === "owner";
       },
 
       isAdmin: () => {
         const { user } = get();
-        return user?.role === 'owner' || user?.role === 'admin';
+        return user?.role === "owner" || user?.role === "admin";
       },
 
       canManageUsers: () => {
         const { user } = get();
-        return user?.role === 'owner' || user?.role === 'admin';
+        return user?.role === "owner" || user?.role === "admin";
       },
 
       canManageHousehold: () => {
         const { user } = get();
-        return user?.role === 'owner';
+        return user?.role === "owner";
       },
     }),
     {
-      name: 'household-storage',
+      name: "household-storage",
       partialize: (state) => ({
         // Only persist essential data, not loading states
         household: state.household,
         user: state.user,
       }),
-    }
-  )
+    },
+  ),
 );
 
 // Selector hooks for common patterns

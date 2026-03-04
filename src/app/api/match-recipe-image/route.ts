@@ -1,13 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getGeminiClient, GEMINI_MODELS, cleanJsonResponse } from '@/lib/gemini/client';
-import { requireAuth } from '@/lib/api/auth';
-import { createAuthenticatedClient } from '@/lib/supabase/server';
-import { logger } from '@/lib/logger';
+import { NextRequest, NextResponse } from "next/server";
+import {
+  getGeminiClient,
+  GEMINI_MODELS,
+  cleanJsonResponse,
+} from "@/lib/gemini/client";
+import { requireAuth } from "@/lib/api/auth";
+import { createAuthenticatedClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/logger";
 
 interface MatchRequest {
   recipeName: string;
   recipeDescription?: string;
-  recipeType?: 'breakfast' | 'lunch' | 'dinner';
+  recipeType?: "breakfast" | "lunch" | "dinner";
   ingredients?: string[];
   recipeId?: string;
   autoAssign?: boolean;
@@ -41,23 +45,24 @@ export async function POST(request: NextRequest) {
       recipeType,
       ingredients,
       recipeId,
-      autoAssign = false
+      autoAssign = false,
     } = body;
 
     if (!recipeName) {
-      return NextResponse.json({ error: 'Recipe name is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Recipe name is required" },
+        { status: 400 },
+      );
     }
 
     // Get images from library, filtered by category if available
-    let query = supabase
-      .from('image_library')
-      .select('*');
+    let query = supabase.from("image_library").select("*");
 
     // Filter by category if recipe type is provided
-    if (recipeType === 'breakfast') {
-      query = query.eq('category', 'breakfast');
-    } else if (recipeType === 'lunch' || recipeType === 'dinner') {
-      query = query.in('category', ['lunch', 'dinner']);
+    if (recipeType === "breakfast") {
+      query = query.eq("category", "breakfast");
+    } else if (recipeType === "lunch" || recipeType === "dinner") {
+      query = query.in("category", ["lunch", "dinner"]);
     }
 
     const { data: libraryImages, error: fetchError } = await query.limit(100);
@@ -65,9 +70,9 @@ export async function POST(request: NextRequest) {
     if (fetchError || !libraryImages || libraryImages.length === 0) {
       return NextResponse.json({
         success: false,
-        error: 'No images in library or error fetching',
+        error: "No images in library or error fetching",
         fallback: true,
-        message: 'Consider generating a new image'
+        message: "Consider generating a new image",
       });
     }
 
@@ -81,18 +86,19 @@ export async function POST(request: NextRequest) {
       tags: img.tags,
       cuisine: img.cuisine_type,
       protein: img.main_protein,
-      ingredients: img.key_ingredients
+      ingredients: img.key_ingredients,
     }));
 
     // Build prompt for Gemini Flash
-    const ingredientsList = ingredients?.slice(0, 8).join(', ') || 'not specified';
+    const ingredientsList =
+      ingredients?.slice(0, 8).join(", ") || "not specified";
 
     const prompt = `You are a food matching assistant. Match this recipe to the BEST image from the library.
 
 RECIPE TO MATCH:
 Name: "${recipeName}"
-${recipeDescription ? `Description: ${recipeDescription}` : ''}
-Type: ${recipeType || 'main dish'}
+${recipeDescription ? `Description: ${recipeDescription}` : ""}
+Type: ${recipeType || "main dish"}
 Main ingredients: ${ingredientsList}
 
 AVAILABLE IMAGES (pick the best match):
@@ -116,14 +122,15 @@ Respond with JSON only:
 
     const response = await gemini.models.generateContent({
       model: GEMINI_MODELS.FLASH,
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
       config: {
         temperature: 0.3,
         maxOutputTokens: 500,
       },
     });
 
-    const responseText = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const responseText =
+      response.candidates?.[0]?.content?.parts?.[0]?.text || "";
     const cleanedJson = cleanJsonResponse(responseText);
 
     let matchResult;
@@ -135,20 +142,20 @@ Respond with JSON only:
       const randomIndex = Math.floor(Math.random() * candidates.length);
       matchResult = {
         bestMatchIndex: randomIndex,
-        confidence: 'low',
-        reason: 'AI parsing failed, random selection',
-        alternativeIndices: []
+        confidence: "low",
+        reason: "AI parsing failed, random selection",
+        alternativeIndices: [],
       };
     }
 
     const bestMatch = candidates[matchResult.bestMatchIndex];
-    const matchedImage = libraryImages.find(img => img.id === bestMatch?.id);
+    const matchedImage = libraryImages.find((img) => img.id === bestMatch?.id);
 
     if (!matchedImage) {
       return NextResponse.json({
         success: false,
-        error: 'No suitable match found',
-        fallback: true
+        error: "No suitable match found",
+        fallback: true,
       });
     }
 
@@ -156,28 +163,30 @@ Respond with JSON only:
     const alternatives = (matchResult.alternativeIndices || [])
       .map((idx: number) => {
         const alt = candidates[idx];
-        const altImg = libraryImages.find(img => img.id === alt?.id);
-        return altImg ? {
-          id: altImg.id,
-          image_url: altImg.image_url,
-          name_es: altImg.name_es,
-          name_en: altImg.name_en
-        } : null;
+        const altImg = libraryImages.find((img) => img.id === alt?.id);
+        return altImg
+          ? {
+              id: altImg.id,
+              image_url: altImg.image_url,
+              name_es: altImg.name_es,
+              name_en: altImg.name_en,
+            }
+          : null;
       })
       .filter(Boolean);
 
     // If autoAssign and recipeId provided, update the recipe with this image
     if (autoAssign && recipeId) {
       await supabase
-        .from('recipes')
+        .from("recipes")
         .update({ image_url: matchedImage.image_url })
-        .eq('id', recipeId);
+        .eq("id", recipeId);
 
       // Increment usage count
       await supabase
-        .from('image_library')
+        .from("image_library")
         .update({ usage_count: (matchedImage.usage_count || 0) + 1 })
-        .eq('id', matchedImage.id);
+        .eq("id", matchedImage.id);
     }
 
     return NextResponse.json({
@@ -189,15 +198,16 @@ Respond with JSON only:
         name_en: matchedImage.name_en,
         description_en: matchedImage.description_en,
         confidence: matchResult.confidence,
-        reason: matchResult.reason
+        reason: matchResult.reason,
       },
       alternatives,
-      autoAssigned: autoAssign && recipeId ? true : false
+      autoAssigned: autoAssign && recipeId ? true : false,
     });
-
   } catch (error) {
-    logger.error('Match recipe image error', { error: error instanceof Error ? error.message : String(error) });
-    return NextResponse.json({ error: 'Matching failed' }, { status: 500 });
+    logger.error("Match recipe image error", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return NextResponse.json({ error: "Matching failed" }, { status: 500 });
   }
 }
 
@@ -209,18 +219,21 @@ export async function GET(request: NextRequest) {
   const supabase = await createAuthenticatedClient();
   try {
     const { data: stats, error } = await supabase
-      .from('image_library')
-      .select('category, cuisine_type, usage_count');
+      .from("image_library")
+      .select("category, cuisine_type, usage_count");
 
     if (error) {
-      return NextResponse.json({ error: 'Error fetching stats' }, { status: 500 });
+      return NextResponse.json(
+        { error: "Error fetching stats" },
+        { status: 500 },
+      );
     }
 
     const byCategory: Record<string, number> = {};
     const byCuisine: Record<string, number> = {};
     let totalUsage = 0;
 
-    stats?.forEach(img => {
+    stats?.forEach((img) => {
       byCategory[img.category] = (byCategory[img.category] || 0) + 1;
       byCuisine[img.cuisine_type] = (byCuisine[img.cuisine_type] || 0) + 1;
       totalUsage += img.usage_count || 0;
@@ -231,10 +244,12 @@ export async function GET(request: NextRequest) {
       totalImages: stats?.length || 0,
       totalUsage,
       byCategory,
-      byCuisine
+      byCuisine,
     });
   } catch (error) {
-    logger.error('Stats error', { error: error instanceof Error ? error.message : String(error) });
-    return NextResponse.json({ error: 'Error getting stats' }, { status: 500 });
+    logger.error("Stats error", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return NextResponse.json({ error: "Error getting stats" }, { status: 500 });
   }
 }

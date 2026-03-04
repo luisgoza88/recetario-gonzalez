@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { Flame, Beef, Wheat, Droplets, Leaf } from 'lucide-react';
-import { NutritionInfo, DietaryTag } from '@/types';
+import { Flame, Beef, Wheat, Droplets, Leaf } from "lucide-react";
+import { NutritionInfo, DietaryTag } from "@/types";
 
 interface NutritionDisplayProps {
   nutrition: NutritionInfo;
@@ -11,14 +11,18 @@ interface NutritionDisplayProps {
 
 // Colores para los macros
 const MACRO_COLORS = {
-  calories: 'text-orange-600 bg-orange-50',
-  protein: 'text-red-600 bg-red-50',
-  carbs: 'text-amber-600 bg-amber-50',
-  fat: 'text-blue-600 bg-blue-50',
-  fiber: 'text-green-600 bg-green-50',
+  calories: "text-orange-600 bg-orange-50",
+  protein: "text-red-600 bg-red-50",
+  carbs: "text-amber-600 bg-amber-50",
+  fat: "text-blue-600 bg-blue-50",
+  fiber: "text-green-600 bg-green-50",
 };
 
-export default function NutritionDisplay({ nutrition, servings = 1, compact = false }: NutritionDisplayProps) {
+export default function NutritionDisplay({
+  nutrition,
+  servings = 1,
+  compact = false,
+}: NutritionDisplayProps) {
   if (!nutrition) return null;
 
   if (compact) {
@@ -94,13 +98,19 @@ export default function NutritionDisplay({ nutrition, servings = 1, compact = fa
       {(nutrition.fiber || nutrition.sodium || nutrition.sugar) && (
         <div className="mt-3 pt-3 border-t border-gray-200 flex flex-wrap gap-4 text-xs text-gray-600">
           {nutrition.fiber !== undefined && (
-            <span>Fibra: <strong>{nutrition.fiber}g</strong></span>
+            <span>
+              Fibra: <strong>{nutrition.fiber}g</strong>
+            </span>
           )}
           {nutrition.sugar !== undefined && (
-            <span>Azúcar: <strong>{nutrition.sugar}g</strong></span>
+            <span>
+              Azúcar: <strong>{nutrition.sugar}g</strong>
+            </span>
           )}
           {nutrition.sodium !== undefined && (
-            <span>Sodio: <strong>{nutrition.sodium}mg</strong></span>
+            <span>
+              Sodio: <strong>{nutrition.sodium}mg</strong>
+            </span>
           )}
         </div>
       )}
@@ -108,7 +118,8 @@ export default function NutritionDisplay({ nutrition, servings = 1, compact = fa
       {/* Total para múltiples porciones */}
       {servings > 1 && (
         <div className="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-500">
-          Total para {servings} porciones: <strong>{nutrition.calories * servings} kcal</strong>
+          Total para {servings} porciones:{" "}
+          <strong>{nutrition.calories * servings} kcal</strong>
         </div>
       )}
     </div>
@@ -121,16 +132,19 @@ interface DietaryTagsProps {
 }
 
 const TAG_STYLES: Record<DietaryTag, { label: string; color: string }> = {
-  'vegetariano': { label: 'Vegetariano', color: 'bg-green-100 text-green-700' },
-  'vegano': { label: 'Vegano', color: 'bg-green-200 text-green-800' },
-  'sin-gluten': { label: 'Sin Gluten', color: 'bg-yellow-100 text-yellow-700' },
-  'sin-lactosa': { label: 'Sin Lactosa', color: 'bg-blue-100 text-blue-700' },
-  'bajo-carbohidrato': { label: 'Low Carb', color: 'bg-purple-100 text-purple-700' },
-  'alto-proteina': { label: 'Alto Proteína', color: 'bg-red-100 text-red-700' },
-  'bajo-sodio': { label: 'Bajo Sodio', color: 'bg-cyan-100 text-cyan-700' },
-  'bajo-azucar': { label: 'Bajo Azúcar', color: 'bg-pink-100 text-pink-700' },
-  'keto': { label: 'Keto', color: 'bg-indigo-100 text-indigo-700' },
-  'paleo': { label: 'Paleo', color: 'bg-orange-100 text-orange-700' },
+  vegetariano: { label: "Vegetariano", color: "bg-green-100 text-green-700" },
+  vegano: { label: "Vegano", color: "bg-green-200 text-green-800" },
+  "sin-gluten": { label: "Sin Gluten", color: "bg-yellow-100 text-yellow-700" },
+  "sin-lactosa": { label: "Sin Lactosa", color: "bg-blue-100 text-blue-700" },
+  "bajo-carbohidrato": {
+    label: "Low Carb",
+    color: "bg-purple-100 text-purple-700",
+  },
+  "alto-proteina": { label: "Alto Proteína", color: "bg-red-100 text-red-700" },
+  "bajo-sodio": { label: "Bajo Sodio", color: "bg-cyan-100 text-cyan-700" },
+  "bajo-azucar": { label: "Bajo Azúcar", color: "bg-pink-100 text-pink-700" },
+  keto: { label: "Keto", color: "bg-indigo-100 text-indigo-700" },
+  paleo: { label: "Paleo", color: "bg-orange-100 text-orange-700" },
 };
 
 export function DietaryTags({ tags }: DietaryTagsProps) {
@@ -138,7 +152,7 @@ export function DietaryTags({ tags }: DietaryTagsProps) {
 
   return (
     <div className="flex flex-wrap gap-1">
-      {tags.map(tag => {
+      {tags.map((tag) => {
         const style = TAG_STYLES[tag];
         return (
           <span
@@ -160,7 +174,11 @@ interface PrepTimeDisplayProps {
   totalTime?: number;
 }
 
-export function PrepTimeDisplay({ prepTime, cookTime, totalTime }: PrepTimeDisplayProps) {
+export function PrepTimeDisplay({
+  prepTime,
+  cookTime,
+  totalTime,
+}: PrepTimeDisplayProps) {
   if (!prepTime && !cookTime && !totalTime) return null;
 
   const formatTime = (minutes: number) => {
@@ -196,25 +214,27 @@ export function PrepTimeDisplay({ prepTime, cookTime, totalTime }: PrepTimeDispl
 
 // Componente para mostrar dificultad
 interface DifficultyDisplayProps {
-  difficulty: 'fácil' | 'media' | 'difícil';
+  difficulty: "fácil" | "media" | "difícil";
 }
 
 export function DifficultyDisplay({ difficulty }: DifficultyDisplayProps) {
   const styles = {
-    'fácil': { color: 'text-green-600', bg: 'bg-green-100', dots: 1 },
-    'media': { color: 'text-yellow-600', bg: 'bg-yellow-100', dots: 2 },
-    'difícil': { color: 'text-red-600', bg: 'bg-red-100', dots: 3 },
+    fácil: { color: "text-green-600", bg: "bg-green-100", dots: 1 },
+    media: { color: "text-yellow-600", bg: "bg-yellow-100", dots: 2 },
+    difícil: { color: "text-red-600", bg: "bg-red-100", dots: 3 },
   };
 
   const style = styles[difficulty];
 
   return (
-    <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${style.bg} ${style.color}`}>
+    <div
+      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${style.bg} ${style.color}`}
+    >
       <span className="flex gap-0.5">
-        {[1, 2, 3].map(i => (
+        {[1, 2, 3].map((i) => (
           <span
             key={i}
-            className={`w-1.5 h-1.5 rounded-full ${i <= style.dots ? 'bg-current' : 'bg-gray-300'}`}
+            className={`w-1.5 h-1.5 rounded-full ${i <= style.dots ? "bg-current" : "bg-gray-300"}`}
           />
         ))}
       </span>

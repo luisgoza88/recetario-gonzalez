@@ -1,10 +1,22 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { ShoppingCart, Loader2, X, Check, TrendingDown, TrendingUp, DollarSign, AlertTriangle, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
-import { supabase } from '@/lib/supabase/client';
-import type { ShoppingList, ShoppingListItem } from '@/types';
-import PriceLogModal from './PriceLogModal';
+import { useState, useEffect, useCallback } from "react";
+import {
+  ShoppingCart,
+  Loader2,
+  X,
+  Check,
+  TrendingDown,
+  TrendingUp,
+  DollarSign,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+} from "lucide-react";
+import { supabase } from "@/lib/supabase/client";
+import type { ShoppingList, ShoppingListItem } from "@/types";
+import PriceLogModal from "./PriceLogModal";
 
 interface SmartShoppingSectionProps {
   onRefreshMarket: () => void;
@@ -16,7 +28,9 @@ interface SavingsTip {
   amount: number;
 }
 
-export default function SmartShoppingSection({ onRefreshMarket }: SmartShoppingSectionProps) {
+export default function SmartShoppingSection({
+  onRefreshMarket,
+}: SmartShoppingSectionProps) {
   const [loading, setLoading] = useState(false);
   const [list, setList] = useState<ShoppingList | null>(null);
   const [savings, setSavings] = useState<SavingsTip[]>([]);
@@ -31,13 +45,15 @@ export default function SmartShoppingSection({ onRefreshMarket }: SmartShoppingS
     const day = now.getDay();
     const diff = now.getDate() - day + (day === 0 ? -6 : 1);
     const monday = new Date(now.setDate(diff));
-    return monday.toISOString().split('T')[0];
+    return monday.toISOString().split("T")[0];
   };
 
   const fetchActiveList = useCallback(async () => {
     try {
       const weekStart = getWeekStart();
-      const res = await fetch(`/api/generate-shopping-list?weekStartDate=${weekStart}`);
+      const res = await fetch(
+        `/api/generate-shopping-list?weekStartDate=${weekStart}`,
+      );
       if (!res.ok) return;
       const data = await res.json();
       if (data.list) {
@@ -47,7 +63,7 @@ export default function SmartShoppingSection({ onRefreshMarket }: SmartShoppingS
         setSavings(data.savings);
       }
     } catch (err) {
-      console.error('Error fetching active list:', err);
+      console.error("Error fetching active list:", err);
     }
   }, []);
 
@@ -62,24 +78,24 @@ export default function SmartShoppingSection({ onRefreshMarket }: SmartShoppingS
 
       // Try to find an active generated menu
       const { data: menus } = await supabase
-        .from('generated_menus')
-        .select('id')
-        .in('status', ['active', 'approved'])
-        .order('created_at', { ascending: false })
+        .from("generated_menus")
+        .select("id")
+        .in("status", ["active", "approved"])
+        .order("created_at", { ascending: false })
         .limit(1);
 
       const menuId = menus?.[0]?.id;
 
-      const res = await fetch('/api/generate-shopping-list', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/generate-shopping-list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           menuId: menuId || undefined,
           weekStartDate: weekStart,
         }),
       });
 
-      if (!res.ok) throw new Error('Error generating list');
+      if (!res.ok) throw new Error("Error generating list");
       const data = await res.json();
       if (data.list) {
         setList(data.list);
@@ -87,7 +103,7 @@ export default function SmartShoppingSection({ onRefreshMarket }: SmartShoppingS
       // Refresh savings too
       await fetchActiveList();
     } catch (err) {
-      console.error('Error generating list:', err);
+      console.error("Error generating list:", err);
     } finally {
       setLoading(false);
     }
@@ -109,18 +125,22 @@ export default function SmartShoppingSection({ onRefreshMarket }: SmartShoppingS
 
     // Calculate actual total
     const totalActual = updatedItems
-      .filter(i => i.checked && i.actualPrice)
+      .filter((i) => i.checked && i.actualPrice)
       .reduce((sum, i) => sum + (i.actualPrice || 0), 0);
 
-    const updatedList = { ...list, items: updatedItems, total_actual: totalActual || undefined };
+    const updatedList = {
+      ...list,
+      items: updatedItems,
+      total_actual: totalActual || undefined,
+    };
     setList(updatedList);
 
     // Save to DB
     if (list.id) {
       await supabase
-        .from('shopping_lists')
+        .from("shopping_lists")
         .update({ items: updatedItems, total_actual: totalActual || null })
-        .eq('id', list.id);
+        .eq("id", list.id);
     }
   };
 
@@ -133,9 +153,9 @@ export default function SmartShoppingSection({ onRefreshMarket }: SmartShoppingS
 
     // Log the price
     try {
-      await fetch('/api/log-price', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      await fetch("/api/log-price", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           itemName: checkingItem,
           price,
@@ -143,26 +163,32 @@ export default function SmartShoppingSection({ onRefreshMarket }: SmartShoppingS
         }),
       });
     } catch (err) {
-      console.error('Error logging price:', err);
+      console.error("Error logging price:", err);
     }
 
     // Update the item in the list with actual price and store
-    const updatedItems = list.items.map(item =>
-      item.name === checkingItem ? { ...item, actualPrice: price, store } : item
+    const updatedItems = list.items.map((item) =>
+      item.name === checkingItem
+        ? { ...item, actualPrice: price, store }
+        : item,
     );
 
     const totalActual = updatedItems
-      .filter(i => i.checked && i.actualPrice)
+      .filter((i) => i.checked && i.actualPrice)
       .reduce((sum, i) => sum + (i.actualPrice || 0), 0);
 
-    const updatedList = { ...list, items: updatedItems, total_actual: totalActual || undefined };
+    const updatedList = {
+      ...list,
+      items: updatedItems,
+      total_actual: totalActual || undefined,
+    };
     setList(updatedList);
 
     if (list.id) {
       await supabase
-        .from('shopping_lists')
+        .from("shopping_lists")
         .update({ items: updatedItems, total_actual: totalActual || null })
-        .eq('id', list.id);
+        .eq("id", list.id);
     }
 
     setPriceLogItem(null);
@@ -176,22 +202,26 @@ export default function SmartShoppingSection({ onRefreshMarket }: SmartShoppingS
   };
 
   // Group items by category
-  const groupedItems = list?.items.reduce((acc, item, index) => {
-    const cat = item.category || 'otros';
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push({ ...item, _index: index });
-    return acc;
-  }, {} as Record<string, (ShoppingListItem & { _index: number })[]>) || {};
+  const groupedItems =
+    list?.items.reduce(
+      (acc, item, index) => {
+        const cat = item.category || "otros";
+        if (!acc[cat]) acc[cat] = [];
+        acc[cat].push({ ...item, _index: index });
+        return acc;
+      },
+      {} as Record<string, (ShoppingListItem & { _index: number })[]>,
+    ) || {};
 
   const CATEGORY_LABELS: Record<string, string> = {
-    proteinas: '🥩 Proteínas',
-    frutas: '🥬 Frutas y Verduras',
-    lacteos: '🧀 Lácteos',
-    granos: '🌾 Granos y Despensa',
-    otros: '🧂 Otros',
+    proteinas: "🥩 Proteínas",
+    frutas: "🥬 Frutas y Verduras",
+    lacteos: "🧀 Lácteos",
+    granos: "🌾 Granos y Despensa",
+    otros: "🧂 Otros",
   };
 
-  const checkedCount = list?.items.filter(i => i.checked).length || 0;
+  const checkedCount = list?.items.filter((i) => i.checked).length || 0;
   const totalCount = list?.items.length || 0;
 
   if (!list && !loading) {
@@ -204,7 +234,9 @@ export default function SmartShoppingSection({ onRefreshMarket }: SmartShoppingS
             </div>
             <div>
               <h3 className="font-bold text-gray-800">Lista Semanal IA</h3>
-              <p className="text-xs text-gray-500">Genera tu lista basada en el menú</p>
+              <p className="text-xs text-gray-500">
+                Genera tu lista basada en el menú
+              </p>
             </div>
           </div>
           <button
@@ -212,7 +244,11 @@ export default function SmartShoppingSection({ onRefreshMarket }: SmartShoppingS
             disabled={loading}
             className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
           >
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <ShoppingCart size={16} />}
+            {loading ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <ShoppingCart size={16} />
+            )}
             Generar
           </button>
         </div>
@@ -252,21 +288,29 @@ export default function SmartShoppingSection({ onRefreshMarket }: SmartShoppingS
           <div className="mt-3 bg-white/10 rounded-lg p-3">
             <div className="flex items-center justify-between text-sm">
               <span>Estimado: ${list.total_estimated.toLocaleString()}</span>
-              <span className="font-bold">Real: ${list.total_actual.toLocaleString()}</span>
+              <span className="font-bold">
+                Real: ${list.total_actual.toLocaleString()}
+              </span>
             </div>
             <div className="flex items-center gap-2 mt-1">
               {list.total_actual <= list.total_estimated ? (
                 <>
                   <TrendingDown size={14} className="text-green-200" />
                   <span className="text-xs text-green-200">
-                    Ahorras ${(list.total_estimated - list.total_actual).toLocaleString()}
+                    Ahorras $
+                    {(
+                      list.total_estimated - list.total_actual
+                    ).toLocaleString()}
                   </span>
                 </>
               ) : (
                 <>
                   <TrendingUp size={14} className="text-red-200" />
                   <span className="text-xs text-red-200">
-                    Sobrepasas ${(list.total_actual - list.total_estimated).toLocaleString()}
+                    Sobrepasas $
+                    {(
+                      list.total_actual - list.total_estimated
+                    ).toLocaleString()}
                   </span>
                 </>
               )}
@@ -287,7 +331,7 @@ export default function SmartShoppingSection({ onRefreshMarket }: SmartShoppingS
                 <div
                   key={item._index}
                   className={`flex items-center p-3 px-4 border-b last:border-b-0 transition-colors ${
-                    item.checked ? 'bg-green-50' : ''
+                    item.checked ? "bg-green-50" : ""
                   }`}
                 >
                   <input
@@ -298,7 +342,9 @@ export default function SmartShoppingSection({ onRefreshMarket }: SmartShoppingS
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className={`text-sm font-medium ${item.checked ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+                      <span
+                        className={`text-sm font-medium ${item.checked ? "line-through text-gray-400" : "text-gray-800"}`}
+                      >
                         {item.name}
                       </span>
                       {item.actualPrice ? (
@@ -334,7 +380,11 @@ export default function SmartShoppingSection({ onRefreshMarket }: SmartShoppingS
               disabled={loading}
               className="text-blue-600 text-sm font-medium flex items-center gap-1 hover:text-blue-700"
             >
-              {loading ? <Loader2 size={14} className="animate-spin" /> : <ShoppingCart size={14} />}
+              {loading ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <ShoppingCart size={14} />
+              )}
               Regenerar
             </button>
 
@@ -344,7 +394,7 @@ export default function SmartShoppingSection({ onRefreshMarket }: SmartShoppingS
                 className="text-green-600 text-sm font-medium flex items-center gap-1 hover:text-green-700"
               >
                 <DollarSign size={14} />
-                {savings.length} tip{savings.length !== 1 ? 's' : ''} de ahorro
+                {savings.length} tip{savings.length !== 1 ? "s" : ""} de ahorro
               </button>
             )}
           </div>
@@ -363,8 +413,14 @@ export default function SmartShoppingSection({ onRefreshMarket }: SmartShoppingS
               </div>
               <div className="space-y-2">
                 {savings.map((tip, i) => (
-                  <div key={i} className="bg-white rounded-lg p-2 px-3 text-sm text-green-700 flex items-start gap-2">
-                    <AlertTriangle size={14} className="text-green-500 mt-0.5 shrink-0" />
+                  <div
+                    key={i}
+                    className="bg-white rounded-lg p-2 px-3 text-sm text-green-700 flex items-start gap-2"
+                  >
+                    <AlertTriangle
+                      size={14}
+                      className="text-green-500 mt-0.5 shrink-0"
+                    />
                     <span>{tip.message}</span>
                   </div>
                 ))}

@@ -1,17 +1,17 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Lock, CheckCircle2, AlertCircle, ChefHat } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Lock, CheckCircle2, AlertCircle, ChefHat } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
   const { isLoading, isAuthenticated, updatePassword } = useAuth();
 
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -23,19 +23,20 @@ export default function ResetPasswordPage() {
     number: /[0-9]/.test(newPassword),
   };
   const isPasswordValid = Object.values(passwordChecks).every(Boolean);
-  const passwordsMatch = newPassword === confirmPassword && confirmPassword.length > 0;
+  const passwordsMatch =
+    newPassword === confirmPassword && confirmPassword.length > 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
     if (!isPasswordValid) {
-      setError('La contrasena no cumple con los requisitos');
+      setError("La contrasena no cumple con los requisitos");
       return;
     }
 
     if (!passwordsMatch) {
-      setError('Las contrasenas no coinciden');
+      setError("Las contrasenas no coinciden");
       return;
     }
 
@@ -50,7 +51,7 @@ export default function ResetPasswordPage() {
 
     setSuccess(true);
     setTimeout(() => {
-      router.push('/');
+      router.push("/");
     }, 1200);
   };
 
@@ -62,7 +63,9 @@ export default function ResetPasswordPage() {
             <ChefHat className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-gray-800">Nueva contrasena</h1>
-          <p className="text-gray-600 mt-1">Actualiza tu contrasena de acceso</p>
+          <p className="text-gray-600 mt-1">
+            Actualiza tu contrasena de acceso
+          </p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8">
@@ -71,7 +74,9 @@ export default function ResetPasswordPage() {
               <div className="inline-flex items-center justify-center w-14 h-14 bg-green-100 rounded-full mb-4">
                 <CheckCircle2 className="w-7 h-7 text-green-600" />
               </div>
-              <h2 className="text-xl font-semibold text-gray-800 mb-2">Contrasena actualizada</h2>
+              <h2 className="text-xl font-semibold text-gray-800 mb-2">
+                Contrasena actualizada
+              </h2>
               <p className="text-gray-600">Redirigiendo...</p>
             </div>
           ) : (
@@ -132,12 +137,17 @@ export default function ResetPasswordPage() {
                   disabled={isSubmitting || !isAuthenticated}
                   className="w-full py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 focus:ring-4 focus:ring-green-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSubmitting ? 'Actualizando...' : 'Guardar nueva contrasena'}
+                  {isSubmitting
+                    ? "Actualizando..."
+                    : "Guardar nueva contrasena"}
                 </button>
               </form>
 
               <p className="mt-6 text-center text-gray-600">
-                <Link href="/auth/login" className="text-green-600 font-semibold hover:text-green-700">
+                <Link
+                  href="/auth/login"
+                  className="text-green-600 font-semibold hover:text-green-700"
+                >
                   Volver a iniciar sesion
                 </Link>
               </p>

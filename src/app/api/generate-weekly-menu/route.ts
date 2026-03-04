@@ -1,10 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { z } from 'zod';
-import { getGeminiClient, GEMINI_MODELS, cleanJsonResponse, geminiWithRetry, sanitizeUserInput } from '@/lib/gemini/client';
-import { withRateLimit } from '@/lib/rate-limit';
-import { requireAuth } from '@/lib/api/auth';
-import { logger } from '@/lib/logger';
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import {
+  getGeminiClient,
+  GEMINI_MODELS,
+  cleanJsonResponse,
+  geminiWithRetry,
+  sanitizeUserInput,
+} from "@/lib/gemini/client";
+import { withRateLimit } from "@/lib/rate-limit";
+import { requireAuth } from "@/lib/api/auth";
+import { createServiceRoleClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/logger";
 
 // =====================================================
 // Input validation
@@ -13,27 +19,21 @@ import { logger } from '@/lib/logger';
 const GenerateWeeklyMenuRequestSchema = z.object({
   weekStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   householdId: z.string().uuid().optional(),
-  preferences: z.object({
-    excludeRecent: z.number().min(0).max(8).optional(),
-    style: z.string().max(200).optional(),
-    prioritizeThermomix: z.boolean().optional(),
-  }).optional(),
+  preferences: z
+    .object({
+      excludeRecent: z.number().min(0).max(8).optional(),
+      style: z.string().max(200).optional(),
+      prioritizeThermomix: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 // =====================================================
-// Supabase client (server-side, reusable)
+// Supabase client (server-side, service role for DB ops)
 // =====================================================
 
-let _supabase: ReturnType<typeof createClient> | null = null;
-
 function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-  }
-  return _supabase;
+  return createServiceRoleClient();
 }
 
 // =====================================================
@@ -47,32 +47,41 @@ interface InventoryItemRow {
 
 async function getAvailableInventory(): Promise<string[]> {
   try {
-    const { data } = await getSupabase()
-      .from('inventory')
-      .select('current_number, market_items(name, category)')
-      .gt('current_number', 0) as { data: InventoryItemRow[] | null };
+    const { data } = (await getSupabase()
+      .from("inventory")
+      .select("current_number, market_items(name, category)")
+      .gt("current_number", 0)) as { data: InventoryItemRow[] | null };
 
     if (!data) return [];
     return data
-      .filter(item => item.market_items)
-      .map(item => `${item.market_items!.name} (${item.current_number} disponible)`);
+      .filter((item) => item.market_items)
+      .map(
+        (item) =>
+          `${item.market_items!.name} (${item.current_number} disponible)`,
+      );
   } catch (error) {
-    logger.error('Error loading inventory', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error loading inventory", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return [];
   }
 }
 
 async function getMarketItems(): Promise<string[]> {
   try {
-    const { data } = await getSupabase()
-      .from('market_items')
-      .select('name, category')
-      .order('category') as { data: Array<{ name: string; category: string }> | null };
+    const { data } = (await getSupabase()
+      .from("market_items")
+      .select("name, category")
+      .order("category")) as {
+      data: Array<{ name: string; category: string }> | null;
+    };
 
     if (!data) return [];
-    return data.map(item => item.name);
+    return data.map((item) => item.name);
   } catch (error) {
-    logger.error('Error loading market items', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error loading market items", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return [];
   }
 }
@@ -89,11 +98,13 @@ async function getRecentMenuRecipes(weeksBack: number = 3): Promise<string[]> {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - weeksBack * 7);
 
-    const { data } = await getSupabase()
-      .from('generated_menus')
-      .select('menu_data')
-      .gte('week_start_date', cutoffDate.toISOString().split('T')[0])
-      .order('week_start_date', { ascending: false }) as { data: Array<{ menu_data: unknown }> | null };
+    const { data } = (await getSupabase()
+      .from("generated_menus")
+      .select("menu_data")
+      .gte("week_start_date", cutoffDate.toISOString().split("T")[0])
+      .order("week_start_date", { ascending: false })) as {
+      data: Array<{ menu_data: unknown }> | null;
+    };
 
     if (!data) return [];
 
@@ -113,19 +124,24 @@ async function getRecentMenuRecipes(weeksBack: number = 3): Promise<string[]> {
     }
     return [...new Set(recipeNames)];
   } catch (error) {
-    logger.error('Error loading recent menus', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error loading recent menus", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return [];
   }
 }
 
-async function getMealFeedback(): Promise<{ liked: string[]; disliked: string[] }> {
+async function getMealFeedback(): Promise<{
+  liked: string[];
+  disliked: string[];
+}> {
   try {
-    const { data } = await getSupabase()
-      .from('meal_feedback')
-      .select('recipe_name, star_rating, would_repeat, notes')
-      .not('recipe_name', 'is', null)
-      .order('created_at', { ascending: false })
-      .limit(50) as { data: FeedbackRow[] | null };
+    const { data } = (await getSupabase()
+      .from("meal_feedback")
+      .select("recipe_name, star_rating, would_repeat, notes")
+      .not("recipe_name", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(50)) as { data: FeedbackRow[] | null };
 
     if (!data) return { liked: [], disliked: [] };
 
@@ -137,7 +153,10 @@ async function getMealFeedback(): Promise<{ liked: string[]; disliked: string[] 
       if ((fb.star_rating && fb.star_rating >= 4) || fb.would_repeat === true) {
         liked.push(fb.recipe_name);
       }
-      if ((fb.star_rating && fb.star_rating <= 2) || fb.would_repeat === false) {
+      if (
+        (fb.star_rating && fb.star_rating <= 2) ||
+        fb.would_repeat === false
+      ) {
         disliked.push(fb.recipe_name);
       }
     }
@@ -147,7 +166,9 @@ async function getMealFeedback(): Promise<{ liked: string[]; disliked: string[] 
       disliked: [...new Set(disliked)],
     };
   } catch (error) {
-    logger.error('Error loading feedback', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error loading feedback", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return { liked: [], disliked: [] };
   }
 }
@@ -160,13 +181,17 @@ interface PreparationRow {
 
 async function getPreparations(): Promise<PreparationRow[]> {
   try {
-    const { data } = await getSupabase()
-      .from('preparations')
-      .select('name, ingredients, description') as { data: PreparationRow[] | null };
+    const { data } = (await getSupabase()
+      .from("preparations")
+      .select("name, ingredients, description")) as {
+      data: PreparationRow[] | null;
+    };
 
     return data || [];
   } catch (error) {
-    logger.error('Error loading preparations', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error loading preparations", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return [];
   }
 }
@@ -175,10 +200,19 @@ async function getPreparations(): Promise<PreparationRow[]> {
 // Day name helpers
 // =====================================================
 
-const DAY_NAMES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+const DAY_NAMES = [
+  "Lunes",
+  "Martes",
+  "Miércoles",
+  "Jueves",
+  "Viernes",
+  "Sábado",
+];
 
-function getWeekDates(weekStartDate: string): Array<{ dayNumber: number; dayName: string; date: string }> {
-  const start = new Date(weekStartDate + 'T12:00:00'); // avoid timezone issues
+function getWeekDates(
+  weekStartDate: string,
+): Array<{ dayNumber: number; dayName: string; date: string }> {
+  const start = new Date(weekStartDate + "T12:00:00"); // avoid timezone issues
   const days: Array<{ dayNumber: number; dayName: string; date: string }> = [];
 
   for (let i = 0; i < 6; i++) {
@@ -187,7 +221,7 @@ function getWeekDates(weekStartDate: string): Array<{ dayNumber: number; dayName
     days.push({
       dayNumber: i,
       dayName: DAY_NAMES[i],
-      date: d.toISOString().split('T')[0],
+      date: d.toISOString().split("T")[0],
     });
   }
   return days;
@@ -203,8 +237,11 @@ export async function POST(request: NextRequest) {
 
   try {
     // Rate limit
-    const userId = request.headers.get('x-user-id') || request.headers.get('x-forwarded-for') || 'anonymous';
-    const rateLimit = await withRateLimit(userId, 'generate-recipe');
+    const userId =
+      request.headers.get("x-user-id") ||
+      request.headers.get("x-forwarded-for") ||
+      "anonymous";
+    const rateLimit = await withRateLimit(userId, "generate-recipe");
     if (!rateLimit.allowed) {
       return NextResponse.json(rateLimit.response, {
         status: 429,
@@ -220,20 +257,37 @@ export async function POST(request: NextRequest) {
     } catch (validationError) {
       if (validationError instanceof z.ZodError) {
         return NextResponse.json(
-          { error: 'Datos inválidos', details: validationError.issues.map(e => `${e.path.join('.')}: ${e.message}`) },
-          { status: 400 }
+          {
+            error: "Datos inválidos",
+            details: validationError.issues.map(
+              (e) => `${e.path.join(".")}: ${e.message}`,
+            ),
+          },
+          { status: 400 },
         );
       }
-      return NextResponse.json({ error: 'Error parsing request' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Error parsing request" },
+        { status: 400 },
+      );
     }
 
     const { weekStartDate, householdId, preferences } = body;
     const excludeRecentWeeks = preferences?.excludeRecent ?? 3;
-    const style = preferences?.style ? sanitizeUserInput(preferences.style, 200) : 'colombiana casera con variaciones internacionales';
+    const style = preferences?.style
+      ? sanitizeUserInput(preferences.style, 200)
+      : "colombiana casera con variaciones internacionales";
     const prioritizeThermomix = preferences?.prioritizeThermomix ?? false;
 
     // Gather context in parallel
-    const [inventory, marketItems, recentRecipes, feedback, preparations, expandedRecipeNames] = await Promise.all([
+    const [
+      inventory,
+      marketItems,
+      recentRecipes,
+      feedback,
+      preparations,
+      expandedRecipeNames,
+    ] = await Promise.all([
       getAvailableInventory(),
       getMarketItems(),
       getRecentMenuRecipes(excludeRecentWeeks),
@@ -262,18 +316,21 @@ export async function POST(request: NextRequest) {
     const response = await geminiWithRetry(() =>
       gemini.models.generateContent({
         model: GEMINI_MODELS.FLASH,
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
         config: {
           temperature: 0.8,
           maxOutputTokens: 8000,
-          responseMimeType: 'application/json',
+          responseMimeType: "application/json",
         },
-      })
+      }),
     );
 
     const content = response.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!content) {
-      return NextResponse.json({ error: 'No response from AI' }, { status: 500 });
+      return NextResponse.json(
+        { error: "No response from AI" },
+        { status: 500 },
+      );
     }
 
     // Parse the response
@@ -284,43 +341,46 @@ export async function POST(request: NextRequest) {
 
       // Validate structure
       if (!menuData.days || !Array.isArray(menuData.days)) {
-        throw new Error('Invalid menu structure: missing days array');
+        throw new Error("Invalid menu structure: missing days array");
       }
     } catch (parseError) {
-      logger.error('JSON parse error for weekly menu', { error: parseError instanceof Error ? parseError.message : String(parseError) });
+      logger.error("JSON parse error for weekly menu", {
+        error:
+          parseError instanceof Error ? parseError.message : String(parseError),
+      });
       return NextResponse.json(
-        { error: 'Error al procesar el menú generado. Intenta de nuevo.' },
-        { status: 500 }
+        { error: "Error al procesar el menú generado. Intenta de nuevo." },
+        { status: 500 },
       );
     }
 
     // Store in database
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: savedMenu, error: saveError } = await (getSupabase() as any)
-      .from('generated_menus')
+      .from("generated_menus")
       .insert({
         household_id: householdId || null,
         week_start_date: weekStartDate,
-        status: 'draft',
+        status: "draft",
         menu_data: menuData.days,
-        generated_by: 'ai',
+        generated_by: "ai",
       })
       .select()
       .single();
 
     if (saveError) {
-      logger.error('Error saving generated menu', { error: saveError.message });
+      logger.error("Error saving generated menu", { error: saveError.message });
       // Still return the menu even if save fails
       return NextResponse.json({
         success: true,
         menu: {
           id: null,
           week_start_date: weekStartDate,
-          status: 'draft',
+          status: "draft",
           menu_data: menuData.days,
-          generated_by: 'ai',
+          generated_by: "ai",
         },
-        saveError: 'No se pudo guardar en la base de datos',
+        saveError: "No se pudo guardar en la base de datos",
       });
     }
 
@@ -329,8 +389,13 @@ export async function POST(request: NextRequest) {
       menu: savedMenu,
     });
   } catch (error) {
-    logger.error('Generate weekly menu error', { error: error instanceof Error ? error.message : String(error) });
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    logger.error("Generate weekly menu error", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
@@ -341,7 +406,7 @@ export async function POST(request: NextRequest) {
 // Lazy-load expanded recipe names to avoid bloating the bundle at module level
 async function getExpandedRecipeNames(): Promise<string[]> {
   try {
-    const { getRecipeNamesForPrompt } = await import('@/data/expanded-recipes');
+    const { getRecipeNamesForPrompt } = await import("@/data/expanded-recipes");
     return getRecipeNamesForPrompt();
   } catch {
     return [];
@@ -359,36 +424,53 @@ function buildPrompt(ctx: {
   prioritizeThermomix?: boolean;
   expandedRecipeNames?: string[];
 }): string {
-  const { weekDays, inventory, recentRecipes, feedback, preparations, style, prioritizeThermomix, expandedRecipeNames } = ctx;
+  const {
+    weekDays,
+    inventory,
+    recentRecipes,
+    feedback,
+    preparations,
+    style,
+    prioritizeThermomix,
+    expandedRecipeNames,
+  } = ctx;
 
-  const inventorySection = inventory.length > 0
-    ? `INGREDIENTES DISPONIBLES EN INVENTARIO:\n${inventory.map(i => `- ${i}`).join('\n')}`
-    : 'INVENTARIO: No hay datos de inventario disponibles. Usa ingredientes comunes colombianos.';
+  const inventorySection =
+    inventory.length > 0
+      ? `INGREDIENTES DISPONIBLES EN INVENTARIO:\n${inventory.map((i) => `- ${i}`).join("\n")}`
+      : "INVENTARIO: No hay datos de inventario disponibles. Usa ingredientes comunes colombianos.";
 
-  const preparationsSection = preparations.length > 0
-    ? `\nPREPARACIONES CASERAS DISPONIBLES (se pueden usar como ingredientes listos):\n${preparations.map(p => `- ${p.name}: ${(p.ingredients || []).join(', ')}`).join('\n')}`
-    : '';
+  const preparationsSection =
+    preparations.length > 0
+      ? `\nPREPARACIONES CASERAS DISPONIBLES (se pueden usar como ingredientes listos):\n${preparations.map((p) => `- ${p.name}: ${(p.ingredients || []).join(", ")}`).join("\n")}`
+      : "";
 
-  const recentSection = recentRecipes.length > 0
-    ? `\nRECETAS RECIENTES A EVITAR (no repetir):\n${recentRecipes.map(r => `- ${r}`).join('\n')}`
-    : '';
+  const recentSection =
+    recentRecipes.length > 0
+      ? `\nRECETAS RECIENTES A EVITAR (no repetir):\n${recentRecipes.map((r) => `- ${r}`).join("\n")}`
+      : "";
 
-  const likedSection = feedback.liked.length > 0
-    ? `\nRECETAS QUE LES GUSTARON (puedes inspirarte en estilos similares):\n${feedback.liked.map(r => `- ${r}`).join('\n')}`
-    : '';
+  const likedSection =
+    feedback.liked.length > 0
+      ? `\nRECETAS QUE LES GUSTARON (puedes inspirarte en estilos similares):\n${feedback.liked.map((r) => `- ${r}`).join("\n")}`
+      : "";
 
-  const dislikedSection = feedback.disliked.length > 0
-    ? `\nRECETAS QUE NO LES GUSTARON (evitar estilos similares):\n${feedback.disliked.map(r => `- ${r}`).join('\n')}`
-    : '';
+  const dislikedSection =
+    feedback.disliked.length > 0
+      ? `\nRECETAS QUE NO LES GUSTARON (evitar estilos similares):\n${feedback.disliked.map((r) => `- ${r}`).join("\n")}`
+      : "";
 
-  const expandedSection = expandedRecipeNames && expandedRecipeNames.length > 0
-    ? `\nRECETAS DE NUESTRA BIBLIOTECA (puedes usar estas como base o crear variaciones):\n${expandedRecipeNames.map(r => `- ${r}`).join('\n')}`
-    : '';
+  const expandedSection =
+    expandedRecipeNames && expandedRecipeNames.length > 0
+      ? `\nRECETAS DE NUESTRA BIBLIOTECA (puedes usar estas como base o crear variaciones):\n${expandedRecipeNames.map((r) => `- ${r}`).join("\n")}`
+      : "";
 
-  const daysDescription = weekDays.map(d => {
-    const hasDinner = d.dayNumber < 4; // Mon-Thu have dinner; Fri-Sat don't
-    return `- ${d.dayName} (${d.date}): desayuno + almuerzo${hasDinner ? ' + cena' : ' (SIN CENA - salen a comer)'}`;
-  }).join('\n');
+  const daysDescription = weekDays
+    .map((d) => {
+      const hasDinner = d.dayNumber < 4; // Mon-Thu have dinner; Fri-Sat don't
+      return `- ${d.dayName} (${d.date}): desayuno + almuerzo${hasDinner ? " + cena" : " (SIN CENA - salen a comer)"}`;
+    })
+    .join("\n");
 
   return `Eres el chef personal de la Familia González en Medellín, Colombia.
 Tu trabajo es crear un menú semanal variado, delicioso y práctico.
@@ -419,14 +501,18 @@ ${likedSection}
 ${dislikedSection}
 ${expandedSection}
 
-${prioritizeThermomix ? `
+${
+  prioritizeThermomix
+    ? `
 THERMOMIX TM6:
 La familia tiene una Thermomix TM6. Prioriza recetas que se puedan preparar fácilmente en Thermomix:
 - Cremas, sopas, sofritos, arroces, masas, batidos
 - Recetas con cocción al vapor (varoma)
 - Evita recetas que requieren principalmente horno, plancha o freidora
 - Marca las recetas adaptables a Thermomix con "thermomix_adapted": true en el JSON
-` : ''}
+`
+    : ""
+}
 FORMATO DE RESPUESTA - JSON ESTRICTO:
 Responde ÚNICAMENTE con un JSON válido con esta estructura:
 
@@ -435,7 +521,7 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura:
     {
       "dayNumber": 0,
       "dayName": "Lunes",
-      "date": "${weekDays[0]?.date || '2026-02-23'}",
+      "date": "${weekDays[0]?.date || "2026-02-23"}",
       "breakfast": {
         "name": "Nombre del desayuno",
         "description": "Descripción breve",

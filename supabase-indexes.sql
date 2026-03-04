@@ -98,44 +98,12 @@ WHERE status = 'pending';
 -- GESTIÓN DEL HOGAR
 -- =====================================================
 
--- scheduled_tasks: La tabla más consultada en home management
-CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_household_id
-ON scheduled_tasks(household_id);
+-- scheduled_tasks: Indices ya creados en migration 20260206000000
+-- (idx_scheduled_tasks_household, idx_scheduled_tasks_date, etc.)
+-- No duplicar aqui.
 
-CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_scheduled_date
-ON scheduled_tasks(scheduled_date);
-
-CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_employee_id
-ON scheduled_tasks(employee_id);
-
-CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_status
-ON scheduled_tasks(status);
-
--- Índice compuesto para dashboard diario (más frecuente)
-CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_household_date
-ON scheduled_tasks(household_id, scheduled_date);
-
--- Índice compuesto para tareas pendientes por household
-CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_household_status
-ON scheduled_tasks(household_id, status);
-
--- daily_task_instances: Consultas por fecha y empleado
-CREATE INDEX IF NOT EXISTS idx_daily_task_instances_date
-ON daily_task_instances(date);
-
-CREATE INDEX IF NOT EXISTS idx_daily_task_instances_employee_id
-ON daily_task_instances(employee_id);
-
-CREATE INDEX IF NOT EXISTS idx_daily_task_instances_status
-ON daily_task_instances(status);
-
--- Índice compuesto para tareas por fecha y empleado
-CREATE INDEX IF NOT EXISTS idx_daily_task_instances_date_employee
-ON daily_task_instances(date, employee_id);
-
--- Índice compuesto para tareas del día con orden
-CREATE INDEX IF NOT EXISTS idx_daily_task_instances_date_time
-ON daily_task_instances(date, time_start);
+-- daily_task_instances: DEPRECATED (tabla bloqueada en migration 20260212090000)
+-- Indices removidos - tabla en modo read-only.
 
 -- home_employees: Filtros por household y estado activo
 CREATE INDEX IF NOT EXISTS idx_home_employees_household_id
@@ -144,8 +112,7 @@ ON home_employees(household_id);
 CREATE INDEX IF NOT EXISTS idx_home_employees_active
 ON home_employees(active);
 
-CREATE INDEX IF NOT EXISTS idx_home_employees_is_active
-ON home_employees(is_active);
+-- Nota: is_active removido, usar solo 'active'
 
 -- Índice compuesto para empleados activos por household
 CREATE INDEX IF NOT EXISTS idx_home_employees_household_active
@@ -169,13 +136,8 @@ ON task_templates(is_active);
 CREATE INDEX IF NOT EXISTS idx_task_templates_household_active
 ON task_templates(household_id, is_active);
 
--- schedule_templates: Filtros y ordenamiento
-CREATE INDEX IF NOT EXISTS idx_schedule_templates_household_id
-ON schedule_templates(household_id);
-
--- Índice compuesto para ordenamiento por día/semana
-CREATE INDEX IF NOT EXISTS idx_schedule_templates_order
-ON schedule_templates(household_id, week_number, day_of_week, order_index);
+-- schedule_templates: DEPRECATED (tabla bloqueada en migration 20260212090000)
+-- Indices removidos - tabla en modo read-only.
 
 -- employee_checkins: Filtros por household y fecha
 CREATE INDEX IF NOT EXISTS idx_employee_checkins_household_id
@@ -253,9 +215,12 @@ ON purchases(budget_id);
 CREATE INDEX IF NOT EXISTS idx_purchases_purchased_at
 ON purchases(purchased_at DESC);
 
--- price_history: Para tracking de precios
-CREATE INDEX IF NOT EXISTS idx_price_history_item_id
-ON price_history(item_id);
+-- price_history: Para tracking de precios por household
+CREATE INDEX IF NOT EXISTS idx_price_history_household_id
+ON price_history(household_id);
+
+CREATE INDEX IF NOT EXISTS idx_price_history_item_name
+ON price_history(item_name);
 
 -- =====================================================
 -- ALIAS E INGREDIENTES

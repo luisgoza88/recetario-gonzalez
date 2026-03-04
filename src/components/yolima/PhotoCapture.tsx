@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useRef } from 'react';
-import { Camera, X, Loader2 } from 'lucide-react';
-import { supabase } from '@/lib/supabase/client';
+import { useState, useRef } from "react";
+import { Camera, X, Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase/client";
 
 interface PhotoCaptureProps {
   date: string;
@@ -35,21 +35,20 @@ export default function PhotoCapture({
 
     try {
       // Generate unique filename
-      const ext = file.name.split('.').pop() || 'jpg';
+      const ext = file.name.split(".").pop() || "jpg";
       const fileName = `yolima/${date}/${Date.now()}.${ext}`;
 
       // Upload to Supabase Storage
-      const { error: uploadError } = await supabase
-        .storage
-        .from('meal-photos')
+      const { error: uploadError } = await supabase.storage
+        .from("meal-photos")
         .upload(fileName, file, {
-          cacheControl: '3600',
+          cacheControl: "3600",
           upsert: false,
         });
 
       if (uploadError) {
         // If bucket doesn't exist, store locally
-        console.error('Upload error:', uploadError);
+        console.error("Upload error:", uploadError);
         // Create a local URL instead
         const localUrl = URL.createObjectURL(file);
         onPhotoAdded(localUrl);
@@ -58,22 +57,21 @@ export default function PhotoCapture({
       }
 
       // Get public URL
-      const { data: urlData } = supabase
-        .storage
-        .from('meal-photos')
+      const { data: urlData } = supabase.storage
+        .from("meal-photos")
         .getPublicUrl(fileName);
 
       if (urlData?.publicUrl) {
         onPhotoAdded(urlData.publicUrl);
       }
     } catch (err) {
-      console.error('Photo capture error:', err);
-      setError('No se pudo subir la foto. Intenta de nuevo.');
+      console.error("Photo capture error:", err);
+      setError("No se pudo subir la foto. Intenta de nuevo.");
     } finally {
       setUploading(false);
       // Reset input
       if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        fileInputRef.current.value = "";
       }
     }
   };
@@ -83,7 +81,9 @@ export default function PhotoCapture({
       {/* Header */}
       <div className="flex items-center gap-3 mb-4">
         <span className="text-3xl">📸</span>
-        <h3 className="text-xl font-bold text-gray-700 uppercase">Fotos del Plato</h3>
+        <h3 className="text-xl font-bold text-gray-700 uppercase">
+          Fotos del Plato
+        </h3>
       </div>
 
       {/* Existing photos */}
@@ -112,10 +112,10 @@ export default function PhotoCapture({
         disabled={uploading}
         className={`w-full min-h-[56px] rounded-xl text-lg font-semibold transition-all
                     flex items-center justify-center gap-3 ${
-          uploading
-            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            : 'bg-orange-100 text-orange-700 hover:bg-orange-200 active:bg-orange-300 border-2 border-orange-300'
-        }`}
+                      uploading
+                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                        : "bg-orange-100 text-orange-700 hover:bg-orange-200 active:bg-orange-300 border-2 border-orange-300"
+                    }`}
       >
         {uploading ? (
           <>
@@ -141,9 +141,7 @@ export default function PhotoCapture({
       />
 
       {/* Error message */}
-      {error && (
-        <p className="text-red-500 text-center mt-3">{error}</p>
-      )}
+      {error && <p className="text-red-500 text-center mt-3">{error}</p>}
 
       {/* Photo preview overlay */}
       {previewPhoto && (

@@ -1,12 +1,23 @@
-'use client';
+"use client";
 
-import { useState, useRef } from 'react';
+import { useState, useRef } from "react";
 import {
-  X, Camera, Upload, Loader2, Check, Plus, Package,
-  AlertCircle, Sparkles, RefreshCw, ChevronDown, ChevronUp,
-  Trash2, ImagePlus
-} from 'lucide-react';
-import { useEscapeKey } from '@/hooks/useEscapeKey';
+  X,
+  Camera,
+  Upload,
+  Loader2,
+  Check,
+  Plus,
+  Package,
+  AlertCircle,
+  Sparkles,
+  RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  Trash2,
+  ImagePlus,
+} from "lucide-react";
+import { useEscapeKey } from "@/hooks/useEscapeKey";
 
 const MAX_PHOTOS = 5;
 
@@ -23,13 +34,13 @@ interface MatchedProduct {
   product: IdentifiedProduct;
   marketItemId: string;
   marketItemName: string;
-  action: 'update_inventory';
+  action: "update_inventory";
   selected?: boolean;
 }
 
 interface NewProduct {
   product: IdentifiedProduct;
-  action: 'create_new';
+  action: "create_new";
   selected?: boolean;
 }
 
@@ -45,14 +56,19 @@ interface ScanPantryModalProps {
   onComplete: () => void;
 }
 
-type ScanStep = 'capture' | 'analyzing' | 'results' | 'applying' | 'done';
+type ScanStep = "capture" | "analyzing" | "results" | "applying" | "done";
 
-export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModalProps) {
-  const [step, setStep] = useState<ScanStep>('capture');
+export default function ScanPantryModal({
+  onClose,
+  onComplete,
+}: ScanPantryModalProps) {
+  const [step, setStep] = useState<ScanStep>("capture");
   const [images, setImages] = useState<string[]>([]);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [expandedSection, setExpandedSection] = useState<'matched' | 'new' | null>('matched');
+  const [expandedSection, setExpandedSection] = useState<
+    "matched" | "new" | null
+  >("matched");
   const [analyzingProgress, setAnalyzingProgress] = useState(0);
   const [continuousMode, setContinuousMode] = useState(true);
   const [showContinuePrompt, setShowContinuePrompt] = useState(false);
@@ -69,7 +85,11 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
     // Process each file
     const newImages: string[] = [];
 
-    for (let i = 0; i < files.length && images.length + newImages.length < MAX_PHOTOS; i++) {
+    for (
+      let i = 0;
+      i < files.length && images.length + newImages.length < MAX_PHOTOS;
+      i++
+    ) {
       const file = files[i];
       const base64 = await fileToBase64(file);
       newImages.push(base64);
@@ -79,7 +99,7 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
     setImages(updatedImages);
 
     // Reset input to allow selecting the same file again
-    e.target.value = '';
+    e.target.value = "";
 
     // If continuous mode is on and we haven't reached max, show prompt to continue
     if (continuousMode && updatedImages.length < MAX_PHOTOS) {
@@ -109,20 +129,20 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
   };
 
   const removeImage = (index: number) => {
-    setImages(prev => prev.filter((_, i) => i !== index));
+    setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const analyzeImages = async () => {
     if (images.length === 0) return;
 
-    setStep('analyzing');
+    setStep("analyzing");
     setError(null);
     setAnalyzingProgress(0);
 
     try {
-      const response = await fetch('/api/scan-pantry', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/scan-pantry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ images }),
       });
 
@@ -135,32 +155,46 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
       // Marcar todos como seleccionados por defecto
       const result: ScanResult = {
         ...data,
-        matched: data.matched.map((m: MatchedProduct) => ({ ...m, selected: true })),
-        newItems: data.newItems.map((n: NewProduct) => ({ ...n, selected: true })),
+        matched: data.matched.map((m: MatchedProduct) => ({
+          ...m,
+          selected: true,
+        })),
+        newItems: data.newItems.map((n: NewProduct) => ({
+          ...n,
+          selected: true,
+        })),
       };
 
       setScanResult(result);
-      setStep('results');
+      setStep("results");
     } catch (err) {
-      console.error('Error analyzing images:', err);
-      setError(err instanceof Error ? err.message : 'Error al analizar las imágenes');
-      setStep('capture');
+      console.error("Error analyzing images:", err);
+      setError(
+        err instanceof Error ? err.message : "Error al analizar las imágenes",
+      );
+      setStep("capture");
     }
   };
 
-  const toggleProductSelection = (type: 'matched' | 'new', index: number) => {
+  const toggleProductSelection = (type: "matched" | "new", index: number) => {
     if (!scanResult) return;
 
-    setScanResult(prev => {
+    setScanResult((prev) => {
       if (!prev) return prev;
 
-      if (type === 'matched') {
+      if (type === "matched") {
         const updated = [...prev.matched];
-        updated[index] = { ...updated[index], selected: !updated[index].selected };
+        updated[index] = {
+          ...updated[index],
+          selected: !updated[index].selected,
+        };
         return { ...prev, matched: updated };
       } else {
         const updated = [...prev.newItems];
-        updated[index] = { ...updated[index], selected: !updated[index].selected };
+        updated[index] = {
+          ...updated[index],
+          selected: !updated[index].selected,
+        };
         return { ...prev, newItems: updated };
       }
     });
@@ -169,16 +203,16 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
   const applyChanges = async () => {
     if (!scanResult) return;
 
-    setStep('applying');
+    setStep("applying");
     setError(null);
 
     try {
-      const selectedMatched = scanResult.matched.filter(m => m.selected);
-      const selectedNew = scanResult.newItems.filter(n => n.selected);
+      const selectedMatched = scanResult.matched.filter((m) => m.selected);
+      const selectedNew = scanResult.newItems.filter((n) => n.selected);
 
-      const response = await fetch('/api/scan-pantry', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/scan-pantry", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           matched: selectedMatched,
           newItems: selectedNew,
@@ -191,15 +225,15 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
         throw new Error(data.error);
       }
 
-      setStep('done');
+      setStep("done");
       setTimeout(() => {
         onComplete();
         onClose();
       }, 2000);
     } catch (err) {
-      console.error('Error applying changes:', err);
-      setError(err instanceof Error ? err.message : 'Error al aplicar cambios');
-      setStep('results');
+      console.error("Error applying changes:", err);
+      setError(err instanceof Error ? err.message : "Error al aplicar cambios");
+      setStep("results");
     }
   };
 
@@ -207,17 +241,22 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
     setImages([]);
     setScanResult(null);
     setError(null);
-    setStep('capture');
+    setStep("capture");
   };
 
   const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 0.8) return 'text-green-600 bg-green-50';
-    if (confidence >= 0.6) return 'text-yellow-600 bg-yellow-50';
-    return 'text-red-600 bg-red-50';
+    if (confidence >= 0.8) return "text-green-600 bg-green-50";
+    if (confidence >= 0.6) return "text-yellow-600 bg-yellow-50";
+    return "text-red-600 bg-red-50";
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center" role="dialog" aria-modal="true">
+    <div
+      className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="scan-pantry-modal-title"
+    >
       <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
@@ -226,13 +265,18 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
               <Camera className="text-purple-600" size={20} />
             </div>
             <div>
-              <h2 className="font-semibold text-gray-900">Escanear Despensa</h2>
+              <h2
+                id="scan-pantry-modal-title"
+                className="font-semibold text-gray-900"
+              >
+                Escanear Despensa
+              </h2>
               <p className="text-xs text-gray-500">
-                {step === 'capture' && `${images.length}/${MAX_PHOTOS} fotos`}
-                {step === 'analyzing' && 'Analizando productos...'}
-                {step === 'results' && 'Revisa los productos identificados'}
-                {step === 'applying' && 'Aplicando cambios...'}
-                {step === 'done' && 'Inventario actualizado'}
+                {step === "capture" && `${images.length}/${MAX_PHOTOS} fotos`}
+                {step === "analyzing" && "Analizando productos..."}
+                {step === "results" && "Revisa los productos identificados"}
+                {step === "applying" && "Aplicando cambios..."}
+                {step === "done" && "Inventario actualizado"}
               </p>
             </div>
           </div>
@@ -249,7 +293,10 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
           {/* Error Message */}
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2">
-              <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={18} />
+              <AlertCircle
+                className="text-red-500 flex-shrink-0 mt-0.5"
+                size={18}
+              />
               <div>
                 <p className="text-sm text-red-700 font-medium">Error</p>
                 <p className="text-xs text-red-600">{error}</p>
@@ -258,7 +305,7 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
           )}
 
           {/* Step: Capture */}
-          {step === 'capture' && (
+          {step === "capture" && (
             <div className="space-y-4">
               {/* Continue Prompt Modal */}
               {showContinuePrompt && (
@@ -272,7 +319,8 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
                         ¡Foto {images.length} agregada!
                       </h3>
                       <p className="text-sm text-gray-500 mt-1">
-                        Puedes agregar {MAX_PHOTOS - images.length} foto{MAX_PHOTOS - images.length > 1 ? 's' : ''} más
+                        Puedes agregar {MAX_PHOTOS - images.length} foto
+                        {MAX_PHOTOS - images.length > 1 ? "s" : ""} más
                       </p>
                     </div>
 
@@ -288,7 +336,8 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
                         onClick={handleStopCapture}
                         className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
                       >
-                        Listo, analizar {images.length} foto{images.length > 1 ? 's' : ''}
+                        Listo, analizar {images.length} foto
+                        {images.length > 1 ? "s" : ""}
                       </button>
                       <button
                         onClick={onClose}
@@ -391,7 +440,7 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
                   className="w-full py-4 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 hover:from-purple-700 hover:to-purple-800 transition-all shadow-lg"
                 >
                   <Sparkles size={20} />
-                  Analizar {images.length} foto{images.length > 1 ? 's' : ''}
+                  Analizar {images.length} foto{images.length > 1 ? "s" : ""}
                 </button>
               )}
 
@@ -415,7 +464,9 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
 
               {/* Tips */}
               <div className="bg-blue-50 p-3 rounded-xl">
-                <p className="text-sm text-blue-700 font-medium mb-1">Tips para mejores resultados:</p>
+                <p className="text-sm text-blue-700 font-medium mb-1">
+                  Tips para mejores resultados:
+                </p>
                 <ul className="text-xs text-blue-600 space-y-1">
                   <li>• Asegúrate de que haya buena iluminación</li>
                   <li>• Incluye varios productos en cada foto</li>
@@ -427,12 +478,14 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
           )}
 
           {/* Step: Analyzing */}
-          {step === 'analyzing' && (
+          {step === "analyzing" && (
             <div className="py-8 text-center">
               <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Loader2 className="text-purple-600 animate-spin" size={32} />
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Analizando {images.length} foto{images.length > 1 ? 's' : ''}...</h3>
+              <h3 className="font-semibold text-gray-900 mb-2">
+                Analizando {images.length} foto{images.length > 1 ? "s" : ""}...
+              </h3>
               <p className="text-sm text-gray-500 mb-4">
                 Identificando productos y cantidades
               </p>
@@ -452,7 +505,7 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
           )}
 
           {/* Step: Results */}
-          {step === 'results' && scanResult && (
+          {step === "results" && scanResult && (
             <div className="space-y-4">
               {/* Summary */}
               <div className="bg-purple-50 p-3 rounded-xl">
@@ -466,22 +519,29 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
               {/* Stats */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-green-50 p-3 rounded-xl text-center">
-                  <p className="text-2xl font-bold text-green-700">{scanResult.matched.length}</p>
+                  <p className="text-2xl font-bold text-green-700">
+                    {scanResult.matched.length}
+                  </p>
                   <p className="text-xs text-green-600">Ya en tu lista</p>
                 </div>
                 <div className="bg-blue-50 p-3 rounded-xl text-center">
-                  <p className="text-2xl font-bold text-blue-700">{scanResult.newItems.length}</p>
+                  <p className="text-2xl font-bold text-blue-700">
+                    {scanResult.newItems.length}
+                  </p>
                   <p className="text-xs text-blue-600">Nuevos productos</p>
                 </div>
               </div>
 
               {/* Selection info */}
               <div className="bg-amber-50 p-3 rounded-xl text-sm text-amber-700">
-                <p className="font-medium">Selecciona los productos correctos:</p>
+                <p className="font-medium">
+                  Selecciona los productos correctos:
+                </p>
                 <p className="text-xs mt-1">
-                  ✓ Seleccionados existentes → actualizan inventario<br/>
-                  ✓ Seleccionados nuevos → se agregan a tu lista<br/>
-                  ✗ No seleccionados → se ignoran
+                  ✓ Seleccionados existentes → actualizan inventario
+                  <br />
+                  ✓ Seleccionados nuevos → se agregan a tu lista
+                  <br />✗ No seleccionados → se ignoran
                 </p>
               </div>
 
@@ -489,41 +549,60 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
               {scanResult.matched.length > 0 && (
                 <div className="border rounded-xl overflow-hidden">
                   <button
-                    onClick={() => setExpandedSection(expandedSection === 'matched' ? null : 'matched')}
+                    onClick={() =>
+                      setExpandedSection(
+                        expandedSection === "matched" ? null : "matched",
+                      )
+                    }
                     className="w-full flex items-center justify-between p-3 bg-green-50 hover:bg-green-100"
                   >
                     <span className="font-medium text-green-700 flex items-center gap-2">
                       <Check size={16} />
-                      Actualizar inventario ({scanResult.matched.filter(m => m.selected).length}/{scanResult.matched.length})
+                      Actualizar inventario (
+                      {scanResult.matched.filter((m) => m.selected).length}/
+                      {scanResult.matched.length})
                     </span>
-                    {expandedSection === 'matched' ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                    {expandedSection === "matched" ? (
+                      <ChevronUp size={18} />
+                    ) : (
+                      <ChevronDown size={18} />
+                    )}
                   </button>
-                  {expandedSection === 'matched' && (
+                  {expandedSection === "matched" && (
                     <div className="divide-y">
                       {scanResult.matched.map((match, index) => (
                         <label
                           key={index}
                           className={`flex items-center gap-3 p-3 cursor-pointer transition-colors ${
-                            match.selected ? 'bg-green-50/50' : 'bg-gray-50 opacity-60'
+                            match.selected
+                              ? "bg-green-50/50"
+                              : "bg-gray-50 opacity-60"
                           }`}
                         >
                           <input
                             type="checkbox"
                             checked={match.selected}
-                            onChange={() => toggleProductSelection('matched', index)}
+                            onChange={() =>
+                              toggleProductSelection("matched", index)
+                            }
                             className="w-5 h-5 accent-green-600"
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className={`font-medium truncate ${!match.selected && 'line-through text-gray-400'}`}>
+                              <span
+                                className={`font-medium truncate ${!match.selected && "line-through text-gray-400"}`}
+                              >
                                 {match.marketItemName}
                               </span>
-                              <span className={`text-xs px-1.5 py-0.5 rounded ${getConfidenceColor(match.product.confidence)}`}>
+                              <span
+                                className={`text-xs px-1.5 py-0.5 rounded ${getConfidenceColor(match.product.confidence)}`}
+                              >
                                 {Math.round(match.product.confidence * 100)}%
                               </span>
                             </div>
                             <p className="text-xs text-gray-500">
-                              Detectado: {match.product.name} → {match.product.quantity} {match.product.unit}
+                              Detectado: {match.product.name} →{" "}
+                              {match.product.quantity} {match.product.unit}
                             </p>
                           </div>
                         </label>
@@ -537,44 +616,64 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
               {scanResult.newItems.length > 0 && (
                 <div className="border rounded-xl overflow-hidden">
                   <button
-                    onClick={() => setExpandedSection(expandedSection === 'new' ? null : 'new')}
+                    onClick={() =>
+                      setExpandedSection(
+                        expandedSection === "new" ? null : "new",
+                      )
+                    }
                     className="w-full flex items-center justify-between p-3 bg-blue-50 hover:bg-blue-100"
                   >
                     <span className="font-medium text-blue-700 flex items-center gap-2">
                       <Plus size={16} />
-                      Agregar a lista ({scanResult.newItems.filter(n => n.selected).length}/{scanResult.newItems.length})
+                      Agregar a lista (
+                      {scanResult.newItems.filter((n) => n.selected).length}/
+                      {scanResult.newItems.length})
                     </span>
-                    {expandedSection === 'new' ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                    {expandedSection === "new" ? (
+                      <ChevronUp size={18} />
+                    ) : (
+                      <ChevronDown size={18} />
+                    )}
                   </button>
-                  {expandedSection === 'new' && (
+                  {expandedSection === "new" && (
                     <div className="divide-y">
                       {scanResult.newItems.map((newItem, index) => (
                         <label
                           key={index}
                           className={`flex items-center gap-3 p-3 cursor-pointer transition-colors ${
-                            newItem.selected ? 'bg-blue-50/50' : 'bg-gray-50 opacity-60'
+                            newItem.selected
+                              ? "bg-blue-50/50"
+                              : "bg-gray-50 opacity-60"
                           }`}
                         >
                           <input
                             type="checkbox"
                             checked={newItem.selected}
-                            onChange={() => toggleProductSelection('new', index)}
+                            onChange={() =>
+                              toggleProductSelection("new", index)
+                            }
                             className="w-5 h-5 accent-blue-600"
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <Package size={14} className="text-blue-500" />
-                              <span className={`font-medium ${!newItem.selected && 'line-through text-gray-400'}`}>
+                              <span
+                                className={`font-medium ${!newItem.selected && "line-through text-gray-400"}`}
+                              >
                                 {newItem.product.genericName}
                               </span>
-                              <span className={`text-xs px-1.5 py-0.5 rounded ${getConfidenceColor(newItem.product.confidence)}`}>
+                              <span
+                                className={`text-xs px-1.5 py-0.5 rounded ${getConfidenceColor(newItem.product.confidence)}`}
+                              >
                                 {Math.round(newItem.product.confidence * 100)}%
                               </span>
                             </div>
                             <p className="text-xs text-gray-500">
-                              {newItem.product.category} • {newItem.product.quantity} {newItem.product.unit}
+                              {newItem.product.category} •{" "}
+                              {newItem.product.quantity} {newItem.product.unit}
                             </p>
-                            {newItem.product.name !== newItem.product.genericName && (
+                            {newItem.product.name !==
+                              newItem.product.genericName && (
                               <p className="text-xs text-purple-500">
                                 Marca: {newItem.product.name}
                               </p>
@@ -588,28 +687,33 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
               )}
 
               {/* No products */}
-              {scanResult.matched.length === 0 && scanResult.newItems.length === 0 && (
-                <div className="text-center py-8">
-                  <Package className="mx-auto text-gray-300 mb-2" size={48} />
-                  <p className="text-gray-500">No se identificaron productos</p>
-                  <button
-                    onClick={resetScan}
-                    className="mt-4 text-purple-600 font-medium"
-                  >
-                    Intentar con otras fotos
-                  </button>
-                </div>
-              )}
+              {scanResult.matched.length === 0 &&
+                scanResult.newItems.length === 0 && (
+                  <div className="text-center py-8">
+                    <Package className="mx-auto text-gray-300 mb-2" size={48} />
+                    <p className="text-gray-500">
+                      No se identificaron productos
+                    </p>
+                    <button
+                      onClick={resetScan}
+                      className="mt-4 text-purple-600 font-medium"
+                    >
+                      Intentar con otras fotos
+                    </button>
+                  </div>
+                )}
             </div>
           )}
 
           {/* Step: Applying */}
-          {step === 'applying' && (
+          {step === "applying" && (
             <div className="py-12 text-center">
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Loader2 className="text-green-600 animate-spin" size={32} />
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Actualizando inventario...</h3>
+              <h3 className="font-semibold text-gray-900 mb-2">
+                Actualizando inventario...
+              </h3>
               <p className="text-sm text-gray-500">
                 Guardando los cambios en tu lista de mercado
               </p>
@@ -617,7 +721,7 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
           )}
 
           {/* Step: Done */}
-          {step === 'done' && (
+          {step === "done" && (
             <div className="py-12 text-center">
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Check className="text-green-600" size={40} />
@@ -631,7 +735,7 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
         </div>
 
         {/* Footer */}
-        {step === 'results' && scanResult && (
+        {step === "results" && scanResult && (
           <div className="p-4 border-t bg-gray-50">
             <div className="flex gap-3">
               <button
@@ -643,8 +747,8 @@ export default function ScanPantryModal({ onClose, onComplete }: ScanPantryModal
               <button
                 onClick={applyChanges}
                 disabled={
-                  scanResult.matched.filter(m => m.selected).length === 0 &&
-                  scanResult.newItems.filter(n => n.selected).length === 0
+                  scanResult.matched.filter((m) => m.selected).length === 0 &&
+                  scanResult.newItems.filter((n) => n.selected).length === 0
                 }
                 className="flex-1 py-3 px-4 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >

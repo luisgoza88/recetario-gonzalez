@@ -1,17 +1,17 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase/client';
-import type { Recipe, MarketItem } from '@/types';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase/client";
+import type { Recipe, MarketItem } from "@/types";
 
 // ============================================
 // QUERY KEYS
 // ============================================
 export const queryKeys = {
-  recipes: ['recipes'] as const,
-  marketItems: ['marketItems'] as const,
-  inventory: ['inventory'] as const,
-  checklist: ['checklist'] as const,
-  suggestions: ['suggestions'] as const,
-  dayMenu: ['dayMenu'] as const,
+  recipes: ["recipes"] as const,
+  marketItems: ["marketItems"] as const,
+  inventory: ["inventory"] as const,
+  checklist: ["checklist"] as const,
+  suggestions: ["suggestions"] as const,
+  dayMenu: ["dayMenu"] as const,
 };
 
 // ============================================
@@ -19,9 +19,9 @@ export const queryKeys = {
 // ============================================
 async function fetchRecipes() {
   const { data, error } = await supabase
-    .from('recipes')
-    .select('*')
-    .order('name');
+    .from("recipes")
+    .select("*")
+    .order("name");
 
   if (error) throw error;
   return data as Recipe[];
@@ -29,9 +29,9 @@ async function fetchRecipes() {
 
 async function fetchMarketItems() {
   const { data, error } = await supabase
-    .from('market_items')
-    .select('*')
-    .order('order_index');
+    .from("market_items")
+    .select("*")
+    .order("order_index");
 
   if (error) throw error;
   return data;
@@ -39,8 +39,8 @@ async function fetchMarketItems() {
 
 async function fetchChecklist() {
   const { data, error } = await supabase
-    .from('market_checklist')
-    .select('item_id, checked');
+    .from("market_checklist")
+    .select("item_id, checked");
 
   if (error) throw error;
   return data;
@@ -48,8 +48,8 @@ async function fetchChecklist() {
 
 async function fetchInventory() {
   const { data, error } = await supabase
-    .from('inventory')
-    .select('item_id, current_quantity, current_number');
+    .from("inventory")
+    .select("item_id, current_quantity, current_number");
 
   if (error) throw error;
   return data;
@@ -57,9 +57,9 @@ async function fetchInventory() {
 
 async function fetchSuggestionsCount() {
   const { count, error } = await supabase
-    .from('adjustment_suggestions')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'pending');
+    .from("adjustment_suggestions")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "pending");
 
   if (error) throw error;
   return count || 0;
@@ -89,26 +89,27 @@ export function useMarketItems() {
     queryKey: queryKeys.marketItems,
     queryFn: async () => {
       // Ejecutar todas las queries en paralelo
-      const [itemsResult, checklistResult, inventoryResult] = await Promise.all([
-        fetchMarketItems(),
-        fetchChecklist(),
-        fetchInventory(),
-      ]);
+      const [itemsResult, checklistResult, inventoryResult] = await Promise.all(
+        [fetchMarketItems(), fetchChecklist(), fetchInventory()],
+      );
 
       // Crear mapas para búsqueda rápida
       const checklistMap = new Map(
-        (checklistResult || []).map(c => [c.item_id, c.checked])
+        (checklistResult || []).map((c) => [c.item_id, c.checked]),
       );
       const inventoryMap = new Map(
-        (inventoryResult || []).map(i => [i.item_id, { qty: i.current_quantity, num: i.current_number }])
+        (inventoryResult || []).map((i) => [
+          i.item_id,
+          { qty: i.current_quantity, num: i.current_number },
+        ]),
       );
 
       // Combinar datos
-      const items: MarketItem[] = (itemsResult || []).map(item => ({
+      const items: MarketItem[] = (itemsResult || []).map((item) => ({
         ...item,
         checked: checklistMap.get(item.id) || false,
-        currentQuantity: inventoryMap.get(item.id)?.qty || '0',
-        currentNumber: inventoryMap.get(item.id)?.num || 0
+        currentQuantity: inventoryMap.get(item.id)?.qty || "0",
+        currentNumber: inventoryMap.get(item.id)?.num || 0,
       }));
 
       // También actualizar queries individuales en cache
@@ -143,10 +144,16 @@ export function useToggleChecklist() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ itemId, checked }: { itemId: string; checked: boolean }) => {
+    mutationFn: async ({
+      itemId,
+      checked,
+    }: {
+      itemId: string;
+      checked: boolean;
+    }) => {
       const { error } = await supabase
-        .from('market_checklist')
-        .upsert({ item_id: itemId, checked }, { onConflict: 'item_id' });
+        .from("market_checklist")
+        .upsert({ item_id: itemId, checked }, { onConflict: "item_id" });
 
       if (error) throw error;
       return { itemId, checked };
@@ -168,18 +175,20 @@ export function useUpdateInventory() {
     mutationFn: async ({
       itemId,
       quantity,
-      number
+      number,
     }: {
       itemId: string;
       quantity: string;
       number: number;
     }) => {
-      const { error } = await supabase
-        .from('inventory')
-        .upsert(
-          { item_id: itemId, current_quantity: quantity, current_number: number },
-          { onConflict: 'item_id' }
-        );
+      const { error } = await supabase.from("inventory").upsert(
+        {
+          item_id: itemId,
+          current_quantity: quantity,
+          current_number: number,
+        },
+        { onConflict: "item_id" },
+      );
 
       if (error) throw error;
       return { itemId, quantity, number };

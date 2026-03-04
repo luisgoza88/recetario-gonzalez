@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { Check } from 'lucide-react';
+import { Check } from "lucide-react";
 
 interface TaskChecklistProps {
   emoji: string;
@@ -46,26 +46,26 @@ export default function TaskChecklist({
               onClick={() => onToggle(item)}
               className={`w-full min-h-[52px] rounded-xl px-4 py-3 flex items-center gap-4 text-left
                           transition-all duration-200 ${
-                isDone
-                  ? 'bg-green-50 border-2 border-green-300'
-                  : 'bg-gray-50 border-2 border-gray-200 hover:bg-gray-100 active:bg-gray-200'
-              }`}
+                            isDone
+                              ? "bg-green-50 border-2 border-green-300"
+                              : "bg-gray-50 border-2 border-gray-200 hover:bg-gray-100 active:bg-gray-200"
+                          }`}
             >
               {/* Checkbox */}
               <div
                 className={`w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center transition-colors ${
-                  isDone
-                    ? 'bg-green-500'
-                    : 'border-2 border-gray-400'
+                  isDone ? "bg-green-500" : "border-2 border-gray-400"
                 }`}
               >
-                {isDone && <Check size={18} strokeWidth={3} className="text-white" />}
+                {isDone && (
+                  <Check size={18} strokeWidth={3} className="text-white" />
+                )}
               </div>
 
               {/* Label */}
               <span
                 className={`text-lg ${
-                  isDone ? 'text-green-700 line-through' : 'text-gray-700'
+                  isDone ? "text-green-700 line-through" : "text-gray-700"
                 }`}
               >
                 {item}

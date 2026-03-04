@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from "react";
 import analytics, {
   AnalyticsEvent,
   EventProperties,
@@ -14,7 +14,7 @@ import analytics, {
   homeAnalytics,
   subscriptionAnalytics,
   engagementAnalytics,
-} from './index';
+} from "./index";
 
 /**
  * Hook para usar analytics en componentes React
@@ -22,9 +22,12 @@ import analytics, {
  */
 export function useAnalytics() {
   // Track generic event
-  const track = useCallback((event: AnalyticsEvent, properties?: EventProperties) => {
-    analytics.track(event, properties);
-  }, []);
+  const track = useCallback(
+    (event: AnalyticsEvent, properties?: EventProperties) => {
+      analytics.track(event, properties);
+    },
+    [],
+  );
 
   // Timer helpers para medir duraciones
   const startTimer = useCallback(() => {
@@ -56,14 +59,17 @@ export function useAnalytics() {
 /**
  * Hook para trackear el tiempo en una página/vista
  */
-export function usePageViewTracking(pageName: string, properties?: EventProperties) {
+export function usePageViewTracking(
+  pageName: string,
+  properties?: EventProperties,
+) {
   const startTimeRef = useRef<number>(Date.now());
 
   useEffect(() => {
     startTimeRef.current = Date.now();
 
     // Track page view
-    analytics.track('feature_discovered', {
+    analytics.track("feature_discovered", {
       feature_name: `page_${pageName}`,
       ...properties,
     });
@@ -71,8 +77,9 @@ export function usePageViewTracking(pageName: string, properties?: EventProperti
     // Cleanup: track tiempo en página al salir
     return () => {
       const duration = Date.now() - startTimeRef.current;
-      if (duration > 1000) { // Solo si estuvo más de 1 segundo
-        analytics.track('feature_discovered', {
+      if (duration > 1000) {
+        // Solo si estuvo más de 1 segundo
+        analytics.track("feature_discovered", {
           feature_name: `page_${pageName}_exit`,
           duration_ms: duration,
         });
@@ -93,22 +100,25 @@ export function useFeatureLoadTracking(featureName: string) {
     trackedRef.current = true;
 
     const loadTime = Date.now() - startTimeRef.current;
-    analytics.track('feature_discovered', {
+    analytics.track("feature_discovered", {
       feature_name: `${featureName}_loaded`,
       duration_ms: loadTime,
     });
   }, [featureName]);
 
-  const markError = useCallback((error: string) => {
-    if (trackedRef.current) return;
-    trackedRef.current = true;
+  const markError = useCallback(
+    (error: string) => {
+      if (trackedRef.current) return;
+      trackedRef.current = true;
 
-    analytics.track('feature_discovered', {
-      feature_name: `${featureName}_error`,
-      error_message: error,
-      duration_ms: Date.now() - startTimeRef.current,
-    });
-  }, [featureName]);
+      analytics.track("feature_discovered", {
+        feature_name: `${featureName}_error`,
+        error_message: error,
+        duration_ms: Date.now() - startTimeRef.current,
+      });
+    },
+    [featureName],
+  );
 
   return { markLoaded, markError };
 }
@@ -117,12 +127,15 @@ export function useFeatureLoadTracking(featureName: string) {
  * Hook para trackear interacciones con botones/CTAs
  */
 export function useButtonTracking() {
-  const trackClick = useCallback((buttonName: string, properties?: EventProperties) => {
-    analytics.track('feature_discovered', {
-      feature_name: `button_${buttonName}`,
-      ...properties,
-    });
-  }, []);
+  const trackClick = useCallback(
+    (buttonName: string, properties?: EventProperties) => {
+      analytics.track("feature_discovered", {
+        feature_name: `button_${buttonName}`,
+        ...properties,
+      });
+    },
+    [],
+  );
 
   return { trackClick };
 }

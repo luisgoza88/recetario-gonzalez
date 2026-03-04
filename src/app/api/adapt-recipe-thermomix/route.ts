@@ -1,10 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
-import { getGeminiClient, GEMINI_MODELS, cleanJsonResponse, geminiWithRetry } from '@/lib/gemini/client';
-import { withRateLimit } from '@/lib/rate-limit';
-import { requireAuth } from '@/lib/api/auth';
-import { logger } from '@/lib/logger';
-import type { ThermomixRecipe } from '@/types';
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import {
+  getGeminiClient,
+  GEMINI_MODELS,
+  cleanJsonResponse,
+  geminiWithRetry,
+} from "@/lib/gemini/client";
+import { withRateLimit } from "@/lib/rate-limit";
+import { requireAuth } from "@/lib/api/auth";
+import { logger } from "@/lib/logger";
+import type { ThermomixRecipe } from "@/types";
 
 // =====================================================
 // Input validation
@@ -27,8 +32,11 @@ export async function POST(request: NextRequest) {
 
   try {
     // Rate limit
-    const userId = request.headers.get('x-user-id') || request.headers.get('x-forwarded-for') || 'anonymous';
-    const rateLimit = await withRateLimit(userId, 'generate-recipe');
+    const userId =
+      request.headers.get("x-user-id") ||
+      request.headers.get("x-forwarded-for") ||
+      "anonymous";
+    const rateLimit = await withRateLimit(userId, "generate-recipe");
     if (!rateLimit.allowed) {
       return NextResponse.json(rateLimit.response, {
         status: 429,
@@ -44,35 +52,51 @@ export async function POST(request: NextRequest) {
     } catch (validationError) {
       if (validationError instanceof z.ZodError) {
         return NextResponse.json(
-          { error: 'Datos inválidos', details: validationError.issues.map(e => `${e.path.join('.')}: ${e.message}`) },
-          { status: 400 }
+          {
+            error: "Datos inválidos",
+            details: validationError.issues.map(
+              (e) => `${e.path.join(".")}: ${e.message}`,
+            ),
+          },
+          { status: 400 },
         );
       }
-      return NextResponse.json({ error: 'Error parsing request' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Error parsing request" },
+        { status: 400 },
+      );
     }
 
     const { recipeName, originalSteps, ingredients, servings } = body;
 
     // Build the prompt
-    const prompt = buildThermomixPrompt(recipeName, originalSteps, ingredients, servings);
+    const prompt = buildThermomixPrompt(
+      recipeName,
+      originalSteps,
+      ingredients,
+      servings,
+    );
 
     // Call Gemini
     const gemini = getGeminiClient();
     const response = await geminiWithRetry(() =>
       gemini.models.generateContent({
         model: GEMINI_MODELS.FLASH,
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
         config: {
           temperature: 0.6,
           maxOutputTokens: 4000,
-          responseMimeType: 'application/json',
+          responseMimeType: "application/json",
         },
-      })
+      }),
     );
 
     const content = response.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!content) {
-      return NextResponse.json({ error: 'No response from AI' }, { status: 500 });
+      return NextResponse.json(
+        { error: "No response from AI" },
+        { status: 500 },
+      );
     }
 
     // Parse the response
@@ -82,16 +106,24 @@ export async function POST(request: NextRequest) {
       thermomixRecipe = JSON.parse(jsonContent);
 
       // Validate structure
-      if (!thermomixRecipe.thermomixSteps || !Array.isArray(thermomixRecipe.thermomixSteps)) {
-        throw new Error('Invalid Thermomix recipe structure: missing thermomixSteps');
+      if (
+        !thermomixRecipe.thermomixSteps ||
+        !Array.isArray(thermomixRecipe.thermomixSteps)
+      ) {
+        throw new Error(
+          "Invalid Thermomix recipe structure: missing thermomixSteps",
+        );
       }
     } catch (parseError) {
-      logger.error('JSON parse error for Thermomix adaptation', {
-        error: parseError instanceof Error ? parseError.message : String(parseError),
+      logger.error("JSON parse error for Thermomix adaptation", {
+        error:
+          parseError instanceof Error ? parseError.message : String(parseError),
       });
       return NextResponse.json(
-        { error: 'Error al procesar la adaptación Thermomix. Intenta de nuevo.' },
-        { status: 500 }
+        {
+          error: "Error al procesar la adaptación Thermomix. Intenta de nuevo.",
+        },
+        { status: 500 },
       );
     }
 
@@ -100,10 +132,13 @@ export async function POST(request: NextRequest) {
       thermomixRecipe,
     });
   } catch (error) {
-    logger.error('Adapt recipe thermomix error', {
+    logger.error("Adapt recipe thermomix error", {
       error: error instanceof Error ? error.message : String(error),
     });
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
@@ -115,11 +150,12 @@ function buildThermomixPrompt(
   recipeName: string,
   originalSteps: string[],
   ingredients?: string[],
-  servings: number = 5
+  servings: number = 5,
 ): string {
-  const ingredientsList = ingredients && ingredients.length > 0
-    ? `\nINGREDIENTES:\n${ingredients.map(i => `- ${i}`).join('\n')}`
-    : '';
+  const ingredientsList =
+    ingredients && ingredients.length > 0
+      ? `\nINGREDIENTES:\n${ingredients.map((i) => `- ${i}`).join("\n")}`
+      : "";
 
   return `Eres un experto en Thermomix TM6. Tu trabajo es convertir recetas normales a instrucciones
 paso a paso optimizadas para Thermomix TM6.
@@ -129,7 +165,7 @@ PORCIONES: ${servings} (Luis come 3, Mariana come 2)
 ${ingredientsList}
 
 PASOS ORIGINALES:
-${originalSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')}
+${originalSteps.map((s, i) => `${i + 1}. ${s}`).join("\n")}
 
 REGLAS THERMOMIX TM6:
 - Capacidad vaso principal: 2.2L máximo

@@ -1,43 +1,123 @@
-'use client';
+"use client";
 
-import HomeSetupWizard from './HomeSetupWizard';
-import EmployeesPanel from './EmployeesPanel';
-import EmployeeDetailModal from './EmployeeDetailModal';
-import SpacesPanel from './SpacesPanel';
-import ScheduleGenerator from './ScheduleGenerator';
-import ScheduleOptimizer from './ScheduleOptimizer';
-import DailyDashboard from './DailyDashboard';
-import WeeklyCalendar from './WeeklyCalendar';
-import QuickRoutines from './QuickRoutines';
-import CleaningRating from './CleaningRating';
-import EmployeeCheckIn from './EmployeeCheckIn';
-import CleaningHistory from './CleaningHistory';
-import SuppliesInventory from './SuppliesInventory';
-import InspectionMode from './InspectionMode';
-import MonthlyReport from './MonthlyReport';
-import ScheduleDashboard from './ScheduleDashboard';
-import ScheduleTemplateEditor from './ScheduleTemplateEditor';
-import { Household, Space, HomeEmployee, ScheduledTask } from '@/types';
+import dynamic from "next/dynamic";
+import { Household, Space, HomeEmployee, ScheduledTask } from "@/types";
+
+// Loading spinner fallback for dynamic imports
+const ModalLoadingSpinner = () => (
+  <div className="flex items-center justify-center p-8">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600" />
+  </div>
+);
+
+// All modal components loaded dynamically to reduce initial bundle
+const HomeSetupWizard = dynamic(() => import("./HomeSetupWizard"), {
+  loading: () => <ModalLoadingSpinner />,
+  ssr: false,
+});
+
+const EmployeesPanel = dynamic(() => import("./EmployeesPanel"), {
+  loading: () => <ModalLoadingSpinner />,
+  ssr: false,
+});
+
+const EmployeeDetailModal = dynamic(() => import("./EmployeeDetailModal"), {
+  loading: () => <ModalLoadingSpinner />,
+  ssr: false,
+});
+
+const SpacesPanel = dynamic(() => import("./SpacesPanel"), {
+  loading: () => <ModalLoadingSpinner />,
+  ssr: false,
+});
+
+const ScheduleGenerator = dynamic(() => import("./ScheduleGenerator"), {
+  loading: () => <ModalLoadingSpinner />,
+  ssr: false,
+});
+
+const ScheduleOptimizer = dynamic(() => import("./ScheduleOptimizer"), {
+  loading: () => <ModalLoadingSpinner />,
+  ssr: false,
+});
+
+const DailyDashboard = dynamic(() => import("./DailyDashboard"), {
+  loading: () => <ModalLoadingSpinner />,
+  ssr: false,
+});
+
+const WeeklyCalendar = dynamic(() => import("./WeeklyCalendar"), {
+  loading: () => <ModalLoadingSpinner />,
+  ssr: false,
+});
+
+const QuickRoutines = dynamic(() => import("./QuickRoutines"), {
+  loading: () => <ModalLoadingSpinner />,
+  ssr: false,
+});
+
+const CleaningRating = dynamic(() => import("./CleaningRating"), {
+  loading: () => <ModalLoadingSpinner />,
+  ssr: false,
+});
+
+const EmployeeCheckIn = dynamic(() => import("./EmployeeCheckIn"), {
+  loading: () => <ModalLoadingSpinner />,
+  ssr: false,
+});
+
+const CleaningHistory = dynamic(() => import("./CleaningHistory"), {
+  loading: () => <ModalLoadingSpinner />,
+  ssr: false,
+});
+
+const SuppliesInventory = dynamic(() => import("./SuppliesInventory"), {
+  loading: () => <ModalLoadingSpinner />,
+  ssr: false,
+});
+
+const InspectionMode = dynamic(() => import("./InspectionMode"), {
+  loading: () => <ModalLoadingSpinner />,
+  ssr: false,
+});
+
+const MonthlyReport = dynamic(() => import("./MonthlyReport"), {
+  loading: () => <ModalLoadingSpinner />,
+  ssr: false,
+});
+
+const ScheduleDashboard = dynamic(() => import("./ScheduleDashboard"), {
+  loading: () => <ModalLoadingSpinner />,
+  ssr: false,
+});
+
+const ScheduleTemplateEditor = dynamic(
+  () => import("./ScheduleTemplateEditor"),
+  {
+    loading: () => <ModalLoadingSpinner />,
+    ssr: false,
+  },
+);
 
 export type ActiveModal =
-  | { type: 'none' }
-  | { type: 'setup' }
-  | { type: 'employees' }
-  | { type: 'employeeDetail'; employee: HomeEmployee }
-  | { type: 'spaces'; initialCategory: 'interior' | 'exterior' }
-  | { type: 'scheduleGenerator' }
-  | { type: 'optimizer' }
-  | { type: 'dailyDashboard' }
-  | { type: 'weeklyCalendar' }
-  | { type: 'quickRoutines' }
-  | { type: 'rating'; task: ScheduledTask }
-  | { type: 'checkIn' }
-  | { type: 'history' }
-  | { type: 'supplies' }
-  | { type: 'inspection'; task: ScheduledTask }
-  | { type: 'monthlyReport' }
-  | { type: 'scheduleDashboard' }
-  | { type: 'scheduleEditor' };
+  | { type: "none" }
+  | { type: "setup" }
+  | { type: "employees" }
+  | { type: "employeeDetail"; employee: HomeEmployee }
+  | { type: "spaces"; initialCategory: "interior" | "exterior" }
+  | { type: "scheduleGenerator" }
+  | { type: "optimizer" }
+  | { type: "dailyDashboard" }
+  | { type: "weeklyCalendar" }
+  | { type: "quickRoutines" }
+  | { type: "rating"; task: ScheduledTask }
+  | { type: "checkIn" }
+  | { type: "history" }
+  | { type: "supplies" }
+  | { type: "inspection"; task: ScheduledTask }
+  | { type: "monthlyReport" }
+  | { type: "scheduleDashboard" }
+  | { type: "scheduleEditor" };
 
 interface HomeModalsProps {
   activeModal: ActiveModal;
@@ -60,17 +140,17 @@ export default function HomeModals({
   onOpenModal,
   onRefreshData,
 }: HomeModalsProps) {
-  if (activeModal.type === 'none') {
+  if (activeModal.type === "none") {
     return null;
   }
 
-  if (activeModal.type === 'setup') {
+  if (activeModal.type === "setup") {
     return <HomeSetupWizard onComplete={onRefreshData} />;
   }
 
   return (
     <>
-      {activeModal.type === 'employees' && (
+      {activeModal.type === "employees" && (
         <EmployeesPanel
           householdId={household.id}
           employees={employees}
@@ -79,7 +159,7 @@ export default function HomeModals({
         />
       )}
 
-      {activeModal.type === 'employeeDetail' && (
+      {activeModal.type === "employeeDetail" && (
         <EmployeeDetailModal
           employee={activeModal.employee}
           householdId={household.id}
@@ -90,7 +170,7 @@ export default function HomeModals({
         />
       )}
 
-      {activeModal.type === 'spaces' && (
+      {activeModal.type === "spaces" && (
         <SpacesPanel
           householdId={household.id}
           spaces={spaces}
@@ -100,7 +180,7 @@ export default function HomeModals({
         />
       )}
 
-      {activeModal.type === 'scheduleGenerator' && (
+      {activeModal.type === "scheduleGenerator" && (
         <ScheduleGenerator
           householdId={household.id}
           spaces={spaces}
@@ -110,7 +190,7 @@ export default function HomeModals({
         />
       )}
 
-      {activeModal.type === 'optimizer' && (
+      {activeModal.type === "optimizer" && (
         <ScheduleOptimizer
           householdId={household.id}
           spaces={spaces}
@@ -120,33 +200,27 @@ export default function HomeModals({
         />
       )}
 
-      {activeModal.type === 'dailyDashboard' && (
+      {activeModal.type === "dailyDashboard" && (
         <DailyDashboard
           householdId={household.id}
           spaces={spaces}
           employees={employees}
           onClose={onClose}
           onTaskComplete={onRefreshData}
-          onOpenRating={(task) => onOpenModal({ type: 'rating', task })}
-          onOpenInspection={(task) => onOpenModal({ type: 'inspection', task })}
+          onOpenRating={(task) => onOpenModal({ type: "rating", task })}
+          onOpenInspection={(task) => onOpenModal({ type: "inspection", task })}
         />
       )}
 
-      {activeModal.type === 'weeklyCalendar' && (
-        <WeeklyCalendar
-          householdId={household.id}
-          onClose={onClose}
-        />
+      {activeModal.type === "weeklyCalendar" && (
+        <WeeklyCalendar householdId={household.id} onClose={onClose} />
       )}
 
-      {activeModal.type === 'quickRoutines' && (
-        <QuickRoutines
-          onClose={onClose}
-          onStartRoutine={() => {}}
-        />
+      {activeModal.type === "quickRoutines" && (
+        <QuickRoutines onClose={onClose} onStartRoutine={() => {}} />
       )}
 
-      {activeModal.type === 'rating' && (
+      {activeModal.type === "rating" && (
         <CleaningRating
           task={activeModal.task}
           onClose={onClose}
@@ -157,7 +231,7 @@ export default function HomeModals({
         />
       )}
 
-      {activeModal.type === 'checkIn' && (
+      {activeModal.type === "checkIn" && (
         <EmployeeCheckIn
           householdId={household.id}
           employees={employees}
@@ -166,7 +240,7 @@ export default function HomeModals({
         />
       )}
 
-      {activeModal.type === 'history' && (
+      {activeModal.type === "history" && (
         <CleaningHistory
           householdId={household.id}
           spaces={spaces}
@@ -175,14 +249,11 @@ export default function HomeModals({
         />
       )}
 
-      {activeModal.type === 'supplies' && (
-        <SuppliesInventory
-          householdId={household.id}
-          onClose={onClose}
-        />
+      {activeModal.type === "supplies" && (
+        <SuppliesInventory householdId={household.id} onClose={onClose} />
       )}
 
-      {activeModal.type === 'inspection' && (
+      {activeModal.type === "inspection" && (
         <InspectionMode
           task={activeModal.task}
           onClose={onClose}
@@ -193,7 +264,7 @@ export default function HomeModals({
         />
       )}
 
-      {activeModal.type === 'monthlyReport' && (
+      {activeModal.type === "monthlyReport" && (
         <MonthlyReport
           householdId={household.id}
           spaces={spaces}
@@ -202,16 +273,16 @@ export default function HomeModals({
         />
       )}
 
-      {activeModal.type === 'scheduleDashboard' && (
+      {activeModal.type === "scheduleDashboard" && (
         <ScheduleDashboard
           householdId={household.id}
           employees={employees}
           onClose={onClose}
-          onOpenEditor={() => onOpenModal({ type: 'scheduleEditor' })}
+          onOpenEditor={() => onOpenModal({ type: "scheduleEditor" })}
         />
       )}
 
-      {activeModal.type === 'scheduleEditor' && (
+      {activeModal.type === "scheduleEditor" && (
         <ScheduleTemplateEditor
           householdId={household.id}
           employees={employees}

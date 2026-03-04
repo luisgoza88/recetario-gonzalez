@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 interface DayProgressProps {
   /** 0 to 100 */
@@ -10,25 +10,25 @@ export default function DayProgress({ percent, label }: DayProgressProps) {
   const clampedPercent = Math.min(100, Math.max(0, Math.round(percent)));
 
   const getColor = () => {
-    if (clampedPercent >= 100) return 'bg-green-500';
-    if (clampedPercent >= 60) return 'bg-blue-500';
-    if (clampedPercent >= 30) return 'bg-yellow-500';
-    return 'bg-gray-400';
+    if (clampedPercent >= 100) return "bg-green-500";
+    if (clampedPercent >= 60) return "bg-blue-500";
+    if (clampedPercent >= 30) return "bg-yellow-500";
+    return "bg-gray-400";
   };
 
   const getEmoji = () => {
-    if (clampedPercent >= 100) return '🎉';
-    if (clampedPercent >= 75) return '💪';
-    if (clampedPercent >= 50) return '👍';
-    if (clampedPercent >= 25) return '🏃‍♀️';
-    return '☀️';
+    if (clampedPercent >= 100) return "🎉";
+    if (clampedPercent >= 75) return "💪";
+    if (clampedPercent >= 50) return "👍";
+    if (clampedPercent >= 25) return "🏃‍♀️";
+    return "☀️";
   };
 
   return (
     <div className="bg-white rounded-2xl p-5 shadow-sm border">
       <div className="flex items-center justify-between mb-3">
         <span className="text-lg font-bold text-gray-800">
-          {getEmoji()} {label || 'Progreso del Día'}
+          {getEmoji()} {label || "Progreso del Día"}
         </span>
         <span className="text-2xl font-bold text-gray-700">
           {clampedPercent}%

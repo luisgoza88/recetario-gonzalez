@@ -1,18 +1,23 @@
-import { supabase } from './supabase/client';
-import { Recipe, Ingredient } from '@/types';
-import { compareQuantities, normalizeQuantity, parseQuantity, formatQuantity } from './units';
+import { supabase } from "./supabase/client";
+import { Recipe, Ingredient } from "@/types";
+import {
+  compareQuantities,
+  normalizeQuantity,
+  parseQuantity,
+  formatQuantity,
+} from "./units";
 
 export interface IngredientStatus {
   name: string;
   required: string;
-  available: string;        // Cantidad disponible formateada
-  availableNumber: number;  // Número disponible (normalizado)
-  needed: string;           // Cantidad faltante formateada
-  neededNumber: number;     // Número faltante
+  available: string; // Cantidad disponible formateada
+  availableNumber: number; // Número disponible (normalizado)
+  needed: string; // Cantidad faltante formateada
+  neededNumber: number; // Número faltante
   hasEnough: boolean;
   percentAvailable: number;
-  matchedItem?: string;     // Nombre del item del inventario que coincidió
-  unitCompatible: boolean;  // Si las unidades son comparables
+  matchedItem?: string; // Nombre del item del inventario que coincidió
+  unitCompatible: boolean; // Si las unidades son comparables
 }
 
 export interface RecipeAvailability {
@@ -31,9 +36,9 @@ let preparationsCache: Map<string, string[]> | null = null;
 function normalizeIngredient(name: string): string {
   return name
     .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Remover acentos
-    .replace(/\s+/g, ' ')
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Remover acentos
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -51,33 +56,33 @@ async function loadAliases(): Promise<Map<string, string>> {
   }
 
   const { data, error } = await supabase
-    .from('ingredient_aliases')
-    .select('alias, market_item_id');
+    .from("ingredient_aliases")
+    .select("alias, market_item_id");
 
   aliasesCache = new Map();
 
   if (error) {
-    console.error('[ALIASES-ERROR]', error);
+    console.error("[ALIASES-ERROR]", error);
     return aliasesCache;
   }
 
   if (data) {
     // También cargar nombres de market_items para mapear
     const { data: items, error: itemsError } = await supabase
-      .from('market_items')
-      .select('id, name');
+      .from("market_items")
+      .select("id, name");
 
     if (itemsError) {
-      console.error('[ALIASES-ERROR] Failed to load market_items:', itemsError);
+      console.error("[ALIASES-ERROR] Failed to load market_items:", itemsError);
       return aliasesCache;
     }
 
     if (!items || items.length === 0) {
-      console.error('[ALIASES-ERROR] No market_items returned from query');
+      console.error("[ALIASES-ERROR] No market_items returned from query");
       return aliasesCache;
     }
 
-    const itemNames = new Map(items.map(i => [i.id, i.name]));
+    const itemNames = new Map(items.map((i) => [i.id, i.name]));
 
     for (const alias of data) {
       const itemName = itemNames.get(alias.market_item_id);
@@ -96,8 +101,8 @@ async function loadPreparations(): Promise<Map<string, string[]>> {
   if (preparationsCache) return preparationsCache;
 
   const { data } = await supabase
-    .from('preparations')
-    .select('name, ingredients');
+    .from("preparations")
+    .select("name, ingredients");
 
   preparationsCache = new Map();
 
@@ -113,8 +118,11 @@ async function loadPreparations(): Promise<Map<string, string[]>> {
 
 // Separar ingredientes compuestos (ej: "Hogao + Aguacate" → ["Hogao", "Aguacate"])
 function splitCompoundIngredient(name: string): string[] {
-  if (name.includes('+')) {
-    return name.split('+').map(s => s.trim()).filter(s => s.length > 0);
+  if (name.includes("+")) {
+    return name
+      .split("+")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
   }
   return [name];
 }
@@ -130,8 +138,8 @@ function calculateSimilarity(str1: string, str2: string): number {
   }
 
   // Comparar palabras
-  const words1 = s1.split(' ');
-  const words2 = s2.split(' ');
+  const words1 = s1.split(" ");
+  const words2 = s2.split(" ");
 
   let matchingWords = 0;
   for (const w1 of words1) {
@@ -150,7 +158,10 @@ function calculateSimilarity(str1: string, str2: string): number {
 // Buscar item del inventario que coincida con ingrediente (MEJORADO)
 async function findInventoryMatch(
   ingredientName: string,
-  inventory: Map<string, { quantity: string; number: number; itemName: string }>
+  inventory: Map<
+    string,
+    { quantity: string; number: number; itemName: string }
+  >,
 ): Promise<{ quantity: string; number: number; itemName: string } | null> {
   const normalizedIngredient = normalizeIngredient(ingredientName);
 
@@ -184,7 +195,7 @@ async function findInventoryMatch(
   }
 
   // 4. Fuzzy matching - buscar palabras clave
-  const ingredientWords = normalizedIngredient.split(' ');
+  const ingredientWords = normalizedIngredient.split(" ");
   for (const [itemName, data] of inventory.entries()) {
     const normalizedItem = normalizeIngredient(itemName);
 
@@ -202,7 +213,10 @@ async function findInventoryMatch(
 // Verificar si una preparación se puede hacer con el inventario
 async function checkPreparationAvailable(
   prepName: string,
-  inventory: Map<string, { quantity: string; number: number; itemName: string }>
+  inventory: Map<
+    string,
+    { quantity: string; number: number; itemName: string }
+  >,
 ): Promise<boolean> {
   const preparations = await loadPreparations();
   const normalizedName = normalizeIngredient(prepName);
@@ -219,38 +233,42 @@ async function checkPreparationAvailable(
     }
   }
 
-  return (available / ingredients.length) >= 0.7;
+  return available / ingredients.length >= 0.7;
 }
 
 // Cargar inventario actual
-export async function loadCurrentInventory(): Promise<Map<string, { quantity: string; number: number; itemName: string }>> {
+export async function loadCurrentInventory(): Promise<
+  Map<string, { quantity: string; number: number; itemName: string }>
+> {
   const { data: items, error: itemsError } = await supabase
-    .from('market_items')
-    .select('id, name');
+    .from("market_items")
+    .select("id, name");
 
   const { data: inventory, error: invError } = await supabase
-    .from('inventory')
-    .select('item_id, current_quantity, current_number');
+    .from("inventory")
+    .select("item_id, current_quantity, current_number");
 
-  if (itemsError) console.error('[INVENTORY-ERROR] items:', itemsError);
-  if (invError) console.error('[INVENTORY-ERROR] inventory:', invError);
+  if (itemsError) console.error("[INVENTORY-ERROR] items:", itemsError);
+  if (invError) console.error("[INVENTORY-ERROR] inventory:", invError);
 
-  const inventoryMap = new Map<string, { quantity: string; number: number; itemName: string }>();
+  const inventoryMap = new Map<
+    string,
+    { quantity: string; number: number; itemName: string }
+  >();
 
   if (items && inventory) {
-    const invMap = new Map(inventory.map(i => [i.item_id, i]));
+    const invMap = new Map(inventory.map((i) => [i.item_id, i]));
 
     for (const item of items) {
       const inv = invMap.get(item.id);
       // Ensure number is actually a number
       const numValue = inv?.current_number ? Number(inv.current_number) : 0;
       inventoryMap.set(item.name, {
-        quantity: inv?.current_quantity || '0',
+        quantity: inv?.current_quantity || "0",
         number: numValue,
-        itemName: item.name
+        itemName: item.name,
       });
     }
-
   }
 
   return inventoryMap;
@@ -259,14 +277,17 @@ export async function loadCurrentInventory(): Promise<Map<string, { quantity: st
 // Verificar disponibilidad de ingredientes para una receta (MEJORADO)
 export async function checkRecipeIngredients(
   recipe: Recipe,
-  inventory: Map<string, { quantity: string; number: number; itemName: string }>
+  inventory: Map<
+    string,
+    { quantity: string; number: number; itemName: string }
+  >,
 ): Promise<RecipeAvailability> {
   const ingredients = recipe.ingredients as Ingredient[];
   const missingIngredients: IngredientStatus[] = [];
   const availableIngredients: IngredientStatus[] = [];
 
   for (const ing of ingredients) {
-    const requiredQty = ing.total || ing.luis || '1';
+    const requiredQty = ing.total || ing.luis || "1";
     const requiredNum = extractNumber(requiredQty);
 
     // Separar ingredientes compuestos
@@ -297,30 +318,39 @@ export async function checkRecipeIngredients(
     // Now we compare quantities intelligently using the units library
     let hasEnough = false;
     let percentAvailable = 0;
-    let availableStr = '0';
-    let neededStr = '0';
+    let availableStr = "0";
+    let neededStr = "0";
     let neededNumber = 0;
     let unitCompatible = true;
 
     if (totalAvailable > 0 && matchedItems.length > 0) {
       // Obtener la cantidad del inventario del primer item matched
-      const matchedData = await findInventoryMatch(subIngredients[0], inventory);
+      const matchedData = await findInventoryMatch(
+        subIngredients[0],
+        inventory,
+      );
       if (matchedData) {
         availableStr = matchedData.quantity;
 
         // Comparar usando el sistema de unidades
-        const comparison = compareQuantities(matchedData.quantity, requiredQty, 0.8);
+        const comparison = compareQuantities(
+          matchedData.quantity,
+          requiredQty,
+          0.8,
+        );
         hasEnough = comparison.hasEnough;
         percentAvailable = comparison.percentAvailable;
         unitCompatible = comparison.compatible;
 
         // Calcular lo que falta
         if (!hasEnough && comparison.compatible) {
-          neededNumber = Math.max(0, comparison.requiredNormalized - comparison.availableNormalized);
+          neededNumber = Math.max(
+            0,
+            comparison.requiredNormalized - comparison.availableNormalized,
+          );
           const parsed = parseQuantity(requiredQty);
           neededStr = formatQuantity(neededNumber, parsed.unit);
         }
-
       }
     } else {
       // No se encontró en inventario
@@ -339,8 +369,9 @@ export async function checkRecipeIngredients(
       neededNumber,
       hasEnough,
       percentAvailable,
-      matchedItem: matchedItems.length > 0 ? matchedItems.join(', ') : undefined,
-      unitCompatible
+      matchedItem:
+        matchedItems.length > 0 ? matchedItems.join(", ") : undefined,
+      unitCompatible,
     };
 
     if (hasEnough) {
@@ -352,23 +383,27 @@ export async function checkRecipeIngredients(
 
   const totalIngredients = ingredients.length;
   const availableCount = availableIngredients.length;
-  const availablePercent = totalIngredients > 0 ? (availableCount / totalIngredients) * 100 : 0;
+  const availablePercent =
+    totalIngredients > 0 ? (availableCount / totalIngredients) * 100 : 0;
 
   return {
     recipe,
     canMake: missingIngredients.length === 0,
     availablePercent,
     missingIngredients,
-    availableIngredients
+    availableIngredients,
   };
 }
 
 // Encontrar recetas alternativas que se pueden hacer con el inventario actual
 export async function findAlternativeRecipes(
   recipes: Recipe[],
-  inventory: Map<string, { quantity: string; number: number; itemName: string }>,
+  inventory: Map<
+    string,
+    { quantity: string; number: number; itemName: string }
+  >,
   excludeRecipeId?: string,
-  mealType?: 'breakfast' | 'lunch' | 'dinner'
+  mealType?: "breakfast" | "lunch" | "dinner",
 ): Promise<RecipeAvailability[]> {
   const alternatives: RecipeAvailability[] = [];
 
@@ -391,7 +426,10 @@ export async function findAlternativeRecipes(
 
 // Obtener lista de ingredientes disponibles para generar recetas con IA
 export function getAvailableIngredientsList(
-  inventory: Map<string, { quantity: string; number: number; itemName: string }>
+  inventory: Map<
+    string,
+    { quantity: string; number: number; itemName: string }
+  >,
 ): string[] {
   const available: string[] = [];
 
@@ -420,21 +458,26 @@ export async function getAvailableIngredientsWithCategories(): Promise<{
 }> {
   // Cargar items del mercado con categorías
   const { data: items } = await supabase
-    .from('market_items')
-    .select('id, name, category, category_id, is_custom');
+    .from("market_items")
+    .select("id, name, category, category_id, is_custom");
 
   // Cargar categorías
   const { data: categories } = await supabase
-    .from('ingredient_categories')
-    .select('id, name_es');
+    .from("ingredient_categories")
+    .select("id, name_es");
 
   // Cargar inventario
   const { data: inventory } = await supabase
-    .from('inventory')
-    .select('item_id, current_quantity, current_number');
+    .from("inventory")
+    .select("item_id, current_quantity, current_number");
 
-  const categoryMap = new Map(categories?.map(c => [c.id, c.name_es]) || []);
-  const invMap = new Map(inventory?.map(i => [i.item_id, { qty: i.current_quantity, num: i.current_number }]) || []);
+  const categoryMap = new Map(categories?.map((c) => [c.id, c.name_es]) || []);
+  const invMap = new Map(
+    inventory?.map((i) => [
+      i.item_id,
+      { qty: i.current_quantity, num: i.current_number },
+    ]) || [],
+  );
 
   const ingredients: IngredientWithCategory[] = [];
   const byCategory: Record<string, IngredientWithCategory[]> = {};
@@ -445,15 +488,15 @@ export async function getAvailableIngredientsWithCategories(): Promise<{
     if (!inv || inv.num <= 0) continue;
 
     const categoryName = item.category_id
-      ? (categoryMap.get(item.category_id) || item.category)
+      ? categoryMap.get(item.category_id) || item.category
       : item.category;
 
     const ingredient: IngredientWithCategory = {
       name: item.name,
       quantity: inv.qty,
-      category: item.category_id || 'other',
+      category: item.category_id || "other",
       categoryName,
-      isCustom: item.is_custom || false
+      isCustom: item.is_custom || false,
     };
 
     ingredients.push(ingredient);

@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * ProposalCard Component
@@ -7,7 +7,7 @@
  * pueda aprobar, rechazar o aprobar parcialmente.
  */
 
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Check,
   X,
@@ -18,8 +18,8 @@ import {
   Undo2,
   Clock,
   Loader2,
-} from 'lucide-react';
-import { AIProposedAction, AIRiskLevel, AI_RISK_LEVELS } from '@/types';
+} from "lucide-react";
+import { AIProposedAction, AIRiskLevel, AI_RISK_LEVELS } from "@/types";
 
 interface ProposalCardProps {
   proposalId: string;
@@ -33,40 +33,43 @@ interface ProposalCardProps {
 }
 
 // Risk level styling and icons
-const RISK_STYLES: Record<AIRiskLevel, {
-  bg: string;
-  border: string;
-  icon: React.ReactNode;
-  label: string;
-  labelColor: string;
-}> = {
+const RISK_STYLES: Record<
+  AIRiskLevel,
+  {
+    bg: string;
+    border: string;
+    icon: React.ReactNode;
+    label: string;
+    labelColor: string;
+  }
+> = {
   [AI_RISK_LEVELS.LOW]: {
-    bg: 'bg-green-50',
-    border: 'border-green-200',
+    bg: "bg-green-50",
+    border: "border-green-200",
     icon: <Check className="w-4 h-4 text-green-600" />,
-    label: 'Bajo riesgo',
-    labelColor: 'text-green-700 bg-green-100',
+    label: "Bajo riesgo",
+    labelColor: "text-green-700 bg-green-100",
   },
   [AI_RISK_LEVELS.MEDIUM]: {
-    bg: 'bg-blue-50',
-    border: 'border-blue-200',
+    bg: "bg-blue-50",
+    border: "border-blue-200",
     icon: <Undo2 className="w-4 h-4 text-blue-600" />,
-    label: 'Riesgo medio',
-    labelColor: 'text-blue-700 bg-blue-100',
+    label: "Riesgo medio",
+    labelColor: "text-blue-700 bg-blue-100",
   },
   [AI_RISK_LEVELS.HIGH]: {
-    bg: 'bg-amber-50',
-    border: 'border-amber-200',
+    bg: "bg-amber-50",
+    border: "border-amber-200",
     icon: <AlertTriangle className="w-4 h-4 text-amber-600" />,
-    label: 'Alto riesgo',
-    labelColor: 'text-amber-700 bg-amber-100',
+    label: "Alto riesgo",
+    labelColor: "text-amber-700 bg-amber-100",
   },
   [AI_RISK_LEVELS.CRITICAL]: {
-    bg: 'bg-red-50',
-    border: 'border-red-200',
+    bg: "bg-red-50",
+    border: "border-red-200",
     icon: <Shield className="w-4 h-4 text-red-600" />,
-    label: 'Riesgo cr\u00edtico',
-    labelColor: 'text-red-700 bg-red-100',
+    label: "Riesgo cr\u00edtico",
+    labelColor: "text-red-700 bg-red-100",
   },
 };
 
@@ -82,7 +85,7 @@ export function ProposalCard({
 }: ProposalCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedActions, setSelectedActions] = useState<Set<string>>(
-    new Set(actions.map(a => a.id))
+    new Set(actions.map((a) => a.id)),
   );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -107,7 +110,7 @@ export function ProposalCard({
 
   const handleApprove = async () => {
     if (isExpired) {
-      setError('Esta propuesta ha expirado');
+      setError("Esta propuesta ha expirado");
       return;
     }
 
@@ -123,7 +126,7 @@ export function ProposalCard({
         await onApprove(proposalId, Array.from(selectedActions));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al aprobar');
+      setError(err instanceof Error ? err.message : "Error al aprobar");
     } finally {
       setIsLoading(false);
     }
@@ -136,7 +139,7 @@ export function ProposalCard({
     try {
       await onReject(proposalId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al rechazar');
+      setError(err instanceof Error ? err.message : "Error al rechazar");
     } finally {
       setIsLoading(false);
     }
@@ -151,7 +154,9 @@ export function ProposalCard({
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${style.labelColor}`}>
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${style.labelColor}`}
+              >
                 {style.icon}
                 {style.label}
               </span>
@@ -170,7 +175,8 @@ export function ProposalCard({
             </div>
             <p className="font-medium text-gray-900">{summary}</p>
             <p className="text-sm text-gray-600 mt-1">
-              {actions.length} acci\u00f3n{actions.length !== 1 ? 'es' : ''} propuesta{actions.length !== 1 ? 's' : ''}
+              {actions.length} acci\u00f3n{actions.length !== 1 ? "es" : ""}{" "}
+              propuesta{actions.length !== 1 ? "s" : ""}
             </p>
           </div>
           {onClose && (
@@ -210,8 +216,8 @@ export function ProposalCard({
                   key={action.id}
                   className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
                     isSelected
-                      ? 'bg-white border-gray-300 shadow-sm'
-                      : 'bg-gray-50 border-gray-200 opacity-60'
+                      ? "bg-white border-gray-300 shadow-sm"
+                      : "bg-gray-50 border-gray-200 opacity-60"
                   }`}
                 >
                   <input
@@ -225,7 +231,9 @@ export function ProposalCard({
                       <span className="font-medium text-gray-900 text-sm">
                         {action.description_es || action.description}
                       </span>
-                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs ${actionRiskStyle.labelColor}`}>
+                      <span
+                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs ${actionRiskStyle.labelColor}`}
+                      >
                         {actionRiskStyle.icon}
                       </span>
                     </div>
@@ -309,13 +317,16 @@ export function ProposalCardCompact({
     >
       <div className="flex items-center gap-2 mb-1">
         {style.icon}
-        <span className={`text-xs font-medium ${style.labelColor} px-1.5 py-0.5 rounded`}>
+        <span
+          className={`text-xs font-medium ${style.labelColor} px-1.5 py-0.5 rounded`}
+        >
           {style.label}
         </span>
       </div>
       <p className="font-medium text-gray-900 text-sm">{summary}</p>
       <p className="text-xs text-gray-500 mt-1">
-        {actionsCount} acci\u00f3n{actionsCount !== 1 ? 'es' : ''} - Toca para revisar
+        {actionsCount} acci\u00f3n{actionsCount !== 1 ? "es" : ""} - Toca para
+        revisar
       </p>
     </button>
   );

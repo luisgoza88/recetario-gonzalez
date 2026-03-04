@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * ContextPills Component
@@ -7,9 +7,21 @@
  * durante el streaming de la IA. Proporciona feedback en tiempo real al usuario.
  */
 
-import { useMemo } from 'react';
-import { Loader2, Check, X, Search, Utensils, Package, ShoppingCart, Users, Home, Calendar, ClipboardList } from 'lucide-react';
-import type { ActiveTool } from '@/lib/hooks/useAIChat';
+import { useMemo } from "react";
+import {
+  Loader2,
+  Check,
+  X,
+  Search,
+  Utensils,
+  Package,
+  ShoppingCart,
+  Users,
+  Home,
+  Calendar,
+  ClipboardList,
+} from "lucide-react";
+import type { ActiveTool } from "@/lib/hooks/useAIChat";
 
 interface ContextPillsProps {
   tools: ActiveTool[];
@@ -19,37 +31,41 @@ interface ContextPillsProps {
 // Get icon for tool category
 function getToolIcon(toolName: string) {
   // Query tools
-  if (toolName.includes('search') || toolName.includes('get_')) {
+  if (toolName.includes("search") || toolName.includes("get_")) {
     return Search;
   }
 
   // Recipe tools
-  if (toolName.includes('recipe') || toolName.includes('menu') || toolName.includes('meal')) {
+  if (
+    toolName.includes("recipe") ||
+    toolName.includes("menu") ||
+    toolName.includes("meal")
+  ) {
     return Utensils;
   }
 
   // Inventory tools
-  if (toolName.includes('inventory') || toolName.includes('scan')) {
+  if (toolName.includes("inventory") || toolName.includes("scan")) {
     return Package;
   }
 
   // Shopping tools
-  if (toolName.includes('shopping') || toolName.includes('list')) {
+  if (toolName.includes("shopping") || toolName.includes("list")) {
     return ShoppingCart;
   }
 
   // Employee tools
-  if (toolName.includes('employee')) {
+  if (toolName.includes("employee")) {
     return Users;
   }
 
   // Space tools
-  if (toolName.includes('space')) {
+  if (toolName.includes("space")) {
     return Home;
   }
 
   // Task tools
-  if (toolName.includes('task') || toolName.includes('schedule')) {
+  if (toolName.includes("task") || toolName.includes("schedule")) {
     return Calendar;
   }
 
@@ -58,16 +74,16 @@ function getToolIcon(toolName: string) {
 }
 
 // Get color for tool status
-function getStatusColor(status: ActiveTool['status']) {
+function getStatusColor(status: ActiveTool["status"]) {
   switch (status) {
-    case 'running':
-      return 'bg-blue-500/20 text-blue-600 border-blue-500/30';
-    case 'completed':
-      return 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30';
-    case 'failed':
-      return 'bg-red-500/20 text-red-600 border-red-500/30';
+    case "running":
+      return "bg-blue-500/20 text-blue-600 border-blue-500/30";
+    case "completed":
+      return "bg-emerald-500/20 text-emerald-600 border-emerald-500/30";
+    case "failed":
+      return "bg-red-500/20 text-red-600 border-red-500/30";
     default:
-      return 'bg-gray-500/20 text-gray-600 border-gray-500/30';
+      return "bg-gray-500/20 text-gray-600 border-gray-500/30";
   }
 }
 
@@ -80,9 +96,9 @@ function ContextPill({ tool }: { tool: ActiveTool }) {
       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all duration-200 ${statusColor}`}
     >
       {/* Status indicator */}
-      {tool.status === 'running' ? (
+      {tool.status === "running" ? (
         <Loader2 className="w-3 h-3 animate-spin" />
-      ) : tool.status === 'completed' ? (
+      ) : tool.status === "completed" ? (
         <Check className="w-3 h-3" />
       ) : (
         <X className="w-3 h-3" />
@@ -100,7 +116,7 @@ function ContextPill({ tool }: { tool: ActiveTool }) {
   );
 }
 
-export function ContextPills({ tools, className = '' }: ContextPillsProps) {
+export function ContextPills({ tools, className = "" }: ContextPillsProps) {
   if (tools.length === 0) return null;
 
   return (
@@ -113,15 +129,20 @@ export function ContextPills({ tools, className = '' }: ContextPillsProps) {
 }
 
 // Compact version for message bubbles
-export function ContextPillsCompact({ tools, className = '' }: ContextPillsProps) {
+export function ContextPillsCompact({
+  tools,
+  className = "",
+}: ContextPillsProps) {
   if (tools.length === 0) return null;
 
-  const runningTools = tools.filter(t => t.status === 'running');
-  const completedTools = tools.filter(t => t.status === 'completed');
-  const failedTools = tools.filter(t => t.status === 'failed');
+  const runningTools = tools.filter((t) => t.status === "running");
+  const completedTools = tools.filter((t) => t.status === "completed");
+  const failedTools = tools.filter((t) => t.status === "failed");
 
   return (
-    <div className={`flex items-center gap-2 text-xs text-gray-500 ${className}`}>
+    <div
+      className={`flex items-center gap-2 text-xs text-gray-500 ${className}`}
+    >
       {runningTools.length > 0 && (
         <span className="flex items-center gap-1 text-blue-500">
           <Loader2 className="w-3 h-3 animate-spin" />
@@ -131,13 +152,14 @@ export function ContextPillsCompact({ tools, className = '' }: ContextPillsProps
       {completedTools.length > 0 && (
         <span className="flex items-center gap-1 text-emerald-500">
           <Check className="w-3 h-3" />
-          {completedTools.length} completado{completedTools.length !== 1 ? 's' : ''}
+          {completedTools.length} completado
+          {completedTools.length !== 1 ? "s" : ""}
         </span>
       )}
       {failedTools.length > 0 && (
         <span className="flex items-center gap-1 text-red-500">
           <X className="w-3 h-3" />
-          {failedTools.length} error{failedTools.length !== 1 ? 'es' : ''}
+          {failedTools.length} error{failedTools.length !== 1 ? "es" : ""}
         </span>
       )}
     </div>

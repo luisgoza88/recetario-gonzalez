@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import FocusTrapReact from 'focus-trap-react';
-import { ReactNode } from 'react';
+import FocusTrapReact from "focus-trap-react";
+import { ReactNode } from "react";
 
 interface FocusTrapProps {
   active: boolean;

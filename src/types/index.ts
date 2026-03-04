@@ -23,7 +23,7 @@ export interface ShoppingList {
   items: ShoppingListItem[];
   total_estimated?: number;
   total_actual?: number;
-  status: 'active' | 'completed' | 'archived';
+  status: "active" | "completed" | "archived";
   created_at?: string;
   completed_at?: string;
 }
@@ -37,14 +37,21 @@ export interface PriceRecord {
   recorded_at: string;
 }
 
-export const STORE_OPTIONS = ['Éxito', 'D1', 'Jumbo', 'Carulla', 'Euro', 'Otro'] as const;
-export type StoreName = typeof STORE_OPTIONS[number];
+export const STORE_OPTIONS = [
+  "Éxito",
+  "D1",
+  "Jumbo",
+  "Carulla",
+  "Euro",
+  "Otro",
+] as const;
+export type StoreName = (typeof STORE_OPTIONS)[number];
 
 // =====================================================
 // TIPOS PARA MENÚ GENERATIVO SEMANAL (IA)
 // =====================================================
 
-export type GeneratedMenuStatus = 'draft' | 'approved' | 'active' | 'archived';
+export type GeneratedMenuStatus = "draft" | "approved" | "active" | "archived";
 
 export interface GeneratedMeal {
   name: string;
@@ -68,9 +75,9 @@ export interface GeneratedIngredient {
 }
 
 export interface GeneratedDayMenu {
-  dayNumber: number;       // 0=Monday, 5=Saturday
-  dayName: string;         // "Lunes", "Martes", etc.
-  date: string;            // "2026-02-23"
+  dayNumber: number; // 0=Monday, 5=Saturday
+  dayName: string; // "Lunes", "Martes", etc.
+  date: string; // "2026-02-23"
   breakfast: GeneratedMeal | null;
   lunch: GeneratedMeal | null;
   dinner: GeneratedMeal | null;
@@ -79,7 +86,7 @@ export interface GeneratedDayMenu {
 export interface GeneratedMenu {
   id: string;
   household_id?: string;
-  week_start_date: string;  // "2026-02-23" (Monday)
+  week_start_date: string; // "2026-02-23" (Monday)
   status: GeneratedMenuStatus;
   menu_data: GeneratedDayMenu[];
   generated_by: string;
@@ -94,45 +101,45 @@ export interface GeneratedMenu {
 
 // Información nutricional por porción
 export interface NutritionInfo {
-  calories: number;        // kcal por porción
-  protein: number;         // gramos
-  carbs: number;           // gramos
-  fat: number;             // gramos
-  fiber?: number;          // gramos
-  sodium?: number;         // mg
-  sugar?: number;          // gramos
+  calories: number; // kcal por porción
+  protein: number; // gramos
+  carbs: number; // gramos
+  fat: number; // gramos
+  fiber?: number; // gramos
+  sodium?: number; // mg
+  sugar?: number; // gramos
 }
 
 // Tags dietéticos para filtrado
 export type DietaryTag =
-  | 'vegetariano'
-  | 'vegano'
-  | 'sin-gluten'
-  | 'sin-lactosa'
-  | 'bajo-carbohidrato'
-  | 'alto-proteina'
-  | 'bajo-sodio'
-  | 'bajo-azucar'
-  | 'keto'
-  | 'paleo';
+  | "vegetariano"
+  | "vegano"
+  | "sin-gluten"
+  | "sin-lactosa"
+  | "bajo-carbohidrato"
+  | "alto-proteina"
+  | "bajo-sodio"
+  | "bajo-azucar"
+  | "keto"
+  | "paleo";
 
 // Dificultad de la receta
-export type RecipeDifficulty = 'fácil' | 'media' | 'difícil';
+export type RecipeDifficulty = "fácil" | "media" | "difícil";
 
 // Categorías de recetas para la biblioteca expandida
 export type RecipeCategory =
-  | 'colombiana'
-  | 'rapida'
-  | 'thermomix'
-  | 'fitness'
-  | 'internacional'
-  | 'meal-prep'
-  | 'cena-ligera';
+  | "colombiana"
+  | "rapida"
+  | "thermomix"
+  | "fitness"
+  | "internacional"
+  | "meal-prep"
+  | "cena-ligera";
 
 export interface Recipe {
   id: string;
   name: string;
-  type: 'breakfast' | 'lunch' | 'dinner';
+  type: "breakfast" | "lunch" | "dinner";
   portions?: {
     luis: string;
     mariana: string;
@@ -155,7 +162,7 @@ export interface Recipe {
   dietary_tags?: DietaryTag[];
   description?: string;
   tips?: string;
-  source?: 'manual' | 'ai_generated';
+  source?: "manual" | "ai_generated";
   image_url?: string;
   created_at?: string;
   updated_at?: string;
@@ -232,48 +239,48 @@ export interface MarketChecklist {
 
 // Categorías del mercado (legacy - para compatibilidad)
 export const MARKET_CATEGORIES = [
-  'Proteínas Premium',
-  'Proteínas Económicas',
-  'Vegetales',
-  'Tubérculos',
-  'Carbohidratos',
-  'Lácteos',
-  'Despensa',
-  'Especias'
+  "Proteínas Premium",
+  "Proteínas Económicas",
+  "Vegetales",
+  "Tubérculos",
+  "Carbohidratos",
+  "Lácteos",
+  "Despensa",
+  "Especias",
 ] as const;
 
-export type MarketCategory = typeof MARKET_CATEGORIES[number];
+export type MarketCategory = (typeof MARKET_CATEGORIES)[number];
 
 // Nuevas categorías de ingredientes (desde DB)
 export const INGREDIENT_CATEGORY_IDS = [
-  'proteins',
-  'dairy',
-  'vegetables',
-  'fruits',
-  'grains',
-  'pantry',
-  'spices',
-  'beverages',
-  'frozen',
-  'other'
+  "proteins",
+  "dairy",
+  "vegetables",
+  "fruits",
+  "grains",
+  "pantry",
+  "spices",
+  "beverages",
+  "frozen",
+  "other",
 ] as const;
 
-export type IngredientCategoryId = typeof INGREDIENT_CATEGORY_IDS[number];
+export type IngredientCategoryId = (typeof INGREDIENT_CATEGORY_IDS)[number];
 
 // Tipos de comida
 export const MEAL_TYPES = {
-  breakfast: 'Desayuno',
-  lunch: 'Almuerzo',
-  dinner: 'Cena'
+  breakfast: "Desayuno",
+  lunch: "Almuerzo",
+  dinner: "Cena",
 } as const;
 
 export type MealType = keyof typeof MEAL_TYPES;
 
 // Tipos para el sistema de feedback
-export type PortionRating = 'poca' | 'bien' | 'mucha';
-export type LeftoverRating = 'nada' | 'poco' | 'mucho';
-export type SuggestionType = 'portion' | 'ingredient' | 'market';
-export type SuggestionStatus = 'pending' | 'applied' | 'dismissed';
+export type PortionRating = "poca" | "bien" | "mucha";
+export type LeftoverRating = "nada" | "poco" | "mucho";
+export type SuggestionType = "portion" | "ingredient" | "market";
+export type SuggestionStatus = "pending" | "applied" | "dismissed";
 
 export interface MealFeedback {
   id: string;
@@ -314,17 +321,17 @@ export interface AdjustmentSuggestion {
 export interface Household {
   id: string;
   name: string;
-  owner_name?: string;
+  owner_id?: string | null;
   address?: string;
   created_at?: string;
   updated_at?: string;
-  setup_completed: boolean;
+  setup_completed?: boolean;
 }
 
 export interface SpaceType {
   id: string;
   name: string;
-  category: 'interior' | 'exterior';
+  category: "interior" | "exterior";
   icon: string;
   default_tasks: string[];
   sort_order: number;
@@ -335,7 +342,7 @@ export interface SpaceAttributes {
   has_walkin_closet: boolean;
   has_balcony: boolean;
   has_windows: number; // cantidad de ventanas
-  floor_type: 'tile' | 'wood' | 'carpet' | 'concrete' | 'other';
+  floor_type: "tile" | "wood" | "carpet" | "concrete" | "other";
   has_curtains: boolean;
   has_air_conditioning: boolean;
 }
@@ -346,8 +353,8 @@ export interface Space {
   space_type_id?: string;
   space_type?: SpaceType;
   custom_name?: string;
-  category: 'interior' | 'exterior';
-  usage_level: 'alto' | 'medio' | 'bajo';
+  category: "interior" | "exterior";
+  usage_level: "alto" | "medio" | "bajo";
   has_bathroom: boolean;
   area_sqm?: number;
   attributes?: SpaceAttributes;
@@ -367,7 +374,7 @@ export interface HomeEmployee {
   household_id: string;
   name: string;
   role?: string;
-  zone: 'interior' | 'exterior' | 'ambos';
+  zone: "interior" | "exterior" | "ambos";
   work_days: string[];
   hours_per_day: number;
   schedule?: Record<string, DaySchedule>;
@@ -377,14 +384,20 @@ export interface HomeEmployee {
   created_at?: string;
 }
 
-export type TaskFrequency = 'diaria' | 'semanal' | 'quincenal' | 'mensual' | 'trimestral' | 'personalizada';
-export type TaskPriority = 'alta' | 'normal' | 'baja';
-export type TaskStatus = 'pendiente' | 'en_progreso' | 'completada' | 'omitida';
+export type TaskFrequency =
+  | "diaria"
+  | "semanal"
+  | "quincenal"
+  | "mensual"
+  | "trimestral"
+  | "personalizada";
+export type TaskPriority = "alta" | "normal" | "baja";
+export type TaskStatus = "pendiente" | "en_progreso" | "completada" | "omitida";
 
 export interface TaskTemplate {
   id: string;
   household_id: string;
-  space_id: string;
+  space_id?: string | null;
   space?: Space;
   name: string;
   description?: string;
@@ -404,18 +417,18 @@ export interface ScheduledTask {
   household_id: string;
   task_template_id: string;
   task_template?: TaskTemplate;
-  space_id: string;
+  space_id?: string | null;
   space?: Space;
   employee_id?: string;
   employee?: HomeEmployee;
   scheduled_date: string;
   status: TaskStatus;
-  started_at?: string;  // When the task was started (Play button)
+  started_at?: string; // When the task was started (Play button)
   completed_at?: string;
   completed_by?: string;
   notes?: string;
-  actual_minutes?: number;  // Calculated from completed_at - started_at
-  rating?: number;  // 1-5 quality rating
+  actual_minutes?: number; // Calculated from completed_at - started_at
+  rating?: number; // 1-5 quality rating
   created_at?: string;
 }
 
@@ -450,8 +463,13 @@ export interface WorkloadAnalysis {
 }
 
 export interface ScheduleIssue {
-  type: 'overload' | 'uncovered_space' | 'uncovered_task' | 'time_conflict' | 'inefficient_distribution';
-  severity: 'high' | 'medium' | 'low';
+  type:
+    | "overload"
+    | "uncovered_space"
+    | "uncovered_task"
+    | "time_conflict"
+    | "inefficient_distribution";
+  severity: "high" | "medium" | "low";
   description: string;
   affectedDay?: string;
   affectedEmployee?: string;
@@ -461,7 +479,12 @@ export interface ScheduleIssue {
 
 export interface ScheduleOptimization {
   id: string;
-  type: 'redistribute' | 'reschedule' | 'add_employee' | 'reduce_frequency' | 'combine_tasks';
+  type:
+    | "redistribute"
+    | "reschedule"
+    | "add_employee"
+    | "reduce_frequency"
+    | "combine_tasks";
   description: string;
   impact: string;
   tasks: {
@@ -498,16 +521,18 @@ export interface CoverageReport {
 
 export interface PriceHistory {
   id: string;
-  item_id: string;
+  household_id: string;
+  item_name: string;
   price: number;
-  price_unit: string;
-  source?: string;
+  store?: string;
+  quantity?: number;
   recorded_at: string;
+  receipt_photo_url?: string;
 }
 
 export interface Budget {
   id: string;
-  period_type: 'weekly' | 'monthly';
+  period_type: "weekly" | "monthly";
   period_start: string;
   period_end: string;
   budget_amount: number;
@@ -545,8 +570,8 @@ export interface BudgetSummary {
 // TIPOS PARA NAVEGACIÓN PRINCIPAL
 // =====================================================
 
-export type MainSection = 'hoy' | 'recetario' | 'hogar' | 'ajustes';
-export type RecetarioTab = 'calendar' | 'market' | 'recipes' | 'suggestions';
+export type MainSection = "hoy" | "recetario" | "hogar" | "ajustes";
+export type RecetarioTab = "calendar" | "market" | "recipes" | "suggestions";
 
 export interface FABAction {
   id: string;
@@ -560,7 +585,7 @@ export interface FABAction {
 // TIPOS PARA SISTEMA MULTI-TENANT DE USUARIOS
 // =====================================================
 
-export type UserRole = 'admin' | 'empleado' | 'familia';
+export type UserRole = "admin" | "empleado" | "familia";
 
 export interface UserProfile {
   id: string;
@@ -616,43 +641,64 @@ export interface HouseholdInvitation {
 // Permisos disponibles en el sistema
 export type Permission =
   // Lectura
-  | 'view_menu'
-  | 'view_shopping_list'
-  | 'view_tasks'
-  | 'view_inventory'
+  | "view_menu"
+  | "view_shopping_list"
+  | "view_tasks"
+  | "view_inventory"
   // Empleado
-  | 'complete_tasks'
-  | 'update_inventory'
-  | 'check_in'
+  | "complete_tasks"
+  | "update_inventory"
+  | "check_in"
   // Escritura (admin + familia)
-  | 'edit_menu'
-  | 'edit_recipes'
-  | 'edit_shopping_list'
+  | "edit_menu"
+  | "edit_recipes"
+  | "edit_shopping_list"
   // Gestión (solo admin)
-  | 'manage_employees'
-  | 'manage_spaces'
-  | 'manage_tasks'
-  | 'manage_members'
-  | 'manage_invitations'
-  | 'delete_data';
+  | "manage_employees"
+  | "manage_spaces"
+  | "manage_tasks"
+  | "manage_members"
+  | "manage_invitations"
+  | "delete_data";
 
 // Permisos por defecto según rol
 export const DEFAULT_PERMISSIONS: Record<UserRole, Permission[]> = {
   admin: [
-    'view_menu', 'view_shopping_list', 'view_tasks', 'view_inventory',
-    'complete_tasks', 'update_inventory', 'check_in',
-    'edit_menu', 'edit_recipes', 'edit_shopping_list',
-    'manage_employees', 'manage_spaces', 'manage_tasks',
-    'manage_members', 'manage_invitations', 'delete_data'
+    "view_menu",
+    "view_shopping_list",
+    "view_tasks",
+    "view_inventory",
+    "complete_tasks",
+    "update_inventory",
+    "check_in",
+    "edit_menu",
+    "edit_recipes",
+    "edit_shopping_list",
+    "manage_employees",
+    "manage_spaces",
+    "manage_tasks",
+    "manage_members",
+    "manage_invitations",
+    "delete_data",
   ],
   familia: [
-    'view_menu', 'view_shopping_list', 'view_tasks', 'view_inventory',
-    'edit_menu', 'edit_recipes', 'edit_shopping_list'
+    "view_menu",
+    "view_shopping_list",
+    "view_tasks",
+    "view_inventory",
+    "edit_menu",
+    "edit_recipes",
+    "edit_shopping_list",
   ],
   empleado: [
-    'view_menu', 'view_shopping_list', 'view_tasks', 'view_inventory',
-    'complete_tasks', 'update_inventory', 'check_in'
-  ]
+    "view_menu",
+    "view_shopping_list",
+    "view_tasks",
+    "view_inventory",
+    "complete_tasks",
+    "update_inventory",
+    "check_in",
+  ],
 };
 
 // Contexto de autenticación
@@ -691,27 +737,27 @@ export interface SessionState {
 export type AIRiskLevel = 1 | 2 | 3 | 4;
 
 export const AI_RISK_LEVELS = {
-  LOW: 1 as const,        // Auto-execute (consultas)
-  MEDIUM: 2 as const,     // Execute + Undo disponible
-  HIGH: 3 as const,       // Requiere confirmación
-  CRITICAL: 4 as const,   // Multi-step + confirmación detallada
+  LOW: 1 as const, // Auto-execute (consultas)
+  MEDIUM: 2 as const, // Execute + Undo disponible
+  HIGH: 3 as const, // Requiere confirmación
+  CRITICAL: 4 as const, // Multi-step + confirmación detallada
 };
 
 export const AI_RISK_LABELS: Record<AIRiskLevel, string> = {
-  1: 'Automático',
-  2: 'Con opción de deshacer',
-  3: 'Requiere confirmación',
-  4: 'Acción crítica',
+  1: "Automático",
+  2: "Con opción de deshacer",
+  3: "Requiere confirmación",
+  4: "Acción crítica",
 };
 
 // Categorías de funciones
 export type AIFunctionCategory =
-  | 'query'
-  | 'action_recipe'
-  | 'action_inventory'
-  | 'action_home'
-  | 'action_destructive'
-  | 'action_bulk';
+  | "query"
+  | "action_recipe"
+  | "action_inventory"
+  | "action_home"
+  | "action_destructive"
+  | "action_bulk";
 
 // Registro de función en la base de datos
 export interface AIFunctionConfig {
@@ -727,7 +773,7 @@ export interface AIFunctionConfig {
 }
 
 // Estado de una acción en el audit log
-export type AIActionStatus = 'pending' | 'completed' | 'failed' | 'rolled_back';
+export type AIActionStatus = "pending" | "completed" | "failed" | "rolled_back";
 
 // Entrada del audit log
 export interface AIAuditLog {
@@ -738,7 +784,7 @@ export interface AIAuditLog {
   conversation_id?: string;
 
   // Información de la acción
-  action_type: 'query' | 'mutation' | 'bulk_mutation';
+  action_type: "query" | "mutation" | "bulk_mutation";
   function_name: string;
   parameters: Record<string, unknown>;
 
@@ -771,14 +817,14 @@ export interface AIAuditLog {
 
 // Estado de una propuesta
 export type AIProposalStatus =
-  | 'pending'
-  | 'approved'
-  | 'rejected'
-  | 'expired'
-  | 'partially_approved'
-  | 'executing'
-  | 'completed'
-  | 'failed';
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "expired"
+  | "partially_approved"
+  | "executing"
+  | "completed"
+  | "failed";
 
 // Acción propuesta individual
 export interface AIProposedAction {
@@ -868,14 +914,14 @@ export interface HouseholdAITrust {
 
 // Respuesta del API con propuesta
 export interface AIResponseWithProposal {
-  type: 'proposal';
+  type: "proposal";
   proposal: AIProposal;
   message: string;
 }
 
 // Respuesta del API con resultado directo
 export interface AIResponseDirect {
-  type: 'direct';
+  type: "direct";
   content: string;
   actions_executed?: {
     function_name: string;
@@ -918,12 +964,12 @@ export interface RollbackResult {
 
 // Evento de streaming de herramientas
 export type AIStreamEvent =
-  | { type: 'tool_start'; tool: string; message: string }
-  | { type: 'tool_end'; tool: string; result_summary: string }
-  | { type: 'thinking'; message: string }
-  | { type: 'content'; content: string; done: boolean }
-  | { type: 'proposal'; proposal: AIProposal }
-  | { type: 'error'; error: string };
+  | { type: "tool_start"; tool: string; message: string }
+  | { type: "tool_end"; tool: string; result_summary: string }
+  | { type: "thinking"; message: string }
+  | { type: "content"; content: string; done: boolean }
+  | { type: "proposal"; proposal: AIProposal }
+  | { type: "error"; error: string };
 
 // Context pills (fuentes de datos activas)
 export interface AIContextPill {
@@ -961,19 +1007,24 @@ export interface AIGuardrails {
 // TIPOS PARA THERMOMIX TM6
 // =====================================================
 
-export type ThermomixAccessory = 'cuchilla' | 'mariposa' | 'cestillo' | 'varoma' | 'ninguno';
+export type ThermomixAccessory =
+  | "cuchilla"
+  | "mariposa"
+  | "cestillo"
+  | "varoma"
+  | "ninguno";
 
-export type ThermomixDifficulty = 'fácil' | 'media' | 'avanzada';
+export type ThermomixDifficulty = "fácil" | "media" | "avanzada";
 
 export interface ThermomixStep {
   stepNumber: number;
   description: string;
-  speed: string;         // "1" a "10", "Turbo", "Spátula"
-  temperature: string;   // "37°C" a "120°C", "Varoma", "Sin temp"
-  time: string;          // "5 min", "30 seg", etc.
+  speed: string; // "1" a "10", "Turbo", "Spátula"
+  temperature: string; // "37°C" a "120°C", "Varoma", "Sin temp"
+  time: string; // "5 min", "30 seg", etc.
   accessory: ThermomixAccessory;
   accessoryEmoji: string; // 🔪🦋🧺🫕
-  tip?: string;           // Tip opcional de Thermomix
+  tip?: string; // Tip opcional de Thermomix
 }
 
 export interface ThermomixRecipe {

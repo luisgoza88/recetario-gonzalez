@@ -1,22 +1,35 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from "react";
 import {
-  X, Plus, Sparkles, Mic, MicOff, Edit3, Check, Trash2,
-  AlertCircle, ChevronUp, Loader2, Camera, ScanBarcode,
-  Clock, Star, Receipt
-} from 'lucide-react';
-import { supabase } from '@/lib/supabase/client';
-import { IngredientCategory } from '@/types';
-import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
+  X,
+  Plus,
+  Sparkles,
+  Mic,
+  MicOff,
+  Edit3,
+  Check,
+  Trash2,
+  AlertCircle,
+  ChevronUp,
+  Loader2,
+  Camera,
+  ScanBarcode,
+  Clock,
+  Star,
+  Receipt,
+} from "lucide-react";
+import { supabase } from "@/lib/supabase/client";
+import { IngredientCategory } from "@/types";
+import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import {
   recordProductUsage,
   getFrequentItems,
   getRecentItems,
   lookupBarcodeWithCache,
-  FrequentItem
-} from '@/lib/userPreferences';
-import { useEscapeKey } from '@/hooks/useEscapeKey';
+  FrequentItem,
+} from "@/lib/userPreferences";
+import { useEscapeKey } from "@/hooks/useEscapeKey";
 
 interface AddCustomItemModalProps {
   onClose: () => void;
@@ -42,23 +55,26 @@ interface ParsedItem {
   isSelected: boolean;
 }
 
-type InputMode = 'smart' | 'voice' | 'barcode' | 'receipt' | 'manual';
+type InputMode = "smart" | "voice" | "barcode" | "receipt" | "manual";
 
-export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemModalProps) {
-  const [mode, setMode] = useState<InputMode>('smart');
+export default function AddCustomItemModal({
+  onClose,
+  onAdded,
+}: AddCustomItemModalProps) {
+  const [mode, setMode] = useState<InputMode>("smart");
   const [categories, setCategories] = useState<IngredientCategory[]>([]);
 
   // Smart mode state
-  const [smartInput, setSmartInput] = useState('');
+  const [smartInput, setSmartInput] = useState("");
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([]);
   const [isParsing, setIsParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
 
   // Manual mode state
-  const [name, setName] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('other');
-  const [quantity, setQuantity] = useState('');
-  const [unit, setUnit] = useState('unid');
+  const [name, setName] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("other");
+  const [quantity, setQuantity] = useState("");
+  const [unit, setUnit] = useState("unid");
 
   // Voice mode
   const {
@@ -69,13 +85,16 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
     isSupported: voiceSupported,
     startListening,
     stopListening,
-    resetTranscript
-  } = useSpeechRecognition({ language: 'es-CO' });
+    resetTranscript,
+  } = useSpeechRecognition({ language: "es-CO" });
 
   // Barcode mode
   const [barcodeScanning, setBarcodeScanning] = useState(false);
   const [barcodeResult, setBarcodeResult] = useState<string | null>(null);
-  const [barcodeProduct, setBarcodeProduct] = useState<{ name: string; brand?: string } | null>(null);
+  const [barcodeProduct, setBarcodeProduct] = useState<{
+    name: string;
+    brand?: string;
+  } | null>(null);
   const [barcodeLoading, setBarcodeLoading] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const barcodeStreamRef = useRef<MediaStream | null>(null);
@@ -93,7 +112,21 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const commonUnits = ['kg', 'g', 'lb', 'unid', 'bolsa', 'paquete', 'botella', 'lata', 'tarro', 'litro', 'ml', 'manojo', 'racimo'];
+  const commonUnits = [
+    "kg",
+    "g",
+    "lb",
+    "unid",
+    "bolsa",
+    "paquete",
+    "botella",
+    "lata",
+    "tarro",
+    "litro",
+    "ml",
+    "manojo",
+    "racimo",
+  ];
 
   useEscapeKey(onClose);
 
@@ -104,16 +137,16 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
 
   // Handle voice transcript changes
   useEffect(() => {
-    if (transcript && mode === 'voice') {
+    if (transcript && mode === "voice") {
       setSmartInput(transcript);
     }
   }, [transcript, mode]);
 
   const loadCategories = async () => {
     const { data } = await supabase
-      .from('ingredient_categories')
-      .select('*')
-      .order('sort_order');
+      .from("ingredient_categories")
+      .select("*")
+      .order("sort_order");
 
     if (data) {
       setCategories(data);
@@ -123,7 +156,7 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
   const loadUserPreferences = async () => {
     const [frequent, recent] = await Promise.all([
       getFrequentItems(8),
-      getRecentItems(5)
+      getRecentItems(5),
     ]);
     setFrequentItems(frequent);
     setRecentItems(recent);
@@ -135,38 +168,39 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
     setSaving(true);
     try {
       const customId = `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const fullQuantity = '1 unid';
+      const fullQuantity = "1 unid";
 
-      await supabase
-        .from('market_items')
-        .insert({
-          id: customId,
-          name: item.productName,
-          category: item.category || 'Otros',
-          category_id: item.categoryId || 'other',
-          quantity: fullQuantity,
-          order_index: 999,
-          is_custom: true,
-          unit: 'unid',
-          created_at: new Date().toISOString()
-        });
+      await supabase.from("market_items").insert({
+        id: customId,
+        name: item.productName,
+        category: item.category || "Otros",
+        category_id: item.categoryId || "other",
+        quantity: fullQuantity,
+        order_index: 999,
+        is_custom: true,
+        unit: "unid",
+        created_at: new Date().toISOString(),
+      });
 
-      await supabase
-        .from('inventory')
-        .insert({
-          item_id: customId,
-          current_quantity: fullQuantity,
-          current_number: 1,
-          last_updated: new Date().toISOString()
-        });
+      await supabase.from("inventory").insert({
+        item_id: customId,
+        current_quantity: fullQuantity,
+        current_number: 1,
+        last_updated: new Date().toISOString(),
+      });
 
-      await recordProductUsage(customId, item.productName, item.category, item.categoryId);
+      await recordProductUsage(
+        customId,
+        item.productName,
+        item.category,
+        item.categoryId,
+      );
 
       onAdded();
       onClose();
     } catch (err) {
-      console.error('Error quick adding:', err);
-      setError('Error al agregar el producto');
+      console.error("Error quick adding:", err);
+      setError("Error al agregar el producto");
     } finally {
       setSaving(false);
     }
@@ -175,40 +209,43 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
   // ==================== SMART MODE FUNCTIONS ====================
 
   const handleSmartParse = async () => {
-    const inputText = mode === 'voice' ? transcript : smartInput;
+    const inputText = mode === "voice" ? transcript : smartInput;
     if (!inputText.trim()) return;
 
     setIsParsing(true);
     setParseError(null);
 
     try {
-      const response = await fetch('/api/parse-market-items', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input: inputText.trim() })
+      const response = await fetch("/api/parse-market-items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: inputText.trim() }),
       });
 
       if (!response.ok) {
-        throw new Error('Error al procesar');
+        throw new Error("Error al procesar");
       }
 
       const data = await response.json();
 
-      const itemsWithIds = data.items.map((item: Omit<ParsedItem, 'id' | 'isSelected'>, index: number) => ({
-        ...item,
-        id: `parsed_${Date.now()}_${index}`,
-        isSelected: true
-      }));
+      const itemsWithIds = data.items.map(
+        (item: Omit<ParsedItem, "id" | "isSelected">, index: number) => ({
+          ...item,
+          id: `parsed_${Date.now()}_${index}`,
+          isSelected: true,
+        }),
+      );
 
       setParsedItems(itemsWithIds);
 
-      if (mode === 'voice') {
+      if (mode === "voice") {
         resetTranscript();
       }
-
     } catch (err) {
-      console.error('Error parsing:', err);
-      setParseError('Error al procesar. Intenta de nuevo o usa el modo manual.');
+      console.error("Error parsing:", err);
+      setParseError(
+        "Error al procesar. Intenta de nuevo o usa el modo manual.",
+      );
     } finally {
       setIsParsing(false);
     }
@@ -219,7 +256,7 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
   const startBarcodeScanner = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
+        video: { facingMode: "environment" },
       });
 
       if (videoRef.current) {
@@ -228,9 +265,24 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
         setBarcodeScanning(true);
 
         // Use BarcodeDetector API if available
-        if ('BarcodeDetector' in window) {
-          const barcodeDetector = new (window as Window & { BarcodeDetector: new (options?: { formats: string[] }) => { detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue: string }>> } }).BarcodeDetector({
-            formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39']
+        if ("BarcodeDetector" in window) {
+          const barcodeDetector = new (
+            window as Window & {
+              BarcodeDetector: new (options?: { formats: string[] }) => {
+                detect: (
+                  source: HTMLVideoElement,
+                ) => Promise<Array<{ rawValue: string }>>;
+              };
+            }
+          ).BarcodeDetector({
+            formats: [
+              "ean_13",
+              "ean_8",
+              "upc_a",
+              "upc_e",
+              "code_128",
+              "code_39",
+            ],
           });
 
           const detectBarcode = async () => {
@@ -254,14 +306,14 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
         }
       }
     } catch (err) {
-      console.error('Error accessing camera:', err);
-      setError('No se pudo acceder a la cámara');
+      console.error("Error accessing camera:", err);
+      setError("No se pudo acceder a la cámara");
     }
   };
 
   const stopBarcodeScanner = () => {
     if (barcodeStreamRef.current) {
-      barcodeStreamRef.current.getTracks().forEach(track => track.stop());
+      barcodeStreamRef.current.getTracks().forEach((track) => track.stop());
       barcodeStreamRef.current = null;
     }
     setBarcodeScanning(false);
@@ -273,7 +325,7 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
     setBarcodeLoading(true);
 
     // Vibrate on success
-    if ('vibrate' in navigator) {
+    if ("vibrate" in navigator) {
       navigator.vibrate(100);
     }
 
@@ -286,14 +338,14 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
         setBarcodeProduct(null);
       }
     } catch (err) {
-      console.error('Error looking up barcode:', err);
+      console.error("Error looking up barcode:", err);
     } finally {
       setBarcodeLoading(false);
     }
   };
 
   const handleManualBarcodeInput = () => {
-    const barcode = prompt('Ingresa el código de barras manualmente:');
+    const barcode = prompt("Ingresa el código de barras manualmente:");
     if (barcode) {
       handleBarcodeDetected(barcode);
     }
@@ -301,7 +353,9 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
 
   // ==================== RECEIPT FUNCTIONS ====================
 
-  const handleReceiptCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleReceiptCapture = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -310,11 +364,11 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
 
     try {
       const formData = new FormData();
-      formData.append('image', file);
+      formData.append("image", file);
 
-      const response = await fetch('/api/scan-receipt', {
-        method: 'POST',
-        body: formData
+      const response = await fetch("/api/scan-receipt", {
+        method: "POST",
+        body: formData,
       });
 
       const data = await response.json();
@@ -325,38 +379,43 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
       }
 
       if (data.items?.length > 0) {
-        const itemsWithIds = data.items.map((item: {
-          name: string;
-          quantity: number;
-          unit: string;
-          price?: number;
-          category: { id: string; name: string; icon: string };
-          brand?: string;
-        }, index: number) => ({
-          id: `receipt_${Date.now()}_${index}`,
-          name: item.name,
-          originalInput: item.name,
-          category: item.category,
-          quantity: item.quantity,
-          unit: item.unit,
-          price: item.price,
-          brand: item.brand,
-          confidence: 0.9,
-          isSelected: true
-        }));
+        const itemsWithIds = data.items.map(
+          (
+            item: {
+              name: string;
+              quantity: number;
+              unit: string;
+              price?: number;
+              category: { id: string; name: string; icon: string };
+              brand?: string;
+            },
+            index: number,
+          ) => ({
+            id: `receipt_${Date.now()}_${index}`,
+            name: item.name,
+            originalInput: item.name,
+            category: item.category,
+            quantity: item.quantity,
+            unit: item.unit,
+            price: item.price,
+            brand: item.brand,
+            confidence: 0.9,
+            isSelected: true,
+          }),
+        );
 
         setParsedItems(itemsWithIds);
-        setMode('smart'); // Switch to smart mode to show results
+        setMode("smart"); // Switch to smart mode to show results
       } else {
-        setReceiptError('No se encontraron productos en el recibo');
+        setReceiptError("No se encontraron productos en el recibo");
       }
     } catch (err) {
-      console.error('Receipt scan error:', err);
-      setReceiptError('Error al procesar el recibo');
+      console.error("Receipt scan error:", err);
+      setReceiptError("Error al procesar el recibo");
     } finally {
       setReceiptProcessing(false);
       if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        fileInputRef.current.value = "";
       }
     }
   };
@@ -364,37 +423,35 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
   // ==================== ITEM MANAGEMENT ====================
 
   const toggleItemSelection = (itemId: string) => {
-    setParsedItems(prev =>
-      prev.map(item =>
-        item.id === itemId ? { ...item, isSelected: !item.isSelected } : item
-      )
+    setParsedItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId ? { ...item, isSelected: !item.isSelected } : item,
+      ),
     );
   };
 
   const toggleItemEdit = (itemId: string) => {
-    setParsedItems(prev =>
-      prev.map(item =>
-        item.id === itemId ? { ...item, isEditing: !item.isEditing } : item
-      )
+    setParsedItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId ? { ...item, isEditing: !item.isEditing } : item,
+      ),
     );
   };
 
   const updateParsedItem = (itemId: string, updates: Partial<ParsedItem>) => {
-    setParsedItems(prev =>
-      prev.map(item =>
-        item.id === itemId ? { ...item, ...updates } : item
-      )
+    setParsedItems((prev) =>
+      prev.map((item) => (item.id === itemId ? { ...item, ...updates } : item)),
     );
   };
 
   const removeParsedItem = (itemId: string) => {
-    setParsedItems(prev => prev.filter(item => item.id !== itemId));
+    setParsedItems((prev) => prev.filter((item) => item.id !== itemId));
   };
 
   // ==================== SAVE FUNCTIONS ====================
 
   const handleSaveItems = async () => {
-    const selectedItems = parsedItems.filter(item => item.isSelected);
+    const selectedItems = parsedItems.filter((item) => item.isSelected);
     if (selectedItems.length === 0) return;
 
     setSaving(true);
@@ -405,38 +462,39 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
         const customId = `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const fullQuantity = `${item.quantity} ${item.unit}`;
 
-        await supabase
-          .from('market_items')
-          .insert({
-            id: customId,
-            name: item.brand ? `${item.name} (${item.brand})` : item.name,
-            category: item.category.name,
-            category_id: item.category.id,
-            quantity: fullQuantity,
-            order_index: 999,
-            is_custom: true,
-            unit: item.unit,
-            created_at: new Date().toISOString()
-          });
+        await supabase.from("market_items").insert({
+          id: customId,
+          name: item.brand ? `${item.name} (${item.brand})` : item.name,
+          category: item.category.name,
+          category_id: item.category.id,
+          quantity: fullQuantity,
+          order_index: 999,
+          is_custom: true,
+          unit: item.unit,
+          created_at: new Date().toISOString(),
+        });
 
-        await supabase
-          .from('inventory')
-          .insert({
-            item_id: customId,
-            current_quantity: fullQuantity,
-            current_number: item.quantity,
-            last_updated: new Date().toISOString()
-          });
+        await supabase.from("inventory").insert({
+          item_id: customId,
+          current_quantity: fullQuantity,
+          current_number: item.quantity,
+          last_updated: new Date().toISOString(),
+        });
 
         // Record for learning
-        await recordProductUsage(customId, item.name, item.category.name, item.category.id);
+        await recordProductUsage(
+          customId,
+          item.name,
+          item.category.name,
+          item.category.id,
+        );
       }
 
       onAdded();
       onClose();
     } catch (err) {
-      console.error('Error saving items:', err);
-      setError('Error al guardar los items');
+      console.error("Error saving items:", err);
+      setError("Error al guardar los items");
     } finally {
       setSaving(false);
     }
@@ -444,7 +502,7 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
 
   const handleSaveManual = async () => {
     if (!name.trim()) {
-      setError('El nombre es requerido');
+      setError("El nombre es requerido");
       return;
     }
 
@@ -453,42 +511,44 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
 
     try {
       const customId = `custom_${Date.now()}`;
-      const fullQuantity = quantity && unit ? `${quantity} ${unit}` : quantity || '1 unid';
-      const category = categories.find(c => c.id === selectedCategory);
+      const fullQuantity =
+        quantity && unit ? `${quantity} ${unit}` : quantity || "1 unid";
+      const category = categories.find((c) => c.id === selectedCategory);
 
-      await supabase
-        .from('market_items')
-        .insert({
-          id: customId,
-          name: name.trim(),
-          category: category?.name_es || 'Otros',
-          category_id: selectedCategory,
-          quantity: fullQuantity,
-          order_index: 999,
-          is_custom: true,
-          unit: unit || null,
-          created_at: new Date().toISOString()
-        });
+      await supabase.from("market_items").insert({
+        id: customId,
+        name: name.trim(),
+        category: category?.name_es || "Otros",
+        category_id: selectedCategory,
+        quantity: fullQuantity,
+        order_index: 999,
+        is_custom: true,
+        unit: unit || null,
+        created_at: new Date().toISOString(),
+      });
 
       if (quantity) {
-        await supabase
-          .from('inventory')
-          .insert({
-            item_id: customId,
-            current_quantity: fullQuantity,
-            current_number: parseFloat(quantity) || 1,
-            last_updated: new Date().toISOString()
-          });
+        await supabase.from("inventory").insert({
+          item_id: customId,
+          current_quantity: fullQuantity,
+          current_number: parseFloat(quantity) || 1,
+          last_updated: new Date().toISOString(),
+        });
       }
 
       // Record for learning
-      await recordProductUsage(customId, name.trim(), category?.name_es, selectedCategory);
+      await recordProductUsage(
+        customId,
+        name.trim(),
+        category?.name_es,
+        selectedCategory,
+      );
 
       onAdded();
       onClose();
     } catch (err) {
-      console.error('Error saving custom item:', err);
-      setError('Error al guardar el item');
+      console.error("Error saving custom item:", err);
+      setError("Error al guardar el item");
     } finally {
       setSaving(false);
     }
@@ -496,20 +556,30 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
 
   // ==================== RENDER ====================
 
-  const selectedCount = parsedItems.filter(i => i.isSelected).length;
+  const selectedCount = parsedItems.filter((i) => i.isSelected).length;
   const showResults = parsedItems.length > 0;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="add-item-modal-title"
+    >
       <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-4">
           <div className="flex justify-between items-center mb-3">
             <div className="flex items-center gap-2">
               <Sparkles size={20} />
-              <span className="font-semibold">Agregar Productos</span>
+              <span id="add-item-modal-title" className="font-semibold">
+                Agregar Productos
+              </span>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg">
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-white/20 rounded-lg"
+            >
               <X size={20} />
             </button>
           </div>
@@ -517,46 +587,56 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
           {/* Mode Tabs */}
           <div className="flex bg-white/20 rounded-xl p-1 gap-1">
             <button
-              onClick={() => setMode('smart')}
+              onClick={() => setMode("smart")}
               className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-1 ${
-                mode === 'smart' ? 'bg-white text-purple-600' : 'text-white/80 hover:text-white'
+                mode === "smart"
+                  ? "bg-white text-purple-600"
+                  : "text-white/80 hover:text-white"
               }`}
             >
               <Sparkles size={16} />
               IA
             </button>
             <button
-              onClick={() => setMode('voice')}
+              onClick={() => setMode("voice")}
               disabled={!voiceSupported}
               className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-1 ${
-                mode === 'voice' ? 'bg-white text-purple-600' : 'text-white/80 hover:text-white'
-              } ${!voiceSupported ? 'opacity-50' : ''}`}
+                mode === "voice"
+                  ? "bg-white text-purple-600"
+                  : "text-white/80 hover:text-white"
+              } ${!voiceSupported ? "opacity-50" : ""}`}
             >
               <Mic size={16} />
               Voz
             </button>
             <button
-              onClick={() => setMode('barcode')}
+              onClick={() => setMode("barcode")}
               className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-1 ${
-                mode === 'barcode' ? 'bg-white text-purple-600' : 'text-white/80 hover:text-white'
+                mode === "barcode"
+                  ? "bg-white text-purple-600"
+                  : "text-white/80 hover:text-white"
               }`}
             >
               <ScanBarcode size={16} />
               Código
             </button>
             <button
-              onClick={() => setMode('receipt')}
+              onClick={() => setMode("receipt")}
               className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-1 ${
-                mode === 'receipt' ? 'bg-white text-purple-600' : 'text-white/80 hover:text-white'
+                mode === "receipt"
+                  ? "bg-white text-purple-600"
+                  : "text-white/80 hover:text-white"
               }`}
             >
               <Receipt size={16} />
               Recibo
             </button>
             <button
-              onClick={() => setMode('manual')}
+              onClick={() => setMode("manual")}
               className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-1 ${
-                mode === 'manual' ? 'bg-white text-purple-600' : 'text-white/80 hover:text-white'
+                mode === "manual"
+                  ? "bg-white text-purple-600"
+                  : "text-white/80 hover:text-white"
               }`}
             >
               <Edit3 size={16} />
@@ -567,74 +647,82 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
 
         <div className="flex-1 overflow-y-auto p-4">
           {/* Quick Suggestions (always visible at top unless in manual mode) */}
-          {mode !== 'manual' && !showResults && (frequentItems.length > 0 || recentItems.length > 0) && (
-            <div className="mb-4 space-y-3">
-              {recentItems.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
-                    <Clock size={12} />
-                    <span>Recientes</span>
+          {mode !== "manual" &&
+            !showResults &&
+            (frequentItems.length > 0 || recentItems.length > 0) && (
+              <div className="mb-4 space-y-3">
+                {recentItems.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
+                      <Clock size={12} />
+                      <span>Recientes</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {recentItems.slice(0, 4).map((item) => (
+                        <button
+                          key={item.productId}
+                          onClick={() => handleQuickAdd(item)}
+                          disabled={saving}
+                          className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-sm hover:bg-blue-100 transition-colors"
+                        >
+                          + {item.productName}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {recentItems.slice(0, 4).map((item) => (
-                      <button
-                        key={item.productId}
-                        onClick={() => handleQuickAdd(item)}
-                        disabled={saving}
-                        className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-sm hover:bg-blue-100 transition-colors"
-                      >
-                        + {item.productName}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+                )}
 
-              {frequentItems.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
-                    <Star size={12} />
-                    <span>Más usados</span>
+                {frequentItems.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
+                      <Star size={12} />
+                      <span>Más usados</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {frequentItems.slice(0, 6).map((item) => (
+                        <button
+                          key={item.productId}
+                          onClick={() => handleQuickAdd(item)}
+                          disabled={saving}
+                          className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full text-sm hover:bg-amber-100 transition-colors flex items-center gap-1"
+                        >
+                          + {item.productName}
+                          <span className="text-xs opacity-60">
+                            ({item.count})
+                          </span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {frequentItems.slice(0, 6).map((item) => (
-                      <button
-                        key={item.productId}
-                        onClick={() => handleQuickAdd(item)}
-                        disabled={saving}
-                        className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full text-sm hover:bg-amber-100 transition-colors flex items-center gap-1"
-                      >
-                        + {item.productName}
-                        <span className="text-xs opacity-60">({item.count})</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            )}
 
           {/* ==================== SMART / VOICE MODE ==================== */}
-          {(mode === 'smart' || mode === 'voice') && (
+          {(mode === "smart" || mode === "voice") && (
             <div className="space-y-4">
               {/* Voice Controls */}
-              {mode === 'voice' && (
+              {mode === "voice" && (
                 <div className="text-center py-4">
                   <button
                     onClick={isListening ? stopListening : startListening}
                     className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${
                       isListening
-                        ? 'bg-red-500 text-white animate-pulse scale-110'
-                        : 'bg-purple-100 text-purple-600 hover:bg-purple-200'
+                        ? "bg-red-500 text-white animate-pulse scale-110"
+                        : "bg-purple-100 text-purple-600 hover:bg-purple-200"
                     }`}
                   >
                     {isListening ? <MicOff size={32} /> : <Mic size={32} />}
                   </button>
                   <p className="mt-3 text-sm text-gray-600">
-                    {isListening ? 'Escuchando... Toca para detener' : 'Toca para dictar'}
+                    {isListening
+                      ? "Escuchando... Toca para detener"
+                      : "Toca para dictar"}
                   </p>
                   {interimTranscript && (
-                    <p className="mt-2 text-purple-600 italic">&ldquo;{interimTranscript}&rdquo;</p>
+                    <p className="mt-2 text-purple-600 italic">
+                      &ldquo;{interimTranscript}&rdquo;
+                    </p>
                   )}
                   {voiceError && (
                     <p className="mt-2 text-red-500 text-sm">{voiceError}</p>
@@ -643,24 +731,29 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
               )}
 
               {/* Text Input (for smart mode or after voice) */}
-              {(mode === 'smart' || transcript) && (
+              {(mode === "smart" || transcript) && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {mode === 'voice' ? 'Texto detectado' : 'Escribe lo que compraste'}
+                    {mode === "voice"
+                      ? "Texto detectado"
+                      : "Escribe lo que compraste"}
                   </label>
                   <textarea
-                    value={mode === 'voice' ? transcript : smartInput}
-                    onChange={(e) => mode === 'smart' && setSmartInput(e.target.value)}
+                    value={mode === "voice" ? transcript : smartInput}
+                    onChange={(e) =>
+                      mode === "smart" && setSmartInput(e.target.value)
+                    }
                     placeholder="Ej: 1 kg camarones, chocolate Luker, 2 paquetes galletas saltinas..."
                     className="w-full p-4 border-2 border-purple-200 rounded-xl focus:border-purple-500 resize-none h-24"
                     disabled={isParsing}
-                    readOnly={mode === 'voice'}
+                    readOnly={mode === "voice"}
                   />
                 </div>
               )}
 
               {/* Process Button */}
-              {((mode === 'smart' && smartInput.trim()) || (mode === 'voice' && transcript)) && (
+              {((mode === "smart" && smartInput.trim()) ||
+                (mode === "voice" && transcript)) && (
                 <button
                   onClick={handleSmartParse}
                   disabled={isParsing}
@@ -690,7 +783,7 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
           )}
 
           {/* ==================== BARCODE MODE ==================== */}
-          {mode === 'barcode' && (
+          {mode === "barcode" && (
             <div className="space-y-4">
               {barcodeScanning ? (
                 <div className="relative">
@@ -719,7 +812,9 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
                   >
                     <ScanBarcode size={40} className="text-purple-600" />
                   </button>
-                  <p className="mt-4 text-gray-600">Escanear código de barras</p>
+                  <p className="mt-4 text-gray-600">
+                    Escanear código de barras
+                  </p>
                   <button
                     onClick={handleManualBarcodeInput}
                     className="mt-2 text-sm text-purple-600 underline"
@@ -731,19 +826,28 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
 
               {barcodeLoading && (
                 <div className="text-center py-4">
-                  <Loader2 size={24} className="animate-spin mx-auto text-purple-600" />
-                  <p className="mt-2 text-sm text-gray-500">Buscando producto...</p>
+                  <Loader2
+                    size={24}
+                    className="animate-spin mx-auto text-purple-600"
+                  />
+                  <p className="mt-2 text-sm text-gray-500">
+                    Buscando producto...
+                  </p>
                 </div>
               )}
 
               {barcodeResult && !barcodeLoading && (
                 <div className="bg-gray-50 rounded-xl p-4">
-                  <p className="text-xs text-gray-500 mb-1">Código: {barcodeResult}</p>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Código: {barcodeResult}
+                  </p>
                   {barcodeProduct ? (
                     <div>
                       <p className="font-medium">{barcodeProduct.name}</p>
                       {barcodeProduct.brand && (
-                        <p className="text-sm text-gray-500">{barcodeProduct.brand}</p>
+                        <p className="text-sm text-gray-500">
+                          {barcodeProduct.brand}
+                        </p>
                       )}
                       <button
                         onClick={handleSmartParse}
@@ -754,7 +858,9 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
                     </div>
                   ) : (
                     <div>
-                      <p className="text-amber-600 text-sm mb-2">Producto no encontrado en la base de datos</p>
+                      <p className="text-amber-600 text-sm mb-2">
+                        Producto no encontrado en la base de datos
+                      </p>
                       <input
                         type="text"
                         value={smartInput}
@@ -778,13 +884,16 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
           )}
 
           {/* ==================== RECEIPT MODE ==================== */}
-          {mode === 'receipt' && (
+          {mode === "receipt" && (
             <div className="space-y-4">
               <div className="text-center py-8">
                 <label className="cursor-pointer">
                   <div className="w-24 h-24 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto hover:bg-purple-200 transition-colors">
                     {receiptProcessing ? (
-                      <Loader2 size={40} className="text-purple-600 animate-spin" />
+                      <Loader2
+                        size={40}
+                        className="text-purple-600 animate-spin"
+                      />
                     ) : (
                       <Camera size={40} className="text-purple-600" />
                     )}
@@ -800,7 +909,9 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
                   />
                 </label>
                 <p className="mt-4 text-gray-600">
-                  {receiptProcessing ? 'Analizando recibo...' : 'Toma foto del recibo'}
+                  {receiptProcessing
+                    ? "Analizando recibo..."
+                    : "Toma foto del recibo"}
                 </p>
                 <p className="mt-1 text-xs text-gray-400">
                   La IA extraerá todos los productos automáticamente
@@ -817,7 +928,7 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
           )}
 
           {/* ==================== MANUAL MODE ==================== */}
-          {mode === 'manual' && (
+          {mode === "manual" && (
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -838,15 +949,15 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
                   Categoría
                 </label>
                 <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
-                  {categories.map(cat => (
+                  {categories.map((cat) => (
                     <button
                       key={cat.id}
                       type="button"
                       onClick={() => setSelectedCategory(cat.id)}
                       className={`flex items-center gap-2 p-2.5 rounded-xl border-2 transition-all text-left ${
                         selectedCategory === cat.id
-                          ? 'border-purple-500 bg-purple-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                          ? "border-purple-500 bg-purple-50"
+                          : "border-gray-200 hover:border-gray-300"
                       }`}
                     >
                       <span className="text-lg">{cat.icon}</span>
@@ -878,8 +989,10 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
                     onChange={(e) => setUnit(e.target.value)}
                     className="w-full px-4 py-3 border rounded-xl bg-white"
                   >
-                    {commonUnits.map(u => (
-                      <option key={u} value={u}>{u}</option>
+                    {commonUnits.map((u) => (
+                      <option key={u} value={u}>
+                        {u}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -899,13 +1012,13 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
                 </span>
               </div>
 
-              {parsedItems.map(item => (
+              {parsedItems.map((item) => (
                 <div
                   key={item.id}
                   className={`rounded-xl border-2 transition-all ${
                     item.isSelected
-                      ? 'border-purple-300 bg-purple-50'
-                      : 'border-gray-200 bg-gray-50 opacity-60'
+                      ? "border-purple-300 bg-purple-50"
+                      : "border-gray-200 bg-gray-50 opacity-60"
                   }`}
                 >
                   <div className="p-3">
@@ -914,8 +1027,8 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
                         onClick={() => toggleItemSelection(item.id)}
                         className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
                           item.isSelected
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-gray-200 text-gray-400'
+                            ? "bg-purple-600 text-white"
+                            : "bg-gray-200 text-gray-400"
                         }`}
                       >
                         {item.isSelected && <Check size={14} />}
@@ -934,7 +1047,9 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
                         <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
                           <span>{item.category.name}</span>
                           <span>•</span>
-                          <span>{item.quantity} {item.unit}</span>
+                          <span>
+                            {item.quantity} {item.unit}
+                          </span>
                           {item.price && (
                             <>
                               <span>•</span>
@@ -949,7 +1064,11 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
                           onClick={() => toggleItemEdit(item.id)}
                           className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-100 rounded-lg"
                         >
-                          {item.isEditing ? <ChevronUp size={16} /> : <Edit3 size={16} />}
+                          {item.isEditing ? (
+                            <ChevronUp size={16} />
+                          ) : (
+                            <Edit3 size={16} />
+                          )}
                         </button>
                         <button
                           onClick={() => removeParsedItem(item.id)}
@@ -965,7 +1084,9 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
                         <input
                           type="text"
                           value={item.name}
-                          onChange={(e) => updateParsedItem(item.id, { name: e.target.value })}
+                          onChange={(e) =>
+                            updateParsedItem(item.id, { name: e.target.value })
+                          }
                           className="w-full p-2 border rounded-lg text-sm"
                           placeholder="Nombre"
                         />
@@ -973,33 +1094,49 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
                           <input
                             type="number"
                             value={item.quantity}
-                            onChange={(e) => updateParsedItem(item.id, { quantity: parseFloat(e.target.value) || 1 })}
+                            onChange={(e) =>
+                              updateParsedItem(item.id, {
+                                quantity: parseFloat(e.target.value) || 1,
+                              })
+                            }
                             className="p-2 border rounded-lg text-sm"
                             placeholder="Cantidad"
                           />
                           <select
                             value={item.unit}
-                            onChange={(e) => updateParsedItem(item.id, { unit: e.target.value })}
+                            onChange={(e) =>
+                              updateParsedItem(item.id, {
+                                unit: e.target.value,
+                              })
+                            }
                             className="p-2 border rounded-lg text-sm bg-white"
                           >
-                            {commonUnits.map(u => (
-                              <option key={u} value={u}>{u}</option>
+                            {commonUnits.map((u) => (
+                              <option key={u} value={u}>
+                                {u}
+                              </option>
                             ))}
                           </select>
                         </div>
                         <select
                           value={item.category.id}
                           onChange={(e) => {
-                            const cat = categories.find(c => c.id === e.target.value);
+                            const cat = categories.find(
+                              (c) => c.id === e.target.value,
+                            );
                             if (cat) {
                               updateParsedItem(item.id, {
-                                category: { id: cat.id, name: cat.name_es, icon: cat.icon }
+                                category: {
+                                  id: cat.id,
+                                  name: cat.name_es,
+                                  icon: cat.icon,
+                                },
                               });
                             }
                           }}
                           className="w-full p-2 border rounded-lg text-sm bg-white"
                         >
-                          {categories.map(cat => (
+                          {categories.map((cat) => (
                             <option key={cat.id} value={cat.id}>
                               {cat.icon} {cat.name_es}
                             </option>
@@ -1030,7 +1167,7 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
             Cancelar
           </button>
 
-          {mode === 'manual' ? (
+          {mode === "manual" ? (
             <button
               onClick={handleSaveManual}
               disabled={saving || !name.trim()}
@@ -1056,7 +1193,7 @@ export default function AddCustomItemModal({ onClose, onAdded }: AddCustomItemMo
               ) : (
                 <>
                   <Plus size={18} />
-                  Agregar {selectedCount > 0 ? `(${selectedCount})` : ''}
+                  Agregar {selectedCount > 0 ? `(${selectedCount})` : ""}
                 </>
               )}
             </button>

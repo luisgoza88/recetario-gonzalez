@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   getVoiceManager,
   isSpeechRecognitionSupported,
@@ -8,8 +8,8 @@ import {
   speak,
   stopSpeaking,
   formatForSpeech,
-  type VoiceManager
-} from '@/lib/voice-commands';
+  type VoiceManager,
+} from "@/lib/voice-commands";
 
 interface UseVoiceInputOptions {
   onFinalTranscript?: (transcript: string) => void;
@@ -22,7 +22,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
   const [isListening, setIsListening] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(false);
-  const [interimTranscript, setInterimTranscript] = useState('');
+  const [interimTranscript, setInterimTranscript] = useState("");
 
   const voiceManagerRef = useRef<VoiceManager | null>(null);
 
@@ -49,7 +49,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
     const started = voiceManagerRef.current.start({
       onResult: (transcript, isFinal) => {
         if (isFinal) {
-          setInterimTranscript('');
+          setInterimTranscript("");
           setIsListening(false);
           if (autoSendDelay > 0) {
             setTimeout(() => {
@@ -65,25 +65,25 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
         }
       },
       onError: (error) => {
-        console.error('Voice error:', error);
+        console.error("Voice error:", error);
         setIsListening(false);
-        setInterimTranscript('');
+        setInterimTranscript("");
       },
       onEnd: () => {
         setIsListening(false);
-      }
+      },
     });
 
     if (started) {
       setIsListening(true);
-      setInterimTranscript('');
+      setInterimTranscript("");
     }
   }, [autoSendDelay, onFinalTranscript]);
 
   const stopListening = useCallback(() => {
     voiceManagerRef.current?.stop();
     setIsListening(false);
-    setInterimTranscript('');
+    setInterimTranscript("");
   }, []);
 
   const toggleListening = useCallback(() => {
@@ -94,11 +94,14 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
     }
   }, [isListening, startListening, stopListening]);
 
-  const speakText = useCallback((text: string) => {
-    if (!ttsEnabled) return;
-    const cleanText = formatForSpeech(text);
-    speak(cleanText).catch(console.error);
-  }, [ttsEnabled]);
+  const speakText = useCallback(
+    (text: string) => {
+      if (!ttsEnabled) return;
+      const cleanText = formatForSpeech(text);
+      speak(cleanText).catch(console.error);
+    },
+    [ttsEnabled],
+  );
 
   const toggleTTS = useCallback(() => {
     if (ttsEnabled) {

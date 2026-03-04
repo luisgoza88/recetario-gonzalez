@@ -1,16 +1,22 @@
-'use client';
+"use client";
 
-import { useEffect, ReactNode } from 'react';
-import { useHouseholdStore } from '@/lib/stores/useHouseholdStore';
-import { initializeHouseholdContext } from '@/lib/services/household-service';
+import { useEffect, ReactNode } from "react";
+import { useHouseholdStore } from "@/lib/stores/useHouseholdStore";
+import { initializeHouseholdContext } from "@/lib/services/household-service";
 
 interface HouseholdProviderProps {
   children: ReactNode;
 }
 
 export function HouseholdProvider({ children }: HouseholdProviderProps) {
-  const { setHousehold, setUser, setLoading, setInitialized, setError, isInitialized } =
-    useHouseholdStore();
+  const {
+    setHousehold,
+    setUser,
+    setLoading,
+    setInitialized,
+    setError,
+    isInitialized,
+  } = useHouseholdStore();
 
   useEffect(() => {
     // Don't re-initialize if already done
@@ -24,15 +30,22 @@ export function HouseholdProvider({ children }: HouseholdProviderProps) {
         setUser(user);
         setInitialized(true);
       } catch (error) {
-        console.error('Failed to initialize household context:', error);
-        setError('Error al cargar el contexto del hogar');
+        console.error("Failed to initialize household context:", error);
+        setError("Error al cargar el contexto del hogar");
       } finally {
         setLoading(false);
       }
     };
 
     initialize();
-  }, [isInitialized, setHousehold, setUser, setLoading, setInitialized, setError]);
+  }, [
+    isInitialized,
+    setHousehold,
+    setUser,
+    setLoading,
+    setInitialized,
+    setError,
+  ]);
 
   return <>{children}</>;
 }

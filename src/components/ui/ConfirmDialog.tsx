@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback } from "react";
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -10,7 +10,7 @@ interface ConfirmDialogProps {
   message: string;
   confirmText?: string;
   cancelText?: string;
-  variant?: 'danger' | 'warning';
+  variant?: "danger" | "warning";
 }
 
 export default function ConfirmDialog({
@@ -19,9 +19,9 @@ export default function ConfirmDialog({
   onCancel,
   title,
   message,
-  confirmText = 'Confirmar',
-  cancelText = 'Cancelar',
-  variant = 'danger',
+  confirmText = "Confirmar",
+  cancelText = "Cancelar",
+  variant = "danger",
 }: ConfirmDialogProps) {
   const cancelRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -42,42 +42,39 @@ export default function ConfirmDialog({
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         e.preventDefault();
         onCancel();
       }
     };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onCancel]);
 
   // Basic focus trap
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key !== 'Tab' || !dialogRef.current) return;
-      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      );
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    },
-    []
-  );
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== "Tab" || !dialogRef.current) return;
+    const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }, []);
 
   if (!isOpen) return null;
 
   const confirmButtonClass =
-    variant === 'danger'
-      ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500 text-white'
-      : 'bg-yellow-500 hover:bg-yellow-600 focus:ring-yellow-400 text-white';
+    variant === "danger"
+      ? "bg-red-600 hover:bg-red-700 focus:ring-red-500 text-white"
+      : "bg-yellow-500 hover:bg-yellow-600 focus:ring-yellow-400 text-white";
 
   return (
     <div
@@ -88,10 +85,7 @@ export default function ConfirmDialog({
       aria-describedby="confirm-dialog-message"
     >
       {/* Overlay */}
-      <div
-        className="absolute inset-0 bg-black/50"
-        onClick={onCancel}
-      />
+      <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
 
       {/* Dialog */}
       <div
@@ -105,10 +99,7 @@ export default function ConfirmDialog({
         >
           {title}
         </h3>
-        <p
-          id="confirm-dialog-message"
-          className="text-sm text-gray-600 mb-6"
-        >
+        <p id="confirm-dialog-message" className="text-sm text-gray-600 mb-6">
           {message}
         </p>
 

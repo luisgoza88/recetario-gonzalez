@@ -3,8 +3,8 @@
  * Defines the structure for households, users, and invitations
  */
 
-export type PlanType = 'free' | 'basic' | 'premium' | 'enterprise';
-export type UserRole = 'owner' | 'admin' | 'member' | 'viewer';
+export type PlanType = "free" | "basic" | "premium" | "enterprise";
+export type UserRole = "owner" | "admin" | "member" | "viewer";
 
 export interface HouseholdFeatures {
   ai_assistant: boolean;
@@ -80,12 +80,15 @@ export interface HouseholdInvitation {
 }
 
 // Plan limits configuration
-export const PLAN_LIMITS: Record<PlanType, {
-  max_users: number;
-  max_recipes: number;
-  max_employees: number;
-  features: HouseholdFeatures;
-}> = {
+export const PLAN_LIMITS: Record<
+  PlanType,
+  {
+    max_users: number;
+    max_recipes: number;
+    max_employees: number;
+    features: HouseholdFeatures;
+  }
+> = {
   free: {
     max_users: 2,
     max_recipes: 20,
@@ -97,7 +100,7 @@ export const PLAN_LIMITS: Record<PlanType, {
       image_scanning: false,
       budget_tracking: false,
       multi_employee: false,
-    }
+    },
   },
   basic: {
     max_users: 5,
@@ -110,7 +113,7 @@ export const PLAN_LIMITS: Record<PlanType, {
       image_scanning: false,
       budget_tracking: true,
       multi_employee: true,
-    }
+    },
   },
   premium: {
     max_users: 10,
@@ -123,7 +126,7 @@ export const PLAN_LIMITS: Record<PlanType, {
       image_scanning: true,
       budget_tracking: true,
       multi_employee: true,
-    }
+    },
   },
   enterprise: {
     max_users: -1, // unlimited
@@ -136,8 +139,8 @@ export const PLAN_LIMITS: Record<PlanType, {
       image_scanning: true,
       budget_tracking: true,
       multi_employee: true,
-    }
-  }
+    },
+  },
 };
 
 // Helper to check if user has permission
@@ -145,7 +148,7 @@ export function hasPermission(user: User | null, permission: string): boolean {
   if (!user) return false;
 
   // Owners and admins have all permissions
-  if (user.role === 'owner' || user.role === 'admin') return true;
+  if (user.role === "owner" || user.role === "admin") return true;
 
   // Check specific permission
   return user.permissions[permission] === true;
@@ -154,7 +157,7 @@ export function hasPermission(user: User | null, permission: string): boolean {
 // Helper to check if action is allowed by plan
 export function isPlanFeatureEnabled(
   household: Household | null,
-  feature: keyof HouseholdFeatures
+  feature: keyof HouseholdFeatures,
 ): boolean {
   if (!household) return false;
   return household.features[feature] === true;

@@ -1,21 +1,78 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import BottomNavigation from '@/components/navigation/BottomNavigation';
-import RecetarioSection from '@/components/sections/RecetarioSection';
-import HomeView from '@/components/home/HomeView';
-import TodayDashboard from '@/components/sections/TodayDashboard';
-import SettingsView from '@/components/sections/SettingsView';
-import AICommandCenter from '@/components/ai/AICommandCenter';
-import FloatingAIAssistant from '@/components/FloatingAIAssistant';
-import ErrorBoundary from '@/components/ui/ErrorBoundary';
-import { OfflineBadge } from '@/components/ui/OfflineIndicator';
-import YolimaView from '@/components/yolima/YolimaView';
-import { useRecipes, useMarketItems, useSuggestionsCount, useRefreshAppData } from '@/lib/hooks/useAppData';
-import { useAppStore } from '@/lib/stores/useAppStore';
-import { useHouseholdId } from '@/lib/stores/useHouseholdStore';
-import { useOptionalAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase/client';
+import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
+import BottomNavigation from "@/components/navigation/BottomNavigation";
+import ErrorBoundary from "@/components/ui/ErrorBoundary";
+import { OfflineBadge } from "@/components/ui/OfflineIndicator";
+import {
+  useRecipes,
+  useMarketItems,
+  useSuggestionsCount,
+  useRefreshAppData,
+} from "@/lib/hooks/useAppData";
+import Spinner from "@/components/ui/Spinner";
+
+// Loading spinner fallback for dynamic imports
+const DynamicLoadingSpinner = () => (
+  <div className="flex items-center justify-center p-8">
+    <Spinner size="lg" />
+  </div>
+);
+
+// Heavy components loaded dynamically to reduce initial JS bundle
+const RecetarioSection = dynamic(
+  () => import("@/components/sections/RecetarioSection"),
+  {
+    loading: () => <DynamicLoadingSpinner />,
+    ssr: false,
+  },
+);
+
+const HomeView = dynamic(() => import("@/components/home/HomeView"), {
+  loading: () => <DynamicLoadingSpinner />,
+  ssr: false,
+});
+
+const TodayDashboard = dynamic(
+  () => import("@/components/sections/TodayDashboard"),
+  {
+    loading: () => <DynamicLoadingSpinner />,
+    ssr: false,
+  },
+);
+
+const SettingsView = dynamic(
+  () => import("@/components/sections/SettingsView"),
+  {
+    loading: () => <DynamicLoadingSpinner />,
+    ssr: false,
+  },
+);
+
+const AICommandCenter = dynamic(
+  () => import("@/components/ai/AICommandCenter"),
+  {
+    loading: () => <DynamicLoadingSpinner />,
+    ssr: false,
+  },
+);
+
+const FloatingAIAssistant = dynamic(
+  () => import("@/components/FloatingAIAssistant"),
+  {
+    ssr: false,
+  },
+);
+
+const YolimaView = dynamic(() => import("@/components/yolima/YolimaView"), {
+  loading: () => <DynamicLoadingSpinner />,
+  ssr: false,
+});
+import { useAppStore } from "@/lib/stores/useAppStore";
+import { useHouseholdId } from "@/lib/stores/useHouseholdStore";
+import { useOptionalAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase/client";
 
 export default function Home() {
   // Check if user is employee → render YolimaView (simplified mode)
@@ -45,10 +102,10 @@ export default function Home() {
 
     const fetchProposals = async () => {
       const { count } = await supabase
-        .from('ai_action_queue')
-        .select('*', { count: 'exact', head: true })
-        .eq('household_id', householdId)
-        .eq('status', 'pending');
+        .from("ai_action_queue")
+        .select("*", { count: "exact", head: true })
+        .eq("household_id", householdId)
+        .eq("status", "pending");
 
       setPendingAIProposals(count || 0);
     };
@@ -57,15 +114,19 @@ export default function Home() {
 
     // Subscribe to changes
     const subscription = supabase
-      .channel('ai_proposals')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'ai_action_queue',
-        filter: `household_id=eq.${householdId}`
-      }, () => {
-        fetchProposals();
-      })
+      .channel("ai_proposals")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "ai_action_queue",
+          filter: `household_id=eq.${householdId}`,
+        },
+        () => {
+          fetchProposals();
+        },
+      )
       .subscribe();
 
     return () => {
@@ -73,25 +134,8 @@ export default function Home() {
     };
   }, [householdId]);
 
-  // Listen for navigation events from SmartFAB quick actions
-  useEffect(() => {
-    const handleAppNavigate = (e: CustomEvent<{ section: string; tab?: string }>) => {
-      const { section, tab } = e.detail;
-
-      if (section === 'recetario' && tab) {
-        navigateToRecetario(tab as 'calendar' | 'market' | 'recipes' | 'suggestions');
-      } else if (section === 'hogar') {
-        navigateToHogar();
-      } else {
-        setActiveSection(section as 'hoy' | 'recetario' | 'hogar' | 'ajustes');
-      }
-    };
-
-    window.addEventListener('appNavigate' as keyof WindowEventMap, handleAppNavigate as EventListener);
-    return () => {
-      window.removeEventListener('appNavigate' as keyof WindowEventMap, handleAppNavigate as EventListener);
-    };
-  }, [navigateToRecetario, navigateToHogar, setActiveSection]);
+  // Navigation from SmartFAB is now handled reactively via Zustand store
+  // (navigateTo action). The CustomEvent listener for 'appNavigate' has been removed.
 
   // Datos con TanStack Query (cache automático, refetch inteligente)
   const { data: recipes = [], isLoading: recipesLoading } = useRecipes();
@@ -109,7 +153,7 @@ export default function Home() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-700 mx-auto mb-4"></div>
+          <Spinner size="xl" className="mx-auto mb-4" />
           <p className="text-gray-600">Cargando recetario...</p>
         </div>
       </div>
@@ -134,16 +178,25 @@ export default function Home() {
 
       {/* Content - pb-32 para dejar espacio para los tabs secundarios */}
       <main className="pb-32">
-        {activeSection === 'hoy' && (
+        {activeSection === "hoy" && (
           <ErrorBoundary sectionName="Dashboard">
             <TodayDashboard
-              onNavigateToRecetario={(tab) => navigateToRecetario(tab as 'calendar' | 'market' | 'recipes' | 'suggestions' | undefined)}
+              onNavigateToRecetario={(tab) =>
+                navigateToRecetario(
+                  tab as
+                    | "calendar"
+                    | "market"
+                    | "recipes"
+                    | "suggestions"
+                    | undefined,
+                )
+              }
               onNavigateToHogar={navigateToHogar}
             />
           </ErrorBoundary>
         )}
 
-        {activeSection === 'recetario' && (
+        {activeSection === "recetario" && (
           <ErrorBoundary sectionName="Recetario">
             <RecetarioSection
               activeTab={recetarioTab}
@@ -156,13 +209,13 @@ export default function Home() {
           </ErrorBoundary>
         )}
 
-        {activeSection === 'hogar' && (
+        {activeSection === "hogar" && (
           <ErrorBoundary sectionName="Hogar">
             <HomeView />
           </ErrorBoundary>
         )}
 
-        {activeSection === 'ajustes' && (
+        {activeSection === "ajustes" && (
           <ErrorBoundary sectionName="Ajustes">
             <SettingsView />
           </ErrorBoundary>

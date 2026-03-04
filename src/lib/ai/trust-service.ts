@@ -5,9 +5,9 @@
  * for AI actions per household.
  */
 
-import { SupabaseClient } from '@supabase/supabase-js';
-import { createAuthenticatedClient } from '@/lib/supabase/server';
-import { logger } from '@/lib/logger';
+import { SupabaseClient } from "@supabase/supabase-js";
+import { createAuthenticatedClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/logger";
 
 async function getClient(): Promise<SupabaseClient> {
   return createAuthenticatedClient();
@@ -72,10 +72,10 @@ export interface TrustUpdateResult {
 const TRUST_THRESHOLDS = {
   // Actions needed to level up
   LEVEL_UP_SUCCESS_COUNT: [
-    0,   // Level 0 -> 1 (not used)
-    10,  // Level 1 -> 2: 10 successful actions
-    25,  // Level 2 -> 3: 25 successful actions
-    50,  // Level 3 -> 4: 50 successful actions
+    0, // Level 0 -> 1 (not used)
+    10, // Level 1 -> 2: 10 successful actions
+    25, // Level 2 -> 3: 25 successful actions
+    50, // Level 3 -> 4: 50 successful actions
     100, // Level 4 -> 5: 100 successful actions
   ],
   // Incidents that trigger level down
@@ -88,11 +88,36 @@ const TRUST_THRESHOLDS = {
 
 // Default trust configurations by level
 const DEFAULT_TRUST_CONFIG = {
-  1: { auto_approve_level: 1, max_actions_per_minute: 5, max_critical_actions_per_day: 2, max_items_per_bulk_operation: 10 },
-  2: { auto_approve_level: 1, max_actions_per_minute: 10, max_critical_actions_per_day: 3, max_items_per_bulk_operation: 25 },
-  3: { auto_approve_level: 2, max_actions_per_minute: 15, max_critical_actions_per_day: 5, max_items_per_bulk_operation: 50 },
-  4: { auto_approve_level: 2, max_actions_per_minute: 20, max_critical_actions_per_day: 10, max_items_per_bulk_operation: 75 },
-  5: { auto_approve_level: 3, max_actions_per_minute: 30, max_critical_actions_per_day: 20, max_items_per_bulk_operation: 100 },
+  1: {
+    auto_approve_level: 1,
+    max_actions_per_minute: 5,
+    max_critical_actions_per_day: 2,
+    max_items_per_bulk_operation: 10,
+  },
+  2: {
+    auto_approve_level: 1,
+    max_actions_per_minute: 10,
+    max_critical_actions_per_day: 3,
+    max_items_per_bulk_operation: 25,
+  },
+  3: {
+    auto_approve_level: 2,
+    max_actions_per_minute: 15,
+    max_critical_actions_per_day: 5,
+    max_items_per_bulk_operation: 50,
+  },
+  4: {
+    auto_approve_level: 2,
+    max_actions_per_minute: 20,
+    max_critical_actions_per_day: 10,
+    max_items_per_bulk_operation: 75,
+  },
+  5: {
+    auto_approve_level: 3,
+    max_actions_per_minute: 30,
+    max_critical_actions_per_day: 20,
+    max_items_per_bulk_operation: 100,
+  },
 };
 
 // ============================================
@@ -102,31 +127,40 @@ const DEFAULT_TRUST_CONFIG = {
 /**
  * Get or create trust configuration for a household
  */
-export async function getHouseholdTrust(householdId: string): Promise<HouseholdTrust | null> {
+export async function getHouseholdTrust(
+  householdId: string,
+): Promise<HouseholdTrust | null> {
   const db = await getClient();
   const { data, error } = await db
-    .from('household_ai_trust')
-    .select('*')
-    .eq('household_id', householdId)
+    .from("household_ai_trust")
+    .select("*")
+    .eq("household_id", householdId)
     .single();
 
-  if (error && error.code === 'PGRST116') {
+  if (error && error.code === "PGRST116") {
     // No trust record exists, create one
     const { data: newTrust, error: createError } = await db
-      .from('household_ai_trust')
+      .from("household_ai_trust")
       .insert({ household_id: householdId })
       .select()
       .single();
 
     if (createError) {
-      logger.error('Error creating household trust', { error: createError instanceof Error ? createError.message : String(createError) });
+      logger.error("Error creating household trust", {
+        error:
+          createError instanceof Error
+            ? createError.message
+            : String(createError),
+      });
       return null;
     }
     return newTrust;
   }
 
   if (error) {
-    logger.error('Error getting household trust', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error getting household trust", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 
@@ -139,14 +173,14 @@ export async function getHouseholdTrust(householdId: string): Promise<HouseholdT
 export async function checkAutoApproval(
   householdId: string,
   riskLevel: number,
-  actionCount: number = 1
+  actionCount: number = 1,
 ): Promise<TrustDecision> {
   // Low risk actions (level 1) are always auto-approved - no need to check trust
   if (riskLevel <= 1) {
     return {
       canAutoApprove: true,
       requiresApproval: false,
-      reason: 'Acción de bajo riesgo - auto-aprobada',
+      reason: "Acción de bajo riesgo - auto-aprobada",
       trustLevel: 1,
       riskLevel,
     };
@@ -160,7 +194,7 @@ export async function checkAutoApproval(
       return {
         canAutoApprove: true,
         requiresApproval: false,
-        reason: 'Acción de riesgo moderado - permitida por defecto',
+        reason: "Acción de riesgo moderado - permitida por defecto",
         trustLevel: 1,
         riskLevel,
       };
@@ -168,7 +202,7 @@ export async function checkAutoApproval(
     return {
       canAutoApprove: false,
       requiresApproval: true,
-      reason: 'Esta acción requiere aprobación',
+      reason: "Esta acción requiere aprobación",
       trustLevel: 1,
       riskLevel,
     };
@@ -179,7 +213,7 @@ export async function checkAutoApproval(
     return {
       canAutoApprove: false,
       requiresApproval: true,
-      reason: 'Las acciones críticas siempre requieren aprobación manual',
+      reason: "Las acciones críticas siempre requieren aprobación manual",
       trustLevel: trust.trust_level,
       riskLevel,
     };
@@ -193,7 +227,7 @@ export async function checkAutoApproval(
       return {
         canAutoApprove: false,
         requiresApproval: true,
-        reason: rateCheck.reason || 'Límite de velocidad excedido',
+        reason: rateCheck.reason || "Límite de velocidad excedido",
         trustLevel: trust.trust_level,
         riskLevel,
       };
@@ -223,12 +257,15 @@ export async function checkAutoApproval(
 export async function checkRateLimit(
   householdId: string,
   riskLevel: number,
-  actionCount: number = 1
+  actionCount: number = 1,
 ): Promise<RateLimitCheck> {
   const trust = await getHouseholdTrust(householdId);
 
   if (!trust) {
-    return { allowed: false, reason: 'No se pudo obtener configuración de confianza' };
+    return {
+      allowed: false,
+      reason: "No se pudo obtener configuración de confianza",
+    };
   }
 
   const db = await getClient();
@@ -236,10 +273,10 @@ export async function checkRateLimit(
   // Check actions per minute
   const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
   const { count: recentActions } = await db
-    .from('ai_audit_log')
-    .select('*', { count: 'exact', head: true })
-    .eq('household_id', householdId)
-    .gte('created_at', oneMinuteAgo);
+    .from("ai_audit_log")
+    .select("*", { count: "exact", head: true })
+    .eq("household_id", householdId)
+    .gte("created_at", oneMinuteAgo);
 
   if ((recentActions || 0) + actionCount > trust.max_actions_per_minute) {
     return {
@@ -256,19 +293,24 @@ export async function checkRateLimit(
     todayStart.setHours(0, 0, 0, 0);
 
     const { count: criticalToday } = await db
-      .from('ai_audit_log')
-      .select('*', { count: 'exact', head: true })
-      .eq('household_id', householdId)
-      .gte('risk_level', 3)
-      .gte('created_at', todayStart.toISOString());
+      .from("ai_audit_log")
+      .select("*", { count: "exact", head: true })
+      .eq("household_id", householdId)
+      .gte("risk_level", 3)
+      .gte("created_at", todayStart.toISOString());
 
-    if ((criticalToday || 0) + actionCount > trust.max_critical_actions_per_day) {
+    if (
+      (criticalToday || 0) + actionCount >
+      trust.max_critical_actions_per_day
+    ) {
       return {
         allowed: false,
         reason: `Límite de ${trust.max_critical_actions_per_day} acciones críticas por día excedido`,
         currentCount: criticalToday || 0,
         limit: trust.max_critical_actions_per_day,
-        resetAt: new Date(todayStart.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+        resetAt: new Date(
+          todayStart.getTime() + 24 * 60 * 60 * 1000,
+        ).toISOString(),
       };
     }
   }
@@ -281,12 +323,15 @@ export async function checkRateLimit(
  */
 export async function checkBulkLimit(
   householdId: string,
-  itemCount: number
+  itemCount: number,
 ): Promise<{ allowed: boolean; reason?: string; limit?: number }> {
   const trust = await getHouseholdTrust(householdId);
 
   if (!trust) {
-    return { allowed: false, reason: 'No se pudo obtener configuración de confianza' };
+    return {
+      allowed: false,
+      reason: "No se pudo obtener configuración de confianza",
+    };
   }
 
   if (itemCount > trust.max_items_per_bulk_operation) {
@@ -307,7 +352,9 @@ export async function checkBulkLimit(
 /**
  * Record a successful action and potentially increase trust level
  */
-export async function recordSuccessfulAction(householdId: string): Promise<TrustUpdateResult> {
+export async function recordSuccessfulAction(
+  householdId: string,
+): Promise<TrustUpdateResult> {
   const trust = await getHouseholdTrust(householdId);
 
   if (!trust) {
@@ -315,7 +362,7 @@ export async function recordSuccessfulAction(householdId: string): Promise<Trust
       success: false,
       newTrustLevel: 1,
       previousTrustLevel: 1,
-      message: 'No se pudo obtener configuración de confianza',
+      message: "No se pudo obtener configuración de confianza",
     };
   }
 
@@ -345,26 +392,31 @@ export async function recordSuccessfulAction(householdId: string): Promise<Trust
   };
 
   if (newLevel > previousLevel) {
-    const config = DEFAULT_TRUST_CONFIG[newLevel as keyof typeof DEFAULT_TRUST_CONFIG];
+    const config =
+      DEFAULT_TRUST_CONFIG[newLevel as keyof typeof DEFAULT_TRUST_CONFIG];
     updateData.trust_level = newLevel;
     updateData.auto_approve_level = config.auto_approve_level;
     updateData.max_actions_per_minute = config.max_actions_per_minute;
-    updateData.max_critical_actions_per_day = config.max_critical_actions_per_day;
-    updateData.max_items_per_bulk_operation = config.max_items_per_bulk_operation;
+    updateData.max_critical_actions_per_day =
+      config.max_critical_actions_per_day;
+    updateData.max_items_per_bulk_operation =
+      config.max_items_per_bulk_operation;
   }
 
   const { error } = await db
-    .from('household_ai_trust')
+    .from("household_ai_trust")
     .update(updateData)
-    .eq('household_id', householdId);
+    .eq("household_id", householdId);
 
   if (error) {
-    logger.error('Error updating trust', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error updating trust", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return {
       success: false,
       newTrustLevel: previousLevel,
       previousTrustLevel: previousLevel,
-      message: 'Error al actualizar confianza',
+      message: "Error al actualizar confianza",
     };
   }
 
@@ -372,16 +424,19 @@ export async function recordSuccessfulAction(householdId: string): Promise<Trust
     success: true,
     newTrustLevel: newLevel,
     previousTrustLevel: previousLevel,
-    message: newLevel > previousLevel
-      ? `¡Nivel de confianza aumentado a ${newLevel}!`
-      : `Acción exitosa registrada (${newSuccessCount} total)`,
+    message:
+      newLevel > previousLevel
+        ? `¡Nivel de confianza aumentado a ${newLevel}!`
+        : `Acción exitosa registrada (${newSuccessCount} total)`,
   };
 }
 
 /**
  * Record a failed action and potentially decrease trust level
  */
-export async function recordFailedAction(householdId: string): Promise<TrustUpdateResult> {
+export async function recordFailedAction(
+  householdId: string,
+): Promise<TrustUpdateResult> {
   const trust = await getHouseholdTrust(householdId);
 
   if (!trust) {
@@ -389,7 +444,7 @@ export async function recordFailedAction(householdId: string): Promise<TrustUpda
       success: false,
       newTrustLevel: 1,
       previousTrustLevel: 1,
-      message: 'No se pudo obtener configuración de confianza',
+      message: "No se pudo obtener configuración de confianza",
     };
   }
 
@@ -400,7 +455,10 @@ export async function recordFailedAction(householdId: string): Promise<TrustUpda
 
   // Check if should level down
   let newLevel = previousLevel;
-  if (previousLevel > 1 && newIncidentCount >= TRUST_THRESHOLDS.LEVEL_DOWN_INCIDENT_THRESHOLD) {
+  if (
+    previousLevel > 1 &&
+    newIncidentCount >= TRUST_THRESHOLDS.LEVEL_DOWN_INCIDENT_THRESHOLD
+  ) {
     newLevel = previousLevel - 1;
   }
 
@@ -413,26 +471,31 @@ export async function recordFailedAction(householdId: string): Promise<TrustUpda
   };
 
   if (newLevel < previousLevel) {
-    const config = DEFAULT_TRUST_CONFIG[newLevel as keyof typeof DEFAULT_TRUST_CONFIG];
+    const config =
+      DEFAULT_TRUST_CONFIG[newLevel as keyof typeof DEFAULT_TRUST_CONFIG];
     updateData.trust_level = newLevel;
     updateData.auto_approve_level = config.auto_approve_level;
     updateData.max_actions_per_minute = config.max_actions_per_minute;
-    updateData.max_critical_actions_per_day = config.max_critical_actions_per_day;
-    updateData.max_items_per_bulk_operation = config.max_items_per_bulk_operation;
+    updateData.max_critical_actions_per_day =
+      config.max_critical_actions_per_day;
+    updateData.max_items_per_bulk_operation =
+      config.max_items_per_bulk_operation;
   }
 
   const { error } = await db
-    .from('household_ai_trust')
+    .from("household_ai_trust")
     .update(updateData)
-    .eq('household_id', householdId);
+    .eq("household_id", householdId);
 
   if (error) {
-    logger.error('Error updating trust', { error: error instanceof Error ? error.message : String(error) });
+    logger.error("Error updating trust", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return {
       success: false,
       newTrustLevel: previousLevel,
       previousTrustLevel: previousLevel,
-      message: 'Error al actualizar confianza',
+      message: "Error al actualizar confianza",
     };
   }
 
@@ -440,9 +503,10 @@ export async function recordFailedAction(householdId: string): Promise<TrustUpda
     success: true,
     newTrustLevel: newLevel,
     previousTrustLevel: previousLevel,
-    message: newLevel < previousLevel
-      ? `Nivel de confianza reducido a ${newLevel} debido a incidentes`
-      : `Incidente registrado (${newIncidentCount} de ${TRUST_THRESHOLDS.LEVEL_DOWN_INCIDENT_THRESHOLD})`,
+    message:
+      newLevel < previousLevel
+        ? `Nivel de confianza reducido a ${newLevel} debido a incidentes`
+        : `Incidente registrado (${newIncidentCount} de ${TRUST_THRESHOLDS.LEVEL_DOWN_INCIDENT_THRESHOLD})`,
   };
 }
 
@@ -450,16 +514,30 @@ export async function recordFailedAction(householdId: string): Promise<TrustUpda
  * Record a rollback action
  */
 export async function recordRollback(householdId: string): Promise<void> {
+  const trust = await getHouseholdTrust(householdId);
+  if (!trust) {
+    logger.error("Cannot record rollback: no trust record found", {
+      householdId,
+    });
+    return;
+  }
+
   const client = await getClient();
-  await client
-    .from('household_ai_trust')
+  const { error } = await client
+    .from("household_ai_trust")
     .update({
-      rolled_back_actions: client.rpc('increment', { x: 1 }),
-      incident_count: client.rpc('increment', { x: 1 }),
+      rolled_back_actions: trust.rolled_back_actions + 1,
+      incident_count: trust.incident_count + 1,
       last_incident_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
-    .eq('household_id', householdId);
+    .eq("household_id", householdId);
+
+  if (error) {
+    logger.error("Error recording rollback", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 // ============================================
@@ -471,14 +549,14 @@ export async function recordRollback(householdId: string): Promise<void> {
  */
 export async function setTrustLevel(
   householdId: string,
-  newLevel: number
+  newLevel: number,
 ): Promise<TrustUpdateResult> {
   if (newLevel < 1 || newLevel > 5) {
     return {
       success: false,
       newTrustLevel: 1,
       previousTrustLevel: 1,
-      message: 'Nivel debe estar entre 1 y 5',
+      message: "Nivel debe estar entre 1 y 5",
     };
   }
 
@@ -486,10 +564,11 @@ export async function setTrustLevel(
   const previousLevel = trust?.trust_level || 1;
 
   const db = await getClient();
-  const config = DEFAULT_TRUST_CONFIG[newLevel as keyof typeof DEFAULT_TRUST_CONFIG];
+  const config =
+    DEFAULT_TRUST_CONFIG[newLevel as keyof typeof DEFAULT_TRUST_CONFIG];
 
   const { error } = await db
-    .from('household_ai_trust')
+    .from("household_ai_trust")
     .update({
       trust_level: newLevel,
       auto_approve_level: config.auto_approve_level,
@@ -498,14 +577,14 @@ export async function setTrustLevel(
       max_items_per_bulk_operation: config.max_items_per_bulk_operation,
       updated_at: new Date().toISOString(),
     })
-    .eq('household_id', householdId);
+    .eq("household_id", householdId);
 
   if (error) {
     return {
       success: false,
       newTrustLevel: previousLevel,
       previousTrustLevel: previousLevel,
-      message: 'Error al actualizar nivel de confianza',
+      message: "Error al actualizar nivel de confianza",
     };
   }
 
@@ -527,22 +606,22 @@ export async function updateTrustLimits(
     max_actions_per_minute?: number;
     max_critical_actions_per_day?: number;
     max_items_per_bulk_operation?: number;
-  }
+  },
 ): Promise<{ success: boolean; message: string }> {
   const db = await getClient();
   const { error } = await db
-    .from('household_ai_trust')
+    .from("household_ai_trust")
     .update({
       ...limits,
       updated_at: new Date().toISOString(),
     })
-    .eq('household_id', householdId);
+    .eq("household_id", householdId);
 
   if (error) {
-    return { success: false, message: 'Error al actualizar límites' };
+    return { success: false, message: "Error al actualizar límites" };
   }
 
-  return { success: true, message: 'Límites actualizados correctamente' };
+  return { success: true, message: "Límites actualizados correctamente" };
 }
 
 /**
@@ -566,21 +645,21 @@ export async function getTrustStats(householdId: string): Promise<{
   const db = await getClient();
   const [hourResult, dayResult] = await Promise.all([
     db
-      .from('ai_audit_log')
-      .select('*', { count: 'exact', head: true })
-      .eq('household_id', householdId)
-      .gte('created_at', oneHourAgo),
+      .from("ai_audit_log")
+      .select("*", { count: "exact", head: true })
+      .eq("household_id", householdId)
+      .gte("created_at", oneHourAgo),
     db
-      .from('ai_audit_log')
-      .select('*', { count: 'exact', head: true })
-      .eq('household_id', householdId)
-      .gte('created_at', todayStart.toISOString()),
+      .from("ai_audit_log")
+      .select("*", { count: "exact", head: true })
+      .eq("household_id", householdId)
+      .gte("created_at", todayStart.toISOString()),
   ]);
 
-  const totalActions = (trust?.successful_actions || 0) + (trust?.failed_actions || 0);
-  const successRate = totalActions > 0
-    ? (trust?.successful_actions || 0) / totalActions
-    : 1;
+  const totalActions =
+    (trust?.successful_actions || 0) + (trust?.failed_actions || 0);
+  const successRate =
+    totalActions > 0 ? (trust?.successful_actions || 0) / totalActions : 1;
 
   return {
     trust,

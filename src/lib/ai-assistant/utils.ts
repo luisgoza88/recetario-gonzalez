@@ -5,14 +5,14 @@
  * Extraídas de route.ts para mejor organización.
  */
 
-import { getToolDescription } from './constants';
+import { getToolDescription } from "./constants";
 
 /**
  * Tool stream event for SSE (Server-Sent Events).
  * Extended interface for streaming tool execution progress.
  */
 export interface ToolStreamEventExtended {
-  type: 'tool_start' | 'tool_result' | 'content' | 'done';
+  type: "tool_start" | "tool_result" | "content" | "done";
   tool?: {
     name: string;
     description?: string;
@@ -49,9 +49,12 @@ export function createToolStreamEvent(event: ToolStreamEventExtended): string {
  * @param args - Optional function arguments
  * @returns Formatted SSE string
  */
-export function createToolStartEvent(name: string, args?: Record<string, unknown>): string {
+export function createToolStartEvent(
+  name: string,
+  args?: Record<string, unknown>,
+): string {
   return createToolStreamEvent({
-    type: 'tool_start',
+    type: "tool_start",
     tool: {
       name,
       description: getToolDescription(name),
@@ -67,9 +70,12 @@ export function createToolStartEvent(name: string, args?: Record<string, unknown
  * @param summary - Optional summary of the result
  * @returns Formatted SSE string
  */
-export function createToolResultEvent(success: boolean, summary?: string): string {
+export function createToolResultEvent(
+  success: boolean,
+  summary?: string,
+): string {
   return createToolStreamEvent({
-    type: 'tool_result',
+    type: "tool_result",
     result: { success, summary },
   });
 }
@@ -82,7 +88,7 @@ export function createToolResultEvent(success: boolean, summary?: string): strin
  */
 export function createContentEvent(content: string): string {
   return createToolStreamEvent({
-    type: 'content',
+    type: "content",
     content,
   });
 }
@@ -96,10 +102,10 @@ export function createContentEvent(content: string): string {
  */
 export function createDoneEvent(
   sessionId?: string,
-  executionMetadata?: ToolStreamEventExtended['executionMetadata']
+  executionMetadata?: ToolStreamEventExtended["executionMetadata"],
 ): string {
   return createToolStreamEvent({
-    type: 'done',
+    type: "done",
     done: true,
     sessionId,
     executionMetadata,
@@ -111,13 +117,13 @@ export function createDoneEvent(
  * These should not be shown to users.
  */
 const INVALID_RESPONSE_PATTERNS = [
-  /^print\s*\(/i,           // Python code
+  /^print\s*\(/i, // Python code
   /^console\.(log|error)/i, // JavaScript code
-  /default_api\./i,         // Internal API references
-  /^import\s+/i,            // Import statements
-  /^function\s+/i,          // Function declarations
-  /^class\s+/i,             // Class declarations
-  /^\s*\{\s*"error"/i,      // JSON error objects
+  /default_api\./i, // Internal API references
+  /^import\s+/i, // Import statements
+  /^function\s+/i, // Function declarations
+  /^class\s+/i, // Class declarations
+  /^\s*\{\s*"error"/i, // JSON error objects
   /^```(python|javascript|typescript)/i, // Executable code blocks
 ];
 
@@ -129,7 +135,7 @@ const INVALID_RESPONSE_PATTERNS = [
  */
 export function isInvalidResponse(text: string): boolean {
   const trimmed = text.trim();
-  return INVALID_RESPONSE_PATTERNS.some(pattern => pattern.test(trimmed));
+  return INVALID_RESPONSE_PATTERNS.some((pattern) => pattern.test(trimmed));
 }
 
 /**
@@ -147,59 +153,72 @@ interface FunctionRequirement {
  * @param userMessage - The user's message to analyze
  * @returns Object with required flag and suggested function name
  */
-export function messageRequiresFunction(userMessage: string): FunctionRequirement {
+export function messageRequiresFunction(
+  userMessage: string,
+): FunctionRequirement {
   const msg = userMessage.toLowerCase();
 
   // Questions about today's menu/food
   if (
-    msg.includes('qué hay') ||
-    msg.includes('que hay') ||
-    msg.includes('almuerzo') ||
-    msg.includes('cena') ||
-    msg.includes('desayuno') ||
-    msg.includes('comida') ||
-    msg.includes('comer hoy') ||
-    msg.includes('menú')
+    msg.includes("qué hay") ||
+    msg.includes("que hay") ||
+    msg.includes("almuerzo") ||
+    msg.includes("cena") ||
+    msg.includes("desayuno") ||
+    msg.includes("comida") ||
+    msg.includes("comer hoy") ||
+    msg.includes("menú")
   ) {
-    return { required: true, suggestedFunction: 'get_today_menu' };
+    return { required: true, suggestedFunction: "get_today_menu" };
   }
 
   // Questions about specific recipes
   if (
-    (msg.includes('cómo') || msg.includes('como')) &&
-    (msg.includes('hago') || msg.includes('preparo') || msg.includes('hacer') || msg.includes('preparar'))
+    (msg.includes("cómo") || msg.includes("como")) &&
+    (msg.includes("hago") ||
+      msg.includes("preparo") ||
+      msg.includes("hacer") ||
+      msg.includes("preparar"))
   ) {
-    return { required: true, suggestedFunction: 'get_recipe_details' };
+    return { required: true, suggestedFunction: "get_recipe_details" };
   }
 
   // Questions about inventory
   if (
-    msg.includes('inventario') ||
-    msg.includes('despensa') ||
-    msg.includes('qué tengo') ||
-    msg.includes('que tengo')
+    msg.includes("inventario") ||
+    msg.includes("despensa") ||
+    msg.includes("qué tengo") ||
+    msg.includes("que tengo")
   ) {
-    return { required: true, suggestedFunction: 'get_inventory' };
+    return { required: true, suggestedFunction: "get_inventory" };
   }
 
   // Shopping list
-  if (msg.includes('lista de compras') || msg.includes('comprar') || msg.includes('falta')) {
-    return { required: true, suggestedFunction: 'get_shopping_list' };
+  if (
+    msg.includes("lista de compras") ||
+    msg.includes("comprar") ||
+    msg.includes("falta")
+  ) {
+    return { required: true, suggestedFunction: "get_shopping_list" };
   }
 
   // Tasks
-  if (msg.includes('tarea') || msg.includes('pendiente') || msg.includes('yolima')) {
-    return { required: true, suggestedFunction: 'get_today_tasks' };
+  if (
+    msg.includes("tarea") ||
+    msg.includes("pendiente") ||
+    msg.includes("yolima")
+  ) {
+    return { required: true, suggestedFunction: "get_today_tasks" };
   }
 
   // Recipe suggestions
   if (
-    msg.includes('sugiér') ||
-    msg.includes('sugier') ||
-    msg.includes('qué puedo cocinar') ||
-    msg.includes('que puedo cocinar')
+    msg.includes("sugiér") ||
+    msg.includes("sugier") ||
+    msg.includes("qué puedo cocinar") ||
+    msg.includes("que puedo cocinar")
   ) {
-    return { required: true, suggestedFunction: 'suggest_recipe' };
+    return { required: true, suggestedFunction: "suggest_recipe" };
   }
 
   return { required: false, suggestedFunction: null };
@@ -216,33 +235,41 @@ export function getFallbackResponse(userMessage: string): string {
   const msg = userMessage.toLowerCase();
 
   if (
-    msg.includes('menú') ||
-    msg.includes('menu') ||
-    msg.includes('almuerzo') ||
-    msg.includes('cena') ||
-    msg.includes('desayuno')
+    msg.includes("menú") ||
+    msg.includes("menu") ||
+    msg.includes("almuerzo") ||
+    msg.includes("cena") ||
+    msg.includes("desayuno")
   ) {
-    return 'Déjame revisar el menú de hoy. ¿Qué comida te interesa: desayuno, almuerzo o cena?';
+    return "Déjame revisar el menú de hoy. ¿Qué comida te interesa: desayuno, almuerzo o cena?";
   }
 
   if (
-    msg.includes('receta') ||
-    msg.includes('cocinar') ||
-    msg.includes('preparar') ||
-    msg.includes('hacer')
+    msg.includes("receta") ||
+    msg.includes("cocinar") ||
+    msg.includes("preparar") ||
+    msg.includes("hacer")
   ) {
-    return 'Con gusto te ayudo. ¿Qué receta te gustaría preparar?';
+    return "Con gusto te ayudo. ¿Qué receta te gustaría preparar?";
   }
 
-  if (msg.includes('inventario') || msg.includes('ingredientes') || msg.includes('tengo')) {
-    return 'Déjame revisar qué ingredientes tienes disponibles. Un momento...';
+  if (
+    msg.includes("inventario") ||
+    msg.includes("ingredientes") ||
+    msg.includes("tengo")
+  ) {
+    return "Déjame revisar qué ingredientes tienes disponibles. Un momento...";
   }
 
-  if (msg.includes('compra') || msg.includes('lista') || msg.includes('mercado')) {
-    return 'Te ayudo con la lista de compras. ¿Qué necesitas agregar o revisar?';
+  if (
+    msg.includes("compra") ||
+    msg.includes("lista") ||
+    msg.includes("mercado")
+  ) {
+    return "Te ayudo con la lista de compras. ¿Qué necesitas agregar o revisar?";
   }
 
-  return 'Hola, soy tu asistente del hogar. Puedo ayudarte con recetas, el menú, inventario o la lista de compras.';
+  return "Hola, soy tu asistente del hogar. Puedo ayudarte con recetas, el menú, inventario o la lista de compras.";
 }
 
 /**
@@ -255,7 +282,7 @@ export function getFallbackResponse(userMessage: string): string {
 export function calculateCycleDay(date: Date = new Date()): number {
   const dayOfWeek = date.getDay();
   // Convert to 1-7 where Monday=1, then map to cycle
-  return ((dayOfWeek === 0 ? 7 : dayOfWeek) - 1) % 12 + 1;
+  return (((dayOfWeek === 0 ? 7 : dayOfWeek) - 1) % 12) + 1;
 }
 
 /**
@@ -279,8 +306,8 @@ export function isWeekendDinner(date: Date = new Date()): boolean {
 export function normalizeText(text: string): string {
   return text
     .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 /**

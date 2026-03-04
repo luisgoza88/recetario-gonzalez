@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import CalendarView from '../CalendarView';
-import MarketView from '../MarketView';
-import RecipesView from '../RecipesView';
-import SuggestionsPanel from '../SuggestionsPanel';
-import { Recipe, MarketItem } from '@/types';
+import CalendarView from "../CalendarView";
+import MarketView from "../MarketView";
+import RecipesView from "../RecipesView";
+import SuggestionsPanel from "../SuggestionsPanel";
+import { Recipe, MarketItem } from "@/types";
 
-type RecetarioTab = 'calendar' | 'market' | 'recipes' | 'suggestions';
+type RecetarioTab = "calendar" | "market" | "recipes" | "suggestions";
 
 interface RecetarioSectionProps {
   activeTab: RecetarioTab;
@@ -22,12 +22,17 @@ export default function RecetarioSection({
   onTabChange,
   recipes,
   marketItems,
-  onUpdate
+  onUpdate,
 }: RecetarioSectionProps) {
   // Handler para navegación desde SuggestionsPanel
   const handleNavigateFromSuggestions = (tab: string, mode?: string) => {
     // Navegar al tab correspondiente
-    if (tab === 'calendar' || tab === 'market' || tab === 'recipes' || tab === 'suggestions') {
+    if (
+      tab === "calendar" ||
+      tab === "market" ||
+      tab === "recipes" ||
+      tab === "suggestions"
+    ) {
       onTabChange(tab as RecetarioTab);
     }
     // El mode se puede usar para configurar el estado inicial del MarketView (shopping/pantry)
@@ -38,19 +43,17 @@ export default function RecetarioSection({
     <div className="flex flex-col h-full">
       {/* Content - Sin sub-navigation arriba, ahora está en el BottomNavigation */}
       <div className="flex-1 overflow-auto pb-12">
-        {activeTab === 'calendar' && (
-          <CalendarView recipes={recipes} />
-        )}
+        {activeTab === "calendar" && <CalendarView recipes={recipes} />}
 
-        {activeTab === 'market' && (
+        {activeTab === "market" && (
           <MarketView items={marketItems} onUpdate={onUpdate} />
         )}
 
-        {activeTab === 'recipes' && (
+        {activeTab === "recipes" && (
           <RecipesView recipes={recipes} onUpdate={onUpdate} />
         )}
 
-        {activeTab === 'suggestions' && (
+        {activeTab === "suggestions" && (
           <div className="p-4 max-w-lg mx-auto">
             <SuggestionsPanel
               onUpdate={onUpdate}

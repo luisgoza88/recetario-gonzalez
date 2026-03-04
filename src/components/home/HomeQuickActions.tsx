@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { Zap, LogIn, Package, History, FileText, Eye } from 'lucide-react';
+import { Zap, LogIn, Package, History, FileText, Eye } from "lucide-react";
 
 interface HomeQuickActionsProps {
   hasTasksToday: boolean;
@@ -44,7 +44,9 @@ export default function HomeQuickActions({
           className="flex flex-col items-center p-3 bg-emerald-50 rounded-xl hover:bg-emerald-100 transition-colors"
         >
           <Package size={24} className="text-emerald-600 mb-1" />
-          <span className="text-xs text-emerald-700 font-medium">Productos</span>
+          <span className="text-xs text-emerald-700 font-medium">
+            Productos
+          </span>
         </button>
         <button
           onClick={onOpenHistory}
@@ -65,12 +67,19 @@ export default function HomeQuickActions({
           disabled={!hasTasksToday}
           className={`flex flex-col items-center p-3 rounded-xl transition-colors ${
             hasTasksToday
-              ? 'bg-purple-50 hover:bg-purple-100'
-              : 'bg-gray-50 opacity-50 cursor-not-allowed'
+              ? "bg-purple-50 hover:bg-purple-100"
+              : "bg-gray-50 opacity-50 cursor-not-allowed"
           }`}
         >
-          <Eye size={24} className={hasTasksToday ? 'text-purple-600' : 'text-gray-400'} />
-          <span className={`text-xs font-medium ${hasTasksToday ? 'text-purple-700' : 'text-gray-400'}`}>Inspección</span>
+          <Eye
+            size={24}
+            className={hasTasksToday ? "text-purple-600" : "text-gray-400"}
+          />
+          <span
+            className={`text-xs font-medium ${hasTasksToday ? "text-purple-700" : "text-gray-400"}`}
+          >
+            Inspección
+          </span>
         </button>
       </div>
     </div>

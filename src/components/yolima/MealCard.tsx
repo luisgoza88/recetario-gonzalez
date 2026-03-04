@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { Check } from 'lucide-react';
+import { Check } from "lucide-react";
 
 export interface MealCardMeal {
   name: string;
@@ -36,7 +36,9 @@ export default function MealCard({
           <span className="text-3xl">{emoji}</span>
           <h3 className="text-xl font-bold text-gray-400 uppercase">{label}</h3>
         </div>
-        <p className="text-lg text-gray-400 italic ml-12">No hay comida programada</p>
+        <p className="text-lg text-gray-400 italic ml-12">
+          No hay comida programada
+        </p>
       </div>
     );
   }
@@ -45,8 +47,8 @@ export default function MealCard({
     <div
       className={`rounded-2xl p-5 border-2 transition-all duration-300 ${
         isCompleted
-          ? 'bg-green-50 border-green-300 shadow-sm'
-          : 'bg-white border-gray-200 shadow-sm'
+          ? "bg-green-50 border-green-300 shadow-sm"
+          : "bg-white border-gray-200 shadow-sm"
       }`}
     >
       {/* Header */}
@@ -58,7 +60,7 @@ export default function MealCard({
       {/* Meal name */}
       <h4
         className={`text-xl font-semibold mb-2 ml-1 ${
-          isCompleted ? 'text-green-700 line-through' : 'text-gray-800'
+          isCompleted ? "text-green-700 line-through" : "text-gray-800"
         }`}
       >
         {meal.name}
@@ -104,10 +106,10 @@ export default function MealCard({
         onClick={onToggleComplete}
         className={`w-full min-h-[56px] rounded-xl text-lg font-semibold transition-all duration-300
                     flex items-center justify-center gap-3 ${
-          isCompleted
-            ? 'bg-green-500 text-white shadow-md'
-            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-2 border-gray-300'
-        }`}
+                      isCompleted
+                        ? "bg-green-500 text-white shadow-md"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200 border-2 border-gray-300"
+                    }`}
       >
         {isCompleted ? (
           <>

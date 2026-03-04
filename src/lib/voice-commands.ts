@@ -23,65 +23,68 @@ export interface VoiceCommand {
 // Common voice commands that map to quick actions
 export const VOICE_COMMANDS: VoiceCommand[] = [
   {
-    pattern: /^(qué|cual|cuál).*(menú|menu|comida|almuerzo|cena|desayuno).*(hoy|mañana|semana)?$/i,
-    action: 'get_menu',
-    description: 'Consultar menú'
+    pattern:
+      /^(qué|cual|cuál).*(menú|menu|comida|almuerzo|cena|desayuno).*(hoy|mañana|semana)?$/i,
+    action: "get_menu",
+    description: "Consultar menú",
   },
   {
     pattern: /^(qué|que|cuáles|cuales).*(tarea|pendiente|trabajo).*$/i,
-    action: 'get_tasks',
-    description: 'Ver tareas'
+    action: "get_tasks",
+    description: "Ver tareas",
   },
   {
-    pattern: /^(agregar?|añadir?|poner?)\s+(.+)\s+(a la lista|lista de compras|al mercado)$/i,
-    action: 'add_to_shopping',
-    description: 'Agregar a lista de compras'
+    pattern:
+      /^(agregar?|añadir?|poner?)\s+(.+)\s+(a la lista|lista de compras|al mercado)$/i,
+    action: "add_to_shopping",
+    description: "Agregar a lista de compras",
   },
   {
     pattern: /^(qué|que).*(falta|necesito|comprar).*$/i,
-    action: 'get_shopping_list',
-    description: 'Ver lista de compras'
+    action: "get_shopping_list",
+    description: "Ver lista de compras",
   },
   {
     pattern: /^(sugerir|recomienda|sugiere).*(receta|plato|comida).*$/i,
-    action: 'suggest_recipe',
-    description: 'Sugerir receta'
+    action: "suggest_recipe",
+    description: "Sugerir receta",
   },
   {
     pattern: /^(cómo|como).*(va|están|estan).*(tarea|progreso|avance).*$/i,
-    action: 'get_task_progress',
-    description: 'Progreso de tareas'
+    action: "get_task_progress",
+    description: "Progreso de tareas",
   },
   {
     pattern: /^(mostrar|ver|dame).*(inventario|despensa|stock).*$/i,
-    action: 'get_inventory',
-    description: 'Ver inventario'
+    action: "get_inventory",
+    description: "Ver inventario",
   },
 ];
 
 // Check if speech recognition is supported
 export function isSpeechRecognitionSupported(): boolean {
-  if (typeof window === 'undefined') return false;
-  return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+  if (typeof window === "undefined") return false;
+  return "webkitSpeechRecognition" in window || "SpeechRecognition" in window;
 }
 
 // Check if speech synthesis is supported
 export function isSpeechSynthesisSupported(): boolean {
-  if (typeof window === 'undefined') return false;
-  return 'speechSynthesis' in window;
+  if (typeof window === "undefined") return false;
+  return "speechSynthesis" in window;
 }
 
 // Create speech recognition instance
 export function createSpeechRecognition(): SpeechRecognition | null {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === "undefined") return null;
 
-  const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const SpeechRecognitionClass =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognitionClass) return null;
 
   const recognition = new SpeechRecognitionClass();
   recognition.continuous = false;
   recognition.interimResults = true;
-  recognition.lang = 'es-ES';
+  recognition.lang = "es-ES";
   recognition.maxAlternatives = 1;
 
   return recognition;
@@ -101,14 +104,17 @@ export function matchVoiceCommand(transcript: string): VoiceCommand | null {
 }
 
 // Speak text using speech synthesis
-export function speak(text: string, options?: {
-  rate?: number;
-  pitch?: number;
-  volume?: number;
-}): Promise<void> {
+export function speak(
+  text: string,
+  options?: {
+    rate?: number;
+    pitch?: number;
+    volume?: number;
+  },
+): Promise<void> {
   return new Promise((resolve, reject) => {
     if (!isSpeechSynthesisSupported()) {
-      reject(new Error('Speech synthesis not supported'));
+      reject(new Error("Speech synthesis not supported"));
       return;
     }
 
@@ -116,14 +122,14 @@ export function speak(text: string, options?: {
     window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'es-ES';
+    utterance.lang = "es-ES";
     utterance.rate = options?.rate ?? 1;
     utterance.pitch = options?.pitch ?? 1;
     utterance.volume = options?.volume ?? 1;
 
     // Try to use a Spanish voice
     const voices = window.speechSynthesis.getVoices();
-    const spanishVoice = voices.find(v => v.lang.startsWith('es'));
+    const spanishVoice = voices.find((v) => v.lang.startsWith("es"));
     if (spanishVoice) {
       utterance.voice = spanishVoice;
     }
@@ -146,30 +152,34 @@ export function stopSpeaking(): void {
 export function cleanTranscript(transcript: string): string {
   return transcript
     .trim()
-    .replace(/^\s+|\s+$/g, '')
-    .replace(/\s+/g, ' ');
+    .replace(/^\s+|\s+$/g, "")
+    .replace(/\s+/g, " ");
 }
 
 // Format AI response for speech (remove emojis, special chars)
 export function formatForSpeech(text: string): string {
-  return text
-    // Remove emojis
-    .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
-    // Remove markdown bold
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    // Remove bullet points
-    .replace(/^[•\-]\s*/gm, '')
-    // Remove special symbols
-    .replace(/[✅❌⚠️📝💡🍽️⏱️🧊📊]/g, '')
-    // Clean up extra spaces
-    .replace(/\s+/g, ' ')
-    .trim();
+  return (
+    text
+      // Remove emojis
+      .replace(/[\u{1F300}-\u{1F9FF}]/gu, "")
+      // Remove markdown bold
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      // Remove bullet points
+      .replace(/^[•\-]\s*/gm, "")
+      // Remove special symbols
+      .replace(/[✅❌⚠️📝💡🍽️⏱️🧊📊]/g, "")
+      // Clean up extra spaces
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }
 
 // Voice Hook State Manager
 export class VoiceManager {
   private recognition: SpeechRecognition | null = null;
-  private onResultCallback: ((transcript: string, isFinal: boolean) => void) | null = null;
+  private onResultCallback:
+    | ((transcript: string, isFinal: boolean) => void)
+    | null = null;
   private onErrorCallback: ((error: string) => void) | null = null;
   private onEndCallback: (() => void) | null = null;
   private isActive = false;
@@ -194,20 +204,20 @@ export class VoiceManager {
     };
 
     this.recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      let errorMessage = 'Error de reconocimiento de voz';
+      let errorMessage = "Error de reconocimiento de voz";
 
       switch (event.error) {
-        case 'no-speech':
-          errorMessage = 'No se detectó voz';
+        case "no-speech":
+          errorMessage = "No se detectó voz";
           break;
-        case 'audio-capture':
-          errorMessage = 'No se encontró micrófono';
+        case "audio-capture":
+          errorMessage = "No se encontró micrófono";
           break;
-        case 'not-allowed':
-          errorMessage = 'Permiso de micrófono denegado';
+        case "not-allowed":
+          errorMessage = "Permiso de micrófono denegado";
           break;
-        case 'network':
-          errorMessage = 'Error de conexión';
+        case "network":
+          errorMessage = "Error de conexión";
           break;
       }
 

@@ -52,9 +52,7 @@ self.addEventListener("push", (event) => {
       },
     };
 
-    event.waitUntil(
-      self.registration.showNotification(data.title, options)
-    );
+    event.waitUntil(self.registration.showNotification(data.title, options));
   }
 });
 
@@ -76,7 +74,7 @@ self.addEventListener("notificationclick", (event) => {
         return self.clients.openWindow(url);
       }
       return undefined;
-    })
+    }),
   );
 });
 

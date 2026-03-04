@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useAuth } from '@/contexts/AuthContext';
-import type { UserRole, Permission } from '@/types';
+import { useAuth } from "@/contexts/AuthContext";
+import type { UserRole, Permission } from "@/types";
 
 // =====================================================
 // RoleGate - Renderiza contenido basado en rol
@@ -24,7 +24,7 @@ export function RoleGate({
   allowedRoles,
   requiredPermission,
   fallback = null,
-  hideOnDenied = false
+  hideOnDenied = false,
 }: RoleGateProps) {
   const { isAuthenticated, getRole, hasPermission, isLoading } = useAuth();
 
@@ -84,7 +84,11 @@ interface EmployeeOnlyProps {
 
 export function EmployeeOnly({ children, fallback }: EmployeeOnlyProps) {
   return (
-    <RoleGate allowedRoles="empleado" fallback={fallback} hideOnDenied={!fallback}>
+    <RoleGate
+      allowedRoles="empleado"
+      fallback={fallback}
+      hideOnDenied={!fallback}
+    >
       {children}
     </RoleGate>
   );
@@ -101,7 +105,11 @@ interface FamilyOnlyProps {
 
 export function FamilyOnly({ children, fallback }: FamilyOnlyProps) {
   return (
-    <RoleGate allowedRoles="familia" fallback={fallback} hideOnDenied={!fallback}>
+    <RoleGate
+      allowedRoles="familia"
+      fallback={fallback}
+      hideOnDenied={!fallback}
+    >
       {children}
     </RoleGate>
   );
@@ -117,7 +125,7 @@ interface NotEmployeeProps {
 
 export function NotEmployee({ children }: NotEmployeeProps) {
   return (
-    <RoleGate allowedRoles={['admin', 'familia']} hideOnDenied>
+    <RoleGate allowedRoles={["admin", "familia"]} hideOnDenied>
       {children}
     </RoleGate>
   );
@@ -130,17 +138,17 @@ export function NotEmployee({ children }: NotEmployeeProps) {
 interface CanManageProps {
   children: React.ReactNode;
   /** Tipo de gestion requerida */
-  what: 'employees' | 'spaces' | 'tasks' | 'members' | 'invitations';
+  what: "employees" | "spaces" | "tasks" | "members" | "invitations";
   fallback?: React.ReactNode;
 }
 
 export function CanManage({ children, what, fallback }: CanManageProps) {
   const permissionMap: Record<string, Permission> = {
-    employees: 'manage_employees',
-    spaces: 'manage_spaces',
-    tasks: 'manage_tasks',
-    members: 'manage_members',
-    invitations: 'manage_invitations'
+    employees: "manage_employees",
+    spaces: "manage_spaces",
+    tasks: "manage_tasks",
+    members: "manage_members",
+    invitations: "manage_invitations",
   };
 
   return (
@@ -161,15 +169,15 @@ export function CanManage({ children, what, fallback }: CanManageProps) {
 interface CanEditProps {
   children: React.ReactNode;
   /** Tipo de contenido */
-  what: 'menu' | 'recipes' | 'shopping_list';
+  what: "menu" | "recipes" | "shopping_list";
   fallback?: React.ReactNode;
 }
 
 export function CanEdit({ children, what, fallback }: CanEditProps) {
   const permissionMap: Record<string, Permission> = {
-    menu: 'edit_menu',
-    recipes: 'edit_recipes',
-    shopping_list: 'edit_shopping_list'
+    menu: "edit_menu",
+    recipes: "edit_recipes",
+    shopping_list: "edit_shopping_list",
   };
 
   return (
@@ -194,7 +202,12 @@ interface ShowByRoleProps {
   default?: React.ReactNode;
 }
 
-export function ShowByRole({ admin, empleado, familia, default: defaultContent }: ShowByRoleProps) {
+export function ShowByRole({
+  admin,
+  empleado,
+  familia,
+  default: defaultContent,
+}: ShowByRoleProps) {
   const { isAuthenticated, getRole, isLoading } = useAuth();
 
   if (isLoading) return null;
@@ -203,11 +216,11 @@ export function ShowByRole({ admin, empleado, familia, default: defaultContent }
   const role = getRole();
 
   switch (role) {
-    case 'admin':
+    case "admin":
       return <>{admin ?? defaultContent}</>;
-    case 'empleado':
+    case "empleado":
       return <>{empleado ?? defaultContent}</>;
-    case 'familia':
+    case "familia":
       return <>{familia ?? defaultContent}</>;
     default:
       return <>{defaultContent}</>;
@@ -224,7 +237,11 @@ interface RequireAuthProps {
   redirectTo?: string;
 }
 
-export function RequireAuth({ children, fallback, redirectTo = '/auth/login' }: RequireAuthProps) {
+export function RequireAuth({
+  children,
+  fallback,
+  redirectTo = "/auth/login",
+}: RequireAuthProps) {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
@@ -241,7 +258,7 @@ export function RequireAuth({ children, fallback, redirectTo = '/auth/login' }: 
     }
 
     // Redirigir
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       window.location.href = redirectTo;
     }
     return null;
@@ -255,7 +272,14 @@ export function RequireAuth({ children, fallback, redirectTo = '/auth/login' }: 
 // =====================================================
 
 export function useRoleCheck() {
-  const { isAuthenticated, getRole, hasPermission, isAdmin, isEmployee, isFamily } = useAuth();
+  const {
+    isAuthenticated,
+    getRole,
+    hasPermission,
+    isAdmin,
+    isEmployee,
+    isFamily,
+  } = useAuth();
 
   return {
     isAuthenticated,
@@ -265,18 +289,18 @@ export function useRoleCheck() {
     isFamily: isFamily(),
     hasPermission,
     can: {
-      viewMenu: hasPermission('view_menu'),
-      viewTasks: hasPermission('view_tasks'),
-      viewShoppingList: hasPermission('view_shopping_list'),
-      editMenu: hasPermission('edit_menu'),
-      editRecipes: hasPermission('edit_recipes'),
-      editShoppingList: hasPermission('edit_shopping_list'),
-      completeTasks: hasPermission('complete_tasks'),
-      manageEmployees: hasPermission('manage_employees'),
-      manageSpaces: hasPermission('manage_spaces'),
-      manageTasks: hasPermission('manage_tasks'),
-      manageMembers: hasPermission('manage_members'),
-      manageInvitations: hasPermission('manage_invitations')
-    }
+      viewMenu: hasPermission("view_menu"),
+      viewTasks: hasPermission("view_tasks"),
+      viewShoppingList: hasPermission("view_shopping_list"),
+      editMenu: hasPermission("edit_menu"),
+      editRecipes: hasPermission("edit_recipes"),
+      editShoppingList: hasPermission("edit_shopping_list"),
+      completeTasks: hasPermission("complete_tasks"),
+      manageEmployees: hasPermission("manage_employees"),
+      manageSpaces: hasPermission("manage_spaces"),
+      manageTasks: hasPermission("manage_tasks"),
+      manageMembers: hasPermission("manage_members"),
+      manageInvitations: hasPermission("manage_invitations"),
+    },
   };
 }

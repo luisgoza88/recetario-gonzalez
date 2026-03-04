@@ -1,5 +1,5 @@
-import { GoogleGenAI } from '@google/genai';
-import { logger } from '@/lib/logger';
+import { GoogleGenAI } from "@google/genai";
+import { logger } from "@/lib/logger";
 
 // Cliente singleton de Gemini
 let geminiClient: GoogleGenAI | null = null;
@@ -9,8 +9,10 @@ export function getGeminiClient(): GoogleGenAI {
     const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
 
     if (!apiKey) {
-      logger.error('[Gemini] API key not found in environment variables');
-      throw new Error('GOOGLE_GEMINI_API_KEY no está configurada en las variables de entorno');
+      logger.error("[Gemini] API key not found in environment variables");
+      throw new Error(
+        "GOOGLE_GEMINI_API_KEY no está configurada en las variables de entorno",
+      );
     }
 
     geminiClient = new GoogleGenAI({ apiKey });
@@ -22,16 +24,16 @@ export function getGeminiClient(): GoogleGenAI {
 // Modelos disponibles
 export const GEMINI_MODELS = {
   // Para texto rápido y económico
-  FLASH: 'gemini-2.0-flash',
+  FLASH: "gemini-2.0-flash",
 
   // Para texto con generación de imágenes (Nano Banana)
-  FLASH_IMAGE: 'gemini-2.0-flash-exp',
+  FLASH_IMAGE: "gemini-2.0-flash-exp",
 
   // Para tareas de alta calidad
-  PRO: 'gemini-2.0-pro',
+  PRO: "gemini-2.0-pro",
 
   // Para generación de imágenes profesionales (Imagen 3)
-  IMAGE_GEN: 'imagen-3.0-generate-002',
+  IMAGE_GEN: "imagen-3.0-generate-002",
 } as const;
 
 // Configuraciones comunes
@@ -66,35 +68,38 @@ export function cleanJsonResponse(content: string): string {
   let cleaned = content;
 
   // Remover bloques de código markdown
-  cleaned = cleaned.replace(/```json\s*/gi, '');
-  cleaned = cleaned.replace(/```\s*/g, '');
+  cleaned = cleaned.replace(/```json\s*/gi, "");
+  cleaned = cleaned.replace(/```\s*/g, "");
 
   // Encontrar el primer { y el último }
-  const firstBrace = cleaned.indexOf('{');
+  const firstBrace = cleaned.indexOf("{");
   if (firstBrace > 0) {
     cleaned = cleaned.slice(firstBrace);
   }
 
-  const lastBrace = cleaned.lastIndexOf('}');
+  const lastBrace = cleaned.lastIndexOf("}");
   if (lastBrace !== -1 && lastBrace < cleaned.length - 1) {
     cleaned = cleaned.slice(0, lastBrace + 1);
   }
 
   // Limpiar caracteres de control y comas finales
   cleaned = cleaned
-    .replace(/[\x00-\x1F\x7F]/g, ' ')
-    .replace(/,\s*}/g, '}')
-    .replace(/,\s*]/g, ']')
+    .replace(/[\x00-\x1F\x7F]/g, " ")
+    .replace(/,\s*}/g, "}")
+    .replace(/,\s*]/g, "]")
     .trim();
 
   return cleaned;
 }
 
 // Helper para convertir base64 a formato Gemini
-export function base64ToGeminiFormat(base64String: string, mimeType: string = 'image/jpeg') {
+export function base64ToGeminiFormat(
+  base64String: string,
+  mimeType: string = "image/jpeg",
+) {
   // Si ya tiene el prefijo data:, extraer solo la parte base64
-  if (base64String.startsWith('data:')) {
-    const parts = base64String.split(',');
+  if (base64String.startsWith("data:")) {
+    const parts = base64String.split(",");
     const extractedMime = parts[0].match(/data:(.*?);/)?.[1] || mimeType;
     return {
       inlineData: {
@@ -130,17 +135,17 @@ const DEFAULT_RETRY_OPTIONS: Required<RetryOptions> = {
   maxDelayMs: 30000,
   backoffMultiplier: 2,
   retryableErrors: [
-    'RESOURCE_EXHAUSTED',
-    'UNAVAILABLE',
-    'DEADLINE_EXCEEDED',
-    'INTERNAL',
-    'rate limit',
-    'quota exceeded',
-    '429',
-    '500',
-    '502',
-    '503',
-    '504',
+    "RESOURCE_EXHAUSTED",
+    "UNAVAILABLE",
+    "DEADLINE_EXCEEDED",
+    "INTERNAL",
+    "rate limit",
+    "quota exceeded",
+    "429",
+    "500",
+    "502",
+    "503",
+    "504",
   ],
 };
 
@@ -148,7 +153,7 @@ const DEFAULT_RETRY_OPTIONS: Required<RetryOptions> = {
  * Espera un tiempo determinado
  */
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -156,12 +161,13 @@ function sleep(ms: number): Promise<void> {
  */
 function isRetryableError(error: unknown, retryableErrors: string[]): boolean {
   const errorString = String(error).toLowerCase();
-  const errorMessage = error instanceof Error ? error.message.toLowerCase() : '';
+  const errorMessage =
+    error instanceof Error ? error.message.toLowerCase() : "";
 
   return retryableErrors.some(
-    retryable =>
+    (retryable) =>
       errorString.includes(retryable.toLowerCase()) ||
-      errorMessage.includes(retryable.toLowerCase())
+      errorMessage.includes(retryable.toLowerCase()),
   );
 }
 
@@ -174,7 +180,7 @@ function isRetryableError(error: unknown, retryableErrors: string[]): boolean {
  */
 export async function withRetry<T>(
   fn: () => Promise<T>,
-  options?: RetryOptions
+  options?: RetryOptions,
 ): Promise<T> {
   const opts = { ...DEFAULT_RETRY_OPTIONS, ...options };
   let lastError: unknown;
@@ -187,15 +193,18 @@ export async function withRetry<T>(
       lastError = error;
 
       // Si es el último intento o el error no es reintentable, lanzar
-      if (attempt === opts.maxRetries || !isRetryableError(error, opts.retryableErrors)) {
+      if (
+        attempt === opts.maxRetries ||
+        !isRetryableError(error, opts.retryableErrors)
+      ) {
         throw error;
       }
 
       // Log del retry (solo en desarrollo)
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === "development") {
         logger.info(
           `[Gemini Retry] Attempt ${attempt + 1}/${opts.maxRetries} failed, retrying in ${delay}ms...`,
-          { error: error instanceof Error ? error.message : String(error) }
+          { error: error instanceof Error ? error.message : String(error) },
         );
       }
 
@@ -204,7 +213,10 @@ export async function withRetry<T>(
 
       // Incrementar delay con backoff exponencial (con jitter)
       const jitter = Math.random() * 0.3 + 0.85; // 0.85 - 1.15
-      delay = Math.min(delay * opts.backoffMultiplier * jitter, opts.maxDelayMs);
+      delay = Math.min(
+        delay * opts.backoffMultiplier * jitter,
+        opts.maxDelayMs,
+      );
     }
   }
 
@@ -221,7 +233,7 @@ export async function withRetry<T>(
  */
 export async function geminiWithRetry<T>(
   fn: () => Promise<T>,
-  maxRetries: number = 3
+  maxRetries: number = 3,
 ): Promise<T> {
   return withRetry(fn, { maxRetries });
 }
@@ -248,7 +260,7 @@ const DANGEROUS_PATTERNS = [
 
   // Inyección de comandos/código
   /```(?:bash|sh|shell|cmd|powershell|python|javascript|js)/i,
-  /\$\{.*\}/,  // Template literals
+  /\$\{.*\}/, // Template literals
   /eval\s*\(/i,
   /exec\s*\(/i,
   /system\s*\(/i,
@@ -265,14 +277,14 @@ const DANGEROUS_PATTERNS = [
  */
 const SANITIZATION_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
   // Remover caracteres de control
-  { pattern: /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, replacement: '' },
+  { pattern: /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, replacement: "" },
 
   // Normalizar múltiples espacios/newlines
-  { pattern: /\n{3,}/g, replacement: '\n\n' },
-  { pattern: / {3,}/g, replacement: '  ' },
+  { pattern: /\n{3,}/g, replacement: "\n\n" },
+  { pattern: / {3,}/g, replacement: "  " },
 
   // Escapar caracteres especiales de markdown que podrían usarse maliciosamente
-  { pattern: /^#{4,}/gm, replacement: '####' },  // Limitar niveles de heading
+  { pattern: /^#{4,}/gm, replacement: "####" }, // Limitar niveles de heading
 ];
 
 /**
@@ -282,7 +294,7 @@ const SANITIZATION_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
  * @returns true si se detecta un patrón peligroso
  */
 export function detectsPromptInjection(text: string): boolean {
-  return DANGEROUS_PATTERNS.some(pattern => pattern.test(text));
+  return DANGEROUS_PATTERNS.some((pattern) => pattern.test(text));
 }
 
 /**
@@ -292,7 +304,10 @@ export function detectsPromptInjection(text: string): boolean {
  * @param maxLength - Longitud máxima permitida (default: 5000)
  * @returns Input sanitizado
  */
-export function sanitizeUserInput(userInput: string, maxLength: number = 5000): string {
+export function sanitizeUserInput(
+  userInput: string,
+  maxLength: number = 5000,
+): string {
   let sanitized = userInput;
 
   // Aplicar patrones de sanitización
@@ -302,7 +317,7 @@ export function sanitizeUserInput(userInput: string, maxLength: number = 5000): 
 
   // Truncar si excede el límite
   if (sanitized.length > maxLength) {
-    sanitized = sanitized.slice(0, maxLength) + '...';
+    sanitized = sanitized.slice(0, maxLength) + "...";
   }
 
   return sanitized.trim();
@@ -321,14 +336,14 @@ export function prepareUserInput(
     maxLength?: number;
     allowMarkdown?: boolean;
     throwOnInjection?: boolean;
-  }
+  },
 ): { sanitized: string; possibleInjection: boolean } {
   const { maxLength = 5000, throwOnInjection = false } = options || {};
 
   const possibleInjection = detectsPromptInjection(userInput);
 
   if (possibleInjection && throwOnInjection) {
-    throw new Error('Posible intento de prompt injection detectado');
+    throw new Error("Posible intento de prompt injection detectado");
   }
 
   const sanitized = sanitizeUserInput(userInput, maxLength);

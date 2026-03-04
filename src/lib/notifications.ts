@@ -1,4 +1,5 @@
-import { supabase } from './supabase/client';
+import { supabase } from "./supabase/client";
+import logger from "@/lib/logger";
 
 // Tipos para notificaciones
 export interface ScheduledNotification {
@@ -6,28 +7,35 @@ export interface ScheduledNotification {
   title: string;
   body: string;
   scheduledFor: Date;
-  type: 'meal_reminder' | 'low_stock' | 'prep_reminder';
+  type: "meal_reminder" | "low_stock" | "prep_reminder";
 }
 
 // Verificar si las notificaciones están soportadas y permitidas
 export function canNotify(): boolean {
-  return 'Notification' in window && Notification.permission === 'granted';
+  return "Notification" in window && Notification.permission === "granted";
 }
 
 // Mostrar notificación local
-export function showNotification(title: string, body: string, options?: NotificationOptions) {
+export function showNotification(
+  title: string,
+  body: string,
+  options?: NotificationOptions,
+) {
   if (!canNotify()) return;
 
-  const notificationOptions: NotificationOptions & { vibrate?: number[]; renotify?: boolean } = {
+  const notificationOptions: NotificationOptions & {
+    vibrate?: number[];
+    renotify?: boolean;
+  } = {
     body,
-    icon: '/icon.svg',
-    badge: '/icon.svg',
-    tag: 'recetario',
+    icon: "/icon.svg",
+    badge: "/icon.svg",
+    tag: "recetario",
     ...options,
   };
 
   // Vibrate y renotify son propiedades extendidas (móvil)
-  if ('vibrate' in Notification.prototype) {
+  if ("vibrate" in Notification.prototype) {
     (notificationOptions as Record<string, unknown>).vibrate = [200, 100, 200];
   }
   (notificationOptions as Record<string, unknown>).renotify = true;
@@ -49,17 +57,17 @@ export async function checkLowStockAndNotify() {
   try {
     // Obtener items con bajo stock
     const { data: items } = await supabase
-      .from('market_items')
-      .select('id, name, quantity');
+      .from("market_items")
+      .select("id, name, quantity");
 
     const { data: inventory } = await supabase
-      .from('inventory')
-      .select('item_id, current_number');
+      .from("inventory")
+      .select("item_id, current_number");
 
     if (!items || !inventory) return;
 
     const inventoryMap = new Map(
-      inventory.map(i => [i.item_id, i.current_number || 0])
+      inventory.map((i) => [i.item_id, i.current_number || 0]),
     );
 
     const lowStockItems: string[] = [];
@@ -75,17 +83,18 @@ export async function checkLowStockAndNotify() {
     }
 
     if (lowStockItems.length > 0) {
-      const itemList = lowStockItems.slice(0, 3).join(', ');
-      const more = lowStockItems.length > 3 ? ` y ${lowStockItems.length - 3} más` : '';
+      const itemList = lowStockItems.slice(0, 3).join(", ");
+      const more =
+        lowStockItems.length > 3 ? ` y ${lowStockItems.length - 3} más` : "";
 
       showNotification(
-        'Stock bajo',
+        "Stock bajo",
         `Productos con poco stock: ${itemList}${more}`,
-        { tag: 'low-stock' }
+        { tag: "low-stock" },
       );
     }
   } catch (error) {
-    console.error('Error checking low stock:', error);
+    console.error("Error checking low stock:", error);
   }
 }
 
@@ -115,18 +124,18 @@ export async function checkTomorrowMealAndNotify() {
 
     // Obtener menú de mañana
     const { data: menu } = await supabase
-      .from('day_menu')
-      .select('lunch_id, reminder')
-      .eq('day_number', cycleDay)
+      .from("day_menu")
+      .select("lunch_id, reminder")
+      .eq("day_number", cycleDay)
       .single();
 
     if (!menu) return;
 
     // Obtener nombre de la receta
     const { data: recipe } = await supabase
-      .from('recipes')
-      .select('name')
-      .eq('id', menu.lunch_id)
+      .from("recipes")
+      .select("name")
+      .eq("id", menu.lunch_id)
       .single();
 
     if (recipe) {
@@ -135,25 +144,32 @@ export async function checkTomorrowMealAndNotify() {
         body += `. Recordatorio: ${menu.reminder}`;
       }
 
-      showNotification(
-        'Prepara para mañana',
-        body,
-        { tag: 'meal-prep' }
-      );
+      showNotification("Prepara para mañana", body, { tag: "meal-prep" });
     }
   } catch (error) {
-    console.error('Error checking tomorrow meal:', error);
+    console.error("Error checking tomorrow meal:", error);
   }
 }
+
+// Track active interval IDs for cleanup
+let stockCheckInterval: ReturnType<typeof setInterval> | null = null;
+let mealPrepInterval: ReturnType<typeof setInterval> | null = null;
+let initialCheckTimeout: ReturnType<typeof setTimeout> | null = null;
 
 // Inicializar verificaciones periódicas
 export function initNotificationChecks() {
   if (!canNotify()) return;
 
+  // Clean up any existing intervals before creating new ones
+  stopNotificationChecks();
+
   // Verificar stock bajo cada 4 horas
-  setInterval(() => {
-    checkLowStockAndNotify();
-  }, 4 * 60 * 60 * 1000);
+  stockCheckInterval = setInterval(
+    () => {
+      checkLowStockAndNotify();
+    },
+    4 * 60 * 60 * 1000,
+  );
 
   // Verificar a las 7pm para preparar comida de mañana
   const checkMealPrepTime = () => {
@@ -166,18 +182,39 @@ export function initNotificationChecks() {
   };
 
   // Verificar cada minuto si es hora de la notificación
-  setInterval(checkMealPrepTime, 60 * 1000);
+  mealPrepInterval = setInterval(checkMealPrepTime, 60 * 1000);
 
   // También verificar al iniciar
-  setTimeout(() => {
+  initialCheckTimeout = setTimeout(() => {
     checkLowStockAndNotify();
+    initialCheckTimeout = null;
   }, 5000);
 
-  console.log('Notification checks initialized');
+  logger.info("Notification checks initialized");
+}
+
+// Detener todas las verificaciones periódicas
+export function stopNotificationChecks() {
+  if (stockCheckInterval !== null) {
+    clearInterval(stockCheckInterval);
+    stockCheckInterval = null;
+  }
+  if (mealPrepInterval !== null) {
+    clearInterval(mealPrepInterval);
+    mealPrepInterval = null;
+  }
+  if (initialCheckTimeout !== null) {
+    clearTimeout(initialCheckTimeout);
+    initialCheckTimeout = null;
+  }
 }
 
 // Programar notificación local (para timers, etc.)
-export function scheduleNotification(title: string, body: string, delayMs: number) {
+export function scheduleNotification(
+  title: string,
+  body: string,
+  delayMs: number,
+) {
   if (!canNotify()) return;
 
   return setTimeout(() => {

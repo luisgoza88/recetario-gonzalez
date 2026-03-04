@@ -1,18 +1,18 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { LogOut, Loader2 } from 'lucide-react';
-import { supabase } from '@/lib/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { useHouseholdId } from '@/lib/stores/useHouseholdStore';
-import type { Recipe, ThermomixRecipe } from '@/types';
-import MealCard, { type MealCardMeal } from './MealCard';
-import TaskChecklist from './TaskChecklist';
-import PhotoCapture from './PhotoCapture';
-import DayProgress from './DayProgress';
-import RecipeModal from '@/components/RecipeModal';
-import ThermomixView from '@/components/ThermomixView';
-import { findThermomixRecipe } from '@/data/thermomix-recipes';
+import { useState, useEffect, useCallback } from "react";
+import { LogOut, Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useHouseholdId } from "@/lib/stores/useHouseholdStore";
+import type { Recipe, ThermomixRecipe } from "@/types";
+import MealCard, { type MealCardMeal } from "./MealCard";
+import TaskChecklist from "./TaskChecklist";
+import PhotoCapture from "./PhotoCapture";
+import DayProgress from "./DayProgress";
+import RecipeModal from "@/components/RecipeModal";
+import ThermomixView from "@/components/ThermomixView";
+import { findThermomixRecipe } from "@/data/thermomix-recipes";
 
 // =====================================================
 // Types
@@ -46,8 +46,14 @@ function extractPreparations(reminder: string | null): string[] {
 
   // Common preparations from the menu data
   const knownPreps = [
-    'Hogao', 'Chimichurri', 'Tzatziki', 'Salsa Verde', 'Caldo',
-    'Arroz', 'Guacamole', 'Batata',
+    "Hogao",
+    "Chimichurri",
+    "Tzatziki",
+    "Salsa Verde",
+    "Caldo",
+    "Arroz",
+    "Guacamole",
+    "Batata",
   ];
 
   for (const prep of knownPreps) {
@@ -67,15 +73,19 @@ function getDefaultCleaningTasks(): string[] {
   const dayOfWeek = new Date().getDay();
 
   // Rotate cleaning tasks based on day of week
-  const dailyTasks = ['Cocina - limpiar mesones', 'Barrer áreas comunes', 'Lavar platos'];
+  const dailyTasks = [
+    "Cocina - limpiar mesones",
+    "Barrer áreas comunes",
+    "Lavar platos",
+  ];
 
   const rotatingTasks: Record<number, string[]> = {
-    1: ['Sala - aspirar', 'Baños - desinfectar'], // Monday
-    2: ['Habitaciones - tender camas', 'Cocina - limpieza profunda'], // Tuesday
-    3: ['Baños - limpieza completa', 'Pisos - trapear'], // Wednesday
-    4: ['Ventanas - limpiar', 'Cocina - organizar alacena'], // Thursday
-    5: ['Sala - sacudir muebles', 'Lavandería - lavar ropa'], // Friday
-    6: ['Limpieza general rápida'], // Saturday
+    1: ["Sala - aspirar", "Baños - desinfectar"], // Monday
+    2: ["Habitaciones - tender camas", "Cocina - limpieza profunda"], // Tuesday
+    3: ["Baños - limpieza completa", "Pisos - trapear"], // Wednesday
+    4: ["Ventanas - limpiar", "Cocina - organizar alacena"], // Thursday
+    5: ["Sala - sacudir muebles", "Lavandería - lavar ropa"], // Friday
+    6: ["Limpieza general rápida"], // Saturday
     0: [], // Sunday (free)
   };
 
@@ -86,7 +96,9 @@ function getDefaultCleaningTasks(): string[] {
 // Helper: convert Recipe to MealCardMeal
 // =====================================================
 
-function recipeToMealCard(recipe: Recipe | undefined | null): MealCardMeal | null {
+function recipeToMealCard(
+  recipe: Recipe | undefined | null,
+): MealCardMeal | null {
   if (!recipe) return null;
 
   const hasThermomix = !!findThermomixRecipe(recipe.name);
@@ -114,9 +126,12 @@ export default function YolimaView() {
 
   // Today's info
   const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
-  const dayName = today.toLocaleDateString('es-CO', { weekday: 'long' });
-  const dateFormatted = today.toLocaleDateString('es-CO', { day: 'numeric', month: 'long' });
+  const todayStr = today.toISOString().split("T")[0];
+  const dayName = today.toLocaleDateString("es-CO", { weekday: "long" });
+  const dateFormatted = today.toLocaleDateString("es-CO", {
+    day: "numeric",
+    month: "long",
+  });
 
   // State
   const [loading, setLoading] = useState(true);
@@ -127,7 +142,7 @@ export default function YolimaView() {
     tasks: [],
     preparations: [],
     photos: [],
-    notes: '',
+    notes: "",
   });
   const [cleaningTasks] = useState<string[]>(getDefaultCleaningTasks);
   const [preparations, setPreparations] = useState<string[]>([]);
@@ -135,12 +150,18 @@ export default function YolimaView() {
 
   // Modal states
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
-  const [thermomixRecipe, setThermomixRecipe] = useState<ThermomixRecipe | null>(null);
+  const [thermomixRecipe, setThermomixRecipe] =
+    useState<ThermomixRecipe | null>(null);
 
   // Greeting
   const hour = today.getHours();
-  const userName = user?.full_name?.split(' ')[0] || 'Yolima';
-  const greeting = hour < 12 ? '¡Buenos días' : hour < 18 ? '¡Buenas tardes' : '¡Buenas noches';
+  const userName = user?.full_name?.split(" ")[0] || "Yolima";
+  const greeting =
+    hour < 12
+      ? "¡Buenos días"
+      : hour < 18
+        ? "¡Buenas tardes"
+        : "¡Buenas noches";
 
   // =====================================================
   // Load today's menu from DB
@@ -149,8 +170,10 @@ export default function YolimaView() {
   const loadTodayMenu = useCallback(async () => {
     try {
       // Calculate day in cycle (same logic as useTodayDashboard)
-      const startDate = new Date('2025-01-06');
-      const diffDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const startDate = new Date("2025-01-06");
+      const diffDays = Math.floor(
+        (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+      );
 
       let sundays = 0;
       const tempDate = new Date(startDate);
@@ -163,18 +186,20 @@ export default function YolimaView() {
       const dayNumber = ((effectiveDays % 12) + 12) % 12;
 
       const { data: menuData, error: menuError } = await supabase
-        .from('day_menu')
-        .select(`
+        .from("day_menu")
+        .select(
+          `
           *,
           breakfast:recipes!day_menu_breakfast_id_fkey(*),
           lunch:recipes!day_menu_lunch_id_fkey(*),
           dinner:recipes!day_menu_dinner_id_fkey(*)
-        `)
-        .eq('day_number', dayNumber)
+        `,
+        )
+        .eq("day_number", dayNumber)
         .single();
 
       if (menuError) {
-        console.error('Error loading menu:', menuError);
+        console.error("Error loading menu:", menuError);
         return;
       }
 
@@ -193,9 +218,9 @@ export default function YolimaView() {
         setPreparations(preps);
       }
     } catch (err) {
-      console.error('Error loading today menu:', err);
+      console.error("Error loading today menu:", err);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // =====================================================
@@ -214,16 +239,20 @@ export default function YolimaView() {
 
       if (json.data) {
         setCompletion({
-          meals: json.data.meals_completed || { breakfast: false, lunch: false, dinner: false },
+          meals: json.data.meals_completed || {
+            breakfast: false,
+            lunch: false,
+            dinner: false,
+          },
           tasks: json.data.tasks_completed || [],
           preparations: json.data.preparations_completed || [],
           photos: json.data.photo_urls || [],
-          notes: json.data.notes || '',
+          notes: json.data.notes || "",
         });
         setDayCompleted(!!json.data.completed_at);
       }
     } catch (err) {
-      console.error('Error loading completion:', err);
+      console.error("Error loading completion:", err);
     }
   }, [todayStr, householdId]);
 
@@ -231,34 +260,34 @@ export default function YolimaView() {
   // Save completion to API
   // =====================================================
 
-  const saveCompletion = useCallback(async (
-    newCompletion: DailyCompletionState,
-    markComplete = false,
-  ) => {
-    try {
-      setSaving(true);
-      await fetch('/api/daily-completion', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          date: todayStr,
-          household_id: householdId,
-          employee_id: user?.id,
-          meals_completed: newCompletion.meals,
-          tasks_completed: newCompletion.tasks,
-          preparations_completed: newCompletion.preparations,
-          photo_urls: newCompletion.photos,
-          notes: newCompletion.notes,
-          started_at: new Date().toISOString(),
-          completed_at: markComplete ? new Date().toISOString() : null,
-        }),
-      });
-    } catch (err) {
-      console.error('Error saving completion:', err);
-    } finally {
-      setSaving(false);
-    }
-  }, [todayStr, householdId, user?.id]);
+  const saveCompletion = useCallback(
+    async (newCompletion: DailyCompletionState, markComplete = false) => {
+      try {
+        setSaving(true);
+        await fetch("/api/daily-completion", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            date: todayStr,
+            household_id: householdId,
+            employee_id: user?.id,
+            meals_completed: newCompletion.meals,
+            tasks_completed: newCompletion.tasks,
+            preparations_completed: newCompletion.preparations,
+            photo_urls: newCompletion.photos,
+            notes: newCompletion.notes,
+            started_at: new Date().toISOString(),
+            completed_at: markComplete ? new Date().toISOString() : null,
+          }),
+        });
+      } catch (err) {
+        console.error("Error saving completion:", err);
+      } finally {
+        setSaving(false);
+      }
+    },
+    [todayStr, householdId, user?.id],
+  );
 
   // =====================================================
   // Effects
@@ -280,14 +309,14 @@ export default function YolimaView() {
       saveCompletion(completion, dayCompleted);
     }, 1500);
     return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [completion, dayCompleted]);
 
   // =====================================================
   // Handlers
   // =====================================================
 
-  const toggleMeal = (meal: 'breakfast' | 'lunch' | 'dinner') => {
+  const toggleMeal = (meal: "breakfast" | "lunch" | "dinner") => {
     setCompletion((prev) => ({
       ...prev,
       meals: { ...prev.meals, [meal]: !prev.meals[meal] },
@@ -321,7 +350,7 @@ export default function YolimaView() {
 
   const handleDayCompleted = async () => {
     const confirmed = window.confirm(
-      '¿Marcar el día como completado? ✅\n\nEsto notificará al administrador.'
+      "¿Marcar el día como completado? ✅\n\nEsto notificará al administrador.",
     );
     if (!confirmed) return;
 
@@ -359,7 +388,8 @@ export default function YolimaView() {
     completion.preparations.length +
     completion.tasks.length;
 
-  const progressPercent = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
+  const progressPercent =
+    totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
 
   // =====================================================
   // Loading
@@ -421,7 +451,7 @@ export default function YolimaView() {
           label="Desayuno"
           meal={recipeToMealCard(todayMenu?.breakfast)}
           isCompleted={completion.meals.breakfast}
-          onToggleComplete={() => toggleMeal('breakfast')}
+          onToggleComplete={() => toggleMeal("breakfast")}
           onViewRecipe={() => handleViewRecipe(todayMenu?.breakfast)}
           onStartThermomix={() => handleStartThermomix(todayMenu?.breakfast)}
         />
@@ -431,7 +461,7 @@ export default function YolimaView() {
           label="Almuerzo"
           meal={recipeToMealCard(todayMenu?.lunch)}
           isCompleted={completion.meals.lunch}
-          onToggleComplete={() => toggleMeal('lunch')}
+          onToggleComplete={() => toggleMeal("lunch")}
           onViewRecipe={() => handleViewRecipe(todayMenu?.lunch)}
           onStartThermomix={() => handleStartThermomix(todayMenu?.lunch)}
         />
@@ -441,7 +471,7 @@ export default function YolimaView() {
           label="Cena"
           meal={recipeToMealCard(todayMenu?.dinner)}
           isCompleted={completion.meals.dinner}
-          onToggleComplete={() => toggleMeal('dinner')}
+          onToggleComplete={() => toggleMeal("dinner")}
           onViewRecipe={() => handleViewRecipe(todayMenu?.dinner)}
           onStartThermomix={() => handleStartThermomix(todayMenu?.dinner)}
         />
@@ -462,9 +492,13 @@ export default function YolimaView() {
           <div className="bg-yellow-50 border-2 border-yellow-200 rounded-2xl p-5">
             <div className="flex items-center gap-3 mb-2">
               <span className="text-3xl">💡</span>
-              <h3 className="text-xl font-bold text-yellow-700 uppercase">Recordatorio</h3>
+              <h3 className="text-xl font-bold text-yellow-700 uppercase">
+                Recordatorio
+              </h3>
             </div>
-            <p className="text-lg text-yellow-800 ml-12">{todayMenu.reminder}</p>
+            <p className="text-lg text-yellow-800 ml-12">
+              {todayMenu.reminder}
+            </p>
           </div>
         )}
 
@@ -497,8 +531,12 @@ export default function YolimaView() {
           </button>
         ) : (
           <div className="bg-green-100 border-2 border-green-300 rounded-2xl p-6 text-center">
-            <p className="text-2xl font-bold text-green-700">🎉 ¡Día Completado!</p>
-            <p className="text-lg text-green-600 mt-2">Buen trabajo, {userName}. Descansa bien.</p>
+            <p className="text-2xl font-bold text-green-700">
+              🎉 ¡Día Completado!
+            </p>
+            <p className="text-lg text-green-600 mt-2">
+              Buen trabajo, {userName}. Descansa bien.
+            </p>
           </div>
         )}
       </div>

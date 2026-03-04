@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
   AlertTriangle,
   ChefHat,
@@ -16,31 +16,31 @@ import {
   Leaf,
   Flame,
   Coins,
-  Coffee
-} from 'lucide-react';
-import { Recipe } from '@/types';
-import { supabase } from '@/lib/supabase/client';
+  Coffee,
+} from "lucide-react";
+import { Recipe } from "@/types";
+import { supabase } from "@/lib/supabase/client";
 import {
   RecipeAvailability,
   IngredientStatus,
   loadCurrentInventory,
   checkRecipeIngredients,
   findAlternativeRecipes,
-  getAvailableIngredientsList
-} from '@/lib/inventory-check';
-import { useAnalytics } from '@/lib/analytics/useAnalytics';
-import { useEscapeKey } from '@/hooks/useEscapeKey';
+  getAvailableIngredientsList,
+} from "@/lib/inventory-check";
+import { useAnalytics } from "@/lib/analytics/useAnalytics";
+import { useEscapeKey } from "@/hooks/useEscapeKey";
 
 // Tipos de estilo de receta
 type RecipeStyle =
-  | 'saludable'
-  | 'rapida'
-  | 'economica'
-  | 'alta-proteina'
-  | 'baja-carbohidrato'
-  | 'vegetariana'
-  | 'comfort'
-  | 'ligera';
+  | "saludable"
+  | "rapida"
+  | "economica"
+  | "alta-proteina"
+  | "baja-carbohidrato"
+  | "vegetariana"
+  | "comfort"
+  | "ligera";
 
 interface RecipeStyleOption {
   id: RecipeStyle;
@@ -52,53 +52,53 @@ interface RecipeStyleOption {
 
 const RECIPE_STYLES: RecipeStyleOption[] = [
   {
-    id: 'saludable',
-    label: 'Saludable',
-    description: 'Balanceada y nutritiva',
+    id: "saludable",
+    label: "Saludable",
+    description: "Balanceada y nutritiva",
     icon: <Heart size={18} />,
-    color: 'bg-green-100 text-green-700 border-green-300'
+    color: "bg-green-100 text-green-700 border-green-300",
   },
   {
-    id: 'rapida',
-    label: 'Rápida',
-    description: 'Menos de 30 min',
+    id: "rapida",
+    label: "Rápida",
+    description: "Menos de 30 min",
     icon: <Zap size={18} />,
-    color: 'bg-yellow-100 text-yellow-700 border-yellow-300'
+    color: "bg-yellow-100 text-yellow-700 border-yellow-300",
   },
   {
-    id: 'alta-proteina',
-    label: 'Alta Proteína',
-    description: 'Rica en proteínas',
+    id: "alta-proteina",
+    label: "Alta Proteína",
+    description: "Rica en proteínas",
     icon: <Flame size={18} />,
-    color: 'bg-red-100 text-red-700 border-red-300'
+    color: "bg-red-100 text-red-700 border-red-300",
   },
   {
-    id: 'ligera',
-    label: 'Ligera',
-    description: 'Baja en calorías',
+    id: "ligera",
+    label: "Ligera",
+    description: "Baja en calorías",
     icon: <Leaf size={18} />,
-    color: 'bg-teal-100 text-teal-700 border-teal-300'
+    color: "bg-teal-100 text-teal-700 border-teal-300",
   },
   {
-    id: 'economica',
-    label: 'Económica',
-    description: 'Bajo presupuesto',
+    id: "economica",
+    label: "Económica",
+    description: "Bajo presupuesto",
     icon: <Coins size={18} />,
-    color: 'bg-blue-100 text-blue-700 border-blue-300'
+    color: "bg-blue-100 text-blue-700 border-blue-300",
   },
   {
-    id: 'comfort',
-    label: 'Comfort',
-    description: 'Reconfortante',
+    id: "comfort",
+    label: "Comfort",
+    description: "Reconfortante",
     icon: <Coffee size={18} />,
-    color: 'bg-orange-100 text-orange-700 border-orange-300'
-  }
+    color: "bg-orange-100 text-orange-700 border-orange-300",
+  },
 ];
 
 interface SmartSuggestionsProps {
   recipe: Recipe;
   allRecipes: Recipe[];
-  mealType: 'breakfast' | 'lunch' | 'dinner';
+  mealType: "breakfast" | "lunch" | "dinner";
   onSelectAlternative: (recipe: Recipe) => void;
   onClose: () => void;
 }
@@ -131,20 +131,24 @@ export default function SmartSuggestions({
   allRecipes,
   mealType,
   onSelectAlternative,
-  onClose
+  onClose,
 }: SmartSuggestionsProps) {
   const [loading, setLoading] = useState(true);
-  const [availability, setAvailability] = useState<RecipeAvailability | null>(null);
+  const [availability, setAvailability] = useState<RecipeAvailability | null>(
+    null,
+  );
   const [alternatives, setAlternatives] = useState<RecipeAvailability[]>([]);
-  const [availableIngredients, setAvailableIngredients] = useState<string[]>([]);
+  const [availableIngredients, setAvailableIngredients] = useState<string[]>(
+    [],
+  );
   const [generatingAI, setGeneratingAI] = useState(false);
   const [aiRecipe, setAiRecipe] = useState<AIRecipe | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const [showIngredients, setShowIngredients] = useState(false);
   const [savingRecipe, setSavingRecipe] = useState(false);
-  const [selectedStyle, setSelectedStyle] = useState<RecipeStyle>('saludable');
+  const [selectedStyle, setSelectedStyle] = useState<RecipeStyle>("saludable");
   const [showStyleSelector, setShowStyleSelector] = useState(true);
-  const [userPreferences, setUserPreferences] = useState<string>('');
+  const [userPreferences, setUserPreferences] = useState<string>("");
 
   // Analytics
   const { ai: aiAnalytics, startTimer, getElapsedMs } = useAnalytics();
@@ -152,7 +156,10 @@ export default function SmartSuggestions({
   useEscapeKey(onClose);
 
   // Modo especial: generar receta desde cero (sin receta existente)
-  const isGenerateMode = recipe.id === 'generate-dinner' || recipe.id === 'generate-lunch' || recipe.id === 'generate-breakfast';
+  const isGenerateMode =
+    recipe.id === "generate-dinner" ||
+    recipe.id === "generate-lunch" ||
+    recipe.id === "generate-breakfast";
 
   useEffect(() => {
     checkInventory();
@@ -173,18 +180,26 @@ export default function SmartSuggestions({
           canMake: false,
           availablePercent: 0,
           missingIngredients: [],
-          availableIngredients: []
+          availableIngredients: [],
         });
         setLoading(false);
         return;
       }
 
-      const recipeAvailability = await checkRecipeIngredients(recipe, inventory);
+      const recipeAvailability = await checkRecipeIngredients(
+        recipe,
+        inventory,
+      );
       setAvailability(recipeAvailability);
 
       // Buscar alternativas solo si faltan ingredientes
       if (!recipeAvailability.canMake) {
-        const alts = await findAlternativeRecipes(allRecipes, inventory, recipe.id, mealType);
+        const alts = await findAlternativeRecipes(
+          allRecipes,
+          inventory,
+          recipe.id,
+          mealType,
+        );
         setAlternatives(alts.slice(0, 5)); // Top 5 alternativas
       }
 
@@ -192,7 +207,7 @@ export default function SmartSuggestions({
       const available = getAvailableIngredientsList(inventory);
       setAvailableIngredients(available);
     } catch (error) {
-      console.error('Error checking inventory:', error);
+      console.error("Error checking inventory:", error);
     } finally {
       setLoading(false);
     }
@@ -205,42 +220,54 @@ export default function SmartSuggestions({
     const aiStartTime = startTimer(); // Track tiempo de respuesta
 
     // Construir array de preferencias
-    const preferences = ['Fácil de preparar'];
+    const preferences = ["Fácil de preparar"];
     if (userPreferences.trim()) {
       preferences.push(userPreferences.trim());
     }
 
     try {
-      const response = await fetch('/api/generate-recipe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/generate-recipe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           availableIngredients,
           mealType,
           servings: 5,
           recipeStyle: selectedStyle,
           preferences,
-          userRequest: userPreferences.trim() || undefined
-        })
+          userRequest: userPreferences.trim() || undefined,
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok || data.error) {
-        throw new Error(data.error || 'Error generando receta');
+        throw new Error(data.error || "Error generando receta");
       }
 
       setAiRecipe(data.recipe);
 
       // Track successful AI recipe generation
-      aiAnalytics.recipeGenerated(selectedStyle, mealType, getElapsedMs(aiStartTime), true);
+      aiAnalytics.recipeGenerated(
+        selectedStyle,
+        mealType,
+        getElapsedMs(aiStartTime),
+        true,
+      );
     } catch (error) {
-      console.error('AI recipe error:', error);
-      setAiError(error instanceof Error ? error.message : 'Error al generar receta');
+      console.error("AI recipe error:", error);
+      setAiError(
+        error instanceof Error ? error.message : "Error al generar receta",
+      );
       setShowStyleSelector(true); // Mostrar selector si hay error
 
       // Track failed AI recipe generation
-      aiAnalytics.recipeGenerated(selectedStyle, mealType, getElapsedMs(aiStartTime), false);
+      aiAnalytics.recipeGenerated(
+        selectedStyle,
+        mealType,
+        getElapsedMs(aiStartTime),
+        false,
+      );
     } finally {
       setGeneratingAI(false);
     }
@@ -270,11 +297,11 @@ export default function SmartSuggestions({
     setSavingRecipe(true);
     try {
       // Preparar ingredientes en formato correcto
-      const ingredients = aiRecipe.ingredients.map(i => ({
+      const ingredients = aiRecipe.ingredients.map((i) => ({
         name: i.name,
         total: i.total,
         luis: i.luis,
-        mariana: i.mariana
+        mariana: i.mariana,
       }));
 
       // Generar ID único para la receta
@@ -292,24 +319,24 @@ export default function SmartSuggestions({
         cook_time: parseTime(aiRecipe.cookTime),
         total_time: parseTime(aiRecipe.totalTime),
         tips: aiRecipe.tips,
-        source: 'ai_generated' as const,
+        source: "ai_generated" as const,
         nutrition: {
           calories: parseCalories(aiRecipe.calories),
           protein: 0, // La IA no devuelve estos detalles
           carbs: 0,
-          fat: 0
-        }
+          fat: 0,
+        },
       };
 
       // Guardar en Supabase
       const { data, error } = await supabase
-        .from('recipes')
+        .from("recipes")
         .insert(recipeToSave)
         .select()
         .single();
 
       if (error) {
-        console.error('Error saving AI recipe to database:', error);
+        console.error("Error saving AI recipe to database:", error);
         throw error;
       }
 
@@ -327,7 +354,7 @@ export default function SmartSuggestions({
         tips: data.tips,
         source: data.source,
         nutrition: data.nutrition,
-        created_at: data.created_at
+        created_at: data.created_at,
       };
 
       // Track AI recipe saved
@@ -335,10 +362,11 @@ export default function SmartSuggestions({
 
       onSelectAlternative(savedRecipe);
     } catch (error: unknown) {
-      console.error('Error saving recipe:', error);
-      const errorMessage = error instanceof Error
-        ? error.message
-        : (error as { message?: string })?.message || 'Error desconocido';
+      console.error("Error saving recipe:", error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : (error as { message?: string })?.message || "Error desconocido";
       setAiError(`Error al guardar: ${errorMessage}`);
     } finally {
       setSavingRecipe(false);
@@ -347,7 +375,11 @@ export default function SmartSuggestions({
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
+      <div
+        className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+        role="dialog"
+        aria-modal="true"
+      >
         <div className="bg-white rounded-2xl p-8 text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-700 mx-auto mb-4" />
           <p className="text-gray-600">Verificando inventario...</p>
@@ -358,18 +390,32 @@ export default function SmartSuggestions({
 
   if (!availability) return null;
 
-  const mealLabels = { breakfast: 'Desayuno', lunch: 'Almuerzo', dinner: 'Cena' };
+  const mealLabels = {
+    breakfast: "Desayuno",
+    lunch: "Almuerzo",
+    dinner: "Cena",
+  };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-8 pb-24 overflow-y-auto" role="dialog" aria-modal="true">
+    <div
+      className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-8 pb-24 overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="suggestions-modal-title"
+    >
       <div className="bg-white rounded-2xl w-full max-w-lg">
         {/* Header */}
         <div className="bg-gradient-to-r from-green-700 to-green-600 text-white p-4 rounded-t-2xl flex justify-between items-center">
           <div className="flex items-center gap-2">
             <Sparkles size={20} />
-            <span className="font-semibold">Sugerencias Inteligentes</span>
+            <span id="suggestions-modal-title" className="font-semibold">
+              Sugerencias Inteligentes
+            </span>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg">
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-white/20 rounded-lg"
+          >
             <X size={20} />
           </button>
         </div>
@@ -381,19 +427,25 @@ export default function SmartSuggestions({
               <div className="flex items-start gap-3">
                 <Sparkles className="text-purple-600 mt-1" size={20} />
                 <div className="flex-1">
-                  <h3 className="font-semibold text-purple-800">Generar {mealLabels[mealType]}</h3>
+                  <h3 className="font-semibold text-purple-800">
+                    Generar {mealLabels[mealType]}
+                  </h3>
                   <p className="text-sm text-purple-600 mt-1">
-                    ¿Cambio de planes? Crea una receta con los ingredientes que tienes disponibles
+                    ¿Cambio de planes? Crea una receta con los ingredientes que
+                    tienes disponibles
                   </p>
                   <p className="text-xs text-purple-500 mt-2">
-                    {availableIngredients.length} ingredientes disponibles en tu inventario
+                    {availableIngredients.length} ingredientes disponibles en tu
+                    inventario
                   </p>
                 </div>
               </div>
             </div>
           ) : (
             /* Current Recipe Status */
-            <div className={`p-4 rounded-xl ${availability.canMake ? 'bg-green-50' : 'bg-orange-50'}`}>
+            <div
+              className={`p-4 rounded-xl ${availability.canMake ? "bg-green-50" : "bg-orange-50"}`}
+            >
               <div className="flex items-start gap-3">
                 {availability.canMake ? (
                   <Check className="text-green-600 mt-1" size={20} />
@@ -402,7 +454,9 @@ export default function SmartSuggestions({
                 )}
                 <div className="flex-1">
                   <h3 className="font-semibold">{recipe.name}</h3>
-                  <p className="text-sm text-gray-600">{mealLabels[mealType]}</p>
+                  <p className="text-sm text-gray-600">
+                    {mealLabels[mealType]}
+                  </p>
 
                   {availability.canMake ? (
                     <p className="text-green-700 text-sm mt-2">
@@ -411,11 +465,16 @@ export default function SmartSuggestions({
                   ) : (
                     <div className="mt-2">
                       <p className="text-orange-700 text-sm font-medium">
-                        Faltan {availability.missingIngredients.length} ingrediente{availability.missingIngredients.length > 1 ? 's' : ''}:
+                        Faltan {availability.missingIngredients.length}{" "}
+                        ingrediente
+                        {availability.missingIngredients.length > 1 ? "s" : ""}:
                       </p>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {availability.missingIngredients.map((ing, i) => (
-                          <span key={i} className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-xs">
+                          <span
+                            key={i}
+                            className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-xs"
+                          >
                             {ing.name}
                           </span>
                         ))}
@@ -432,7 +491,9 @@ export default function SmartSuggestions({
                     <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
                         className={`h-full transition-all ${
-                          availability.canMake ? 'bg-green-500' : 'bg-orange-500'
+                          availability.canMake
+                            ? "bg-green-500"
+                            : "bg-orange-500"
                         }`}
                         style={{ width: `${availability.availablePercent}%` }}
                       />
@@ -444,41 +505,46 @@ export default function SmartSuggestions({
           )}
 
           {/* Alternatives Section - Solo mostrar si no es modo generar */}
-          {!isGenerateMode && !availability.canMake && alternatives.length > 0 && (
-            <div className="border rounded-xl overflow-hidden">
-              <div className="bg-blue-50 p-3 border-b">
-                <h4 className="font-semibold text-blue-800 flex items-center gap-2">
-                  <ChefHat size={18} />
-                  Recetas alternativas con lo que tienes
-                </h4>
+          {!isGenerateMode &&
+            !availability.canMake &&
+            alternatives.length > 0 && (
+              <div className="border rounded-xl overflow-hidden">
+                <div className="bg-blue-50 p-3 border-b">
+                  <h4 className="font-semibold text-blue-800 flex items-center gap-2">
+                    <ChefHat size={18} />
+                    Recetas alternativas con lo que tienes
+                  </h4>
+                </div>
+                <div className="divide-y max-h-60 overflow-y-auto">
+                  {alternatives.map((alt, i) => (
+                    <button
+                      key={i}
+                      onClick={() => onSelectAlternative(alt.recipe)}
+                      className="w-full p-3 text-left hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">{alt.recipe.name}</span>
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full ${
+                            alt.canMake
+                              ? "bg-green-100 text-green-700"
+                              : "bg-yellow-100 text-yellow-700"
+                          }`}
+                        >
+                          {Math.round(alt.availablePercent)}% listo
+                        </span>
+                      </div>
+                      {alt.missingIngredients.length > 0 && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Falta:{" "}
+                          {alt.missingIngredients.map((i) => i.name).join(", ")}
+                        </p>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="divide-y max-h-60 overflow-y-auto">
-                {alternatives.map((alt, i) => (
-                  <button
-                    key={i}
-                    onClick={() => onSelectAlternative(alt.recipe)}
-                    className="w-full p-3 text-left hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">{alt.recipe.name}</span>
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        alt.canMake
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-yellow-100 text-yellow-700'
-                      }`}>
-                        {Math.round(alt.availablePercent)}% listo
-                      </span>
-                    </div>
-                    {alt.missingIngredients.length > 0 && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Falta: {alt.missingIngredients.map(i => i.name).join(', ')}
-                      </p>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+            )}
 
           {/* AI Recipe Generation - Mostrar en modo generar o si faltan ingredientes */}
           {(isGenerateMode || !availability.canMake) && (
@@ -508,14 +574,18 @@ export default function SmartSuggestions({
                           className={`p-2 rounded-lg border-2 text-left transition-all ${
                             selectedStyle === style.id
                               ? `${style.color} border-current`
-                              : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                              : "bg-gray-50 border-gray-200 hover:border-gray-300"
                           }`}
                         >
                           <div className="flex items-center gap-2">
                             {style.icon}
-                            <span className="font-medium text-sm">{style.label}</span>
+                            <span className="font-medium text-sm">
+                              {style.label}
+                            </span>
                           </div>
-                          <p className="text-xs opacity-75 mt-0.5">{style.description}</p>
+                          <p className="text-xs opacity-75 mt-0.5">
+                            {style.description}
+                          </p>
                         </button>
                       ))}
                     </div>
@@ -526,7 +596,10 @@ export default function SmartSuggestions({
                 {showStyleSelector && !aiRecipe && (
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      ¿Alguna preferencia específica? <span className="text-gray-400 font-normal">(opcional)</span>
+                      ¿Alguna preferencia específica?{" "}
+                      <span className="text-gray-400 font-normal">
+                        (opcional)
+                      </span>
                     </label>
                     <textarea
                       value={userPreferences}
@@ -536,7 +609,8 @@ export default function SmartSuggestions({
                       rows={2}
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      💡 Escribe ingredientes específicos, tipo de plato, o cualquier preferencia
+                      💡 Escribe ingredientes específicos, tipo de plato, o
+                      cualquier preferencia
                     </p>
                   </div>
                 )}
@@ -546,15 +620,24 @@ export default function SmartSuggestions({
                   onClick={() => setShowIngredients(!showIngredients)}
                   className="w-full flex justify-between items-center text-sm text-gray-600 mb-2"
                 >
-                  <span>Ver ingredientes disponibles ({availableIngredients.length})</span>
-                  {showIngredients ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  <span>
+                    Ver ingredientes disponibles ({availableIngredients.length})
+                  </span>
+                  {showIngredients ? (
+                    <ChevronUp size={16} />
+                  ) : (
+                    <ChevronDown size={16} />
+                  )}
                 </button>
 
                 {showIngredients && (
                   <div className="bg-gray-50 p-2 rounded-lg mb-3 max-h-32 overflow-y-auto">
                     <div className="flex flex-wrap gap-1">
                       {availableIngredients.map((ing, i) => (
-                        <span key={i} className="bg-white text-gray-600 px-2 py-0.5 rounded text-xs border">
+                        <span
+                          key={i}
+                          className="bg-white text-gray-600 px-2 py-0.5 rounded text-xs border"
+                        >
                           {ing}
                         </span>
                       ))}
@@ -571,12 +654,20 @@ export default function SmartSuggestions({
                     {generatingAI ? (
                       <>
                         <RefreshCw size={18} className="animate-spin" />
-                        Generando receta {RECIPE_STYLES.find(s => s.id === selectedStyle)?.label.toLowerCase()}...
+                        Generando receta{" "}
+                        {RECIPE_STYLES.find(
+                          (s) => s.id === selectedStyle,
+                        )?.label.toLowerCase()}
+                        ...
                       </>
                     ) : (
                       <>
                         <Sparkles size={18} />
-                        Generar Receta {RECIPE_STYLES.find(s => s.id === selectedStyle)?.label}
+                        Generar Receta{" "}
+                        {
+                          RECIPE_STYLES.find((s) => s.id === selectedStyle)
+                            ?.label
+                        }
                       </>
                     )}
                   </button>
@@ -584,8 +675,12 @@ export default function SmartSuggestions({
                   <div className="space-y-3">
                     {/* AI Recipe Result */}
                     <div className="bg-purple-50 p-3 rounded-xl">
-                      <h5 className="font-semibold text-purple-800">{aiRecipe.name}</h5>
-                      <p className="text-sm text-purple-600 mt-1">{aiRecipe.description}</p>
+                      <h5 className="font-semibold text-purple-800">
+                        {aiRecipe.name}
+                      </h5>
+                      <p className="text-sm text-purple-600 mt-1">
+                        {aiRecipe.description}
+                      </p>
 
                       <div className="flex flex-wrap gap-2 mt-2">
                         <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs">
@@ -602,7 +697,10 @@ export default function SmartSuggestions({
                       {aiRecipe.nutritionHighlights && (
                         <div className="flex flex-wrap gap-1 mt-2">
                           {aiRecipe.nutritionHighlights.map((h, i) => (
-                            <span key={i} className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs">
+                            <span
+                              key={i}
+                              className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs"
+                            >
                               {h}
                             </span>
                           ))}
@@ -611,7 +709,8 @@ export default function SmartSuggestions({
 
                       {aiRecipe.additionalIngredients?.length > 0 && (
                         <div className="mt-2 text-xs text-orange-600">
-                          <strong>Necesitarás:</strong> {aiRecipe.additionalIngredients.join(', ')}
+                          <strong>Necesitarás:</strong>{" "}
+                          {aiRecipe.additionalIngredients.join(", ")}
                         </div>
                       )}
                     </div>
@@ -631,7 +730,10 @@ export default function SmartSuggestions({
                         className="px-4 py-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200"
                         title="Regenerar misma receta"
                       >
-                        <RefreshCw size={18} className={generatingAI ? 'animate-spin' : ''} />
+                        <RefreshCw
+                          size={18}
+                          className={generatingAI ? "animate-spin" : ""}
+                        />
                       </button>
                     </div>
                     <button
@@ -658,7 +760,9 @@ export default function SmartSuggestions({
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <Check size={32} className="text-green-600" />
               </div>
-              <h4 className="font-semibold text-green-800">Todo listo para cocinar</h4>
+              <h4 className="font-semibold text-green-800">
+                Todo listo para cocinar
+              </h4>
               <p className="text-sm text-gray-600 mt-1">
                 Tienes todos los ingredientes para esta receta
               </p>

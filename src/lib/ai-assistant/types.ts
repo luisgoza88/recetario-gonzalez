@@ -5,7 +5,7 @@
  * Extraídos de route.ts para mejor organización.
  */
 
-import { AIProposedAction, AIRiskLevel } from '@/types';
+import { AIProposedAction, AIRiskLevel } from "@/types";
 
 // Types for messages with images
 export interface MessageWithImage {
@@ -29,7 +29,7 @@ export interface ExecutionResult {
 }
 
 export interface ProposalResponse {
-  type: 'proposal';
+  type: "proposal";
   proposalId: string;
   summary: string;
   actions: AIProposedAction[];
@@ -50,7 +50,7 @@ export interface RecipeIngredient {
 export interface InventoryUpdate {
   item_name: string;
   quantity: number;
-  action?: 'set' | 'add' | 'subtract';
+  action?: "set" | "add" | "subtract";
 }
 
 // Receipt scanning types
@@ -73,7 +73,7 @@ export interface MultiStepResult {
 
 // Tool stream event for SSE
 export interface ToolStreamEvent {
-  type: 'tool_start' | 'tool_end' | 'content' | 'done' | 'error';
+  type: "tool_start" | "tool_end" | "content" | "done" | "error";
   name?: string;
   description?: string;
   result?: unknown;
