@@ -15,6 +15,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   Archive,
+  ArrowLeftRight,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import {
@@ -28,10 +29,12 @@ import {
 import RecipeModal from "./RecipeModal";
 import FeedbackModal from "./FeedbackModal";
 import SmartSuggestions from "./SmartSuggestions";
+import MealSwapModal from "./MealSwapModal";
 import { useOnlineStatus } from "@/hooks/useOfflineSync";
 import { cacheDayMenus, getCachedDayMenus } from "@/lib/indexedDB";
 import logger from "@/lib/logger";
 import { useGoToTodaySignal } from "@/lib/stores/useAppStore";
+import { useToast } from "@/components/ui/Toast";
 
 interface CalendarViewProps {
   recipes: Recipe[];
@@ -101,6 +104,23 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
   } | null>(null);
   const [isFromCache, setIsFromCache] = useState(false);
   const isOnline = useOnlineStatus();
+
+  // --- Meal swap state ---
+  const toast = useToast();
+  const [swapModal, setSwapModal] = useState<{
+    isOpen: boolean;
+    mealType: "breakfast" | "lunch" | "dinner";
+    currentRecipe?: Recipe;
+    menuSource: "static" | "generated";
+    dayNumber?: number;
+    generatedMenuId?: string;
+    generatedWeekStart?: string;
+    generatedDateKey?: string;
+  }>({
+    isOpen: false,
+    mealType: "breakfast",
+    menuSource: "static",
+  });
 
   // --- Generative menu state ---
   const [generatedMenus, setGeneratedMenus] = useState<
@@ -318,6 +338,143 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
   };
 
   // =====================================================
+  // Meal Swap handlers
+  // =====================================================
+  const openSwapModal = (
+    mealType: "breakfast" | "lunch" | "dinner",
+    currentRecipe: Recipe | undefined,
+    menuSource: "static" | "generated",
+    options?: {
+      dayNumber?: number;
+      generatedMenuId?: string;
+      generatedWeekStart?: string;
+      generatedDateKey?: string;
+    },
+  ) => {
+    setSwapModal({
+      isOpen: true,
+      mealType,
+      currentRecipe,
+      menuSource,
+      dayNumber: options?.dayNumber,
+      generatedMenuId: options?.generatedMenuId,
+      generatedWeekStart: options?.generatedWeekStart,
+      generatedDateKey: options?.generatedDateKey,
+    });
+  };
+
+  const handleSwapRecipe = async (newRecipe: Recipe) => {
+    try {
+      if (
+        swapModal.menuSource === "static" &&
+        swapModal.dayNumber !== undefined
+      ) {
+        // Update the static day_menu table
+        const column =
+          swapModal.mealType === "breakfast"
+            ? "breakfast_id"
+            : swapModal.mealType === "lunch"
+              ? "lunch_id"
+              : "dinner_id";
+
+        const { error } = await supabase
+          .from("day_menu")
+          .update({ [column]: newRecipe.id })
+          .eq("day_number", swapModal.dayNumber);
+
+        if (error) {
+          toast.error("Error al cambiar receta: " + error.message);
+          return;
+        }
+
+        // Update local state
+        setDayMenu((prev) =>
+          prev.map((m) =>
+            m.day_number === swapModal.dayNumber
+              ? { ...m, [column]: newRecipe.id }
+              : m,
+          ),
+        );
+
+        toast.success(
+          `${newRecipe.name} asignada como ${swapModal.mealType === "breakfast" ? "desayuno" : swapModal.mealType === "lunch" ? "almuerzo" : "cena"}`,
+        );
+      } else if (
+        swapModal.menuSource === "generated" &&
+        swapModal.generatedMenuId &&
+        swapModal.generatedWeekStart &&
+        swapModal.generatedDateKey
+      ) {
+        // Update generated menu JSONB
+        const weekStart = swapModal.generatedWeekStart;
+        const menu = generatedMenus.get(weekStart);
+        if (!menu) {
+          toast.error("Menu generado no encontrado");
+          return;
+        }
+
+        // Deep clone menu_data and update the specific meal
+        const updatedMenuData: GeneratedDayMenu[] = menu.menu_data.map(
+          (day) => {
+            if (day.date !== swapModal.generatedDateKey) return day;
+
+            const newMeal: GeneratedMeal = {
+              name: newRecipe.name,
+              description: newRecipe.description,
+              ingredients: newRecipe.ingredients.map((ing) => ({
+                name: ing.name,
+                total: ing.total || "",
+                luis: ing.luis,
+                mariana: ing.mariana,
+              })),
+              steps: newRecipe.steps,
+              tips: newRecipe.tips,
+            };
+
+            return {
+              ...day,
+              [swapModal.mealType]: newMeal,
+            };
+          },
+        );
+
+        const { error } = await supabase
+          .from("generated_menus")
+          .update({
+            menu_data: updatedMenuData,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", swapModal.generatedMenuId);
+
+        if (error) {
+          toast.error("Error al cambiar receta: " + error.message);
+          return;
+        }
+
+        // Update local state
+        setGeneratedMenus((prev) => {
+          const next = new Map(prev);
+          const existing = next.get(weekStart);
+          if (existing) {
+            next.set(weekStart, {
+              ...existing,
+              menu_data: updatedMenuData,
+            });
+          }
+          return next;
+        });
+
+        toast.success(
+          `${newRecipe.name} asignada como ${swapModal.mealType === "breakfast" ? "desayuno" : swapModal.mealType === "lunch" ? "almuerzo" : "cena"}`,
+        );
+      }
+    } catch (err) {
+      toast.error("Error inesperado al cambiar receta");
+      console.error("Swap error:", err);
+    }
+  };
+
+  // =====================================================
   // Navigation
   // =====================================================
   const changeMonth = (delta: number) => {
@@ -516,6 +673,18 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
               );
               setFeedbackRecipe({ recipe: fakeRecipe, mealType: "breakfast" });
             }}
+            onSwap={() =>
+              openSwapModal(
+                "breakfast",
+                generatedMealToRecipe(dayData.breakfast!, "breakfast"),
+                "generated",
+                {
+                  generatedMenuId: menu.id,
+                  generatedWeekStart: menu.week_start_date,
+                  generatedDateKey: dateKey,
+                },
+              )
+            }
           />
         )}
 
@@ -539,6 +708,18 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
               );
               setFeedbackRecipe({ recipe: fakeRecipe, mealType: "lunch" });
             }}
+            onSwap={() =>
+              openSwapModal(
+                "lunch",
+                generatedMealToRecipe(dayData.lunch!, "lunch"),
+                "generated",
+                {
+                  generatedMenuId: menu.id,
+                  generatedWeekStart: menu.week_start_date,
+                  generatedDateKey: dateKey,
+                },
+              )
+            }
           />
         )}
 
@@ -562,6 +743,18 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
               );
               setFeedbackRecipe({ recipe: fakeRecipe, mealType: "dinner" });
             }}
+            onSwap={() =>
+              openSwapModal(
+                "dinner",
+                generatedMealToRecipe(dayData.dinner!, "dinner"),
+                "generated",
+                {
+                  generatedMenuId: menu.id,
+                  generatedWeekStart: menu.week_start_date,
+                  generatedDateKey: dateKey,
+                },
+              )
+            }
             isLast
           />
         ) : (
@@ -736,6 +929,11 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
             onSuggestions={() =>
               setSuggestionsRecipe({ recipe: breakfast, mealType: "breakfast" })
             }
+            onSwap={() =>
+              openSwapModal("breakfast", breakfast, "static", {
+                dayNumber: cycleDay,
+              })
+            }
           />
         )}
 
@@ -755,6 +953,11 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
             onSuggestions={() =>
               setSuggestionsRecipe({ recipe: lunch, mealType: "lunch" })
             }
+            onSwap={() =>
+              openSwapModal("lunch", lunch, "static", {
+                dayNumber: cycleDay,
+              })
+            }
           />
         )}
 
@@ -773,6 +976,11 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
             }
             onSuggestions={() =>
               setSuggestionsRecipe({ recipe: dinner, mealType: "dinner" })
+            }
+            onSwap={() =>
+              openSwapModal("dinner", dinner, "static", {
+                dayNumber: cycleDay,
+              })
             }
             isLast
           />
@@ -1023,6 +1231,14 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
           onClose={() => setSuggestionsRecipe(null)}
         />
       )}
+
+      <MealSwapModal
+        isOpen={swapModal.isOpen}
+        onClose={() => setSwapModal((prev) => ({ ...prev, isOpen: false }))}
+        mealType={swapModal.mealType}
+        currentRecipe={swapModal.currentRecipe}
+        onSwap={handleSwapRecipe}
+      />
     </div>
   );
 }
@@ -1061,6 +1277,7 @@ interface GeneratedMealCardProps {
   expanded: boolean;
   onToggle: () => void;
   onFeedback: () => void;
+  onSwap: () => void;
   isLast?: boolean;
 }
 
@@ -1071,6 +1288,7 @@ function GeneratedMealCard({
   expanded,
   onToggle,
   onFeedback,
+  onSwap,
   isLast,
 }: GeneratedMealCardProps) {
   const borderColor = {
@@ -1099,6 +1317,13 @@ function GeneratedMealCard({
             <p className="text-xs text-gray-400 mt-1">⏱ {meal.totalTime}</p>
           )}
         </div>
+        <button
+          onClick={onSwap}
+          className="bg-indigo-100 text-indigo-700 p-2 rounded-lg hover:bg-indigo-200 shrink-0 ml-2"
+          title="Cambiar receta"
+        >
+          <ArrowLeftRight size={18} />
+        </button>
       </div>
 
       <div className="flex gap-2 mt-2">
@@ -1202,6 +1427,7 @@ interface MealCardProps {
   onView: () => void;
   onFeedback: () => void;
   onSuggestions: () => void;
+  onSwap: () => void;
   isLast?: boolean;
 }
 
@@ -1214,6 +1440,7 @@ function MealCard({
   onView,
   onFeedback,
   onSuggestions,
+  onSwap,
   isLast,
 }: MealCardProps) {
   const borderColor = {
@@ -1231,13 +1458,22 @@ function MealCard({
           <div className="text-gray-500 text-sm">{label}</div>
           <h4 className="font-semibold text-lg">{recipe.name}</h4>
         </div>
-        <button
-          onClick={onSuggestions}
-          className="bg-purple-100 text-purple-700 p-2 rounded-lg hover:bg-purple-200"
-          title="Verificar ingredientes"
-        >
-          <Sparkles size={18} />
-        </button>
+        <div className="flex gap-1">
+          <button
+            onClick={onSwap}
+            className="bg-indigo-100 text-indigo-700 p-2 rounded-lg hover:bg-indigo-200"
+            title="Cambiar receta"
+          >
+            <ArrowLeftRight size={18} />
+          </button>
+          <button
+            onClick={onSuggestions}
+            className="bg-purple-100 text-purple-700 p-2 rounded-lg hover:bg-purple-200"
+            title="Verificar ingredientes"
+          >
+            <Sparkles size={18} />
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-2 mt-2">

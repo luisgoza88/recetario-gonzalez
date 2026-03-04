@@ -20,8 +20,10 @@ import { AIRiskLevel } from "@/types";
 import { MessageWithImage, ExecutionContext } from "@/lib/ai-assistant/types";
 import {
   SYSTEM_PROMPT,
+  buildSystemPrompt,
   getToolDescription,
 } from "@/lib/ai-assistant/constants";
+import { getCookingProfile, getFamilyDisplayName } from "@/lib/cooking-profile";
 import {
   createToolStreamEvent,
   isInvalidResponse,
@@ -147,8 +149,17 @@ export async function POST(request: NextRequest) {
 
     const gemini = getGeminiClient();
 
+    // Fetch cooking profile for household-aware prompts
+    const cookingProfile = await getCookingProfile(householdId);
+    const familyName = getFamilyDisplayName(cookingProfile);
+
     // Build enhanced system prompt with context
-    let enhancedSystemPrompt = SYSTEM_PROMPT;
+    let enhancedSystemPrompt = buildSystemPrompt({
+      familyName,
+      city: cookingProfile.city,
+      cookingStyle: cookingProfile.cooking_style,
+      familySize: cookingProfile.family_size,
+    });
 
     if (conversationContext) {
       const { history, lastTopic, preferences } = conversationContext;

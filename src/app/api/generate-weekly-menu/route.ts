@@ -11,6 +11,13 @@ import { withRateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/api/auth";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
+import {
+  getCookingProfile,
+  getFamilyDisplayName,
+  getLocationString,
+} from "@/lib/cooking-profile";
+import type { CookingProfile } from "@/types";
+import { getSeasonalPromptText } from "@/data/colombian-seasons";
 
 // =====================================================
 // Input validation
@@ -173,6 +180,34 @@ async function getMealFeedback(): Promise<{
   }
 }
 
+interface DietaryPreferencesRow {
+  restrictions?: string[];
+  allergies?: string[];
+  preferences?: string[];
+  avoid_ingredients?: string[];
+}
+
+async function getHouseholdDietaryPreferences(
+  householdId?: string,
+): Promise<DietaryPreferencesRow | null> {
+  if (!householdId) return null;
+  try {
+    const { data } = await getSupabase()
+      .from("households")
+      .select("dietary_preferences")
+      .eq("id", householdId)
+      .single();
+
+    if (!data?.dietary_preferences) return null;
+    return data.dietary_preferences as DietaryPreferencesRow;
+  } catch (error) {
+    logger.error("Error loading dietary preferences", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
 interface PreparationRow {
   name: string;
   ingredients: string[];
@@ -287,6 +322,8 @@ export async function POST(request: NextRequest) {
       feedback,
       preparations,
       expandedRecipeNames,
+      cookingProfile,
+      dietaryPreferences,
     ] = await Promise.all([
       getAvailableInventory(),
       getMarketItems(),
@@ -294,6 +331,8 @@ export async function POST(request: NextRequest) {
       getMealFeedback(),
       getPreparations(),
       getExpandedRecipeNames(),
+      getCookingProfile(householdId),
+      getHouseholdDietaryPreferences(householdId),
     ]);
 
     const weekDays = getWeekDates(weekStartDate);
@@ -309,6 +348,8 @@ export async function POST(request: NextRequest) {
       style,
       prioritizeThermomix,
       expandedRecipeNames,
+      cookingProfile,
+      dietaryPreferences,
     });
 
     // Call Gemini
@@ -413,6 +454,34 @@ async function getExpandedRecipeNames(): Promise<string[]> {
   }
 }
 
+function buildDietarySection(prefs?: DietaryPreferencesRow | null): string {
+  if (!prefs) return "";
+
+  const restrictions = prefs.restrictions || [];
+  const allergies = prefs.allergies || [];
+  const preferences = prefs.preferences || [];
+  const avoidIngredients = prefs.avoid_ingredients || [];
+
+  // If everything is empty, skip the section
+  if (
+    restrictions.length === 0 &&
+    allergies.length === 0 &&
+    preferences.length === 0 &&
+    avoidIngredients.length === 0
+  ) {
+    return "";
+  }
+
+  return `
+RESTRICCIONES DIETÉTICAS DEL HOGAR:
+- Restricciones: ${restrictions.join(", ") || "Ninguna"}
+- Alergias: ${allergies.join(", ") || "Ninguna"}
+- Preferencias: ${preferences.join(", ") || "Ninguna"}
+- Ingredientes a evitar: ${avoidIngredients.join(", ") || "Ninguno"}
+
+IMPORTANTE: NUNCA incluyas ingredientes que contengan alérgenos listados. Respeta estrictamente todas las restricciones alimentarias. Si el hogar es vegetariano o vegano, NO incluyas carne, pollo, pescado ni mariscos. Si hay alergias, verifica que NINGÚN ingrediente contenga el alérgeno.`;
+}
+
 function buildPrompt(ctx: {
   weekDays: Array<{ dayNumber: number; dayName: string; date: string }>;
   inventory: string[];
@@ -423,6 +492,8 @@ function buildPrompt(ctx: {
   style: string;
   prioritizeThermomix?: boolean;
   expandedRecipeNames?: string[];
+  cookingProfile: Required<CookingProfile>;
+  dietaryPreferences?: DietaryPreferencesRow | null;
 }): string {
   const {
     weekDays,
@@ -433,7 +504,12 @@ function buildPrompt(ctx: {
     style,
     prioritizeThermomix,
     expandedRecipeNames,
+    cookingProfile,
+    dietaryPreferences,
   } = ctx;
+
+  const familyName = getFamilyDisplayName(cookingProfile);
+  const location = getLocationString(cookingProfile);
 
   const inventorySection =
     inventory.length > 0
@@ -472,13 +548,12 @@ function buildPrompt(ctx: {
     })
     .join("\n");
 
-  return `Eres el chef personal de la Familia González en Medellín, Colombia.
+  return `Eres el chef personal de ${familyName} ${location}.
 Tu trabajo es crear un menú semanal variado, delicioso y práctico.
 
 FAMILIA:
-- Luis: come porciones grandes (3 de 5 porciones totales). Le gusta sustancioso.
-- Mariana: come porciones medianas/ligeras (2 de 5 porciones totales). Prefiere más saludable.
-- Total por receta: 5 porciones siempre.
+- ${cookingProfile.family_size} miembros en el hogar.
+- Total por receta: 5 porciones siempre (distribuidas según preferencias del hogar).
 
 REGLAS DEL MENÚ:
 - 6 días: Lunes a Sábado (domingos libres, no incluir)
@@ -490,6 +565,7 @@ REGLAS DEL MENÚ:
 - Incluir preparaciones base cuando aplique (hogao, chimichurri, guacamole, etc.)
 - Priorizar ingredientes del inventario disponible
 - Cenas más ligeras que almuerzos
+- Cocina adaptada a la región: ${cookingProfile.region || "Colombia"}
 
 DÍAS DE LA SEMANA:
 ${daysDescription}
@@ -500,7 +576,9 @@ ${recentSection}
 ${likedSection}
 ${dislikedSection}
 ${expandedSection}
+${getSeasonalPromptText()}
 
+${buildDietarySection(dietaryPreferences)}
 ${
   prioritizeThermomix
     ? `

@@ -19,6 +19,7 @@ import {
   PlusIcon,
   ListChecks,
   Loader2,
+  TrendingDown,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { MarketItem, IngredientCategory } from "@/types";
@@ -28,9 +29,15 @@ import AddCustomItemModal from "./AddCustomItemModal";
 import ScanPantryModal from "./ScanPantryModal";
 import SmartShoppingSection from "./SmartShoppingSection";
 import PriceLogModal from "./PriceLogModal";
+import PriceComparisonView from "./PriceComparisonView";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { useToast } from "@/components/ui/Toast";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import SeasonalBadge, { isInSeason } from "@/components/ui/SeasonalBadge";
+import {
+  getSeasonalProduceForMonth,
+  getMonthName,
+} from "@/data/colombian-seasons";
 import {
   cacheMarketItems,
   getCachedMarketItems,
@@ -43,7 +50,7 @@ interface MarketViewProps {
   onUpdate: () => void;
 }
 
-type ViewMode = "shopping" | "pantry";
+type ViewMode = "shopping" | "pantry" | "prices";
 
 export default function MarketView({ items, onUpdate }: MarketViewProps) {
   const toast = useToast();
@@ -427,6 +434,35 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
   // Contar items personalizados
   const customItemsCount = items.filter((i) => i.is_custom).length;
 
+  // Datos de temporada colombiana
+  const currentMonth = new Date().getMonth() + 1;
+  const seasonalData = useMemo(() => {
+    const { peak, inSeason } = getSeasonalProduceForMonth(currentMonth);
+    // Filtrar solo los que coinciden con items del mercado
+    const marketNames = items.map((i) => i.name);
+    const peakInMarket = peak.filter((p) =>
+      marketNames.some(
+        (m) =>
+          isInSeason(m, currentMonth) === "peak" &&
+          m.toLowerCase().includes(p.name.toLowerCase().split(" ")[0]),
+      ),
+    );
+    const inSeasonInMarket = inSeason.filter((p) =>
+      marketNames.some(
+        (m) =>
+          isInSeason(m, currentMonth) === "in_season" &&
+          m.toLowerCase().includes(p.name.toLowerCase().split(" ")[0]),
+      ),
+    );
+    return {
+      peak,
+      inSeason,
+      peakInMarket,
+      inSeasonInMarket,
+      monthName: getMonthName(currentMonth),
+    };
+  }, [items, currentMonth]);
+
   // Agrupar items filtrados por categoría
   const categories = filteredItems.reduce(
     (acc, item) => {
@@ -474,6 +510,17 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
               {lowStockCount}
             </span>
           )}
+        </button>
+        <button
+          onClick={() => setViewMode("prices")}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-medium transition-colors ${
+            viewMode === "prices"
+              ? "bg-blue-600 text-white"
+              : "bg-white text-gray-600 hover:bg-gray-50"
+          }`}
+        >
+          <TrendingDown size={18} />
+          Precios
         </button>
       </div>
 
@@ -592,6 +639,53 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
             </button>
           </div>
 
+          {/* De temporada este mes */}
+          {(seasonalData.peak.length > 0 ||
+            seasonalData.inSeason.length > 0) && (
+            <div className="bg-gradient-to-r from-amber-50 to-green-50 border border-amber-200 rounded-xl p-4 mb-4">
+              <h3 className="font-semibold text-amber-800 text-sm mb-2 flex items-center gap-2">
+                <span aria-hidden="true">&#x1F33E;</span>
+                De temporada en {seasonalData.monthName}
+              </h3>
+              {seasonalData.peak.length > 0 && (
+                <div className="mb-2">
+                  <span className="text-[10px] font-semibold text-amber-700 uppercase tracking-wide">
+                    Temporada alta
+                  </span>
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {seasonalData.peak.map((item) => (
+                      <span
+                        key={item.name}
+                        className="bg-amber-100 text-amber-800 text-xs px-2 py-1 rounded-full border border-amber-200 flex items-center gap-1"
+                      >
+                        <span aria-hidden="true">&#x1F525;</span>
+                        {item.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {seasonalData.inSeason.length > 0 && (
+                <div>
+                  <span className="text-[10px] font-semibold text-green-700 uppercase tracking-wide">
+                    Disponible
+                  </span>
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {seasonalData.inSeason.map((item) => (
+                      <span
+                        key={item.name}
+                        className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full border border-green-200 flex items-center gap-1"
+                      >
+                        <span aria-hidden="true">&#x1F33F;</span>
+                        {item.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Shopping List - Simplified: Only checkboxes */}
           {Object.entries(categories).map(([category, categoryItems]) => (
             <div key={category} className="mb-4">
@@ -620,7 +714,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
                         onClick={(e) => e.stopPropagation()}
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span
                             className={`font-medium truncate ${item.checked ? "line-through text-gray-400" : ""}`}
                           >
@@ -632,6 +726,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
                               nuevo
                             </span>
                           )}
+                          <SeasonalBadge itemName={item.name} compact />
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -667,7 +762,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
             </div>
           ))}
         </>
-      ) : (
+      ) : viewMode === "pantry" ? (
         <>
           {/* Pantry View */}
           <div className="bg-orange-50 border border-orange-200 text-orange-700 p-3 rounded-xl mb-4 text-sm">
@@ -720,6 +815,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
                               nuevo
                             </span>
                           )}
+                          <SeasonalBadge itemName={item.name} compact />
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-gray-400">
@@ -820,6 +916,9 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
             </div>
           ))}
         </>
+      ) : (
+        /* Price Comparison View */
+        <PriceComparisonView />
       )}
 
       {/* Speed Dial FAB */}

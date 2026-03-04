@@ -136,6 +136,16 @@ export type RecipeCategory =
   | "meal-prep"
   | "cena-ligera";
 
+// Regiones colombianas
+export type ColombianRegion =
+  | "Andina"
+  | "Costa Caribe"
+  | "Pacífico"
+  | "Llanos"
+  | "Santander"
+  | "Valle del Cauca"
+  | "Tolima-Huila";
+
 export interface Recipe {
   id: string;
   name: string;
@@ -153,6 +163,7 @@ export interface Recipe {
   total_time?: number;
   // Categorización
   category?: RecipeCategory;
+  region?: ColombianRegion;
   thermomixCompatible?: boolean;
   tags?: string[];
   // Información nutricional (por porción)
@@ -318,6 +329,23 @@ export interface AdjustmentSuggestion {
 // TIPOS PARA MÓDULO GESTIÓN DEL HOGAR
 // =====================================================
 
+export interface CookingProfile {
+  city?: string;
+  region?: string;
+  country?: string;
+  cooking_style?: string;
+  family_name?: string;
+  family_size?: number;
+  portions_config?: Record<string, number>;
+}
+
+export interface DietaryPreferences {
+  restrictions?: string[];
+  allergies?: string[];
+  preferences?: string[];
+  avoid_ingredients?: string[];
+}
+
 export interface Household {
   id: string;
   name: string;
@@ -326,6 +354,8 @@ export interface Household {
   created_at?: string;
   updated_at?: string;
   setup_completed?: boolean;
+  cooking_profile?: CookingProfile;
+  dietary_preferences?: DietaryPreferences;
 }
 
 export interface SpaceType {

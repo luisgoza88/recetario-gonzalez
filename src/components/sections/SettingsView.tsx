@@ -13,10 +13,16 @@ import {
   HelpCircle,
   Smartphone,
   Brain,
+  UtensilsCrossed,
 } from "lucide-react";
 import AICommandCenter from "@/components/ai/AICommandCenter";
+import DietaryPreferencesPanel from "@/components/settings/DietaryPreferencesPanel";
+import CookingProfilePanel from "@/components/settings/CookingProfilePanel";
 import { AdminOnly } from "@/components/auth/RoleGate";
-import { useHouseholdId } from "@/lib/stores/useHouseholdStore";
+import {
+  useHouseholdId,
+  useCurrentHousehold,
+} from "@/lib/stores/useHouseholdStore";
 
 interface SettingsSectionProps {
   icon: React.ReactNode;
@@ -65,7 +71,10 @@ function SettingsSection({
 export default function SettingsView() {
   const [notifications, setNotifications] = useState(true);
   const [showAICommandCenter, setShowAICommandCenter] = useState(false);
+  const [showDietaryPreferences, setShowDietaryPreferences] = useState(false);
+  const [showCookingProfile, setShowCookingProfile] = useState(false);
   const householdId = useHouseholdId();
+  const household = useCurrentHousehold();
 
   // Show AI Command Center as full screen
   if (showAICommandCenter) {
@@ -73,6 +82,26 @@ export default function SettingsView() {
       <AICommandCenter
         onClose={() => setShowAICommandCenter(false)}
         householdId={householdId || undefined}
+      />
+    );
+  }
+
+  // Show Dietary Preferences panel
+  if (showDietaryPreferences && householdId) {
+    return (
+      <DietaryPreferencesPanel
+        householdId={householdId}
+        onBack={() => setShowDietaryPreferences(false)}
+      />
+    );
+  }
+
+  // Show Cooking Profile panel
+  if (showCookingProfile && householdId) {
+    return (
+      <CookingProfilePanel
+        householdId={householdId}
+        onBack={() => setShowCookingProfile(false)}
       />
     );
   }
@@ -185,6 +214,12 @@ export default function SettingsView() {
                 />
               </button>
             }
+          />
+          <SettingsSection
+            icon={<UtensilsCrossed size={20} />}
+            title="Preferencias Dietéticas"
+            description="Restricciones, alergias y preferencias"
+            onClick={() => setShowDietaryPreferences(true)}
           />
           <SettingsSection
             icon={<Moon size={20} />}

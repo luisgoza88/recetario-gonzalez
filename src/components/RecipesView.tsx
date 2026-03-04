@@ -3,12 +3,17 @@
 import { useState, useMemo, useCallback } from "react";
 import Image from "next/image";
 import { Search, Plus, Edit2, Trash2, ImageIcon } from "lucide-react";
-import { Recipe, Ingredient, RecipeCategory } from "@/types";
+import { Recipe, Ingredient, RecipeCategory, ColombianRegion } from "@/types";
 import {
   expandedRecipes,
   CATEGORY_CONFIG,
   ExpandedRecipe,
 } from "@/data/expanded-recipes";
+import {
+  regionalRecipes,
+  REGION_CONFIG,
+  RegionalRecipe,
+} from "@/data/regional-colombian-recipes";
 import RecipeModal from "./RecipeModal";
 import RecipeForm from "./forms/RecipeForm";
 import { CanEdit } from "@/components/auth/RoleGate";
@@ -37,6 +42,22 @@ const CATEGORY_FILTERS: Array<{
   { key: "cena-ligera", label: "Cena Ligera", icon: "🌙" },
 ];
 
+// Region filter options (shown when "Colombiana" is selected)
+const REGION_FILTERS: Array<{
+  key: "all" | ColombianRegion;
+  label: string;
+  icon: string;
+}> = [
+  { key: "all", label: "Todas las regiones", icon: "🗺️" },
+  { key: "Andina", label: "Andina", icon: "🏔️" },
+  { key: "Costa Caribe", label: "Costa Caribe", icon: "🏖️" },
+  { key: "Pacífico", label: "Pacífico", icon: "🌊" },
+  { key: "Llanos", label: "Llanos", icon: "🐄" },
+  { key: "Santander", label: "Santander", icon: "🐐" },
+  { key: "Valle del Cauca", label: "Valle del Cauca", icon: "🌿" },
+  { key: "Tolima-Huila", label: "Tolima-Huila", icon: "🌾" },
+];
+
 export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
   const toast = useToast();
   const [search, setSearch] = useState("");
@@ -52,27 +73,46 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
   const [confirmDeleteRecipe, setConfirmDeleteRecipe] = useState<Recipe | null>(
     null,
   );
+  const [regionFilter, setRegionFilter] = useState<"all" | ColombianRegion>(
+    "all",
+  );
 
-  // Combine DB recipes with expanded recipes (avoiding id duplicates)
+  // Combine DB recipes with expanded recipes and regional recipes (avoiding id duplicates)
   const allRecipes = useMemo(() => {
     const dbIds = new Set(recipes.map((r) => r.id));
+
+    const mapExpandedToRecipe = (
+      er: ExpandedRecipe | RegionalRecipe,
+    ): Recipe => ({
+      id: er.id,
+      name: er.name,
+      type: er.type,
+      portions: er.portions,
+      ingredients: er.ingredients,
+      steps: er.steps,
+      prep_time: er.prep_time,
+      cook_time: er.cook_time,
+      total_time: (er as RegionalRecipe).total_time,
+      category: er.category,
+      region: (er as RegionalRecipe).region,
+      thermomixCompatible: er.thermomixCompatible,
+      tags: er.tags,
+      nutrition: (er as RegionalRecipe).nutrition,
+      difficulty: (er as RegionalRecipe).difficulty,
+      dietary_tags: (er as RegionalRecipe).dietary_tags,
+      description: (er as RegionalRecipe).description,
+      source: "manual" as const,
+    });
+
     const expandedAsRecipes: Recipe[] = expandedRecipes
       .filter((er) => !dbIds.has(er.id))
-      .map((er: ExpandedRecipe) => ({
-        id: er.id,
-        name: er.name,
-        type: er.type,
-        portions: er.portions,
-        ingredients: er.ingredients,
-        steps: er.steps,
-        prep_time: er.prep_time,
-        cook_time: er.cook_time,
-        category: er.category,
-        thermomixCompatible: er.thermomixCompatible,
-        tags: er.tags,
-        source: "manual" as const,
-      }));
-    return [...recipes, ...expandedAsRecipes];
+      .map(mapExpandedToRecipe);
+
+    const regionalAsRecipes: Recipe[] = regionalRecipes
+      .filter((rr) => !dbIds.has(rr.id))
+      .map(mapExpandedToRecipe);
+
+    return [...recipes, ...expandedAsRecipes, ...regionalAsRecipes];
   }, [recipes]);
 
   // Memoizar filtrado de recetas para evitar recálculos innecesarios
@@ -94,9 +134,17 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
       const matchesCategory =
         categoryFilter === "all" || recipe.category === categoryFilter;
 
-      return matchesSearch && matchesFilter && matchesCategory;
+      // Region filter (only applies when colombiana is selected)
+      // Recipes without a region that are "colombiana" are treated as "Andina"
+      const effectiveRegion =
+        recipe.region ||
+        (recipe.category === "colombiana" ? "Andina" : undefined);
+      const matchesRegion =
+        regionFilter === "all" || effectiveRegion === regionFilter;
+
+      return matchesSearch && matchesFilter && matchesCategory && matchesRegion;
     });
-  }, [allRecipes, search, filter, categoryFilter]);
+  }, [allRecipes, search, filter, categoryFilter, regionFilter]);
 
   const getTypeLabel = (type: string) => {
     switch (type) {
@@ -143,6 +191,14 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
       const cfg = CATEGORY_CONFIG[recipe.category as RecipeCategory];
       badges.push({ label: cfg.icon, className: cfg.color });
     }
+    // Region badge for Colombian regional recipes
+    if (recipe.region && REGION_CONFIG[recipe.region]) {
+      const regionCfg = REGION_CONFIG[recipe.region];
+      badges.push({
+        label: `${regionCfg.icon} ${regionCfg.label}`,
+        className: regionCfg.color,
+      });
+    }
     return badges;
   };
 
@@ -151,7 +207,7 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
     async (recipe: Recipe) => {
       try {
         // Only delete from DB if it's a DB recipe (not expanded)
-        if (recipe.id.match(/^(col|rap|thm|fit|int|mp|cl)-/)) {
+        if (recipe.id.match(/^(col|rap|thm|fit|int|mp|cl|reg)-/)) {
           toast.error("Las recetas de la biblioteca no se pueden eliminar");
           return;
         }
@@ -188,7 +244,7 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
 
   // Check if recipe is from expanded library (not editable/deletable from DB)
   const isExpandedRecipe = (recipe: Recipe) => {
-    return recipe.id.match(/^(col|rap|thm|fit|int|mp|cl)-/);
+    return recipe.id.match(/^(col|rap|thm|fit|int|mp|cl|reg)-/);
   };
 
   return (
@@ -216,7 +272,10 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
         {CATEGORY_FILTERS.map((cat) => (
           <button
             key={cat.key}
-            onClick={() => setCategoryFilter(cat.key)}
+            onClick={() => {
+              setCategoryFilter(cat.key);
+              if (cat.key !== "colombiana") setRegionFilter("all");
+            }}
             className={`
               flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border
               ${
@@ -231,6 +290,32 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
           </button>
         ))}
       </div>
+
+      {/* Region Filter - Shown when "Colombiana" category is selected */}
+      {categoryFilter === "colombiana" && (
+        <div
+          className="flex gap-2 mb-3 overflow-x-auto pb-2 scrollbar-hide"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
+          {REGION_FILTERS.map((reg) => (
+            <button
+              key={reg.key}
+              onClick={() => setRegionFilter(reg.key)}
+              className={`
+                flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border
+                ${
+                  regionFilter === reg.key
+                    ? "bg-amber-600 text-white border-amber-600"
+                    : "bg-white text-gray-600 hover:bg-gray-50 border-gray-200"
+                }
+              `}
+            >
+              <span>{reg.icon}</span>
+              <span>{reg.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Meal Type Filter Tabs */}
       <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
@@ -257,6 +342,8 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
         {filteredRecipes.length} receta{filteredRecipes.length !== 1 ? "s" : ""}
         {categoryFilter !== "all" &&
           ` en ${CATEGORY_FILTERS.find((c) => c.key === categoryFilter)?.label}`}
+        {regionFilter !== "all" &&
+          ` - ${REGION_FILTERS.find((r) => r.key === regionFilter)?.label}`}
       </p>
 
       {/* Add Button */}

@@ -13,6 +13,7 @@ import {
 import { withRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 import { createAuthenticatedClient } from "@/lib/supabase/server";
+import { getCookingProfile, getFamilyDisplayName } from "@/lib/cooking-profile";
 
 // Import shared types and utilities from the ai-assistant module
 import { MessageWithImage } from "@/lib/ai-assistant/types";
@@ -38,6 +39,7 @@ const ChatRequestSchema = z.object({
   messages: z.array(MessageSchema).min(1).max(50),
   stream: z.boolean().optional(),
   conversationContext: z.record(z.string(), z.unknown()).optional(),
+  householdId: z.string().uuid().optional(),
 });
 
 /**
@@ -1118,7 +1120,16 @@ async function executeQueryFunction(
 // SYSTEM PROMPT SIMPLIFICADO
 // ============================================
 
-const SYSTEM_PROMPT = `Eres el asistente del hogar González. Ayudas con consultas sobre recetas, menú, inventario y tareas.
+function buildChatSystemPrompt(opts?: {
+  familyName?: string;
+  city?: string;
+  cookingStyle?: string;
+  familySize?: number;
+}): string {
+  const familyName = opts?.familyName || "tu hogar";
+  const locationSuffix = opts?.city ? ` (${opts.city})` : "";
+
+  return `Eres el asistente de ${familyName}${locationSuffix}. Ayudas con consultas sobre recetas, menú, inventario y tareas.
 
 ## REGLA: SIEMPRE USA LAS FUNCIONES
 - "¿Qué hay de comer?" → get_today_menu()
@@ -1128,10 +1139,9 @@ const SYSTEM_PROMPT = `Eres el asistente del hogar González. Ayudas con consult
 - "Tareas de hoy" → get_today_tasks()
 
 ## DATOS DEL HOGAR
-- Familia González (Luis y Mariana)
-- Porciones: Luis (3) + Mariana (2) = 5 total
-- Viernes/Sábado: Sin cena
-- Empleada: Yolima
+- Hogar: ${familyName}
+- Porciones totales: 5 por receta
+- Viernes/Sábado: Sin cena${opts?.cookingStyle ? `\n- Estilo: ${opts.cookingStyle}` : ""}${opts?.familySize ? `\n- Miembros: ${opts.familySize}` : ""}
 
 ## FORMATO
 - Sé amigable y conciso
@@ -1139,6 +1149,7 @@ const SYSTEM_PROMPT = `Eres el asistente del hogar González. Ayudas con consult
 - Respuestas claras y organizadas
 
 NOTA: Este chat es solo para CONSULTAS. Para acciones (crear, modificar, eliminar), indica al usuario que use el chat principal.`;
+}
 
 // ============================================
 // HELPER: Detectar función requerida
@@ -1275,7 +1286,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { messages, stream = false } = validatedBody;
+    const { messages, stream = false, householdId } = validatedBody;
+
+    // Fetch cooking profile for dynamic system prompt
+    const cookingProfile = await getCookingProfile(householdId);
+    const familyName = getFamilyDisplayName(cookingProfile);
+    const dynamicSystemPrompt = buildChatSystemPrompt({
+      familyName,
+      city: cookingProfile.city,
+      cookingStyle: cookingProfile.cooking_style,
+      familySize: cookingProfile.family_size,
+    });
 
     const gemini = getGeminiClient();
     const lastUserMessage = messages[messages.length - 1]?.content || "";
@@ -1300,7 +1321,7 @@ export async function POST(request: NextRequest) {
       config: {
         temperature: 0.7,
         maxOutputTokens: 1000,
-        systemInstruction: SYSTEM_PROMPT,
+        systemInstruction: dynamicSystemPrompt,
         tools: [{ functionDeclarations: queryFunctions }],
         toolConfig: {
           functionCallingConfig: { mode: FunctionCallingConfigMode.AUTO },
@@ -1336,7 +1357,7 @@ export async function POST(request: NextRequest) {
           config: {
             temperature: 0.7,
             maxOutputTokens: 1000,
-            systemInstruction: SYSTEM_PROMPT,
+            systemInstruction: dynamicSystemPrompt,
           },
         });
 
@@ -1404,7 +1425,7 @@ export async function POST(request: NextRequest) {
       config: {
         temperature: 0.7,
         maxOutputTokens: 1000,
-        systemInstruction: SYSTEM_PROMPT,
+        systemInstruction: dynamicSystemPrompt,
       },
     });
 

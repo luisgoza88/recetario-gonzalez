@@ -11,6 +11,7 @@ export * from "./types";
 // Constants
 export {
   SYSTEM_PROMPT,
+  buildSystemPrompt,
   TOOL_DESCRIPTIONS,
   getToolDescription,
   DAYS_OF_WEEK,

@@ -9,6 +9,11 @@ import {
 } from "@/lib/gemini/client";
 import { requireAuth } from "@/lib/api/auth";
 import { logger } from "@/lib/logger";
+import {
+  getCookingProfile,
+  getFamilyDisplayName,
+  getLocationString,
+} from "@/lib/cooking-profile";
 
 // Zod schema for input validation
 const GenerateRecipeFromImageSchema = z
@@ -16,6 +21,7 @@ const GenerateRecipeFromImageSchema = z
     image: z.string().max(20_000_000).optional(), // base64-encoded image, ~15 MB max raw
     description: z.string().min(1).max(2000).optional(),
     type: z.enum(["breakfast", "lunch", "dinner"]).optional(),
+    householdId: z.string().uuid().optional(),
   })
   .refine((data) => data.image || data.description, {
     message: "Se requiere una imagen o descripción",
@@ -57,17 +63,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { image, description, type } = parsed.data;
+    const { image, description, type, householdId } = parsed.data;
+
+    // Fetch cooking profile
+    const cookingProfile = await getCookingProfile(householdId);
+    const familyName = getFamilyDisplayName(cookingProfile);
+    const location = getLocationString(cookingProfile);
 
     const gemini = getGeminiClient();
 
-    const systemPrompt = `Eres un chef experto colombiano que ayuda a la Familia González a crear recetas.
+    const systemPrompt = `Eres un chef experto que ayuda a ${familyName} a crear recetas. Estilo: ${cookingProfile.cooking_style}.
 
-CONTEXTO FAMILIAR:
-- Luis: Come porciones más grandes (aproximadamente 60% del total)
-- Mariana: Come porciones más ligeras (aproximadamente 40% del total)
-- Prefieren comida colombiana casera pero también les gustan recetas internacionales
-- Cocinan para 2 personas
+CONTEXTO DEL HOGAR:
+- ${cookingProfile.family_size} personas en el hogar
+- Ubicación: ${[cookingProfile.city, cookingProfile.region, cookingProfile.country].filter(Boolean).join(", ")}
+- Prefieren cocina ${cookingProfile.cooking_style}
 
 Tu tarea es generar una receta completa basada en la imagen o descripción proporcionada.
 
@@ -75,14 +85,14 @@ INSTRUCCIONES:
 1. Identifica el plato y dale un nombre apropiado
 2. Determina si es desayuno, almuerzo o cena
 3. Lista TODOS los ingredientes con cantidades específicas
-4. Calcula porciones para Luis (60%) y Mariana (40%)
+4. Calcula porciones distribuidas para ${cookingProfile.family_size} personas
 5. Escribe pasos detallados de preparación
 6. Incluye tips útiles
 
 IMPORTANTE para ingredientes:
-- Usa unidades colombianas cuando sea apropiado (lb, kg, g, ml, unidades, cucharadas, etc.)
+- Usa unidades apropiadas para la región (${cookingProfile.region || cookingProfile.country || "Colombia"})
 - Sé específico con las cantidades (no "un poco", sino "2 cucharadas")
-- Para el total, suma las cantidades de ambas porciones
+- Para el total, suma las cantidades de todas las porciones
 
 Responde ÚNICAMENTE en formato JSON válido con esta estructura:
 {

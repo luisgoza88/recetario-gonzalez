@@ -32,6 +32,16 @@ export interface HouseholdSettings {
   };
 }
 
+export interface CookingProfile {
+  city?: string;
+  region?: string;
+  country?: string;
+  cooking_style?: string;
+  family_name?: string;
+  family_size?: number;
+  portions_config?: Record<string, number>;
+}
+
 export interface Household {
   id: string;
   name: string;
@@ -49,6 +59,7 @@ export interface Household {
   language: string;
   currency: string;
   setup_completed: boolean;
+  cooking_profile?: CookingProfile;
   created_at: string;
   updated_at: string;
 }

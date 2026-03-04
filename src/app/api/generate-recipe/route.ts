@@ -12,6 +12,11 @@ import { withRateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/api/auth";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
+import {
+  getCookingProfile,
+  getFamilyDisplayName,
+  getLocationString,
+} from "@/lib/cooking-profile";
 
 // Zod schemas for input validation
 const IngredientWithContextSchema = z.object({
@@ -47,6 +52,7 @@ const GenerateRecipeRequestSchema = z.object({
     .optional(),
   customItems: z.array(z.string().max(200)).max(50).optional(),
   generateImage: z.boolean().optional(),
+  householdId: z.string().uuid().optional(),
 });
 
 function getSupabase() {
@@ -81,6 +87,7 @@ interface GenerateRecipeRequest {
   ingredientsByCategory?: Record<string, string[]>;
   customItems?: string[];
   generateImage?: boolean; // Nueva opción para generar imagen junto con la receta
+  householdId?: string;
 }
 
 interface Preparation {
@@ -226,7 +233,13 @@ export async function POST(request: NextRequest) {
       ingredientsByCategory,
       customItems = [],
       generateImage = false,
+      householdId,
     } = body;
+
+    // Fetch cooking profile for this household
+    const cookingProfile = await getCookingProfile(householdId);
+    const familyName = getFamilyDisplayName(cookingProfile);
+    const location = getLocationString(cookingProfile);
 
     // Instrucciones específicas según el estilo de receta
     const styleInstructions: Record<RecipeStyle, string> = {
@@ -342,25 +355,26 @@ PRIORIZA usar estos ingredientes especiales! La familia los tiene disponibles y 
       sanitizeUserInput(p, 200),
     );
 
-    const prompt = `Eres un chef profesional especializado en cocina colombiana y latinoamericana saludable.
-Trabajas para la Familia González: Luis come porciones más grandes (3 porciones) y Mariana porciones medianas (2 porciones).
+    const prompt = `Eres un chef profesional especializado en cocina ${cookingProfile.cooking_style || "colombiana y latinoamericana saludable"}.
+Trabajas para ${familyName} ${location}. Cocinas para ${cookingProfile.family_size} personas.
 
 INGREDIENTES DISPONIBLES EN LA DESPENSA:
 ${ingredientsSection}
 ${customSection}${preparationsSection}${avoidSection}
 REQUERIMIENTOS:
 - Tipo de comida: ${mealTypeLabels[mealType]}
-- Porciones totales: ${servings} (3 para Luis + 2 para Mariana)
+- Porciones totales: ${servings}
 - Estilo de receta: ${recipeStyle.toUpperCase()}
 - ${selectedStyleInstruction}
 - Preferencias adicionales: ${sanitizedPreferences.length > 0 ? sanitizedPreferences.join(", ") : "Fácil de preparar"}
+- Estilo de cocina del hogar: ${cookingProfile.cooking_style}
+- Región: ${cookingProfile.region || cookingProfile.country || "Colombia"}
 
 CONTEXTO IMPORTANTE:
 - Prioriza usar ingredientes que YA están disponibles
 - Puedes usar las preparaciones caseras listadas arriba como ingredientes listos
 - Minimiza ingredientes adicionales necesarios
-- Las recetas deben ser prácticas para una familia de dos personas
-- Considera que Luis prefiere porciones más sustanciosas y Mariana más ligeras
+- Las recetas deben ser prácticas para una familia de ${cookingProfile.family_size} personas
 
 INSTRUCCIONES:
 Genera UNA receta saludable y deliciosa que pueda prepararse PRINCIPALMENTE con los ingredientes disponibles.
