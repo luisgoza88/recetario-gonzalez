@@ -35,6 +35,9 @@ import Spinner from "@/components/ui/Spinner";
 import dynamic from "next/dynamic";
 import FeedbackModal from "./FeedbackModal";
 import SmartSuggestions from "./SmartSuggestions";
+import { MoodChip } from "@/components/ui/MoodChip";
+import { MoodSelector } from "./MoodSelector";
+import { Mood } from "@/lib/moods";
 
 const RecipeModal = dynamic(() => import("./RecipeModal"), {
   loading: () => null,
@@ -130,6 +133,12 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
     mealType: "breakfast",
     menuSource: "static",
   });
+
+  // --- Mood state for meal regeneration ---
+  const [moodPopover, setMoodPopover] = useState<{
+    mealKey: string; // e.g. "2026-05-09-breakfast"
+    selectedMood?: Mood;
+  } | null>(null);
 
   // --- Generative menu state ---
   const [generatedMenus, setGeneratedMenus] = useState<
@@ -983,6 +992,23 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
                 dayNumber: cycleDay,
               })
             }
+            mealKey={`${dateKey}-breakfast`}
+            activeMoodKey={moodPopover?.mealKey ?? null}
+            onMoodToggle={(key) =>
+              setMoodPopover((prev) =>
+                prev?.mealKey === key ? null : { mealKey: key },
+              )
+            }
+            onMoodChange={(mood) =>
+              setMoodPopover((prev) =>
+                prev ? { ...prev, selectedMood: mood } : null,
+              )
+            }
+            currentMood={
+              moodPopover?.mealKey === `${dateKey}-breakfast`
+                ? moodPopover.selectedMood
+                : undefined
+            }
           />
         )}
 
@@ -1007,6 +1033,23 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
                 dayNumber: cycleDay,
               })
             }
+            mealKey={`${dateKey}-lunch`}
+            activeMoodKey={moodPopover?.mealKey ?? null}
+            onMoodToggle={(key) =>
+              setMoodPopover((prev) =>
+                prev?.mealKey === key ? null : { mealKey: key },
+              )
+            }
+            onMoodChange={(mood) =>
+              setMoodPopover((prev) =>
+                prev ? { ...prev, selectedMood: mood } : null,
+              )
+            }
+            currentMood={
+              moodPopover?.mealKey === `${dateKey}-lunch`
+                ? moodPopover.selectedMood
+                : undefined
+            }
           />
         )}
 
@@ -1030,6 +1073,23 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
               openSwapModal("dinner", dinner, "static", {
                 dayNumber: cycleDay,
               })
+            }
+            mealKey={`${dateKey}-dinner`}
+            activeMoodKey={moodPopover?.mealKey ?? null}
+            onMoodToggle={(key) =>
+              setMoodPopover((prev) =>
+                prev?.mealKey === key ? null : { mealKey: key },
+              )
+            }
+            onMoodChange={(mood) =>
+              setMoodPopover((prev) =>
+                prev ? { ...prev, selectedMood: mood } : null,
+              )
+            }
+            currentMood={
+              moodPopover?.mealKey === `${dateKey}-dinner`
+                ? moodPopover.selectedMood
+                : undefined
             }
             isLast
           />
@@ -1504,6 +1564,11 @@ interface MealCardProps {
   onSuggestions: () => void;
   onSwap: () => void;
   isLast?: boolean;
+  mealKey?: string;
+  activeMoodKey?: string | null;
+  onMoodToggle?: (key: string) => void;
+  onMoodChange?: (mood: Mood | undefined) => void;
+  currentMood?: Mood;
 }
 
 function MealCard({
@@ -1517,12 +1582,19 @@ function MealCard({
   onSuggestions,
   onSwap,
   isLast,
+  mealKey,
+  activeMoodKey,
+  onMoodToggle,
+  onMoodChange,
+  currentMood,
 }: MealCardProps) {
   const borderColor = {
     breakfast: "border-orange-500",
     lunch: "border-green-700",
     dinner: "border-blue-700",
   }[type];
+
+  const showMoodSelector = mealKey && activeMoodKey === mealKey;
 
   return (
     <div
@@ -1532,6 +1604,25 @@ function MealCard({
         <div>
           <div className="text-gray-500 text-sm">{label}</div>
           <h4 className="font-semibold text-lg">{recipe.name}</h4>
+          {/* Mood chips */}
+          {recipe.moods && recipe.moods.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {recipe.moods.map((mood) => (
+                <MoodChip key={mood} mood={mood} size="sm" />
+              ))}
+            </div>
+          )}
+          {/* Mood selector toggle */}
+          {mealKey && onMoodToggle && (
+            <button
+              onClick={() => onMoodToggle(mealKey)}
+              className="mt-1 text-[10px] text-indigo-600 hover:underline flex items-center gap-0.5"
+              aria-expanded={!!showMoodSelector}
+            >
+              {currentMood ? `Mood: ${currentMood}` : "Cambiar mood"}
+              {showMoodSelector ? " ▲" : " ▼"}
+            </button>
+          )}
         </div>
         <div className="flex gap-1">
           <button
@@ -1572,6 +1663,29 @@ function MealCard({
           <MessageSquare size={16} />
         </button>
       </div>
+
+      {/* Inline Mood Selector */}
+      {showMoodSelector && onMoodChange && (
+        <div className="mt-3 p-3 bg-indigo-50 rounded-xl border border-indigo-100">
+          <p className="text-xs text-indigo-700 font-medium mb-2">
+            Selecciona el mood para regenerar esta comida:
+          </p>
+          <MoodSelector
+            selected={currentMood}
+            onChange={onMoodChange}
+            showDescription
+          />
+          {currentMood && (
+            <button
+              onClick={() => onSuggestions()}
+              className="mt-2 w-full bg-indigo-600 text-white text-xs py-2 rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-1"
+            >
+              <Sparkles size={12} /> Regenerar con mood &quot;{currentMood}
+              &quot;
+            </button>
+          )}
+        </div>
+      )}
 
       {expanded && (
         <div className="mt-4 pt-4 border-t">

@@ -179,6 +179,8 @@ export interface Recipe {
   image_url?: string;
   created_at?: string;
   updated_at?: string;
+  // Moods asociados a la receta
+  moods?: import("@/lib/moods").Mood[];
 }
 
 export interface Ingredient {

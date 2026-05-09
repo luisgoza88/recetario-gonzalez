@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import Spinner from "@/components/ui/Spinner";
 import { Recipe, Ingredient, ThermomixRecipe } from "@/types";
+import { MoodChip } from "@/components/ui/MoodChip";
 import NutritionDisplay, {
   DietaryTags,
   PrepTimeDisplay,
@@ -343,6 +344,24 @@ export default function RecipeModal({
                   </span>
                 )}
               </div>
+
+              {/* Mood chips */}
+              {recipe.moods && recipe.moods.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {recipe.moods.map((mood) => (
+                    <MoodChip key={mood} mood={mood} size="sm" />
+                  ))}
+                </div>
+              )}
+
+              {/* Region badge */}
+              {recipe.region && (
+                <div className="mb-3">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
+                    🇨🇴 {recipe.region}
+                  </span>
+                </div>
+              )}
 
               {/* Description */}
               {recipe.description && (

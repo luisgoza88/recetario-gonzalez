@@ -18,6 +18,11 @@ import {
 } from "@/lib/cooking-profile";
 import type { CookingProfile } from "@/types";
 import { getSeasonalPromptText } from "@/data/colombian-seasons";
+import type { Mood } from "@/lib/moods";
+import {
+  getHouseholdMoodPatterns,
+  formatMoodPatternsForPrompt,
+} from "@/lib/mood-learning";
 
 // =====================================================
 // Input validation
@@ -33,6 +38,7 @@ const GenerateWeeklyMenuRequestSchema = z.object({
       prioritizeThermomix: z.boolean().optional(),
     })
     .optional(),
+  desiredMoods: z.record(z.string(), z.string()).optional(),
 });
 
 // =====================================================
@@ -307,7 +313,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { weekStartDate, householdId, preferences } = body;
+    const { weekStartDate, householdId, preferences, desiredMoods } = body;
     const excludeRecentWeeks = preferences?.excludeRecent ?? 3;
     const style = preferences?.style
       ? sanitizeUserInput(preferences.style, 200)
@@ -324,6 +330,7 @@ export async function POST(request: NextRequest) {
       expandedRecipeNames,
       cookingProfile,
       dietaryPreferences,
+      moodPatterns,
     ] = await Promise.all([
       getAvailableInventory(),
       getMarketItems(),
@@ -333,6 +340,9 @@ export async function POST(request: NextRequest) {
       getExpandedRecipeNames(),
       getCookingProfile(householdId),
       getHouseholdDietaryPreferences(householdId),
+      householdId
+        ? getHouseholdMoodPatterns(householdId)
+        : Promise.resolve(null),
     ]);
 
     const weekDays = getWeekDates(weekStartDate);
@@ -350,6 +360,8 @@ export async function POST(request: NextRequest) {
       expandedRecipeNames,
       cookingProfile,
       dietaryPreferences,
+      desiredMoods: desiredMoods as Record<string, Mood> | undefined,
+      moodPatterns: formatMoodPatternsForPrompt(moodPatterns),
     });
 
     // Call Gemini
@@ -482,6 +494,31 @@ RESTRICCIONES DIETÉTICAS DEL HOGAR:
 IMPORTANTE: NUNCA incluyas ingredientes que contengan alérgenos listados. Respeta estrictamente todas las restricciones alimentarias. Si el hogar es vegetariano o vegano, NO incluyas carne, pollo, pescado ni mariscos. Si hay alergias, verifica que NINGÚN ingrediente contenga el alérgeno.`;
 }
 
+function buildMoodSection(desiredMoods?: Record<string, Mood>): string {
+  const userMoodsLines =
+    desiredMoods && Object.keys(desiredMoods).length > 0
+      ? Object.entries(desiredMoods)
+          .map(([day, mood]) => `  - Día ${day}: ${mood}`)
+          .join("\n")
+      : null;
+
+  return `DISTRIBUCIÓN DE VARIEDAD SEMANAL OBLIGATORIA:
+Cada día debe tener un mood asignado para evitar monotonía.
+${userMoodsLines ? `Moods solicitados por el usuario (RESPETAR EXACTAMENTE):\n${userMoodsLines}\n` : ""}Para los días sin mood especificado, distribuye así:
+- 2 días Nutritivo (ideal lunes/jueves para semana activa)
+- 2 días Saludable (martes/miércoles para mantener equilibrio)
+- 1 día Tradicional Colombia (sábado familiar)
+- 1 día Antojo (viernes premio)
+- 1 día Rápido (cualquiera con tiempo limitado)
+
+REGLAS ANTI-MONOTONÍA (CRÍTICAS):
+1. NO repetir la misma proteína principal en días consecutivos
+2. NO repetir el mismo mood 2 días seguidos
+3. ALTERNAR técnicas de cocción: horneado, sartén, sopa, ensalada, parrilla, plancha
+4. Si una receta tuvo feedback < 3 estrellas en los últimos 30 días, NO sugerirla
+5. Variar regiones colombianas si mood=tradicional (no solo paisa, también costeño, llanero, etc.)`;
+}
+
 function buildPrompt(ctx: {
   weekDays: Array<{ dayNumber: number; dayName: string; date: string }>;
   inventory: string[];
@@ -494,6 +531,8 @@ function buildPrompt(ctx: {
   expandedRecipeNames?: string[];
   cookingProfile: Required<CookingProfile>;
   dietaryPreferences?: DietaryPreferencesRow | null;
+  desiredMoods?: Record<string, Mood>;
+  moodPatterns?: string;
 }): string {
   const {
     weekDays,
@@ -506,6 +545,8 @@ function buildPrompt(ctx: {
     expandedRecipeNames,
     cookingProfile,
     dietaryPreferences,
+    desiredMoods,
+    moodPatterns,
   } = ctx;
 
   const familyName = getFamilyDisplayName(cookingProfile);
@@ -544,9 +585,15 @@ function buildPrompt(ctx: {
   const daysDescription = weekDays
     .map((d) => {
       const hasDinner = d.dayNumber < 4; // Mon-Thu have dinner; Fri-Sat don't
-      return `- ${d.dayName} (${d.date}): desayuno + almuerzo${hasDinner ? " + cena" : " (SIN CENA - salen a comer)"}`;
+      const dayMood = desiredMoods?.[String(d.dayNumber)];
+      const moodSuffix = dayMood ? ` [mood: ${dayMood}]` : "";
+      return `- ${d.dayName} (${d.date}): desayuno + almuerzo${hasDinner ? " + cena" : " (SIN CENA - salen a comer)"}${moodSuffix}`;
     })
     .join("\n");
+
+  // Build mood distribution section
+  const moodSection = buildMoodSection(desiredMoods);
+  const moodPatternsSection = moodPatterns ? `\n${moodPatterns}\n` : "";
 
   return `Eres el chef personal de ${familyName} ${location}.
 Tu trabajo es crear un menú semanal variado, delicioso y práctico.
@@ -577,7 +624,8 @@ ${likedSection}
 ${dislikedSection}
 ${expandedSection}
 ${getSeasonalPromptText()}
-
+${moodPatternsSection}
+${moodSection}
 ${buildDietarySection(dietaryPreferences)}
 ${
   prioritizeThermomix
@@ -600,9 +648,11 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura:
       "dayNumber": 0,
       "dayName": "Lunes",
       "date": "${weekDays[0]?.date || "2026-02-23"}",
+      "mood": "nutritivo",
       "breakfast": {
         "name": "Nombre del desayuno",
         "description": "Descripción breve",
+        "mood": "nutritivo",
         "ingredients": [
           { "name": "Ingrediente", "total": "cantidad total", "luis": "porción Luis", "mariana": "porción Mariana", "available": true }
         ],
@@ -612,8 +662,8 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura:
         "tips": "Consejo opcional",
         "usedPreparations": ["Hogao"]
       },
-      "lunch": { ... mismo formato ... },
-      "dinner": { ... mismo formato ... }
+      "lunch": { ... mismo formato con campo mood ... },
+      "dinner": { ... mismo formato con campo mood ... }
     },
     ... (6 días total, viernes y sábado con dinner: null)
   ]
@@ -626,5 +676,6 @@ IMPORTANTE:
 - Genera exactamente 6 días (dayNumber 0-5)
 - Sé creativo con los nombres de los platos
 - Incluye al menos 2-3 recetas colombianas por semana
-- Varía las proteínas: no repetir la misma proteína principal en días consecutivos`;
+- Varía las proteínas: no repetir la misma proteína principal en días consecutivos
+- Cada día y cada receta DEBE incluir el campo "mood" (nutritivo|saludable|antojo|tradicional|rapido|economico|sorpresa)`;
 }

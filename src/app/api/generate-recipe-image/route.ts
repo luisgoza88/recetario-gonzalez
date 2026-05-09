@@ -7,6 +7,13 @@ import {
   createStorageAdminClient,
 } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
+import { searchPexels, scorePexelsMatch } from "@/lib/pexels";
+import {
+  getCachedRecipeImage,
+  cacheRecipeImage,
+} from "@/lib/recipe-image-cache";
+
+const PEXELS_SCORE_THRESHOLD = 30;
 
 interface GenerateImageRequest {
   recipeName: string;
@@ -17,6 +24,41 @@ interface GenerateImageRequest {
   recipeId?: string;
 }
 
+// Determina si la receta es tipicamente colombiana para mejorar la query a Pexels
+function buildPexelsQuery(recipeName: string): string {
+  const colombianKeywords = [
+    "ajiaco",
+    "bandeja paisa",
+    "sancocho",
+    "changua",
+    "arepa",
+    "patacon",
+    "sudado",
+    "calentado",
+    "mondongo",
+    "lechona",
+    "fritanga",
+    "empanada",
+    "buñuelo",
+    "almojabana",
+    "envuelto",
+    "mazamorra",
+    "aguapanela",
+    "cholado",
+    "lulada",
+    "hogao",
+    "sobrebarriga",
+  ];
+
+  const nameLower = recipeName.toLowerCase();
+  const isColombian = colombianKeywords.some((kw) => nameLower.includes(kw));
+
+  if (isColombian) {
+    return `${recipeName} colombian food dish`;
+  }
+  return `${recipeName} food dish`;
+}
+
 export async function POST(request: NextRequest) {
   const auth = requireAuth(request);
   if (auth instanceof NextResponse) return auth;
@@ -25,13 +67,6 @@ export async function POST(request: NextRequest) {
     request.headers.get("x-user-id") ||
     request.headers.get("x-forwarded-for") ||
     "anonymous";
-  const rateLimit = await withRateLimit(userId, "generate-image");
-  if (!rateLimit.allowed) {
-    return NextResponse.json(rateLimit.response, {
-      status: 429,
-      headers: rateLimit.headers,
-    });
-  }
 
   try {
     const body: GenerateImageRequest = await request.json();
@@ -51,9 +86,122 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // --- PASO 1: Verificar cache ---
+    const cached = await getCachedRecipeImage(recipeName);
+    if (cached) {
+      logger.info(`[generate-recipe-image] Cache hit para "${recipeName}"`, {
+        source: cached.source,
+      });
+
+      // Si hay recipeId y saveToSupabase, actualizar receta con la URL cacheada
+      if (saveToSupabase && recipeId) {
+        try {
+          const supabase = await createAuthenticatedClient();
+          await supabase
+            .from("recipes")
+            .update({ image_url: cached.image_url })
+            .eq("id", recipeId);
+        } catch (updateErr) {
+          logger.error(
+            "[generate-recipe-image] Error actualizando receta con cache",
+            {
+              error:
+                updateErr instanceof Error
+                  ? updateErr.message
+                  : String(updateErr),
+            },
+          );
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        imageUrl: cached.image_url,
+        source: cached.source,
+        attribution: cached.attribution,
+        attributionUrl: cached.attribution_url,
+        fromCache: true,
+        recipeName,
+      });
+    }
+
+    // --- PASO 2: Buscar en Pexels (gratis, fotos reales) ---
+    const pexelsQuery = buildPexelsQuery(recipeName);
+    logger.info(`[generate-recipe-image] Buscando en Pexels: "${pexelsQuery}"`);
+
+    const pexelsPhotos = await searchPexels(pexelsQuery, {
+      perPage: 5,
+      orientation: "landscape",
+    });
+
+    if (pexelsPhotos.length > 0) {
+      const bestPhoto = pexelsPhotos[0];
+      const score = scorePexelsMatch(bestPhoto, recipeName);
+
+      logger.info(
+        `[generate-recipe-image] Pexels score: ${score} para "${bestPhoto.alt}"`,
+      );
+
+      if (score >= PEXELS_SCORE_THRESHOLD) {
+        const imageUrl = bestPhoto.src.large;
+
+        // Cachear el resultado de Pexels (best-effort)
+        await cacheRecipeImage({
+          recipeName,
+          imageUrl,
+          source: "pexels",
+          attribution: bestPhoto.photographer,
+          attributionUrl: bestPhoto.photographer_url,
+        });
+
+        // Guardar en receta si se solicita
+        if (saveToSupabase && recipeId) {
+          try {
+            const supabase = await createAuthenticatedClient();
+            await supabase
+              .from("recipes")
+              .update({ image_url: imageUrl })
+              .eq("id", recipeId);
+          } catch (updateErr) {
+            logger.error(
+              "[generate-recipe-image] Error actualizando receta con Pexels",
+              {
+                error:
+                  updateErr instanceof Error
+                    ? updateErr.message
+                    : String(updateErr),
+              },
+            );
+          }
+        }
+
+        return NextResponse.json({
+          success: true,
+          imageUrl,
+          source: "pexels",
+          attribution: bestPhoto.photographer,
+          attributionUrl: bestPhoto.photographer_url,
+          fromCache: false,
+          recipeName,
+        });
+      }
+
+      logger.info(
+        `[generate-recipe-image] Pexels no superó umbral (${score} < ${PEXELS_SCORE_THRESHOLD}), usando Imagen 3`,
+      );
+    }
+
+    // --- PASO 3: Fallback a Imagen 3 (aplica rate limit aqui) ---
+    const rateLimit = await withRateLimit(userId, "generate-image");
+    if (!rateLimit.allowed) {
+      return NextResponse.json(rateLimit.response, {
+        status: 429,
+        headers: rateLimit.headers,
+      });
+    }
+
     const gemini = getGeminiClient();
 
-    // Construir el prompt para generar una imagen de comida fotorrealista
     const mealTypeContext = {
       breakfast: "plato de desayuno",
       lunch: "plato de almuerzo",
@@ -82,12 +230,12 @@ Requisitos de la imagen:
 - NO incluir texto, marcas de agua ni elementos artificiales
 - Colores vibrantes y naturales`;
 
-    // Usar Imagen 3 primero para mejor calidad fotorrealista
     let imageData: string | null = null;
     let textResponse: string | null = null;
 
+    // Intentar con Imagen 3 primero
     try {
-      logger.info("Generando imagen con Imagen 3...");
+      logger.info("[generate-recipe-image] Generando imagen con Imagen 3...");
       const imagen3Response = await gemini.models.generateImages({
         model: GEMINI_MODELS.IMAGE_GEN,
         prompt: prompt,
@@ -101,15 +249,20 @@ Requisitos de la imagen:
       const generatedImage = imagen3Response.generatedImages?.[0];
       if (generatedImage?.image?.imageBytes) {
         imageData = generatedImage.image.imageBytes;
-        logger.info("Imagen generada exitosamente con Imagen 3");
+        logger.info(
+          "[generate-recipe-image] Imagen generada exitosamente con Imagen 3",
+        );
       }
     } catch (imagen3Error) {
-      logger.error("Imagen 3 error, intentando con Gemini Flash", {
-        error:
-          imagen3Error instanceof Error
-            ? imagen3Error.message
-            : String(imagen3Error),
-      });
+      logger.error(
+        "[generate-recipe-image] Imagen 3 error, intentando con Gemini Flash",
+        {
+          error:
+            imagen3Error instanceof Error
+              ? imagen3Error.message
+              : String(imagen3Error),
+        },
+      );
     }
 
     // Si Imagen 3 falla, usar Gemini 2.0 Flash Exp como respaldo
@@ -140,7 +293,7 @@ Requisitos de la imagen:
           }
         }
       } catch (flashError) {
-        logger.error("Gemini Flash error", {
+        logger.error("[generate-recipe-image] Gemini Flash error", {
           error:
             flashError instanceof Error
               ? flashError.message
@@ -165,10 +318,8 @@ Requisitos de la imagen:
         const randomId = Math.random().toString(36).substring(7);
         const fileName = `recipes/${timestamp}-${randomId}.png`;
 
-        // Convertir base64 a buffer
         const imageBuffer = Buffer.from(imageData, "base64");
 
-        // Storage uploads require admin client (bucket-level access)
         const storageClient = createStorageAdminClient();
         const { error: uploadError } = await storageClient.storage
           .from("recipe-images")
@@ -178,22 +329,19 @@ Requisitos de la imagen:
           });
 
         if (uploadError) {
-          logger.error("Error uploading to Supabase", {
+          logger.error("[generate-recipe-image] Error uploading to Supabase", {
             error:
               uploadError instanceof Error
                 ? uploadError.message
                 : String(uploadError),
           });
         } else {
-          // Obtener URL pública
           const { data: urlData } = storageClient.storage
             .from("recipe-images")
             .getPublicUrl(fileName);
 
           imageUrl = urlData?.publicUrl || null;
 
-          // Si hay recipeId, actualizar la receta con la URL de la imagen
-          // Use authenticated client to respect RLS
           if (recipeId && imageUrl) {
             const supabase = await createAuthenticatedClient();
             await supabase
@@ -203,7 +351,7 @@ Requisitos de la imagen:
           }
         }
       } catch (storageError) {
-        logger.error("Storage error", {
+        logger.error("[generate-recipe-image] Storage error", {
           error:
             storageError instanceof Error
               ? storageError.message
@@ -212,15 +360,27 @@ Requisitos de la imagen:
       }
     }
 
+    // Cachear imagen generada con Imagen 3
+    // Usar imageUrl (Supabase Storage) si está disponible; si no, skip (base64 no cacheamos)
+    if (imageUrl) {
+      await cacheRecipeImage({
+        recipeName,
+        imageUrl,
+        source: "imagen3",
+      });
+    }
+
     return NextResponse.json({
       success: true,
       image: `data:image/png;base64,${imageData}`,
       imageUrl,
+      source: "imagen3",
+      fromCache: false,
       recipeName,
       message: textResponse,
     });
   } catch (error) {
-    logger.error("Error generating recipe image", {
+    logger.error("[generate-recipe-image] Error generating recipe image", {
       error: error instanceof Error ? error.message : String(error),
     });
     return NextResponse.json(
@@ -230,14 +390,13 @@ Requisitos de la imagen:
   }
 }
 
-// Endpoint para obtener todas las recetas sin imagen y generar automáticamente
+// Endpoint para obtener todas las recetas sin imagen
 export async function GET(request: NextRequest) {
   const auth = requireAuth(request);
   if (auth instanceof NextResponse) return auth;
 
   try {
     const supabase = await createAuthenticatedClient();
-    // Obtener todas las recetas sin imagen
     const { data: recipes, error } = await supabase
       .from("recipes")
       .select("id, name, description, type, ingredients, image_url")
@@ -270,7 +429,7 @@ export async function GET(request: NextRequest) {
       message: `Hay ${recipes.length} recetas sin imagen. Usa el endpoint PUT con los IDs para generar imágenes.`,
     });
   } catch (error) {
-    logger.error("Error checking recipes", {
+    logger.error("[generate-recipe-image] Error checking recipes", {
       error: error instanceof Error ? error.message : String(error),
     });
     return NextResponse.json(
@@ -295,11 +454,9 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Limitar a 10 recetas por batch para evitar timeouts
     const limitedIds = recipeIds.slice(0, 10);
 
     const supabase = await createAuthenticatedClient();
-    // Obtener las recetas sin imagen
     const { data: recipes, error } = await supabase
       .from("recipes")
       .select("id, name, description, type, ingredients")
@@ -318,15 +475,14 @@ export async function PUT(request: NextRequest) {
       recipeName: string;
       success: boolean;
       imageUrl?: string;
+      source?: string;
       error?: string;
     }[] = [];
     const appOrigin = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
     const cookieHeader = request.headers.get("cookie");
 
-    // Procesar cada receta secuencialmente para evitar rate limits
     for (const recipe of recipes) {
       try {
-        // Hacer llamada interna al endpoint POST
         const ingredientNames = Array.isArray(recipe.ingredients)
           ? recipe.ingredients
               .map((ing: { name?: string } | string) =>
@@ -362,11 +518,15 @@ export async function PUT(request: NextRequest) {
           recipeName: recipe.name,
           success: result.success || false,
           imageUrl: result.imageUrl,
+          source: result.source,
           error: result.error,
         });
 
-        // Esperar 2 segundos entre generaciones para evitar rate limits
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        // Solo esperar entre generaciones si usamos Imagen 3 (costoso)
+        // Para Pexels o cache el delay no es necesario pero tampoco hace daño
+        if (!result.fromCache && result.source === "imagen3") {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
       } catch (recipeError) {
         results.push({
           recipeId: recipe.id,
@@ -387,7 +547,7 @@ export async function PUT(request: NextRequest) {
       results,
     });
   } catch (error) {
-    logger.error("Batch image generation error", {
+    logger.error("[generate-recipe-image] Batch image generation error", {
       error: error instanceof Error ? error.message : String(error),
     });
     return NextResponse.json(

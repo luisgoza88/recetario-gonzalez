@@ -17,6 +17,7 @@ import {
   getFamilyDisplayName,
   getLocationString,
 } from "@/lib/cooking-profile";
+import { type Mood, MOODS } from "@/lib/moods";
 
 // Zod schemas for input validation
 const IngredientWithContextSchema = z.object({
@@ -37,6 +38,16 @@ const RecipeStyleSchema = z.enum([
   "ligera",
 ]);
 
+const MoodSchema = z.enum([
+  "nutritivo",
+  "saludable",
+  "antojo",
+  "tradicional",
+  "rapido",
+  "economico",
+  "sorpresa",
+]);
+
 const GenerateRecipeRequestSchema = z.object({
   availableIngredients: z.union([
     z.array(z.string().min(1).max(200)).min(1).max(100),
@@ -53,6 +64,7 @@ const GenerateRecipeRequestSchema = z.object({
   customItems: z.array(z.string().max(200)).max(50).optional(),
   generateImage: z.boolean().optional(),
   householdId: z.string().uuid().optional(),
+  mood: MoodSchema.optional(),
 });
 
 function getSupabase() {
@@ -88,6 +100,7 @@ interface GenerateRecipeRequest {
   customItems?: string[];
   generateImage?: boolean; // Nueva opción para generar imagen junto con la receta
   householdId?: string;
+  mood?: Mood;
 }
 
 interface Preparation {
@@ -234,6 +247,7 @@ export async function POST(request: NextRequest) {
       customItems = [],
       generateImage = false,
       householdId,
+      mood,
     } = body;
 
     // Fetch cooking profile for this household
@@ -355,12 +369,24 @@ PRIORIZA usar estos ingredientes especiales! La familia los tiene disponibles y 
       sanitizeUserInput(p, 200),
     );
 
+    // Build mood section if provided
+    let moodSection = "";
+    if (mood && mood !== "sorpresa") {
+      const moodData = MOODS.find((m) => m.id === mood);
+      if (moodData) {
+        moodSection = `
+MOOD SOLICITADO: ${moodData.label} ${moodData.emoji} - ${moodData.description}
+La receta DEBE alinearse con este mood. Prioriza características propias del mood.
+`;
+      }
+    }
+
     const prompt = `Eres un chef profesional especializado en cocina ${cookingProfile.cooking_style || "colombiana y latinoamericana saludable"}.
 Trabajas para ${familyName} ${location}. Cocinas para ${cookingProfile.family_size} personas.
 
 INGREDIENTES DISPONIBLES EN LA DESPENSA:
 ${ingredientsSection}
-${customSection}${preparationsSection}${avoidSection}
+${customSection}${preparationsSection}${avoidSection}${moodSection}
 REQUERIMIENTOS:
 - Tipo de comida: ${mealTypeLabels[mealType]}
 - Porciones totales: ${servings}
@@ -407,7 +433,8 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura exacta:
   "nutritionHighlights": ["Alto en proteína", "Bajo en carbohidratos", etc.],
   "usedIngredients": ["lista de ingredientes disponibles que se usaron"],
   "additionalIngredients": ["ingredientes adicionales necesarios (si hay)"],
-  "usedPreparations": ["lista de preparaciones caseras usadas (si aplica)"]
+  "usedPreparations": ["lista de preparaciones caseras usadas (si aplica)"],
+  "moods": ["moods aplicables a esta receta, ej: nutritivo, saludable"]
 }`;
 
     // Llamar a Gemini con retry automático

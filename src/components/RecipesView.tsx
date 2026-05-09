@@ -11,6 +11,8 @@ import { supabase } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import dynamic from "next/dynamic";
+import { MOODS, Mood } from "@/lib/moods";
+import { MoodChip } from "@/components/ui/MoodChip";
 
 const RecipeModal = dynamic(() => import("./RecipeModal"), {
   loading: () => null,
@@ -113,6 +115,13 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
   const [regionFilter, setRegionFilter] = useState<"all" | ColombianRegion>(
     "all",
   );
+  const [moodFilters, setMoodFilters] = useState<Mood[]>([]);
+
+  const toggleMoodFilter = useCallback((mood: Mood) => {
+    setMoodFilters((prev) =>
+      prev.includes(mood) ? prev.filter((m) => m !== mood) : [...prev, mood],
+    );
+  }, []);
 
   // Combine DB recipes with expanded recipes and regional recipes (avoiding id duplicates)
   const allRecipes = useMemo(() => {
@@ -179,9 +188,20 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
       const matchesRegion =
         regionFilter === "all" || effectiveRegion === regionFilter;
 
-      return matchesSearch && matchesFilter && matchesCategory && matchesRegion;
+      // Mood filter: recipe must have at least one of the selected moods
+      const matchesMood =
+        moodFilters.length === 0 ||
+        (recipe.moods ?? []).some((m) => moodFilters.includes(m));
+
+      return (
+        matchesSearch &&
+        matchesFilter &&
+        matchesCategory &&
+        matchesRegion &&
+        matchesMood
+      );
     });
-  }, [allRecipes, search, filter, categoryFilter, regionFilter]);
+  }, [allRecipes, search, filter, categoryFilter, regionFilter, moodFilters]);
 
   const getTypeLabel = (type: string) => {
     switch (type) {
@@ -353,6 +373,34 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
           ))}
         </div>
       )}
+
+      {/* Mood Filter */}
+      <div
+        className="flex gap-2 mb-3 overflow-x-auto pb-2 scrollbar-hide"
+        style={{ WebkitOverflowScrolling: "touch" }}
+        role="group"
+        aria-label="Filtrar por mood"
+      >
+        <button
+          onClick={() => setMoodFilters([])}
+          className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border ${
+            moodFilters.length === 0
+              ? "bg-green-700 text-white border-green-700"
+              : "bg-white text-gray-600 hover:bg-gray-50 border-gray-200"
+          }`}
+        >
+          <span>📋</span>
+          <span>Todos</span>
+        </button>
+        {MOODS.map((m) => (
+          <MoodChip
+            key={m.id}
+            mood={m.id}
+            selected={moodFilters.includes(m.id)}
+            onClick={() => toggleMoodFilter(m.id)}
+          />
+        ))}
+      </div>
 
       {/* Meal Type Filter Tabs */}
       <div className="flex gap-2 mb-4 overflow-x-auto pb-2">

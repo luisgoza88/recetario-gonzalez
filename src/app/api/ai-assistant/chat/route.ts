@@ -14,6 +14,10 @@ import { withRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 import { createAuthenticatedClient } from "@/lib/supabase/server";
 import { getCookingProfile, getFamilyDisplayName } from "@/lib/cooking-profile";
+import {
+  getHouseholdMoodPatterns,
+  formatMoodPatternsForPrompt,
+} from "@/lib/mood-learning";
 
 // Import shared types
 import { MessageWithImage } from "@/lib/ai-assistant/types";
@@ -368,6 +372,7 @@ function buildChatSystemPrompt(opts?: {
   familySize?: number;
   conversationContext?: ConversationContextPayload;
   learningInsights?: LearningInsightsPayload;
+  moodPatterns?: string;
 }): string {
   const familyName = opts?.familyName || "tu hogar";
   const locationSuffix = opts?.city ? ` (${opts.city})` : "";
@@ -414,6 +419,11 @@ function buildChatSystemPrompt(opts?: {
     insightsSection = `\n\n## Aprendizajes recientes (basado en ${insights.totalFeedbacks} feedbacks)\n- Recetas que necesitan ajuste de porciones: ${recipeList}\n- Patrones activos detectados: ${insights.activePatterns}`;
   }
 
+  let moodPatternsSection = "";
+  if (opts?.moodPatterns && opts.moodPatterns.trim().length > 0) {
+    moodPatternsSection = `\n\n${opts.moodPatterns}`;
+  }
+
   return `Eres el asistente de ${familyName}${locationSuffix}. Ayudas con consultas sobre recetas, menú, inventario y tareas.
 
 ## REGLA: SIEMPRE USA LAS FUNCIONES
@@ -431,7 +441,7 @@ function buildChatSystemPrompt(opts?: {
 ## FORMATO
 - Sé amigable y conciso
 - Usa 1-2 emojis por respuesta
-- Respuestas claras y organizadas${snapshotSection}${recentMessagesSection}${preferencesSection}${insightsSection}
+- Respuestas claras y organizadas${snapshotSection}${recentMessagesSection}${preferencesSection}${insightsSection}${moodPatternsSection}
 
 NOTA: Este chat es solo para CONSULTAS. Para acciones (crear, modificar, eliminar), indica al usuario que use el chat principal.`;
 }
@@ -578,13 +588,16 @@ export async function POST(request: NextRequest) {
       conversationContext,
     } = validatedBody;
 
-    // Fetch cooking profile and learning insights in parallel for dynamic system prompt
+    // Fetch cooking profile, learning insights, and mood patterns in parallel
     // getLearningInsights is imported dynamically to avoid top-level env access at build time
-    const [cookingProfile, learningInsights] = await Promise.all([
+    const [cookingProfile, learningInsights, moodPatterns] = await Promise.all([
       getCookingProfile(householdId),
       import("@/lib/feedback-learning")
         .then((m) => m.getLearningInsights())
         .catch(() => null),
+      householdId
+        ? getHouseholdMoodPatterns(householdId).catch(() => null)
+        : Promise.resolve(null),
     ]);
     const familyName = getFamilyDisplayName(cookingProfile);
     const dynamicSystemPrompt = buildChatSystemPrompt({
@@ -596,6 +609,7 @@ export async function POST(request: NextRequest) {
         | ConversationContextPayload
         | undefined,
       learningInsights: learningInsights ?? undefined,
+      moodPatterns: formatMoodPatternsForPrompt(moodPatterns),
     });
 
     const gemini = getGeminiClient();
