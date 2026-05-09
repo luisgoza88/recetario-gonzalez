@@ -1,5 +1,6 @@
 {
   "regions": ["gru1"],
+  "crons": [{ "path": "/api/cron/cleanup-proposals", "schedule": "0 3 * * *" }],
   "functions": {
     "src/app/api/generate-recipe-image/route.ts": { "maxDuration": 60 },
     "src/app/api/generate-library-images/route.ts": { "maxDuration": 60 },

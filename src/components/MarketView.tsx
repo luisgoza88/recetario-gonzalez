@@ -18,18 +18,13 @@ import {
   Camera,
   PlusIcon,
   ListChecks,
-  Loader2,
   TrendingDown,
 } from "lucide-react";
+import Spinner from "@/components/ui/Spinner";
 import { supabase } from "@/lib/supabase/client";
 import { MarketItem, IngredientCategory } from "@/types";
-import { CATEGORY_EMOJIS } from "@/data/market";
+import { CATEGORY_EMOJIS } from "@/lib/constants/categories";
 import { getItemIcon, isProteinCategory } from "@/lib/categoryIcons";
-import AddCustomItemModal from "./AddCustomItemModal";
-import ScanPantryModal from "./ScanPantryModal";
-import SmartShoppingSection from "./SmartShoppingSection";
-import PriceLogModal from "./PriceLogModal";
-import PriceComparisonView from "./PriceComparisonView";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { useToast } from "@/components/ui/Toast";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
@@ -44,6 +39,26 @@ import {
   cacheInventory,
   getCachedInventory,
 } from "@/lib/indexedDB";
+import dynamic from "next/dynamic";
+import SmartShoppingSection from "./SmartShoppingSection";
+import BudgetWidget from "./BudgetWidget";
+
+const AddCustomItemModal = dynamic(() => import("./AddCustomItemModal"), {
+  loading: () => null,
+  ssr: false,
+});
+const ScanPantryModal = dynamic(() => import("./ScanPantryModal"), {
+  loading: () => null,
+  ssr: false,
+});
+const PriceLogModal = dynamic(() => import("./PriceLogModal"), {
+  loading: () => null,
+  ssr: false,
+});
+const PriceComparisonView = dynamic(() => import("./PriceComparisonView"), {
+  loading: () => null,
+  ssr: false,
+});
 
 interface MarketViewProps {
   items: MarketItem[];
@@ -596,6 +611,11 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
 
       {viewMode === "shopping" ? (
         <>
+          {/* Budget Widget */}
+          <div className="mb-4">
+            <BudgetWidget compact />
+          </div>
+
           {/* Smart Shopping Section (AI Weekly List) */}
           <SmartShoppingSection onRefreshMarket={onUpdate} />
 
@@ -624,7 +644,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
               className="bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-blue-100 disabled:opacity-50"
             >
               {smartListLoading ? (
-                <Loader2 size={16} className="animate-spin" />
+                <Spinner size="sm" />
               ) : (
                 <ListChecks size={16} />
               )}

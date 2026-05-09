@@ -285,6 +285,30 @@ CREATE INDEX IF NOT EXISTS idx_households_created_at
 ON households(created_at DESC);
 
 -- =====================================================
+-- MENUS GENERADOS Y COMPRAS SEMANALES
+-- =====================================================
+
+-- shopping_lists: Indice critico sobre household_id (flujo compras semanal)
+CREATE INDEX IF NOT EXISTS idx_shopping_lists_household
+ON shopping_lists(household_id);
+
+-- =====================================================
+-- COMPLETIONS DIARIAS
+-- =====================================================
+
+-- daily_completions: Indice compuesto para patron de query mas comun (household + fecha)
+CREATE INDEX IF NOT EXISTS idx_daily_completions_household_date
+ON daily_completions(household_id, completion_date);
+
+-- =====================================================
+-- PRECIOS POR TIENDA
+-- =====================================================
+
+-- store_prices: Indice compuesto para comparacion de precios por tienda
+CREATE INDEX IF NOT EXISTS idx_store_prices_store_item
+ON store_prices(store, item_name);
+
+-- =====================================================
 -- VERIFICACIÓN DE ÍNDICES CREADOS
 -- =====================================================
 -- Ejecuta esto para ver todos los índices creados:

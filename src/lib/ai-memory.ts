@@ -30,25 +30,45 @@ export interface ConversationContext {
   updated_at: string;
 }
 
-// Session ID management (persistent per device)
-const SESSION_KEY = "ai_session_id";
+// Session ID management (anchored to householdId when available)
+const LEGACY_SESSION_KEY = "ai_session_id";
 
-export function getSessionId(): string {
+export function getSessionId(householdId?: string): string {
   if (typeof window === "undefined") return "server";
 
-  let sessionId = localStorage.getItem(SESSION_KEY);
+  if (householdId) {
+    // Anchor session to householdId so different households (or tabs) stay isolated
+    const key = `ai_session_${householdId}`;
+    let sessionId = localStorage.getItem(key);
+    if (!sessionId) {
+      sessionId = `session_${householdId}_${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem(key, sessionId);
+    }
+    return sessionId;
+  }
+
+  // Fallback: legacy device-scoped session (no household)
+  if (process.env.NODE_ENV !== "production") {
+    console.warn(
+      "[ai-memory] getSessionId called without householdId — using legacy device session",
+    );
+  }
+  let sessionId = localStorage.getItem(LEGACY_SESSION_KEY);
   if (!sessionId) {
     sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    localStorage.setItem(SESSION_KEY, sessionId);
+    localStorage.setItem(LEGACY_SESSION_KEY, sessionId);
   }
   return sessionId;
 }
 
-export function resetSession(): string {
+export function resetSession(householdId?: string): string {
   if (typeof window === "undefined") return "server";
 
-  const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  localStorage.setItem(SESSION_KEY, newSessionId);
+  const key = householdId ? `ai_session_${householdId}` : LEGACY_SESSION_KEY;
+  const newSessionId = householdId
+    ? `session_${householdId}_${Math.random().toString(36).substr(2, 9)}`
+    : `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  localStorage.setItem(key, newSessionId);
   return newSessionId;
 }
 
@@ -57,8 +77,9 @@ export async function saveMessage(
   role: "user" | "assistant",
   content: string,
   richContent?: AIRichMessage,
+  householdId?: string,
 ): Promise<ConversationMessage | null> {
-  const sessionId = getSessionId();
+  const sessionId = getSessionId(householdId);
 
   const { data, error } = await supabase
     .from("ai_conversations")
@@ -81,8 +102,9 @@ export async function saveMessage(
 
 export async function loadConversationHistory(
   limit: number = 20,
+  householdId?: string,
 ): Promise<ConversationMessage[]> {
-  const sessionId = getSessionId();
+  const sessionId = getSessionId(householdId);
 
   const { data, error } = await supabase
     .from("ai_conversations")
@@ -99,8 +121,10 @@ export async function loadConversationHistory(
   return data || [];
 }
 
-export async function clearConversationHistory(): Promise<boolean> {
-  const sessionId = getSessionId();
+export async function clearConversationHistory(
+  householdId?: string,
+): Promise<boolean> {
+  const sessionId = getSessionId(householdId);
 
   const { error } = await supabase
     .from("ai_conversations")
@@ -116,8 +140,10 @@ export async function clearConversationHistory(): Promise<boolean> {
 }
 
 // Context management
-export async function getContext(): Promise<ConversationContext | null> {
-  const sessionId = getSessionId();
+export async function getContext(
+  householdId?: string,
+): Promise<ConversationContext | null> {
+  const sessionId = getSessionId(householdId);
 
   const { data, error } = await supabase
     .from("ai_context")
@@ -139,8 +165,9 @@ export async function updateContext(
     last_topic: string;
     user_preferences: ConversationContext["user_preferences"];
   }>,
+  householdId?: string,
 ): Promise<ConversationContext | null> {
-  const sessionId = getSessionId();
+  const sessionId = getSessionId(householdId);
 
   const { data, error } = await supabase
     .from("ai_context")
@@ -212,14 +239,14 @@ export function formatHistoryForAI(
 }
 
 // Get summarized context for AI
-export async function getAIContext(): Promise<{
+export async function getAIContext(householdId?: string): Promise<{
   history: string;
   lastTopic: string | null;
   preferences: ConversationContext["user_preferences"];
 }> {
   const [messages, context] = await Promise.all([
-    loadConversationHistory(10),
-    getContext(),
+    loadConversationHistory(10, householdId),
+    getContext(householdId),
   ]);
 
   return {
@@ -233,11 +260,12 @@ export async function getAIContext(): Promise<{
 export async function updateContextFromMessage(
   message: string,
   role: "user" | "assistant",
+  householdId?: string,
 ): Promise<void> {
   if (role === "user") {
     const topic = extractTopic(message);
     if (topic) {
-      await updateContext({ last_topic: topic });
+      await updateContext({ last_topic: topic }, householdId);
     }
   }
 
@@ -245,7 +273,7 @@ export async function updateContextFromMessage(
   const lowerMessage = message.toLowerCase();
 
   if (role === "user") {
-    const context = await getContext();
+    const context = await getContext(householdId);
     const preferences = context?.user_preferences || {};
 
     // Detect dietary preferences
@@ -266,9 +294,15 @@ export async function updateContextFromMessage(
           .toLowerCase();
         if (!disliked.includes(ingredient)) {
           disliked.push(ingredient);
-          await updateContext({
-            user_preferences: { ...preferences, dislikedIngredients: disliked },
-          });
+          await updateContext(
+            {
+              user_preferences: {
+                ...preferences,
+                dislikedIngredients: disliked,
+              },
+            },
+            householdId,
+          );
         }
       }
     }
@@ -280,9 +314,12 @@ export async function updateContextFromMessage(
     ) {
       const favorites = preferences.favoriteRecipes || [];
       // Could extract recipe name here
-      await updateContext({
-        user_preferences: { ...preferences, favoriteRecipes: favorites },
-      });
+      await updateContext(
+        {
+          user_preferences: { ...preferences, favoriteRecipes: favorites },
+        },
+        householdId,
+      );
     }
   }
 }

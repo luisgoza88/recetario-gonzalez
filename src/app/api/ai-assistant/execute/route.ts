@@ -24,6 +24,7 @@ import {
 import { requireAuth } from "@/lib/api/auth";
 import { createAuthenticatedClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
+import { escapeIlike } from "@/lib/utils/sql-escape";
 
 // ============================================
 // FUNCTION IMPLEMENTATIONS (copied from main route)
@@ -55,7 +56,7 @@ async function swapMenuRecipe(
   const { data: recipe } = await supabase
     .from("recipes")
     .select("id, name")
-    .ilike("name", `%${newRecipeName}%`)
+    .ilike("name", `%${escapeIlike(newRecipeName)}%`)
     .single();
 
   if (!recipe) {
@@ -96,7 +97,7 @@ async function updateInventory(
   const { data: item } = await supabase
     .from("market_items")
     .select("id, name")
-    .ilike("name", `%${itemName}%`)
+    .ilike("name", `%${escapeIlike(itemName)}%`)
     .single();
 
   if (!item) {
@@ -151,7 +152,7 @@ async function markShoppingItem(
   const { data: item } = await supabase
     .from("market_items")
     .select("id")
-    .ilike("name", `%${itemName}%`)
+    .ilike("name", `%${escapeIlike(itemName)}%`)
     .single();
 
   if (!item) {
@@ -182,7 +183,7 @@ async function addToShoppingList(
   const { data: existingItem } = await supabase
     .from("market_items")
     .select("id")
-    .ilike("name", `%${itemName}%`)
+    .ilike("name", `%${escapeIlike(itemName)}%`)
     .single();
 
   if (existingItem) {
@@ -290,7 +291,7 @@ async function addQuickTask(
     const { data: emp } = await supabase
       .from("home_employees")
       .select("id")
-      .ilike("name", `%${employeeName}%`)
+      .ilike("name", `%${escapeIlike(employeeName)}%`)
       .single();
 
     employeeId = emp?.id;

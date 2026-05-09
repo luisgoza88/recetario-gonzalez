@@ -21,6 +21,11 @@ export const RATE_LIMIT_CONFIG = {
     limit: 10, // 10 requests
     windowMs: 60 * 60 * 1000, // por hora
   },
+  // Análisis de imágenes con Vision (moderado)
+  "analyze-image": {
+    limit: 20, // 20 requests
+    windowMs: 60 * 60 * 1000, // por hora
+  },
   // Escaneo de despensa
   "scan-pantry": {
     limit: 30, // 30 requests

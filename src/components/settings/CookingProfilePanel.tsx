@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ArrowLeft, Save, Loader2, MapPin, ChefHat } from "lucide-react";
+import { ArrowLeft, Save, MapPin, ChefHat } from "lucide-react";
+import Spinner from "@/components/ui/Spinner";
 import { supabase } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
 import type { CookingProfile } from "@/types";
@@ -154,7 +155,7 @@ export default function CookingProfilePanel({
           <h1 className="text-xl font-bold">Perfil de Cocina</h1>
         </div>
         <div className="flex items-center justify-center py-12">
-          <Loader2 size={32} className="animate-spin text-gray-400" />
+          <Spinner size="lg" color="gray" />
         </div>
       </div>
     );
@@ -186,11 +187,7 @@ export default function CookingProfilePanel({
             disabled={isSaving}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
           >
-            {isSaving ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Save size={16} />
-            )}
+            {isSaving ? <Spinner size="sm" /> : <Save size={16} />}
             Guardar
           </button>
         )}
@@ -365,11 +362,7 @@ export default function CookingProfilePanel({
             disabled={isSaving}
             className="w-full flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors shadow-lg disabled:opacity-50"
           >
-            {isSaving ? (
-              <Loader2 size={20} className="animate-spin" />
-            ) : (
-              <Save size={20} />
-            )}
+            {isSaving ? <Spinner size="md" /> : <Save size={20} />}
             Guardar cambios
           </button>
         </div>

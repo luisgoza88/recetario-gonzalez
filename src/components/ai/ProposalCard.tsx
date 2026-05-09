@@ -17,8 +17,8 @@ import {
   ChevronUp,
   Undo2,
   Clock,
-  Loader2,
 } from "lucide-react";
+import Spinner from "@/components/ui/Spinner";
 import { AIProposedAction, AIRiskLevel, AI_RISK_LEVELS } from "@/types";
 
 interface ProposalCardProps {
@@ -276,7 +276,7 @@ export function ProposalCard({
         >
           {isLoading ? (
             <>
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Spinner size="sm" />
               Procesando...
             </>
           ) : selectedActions.size === actions.length ? (

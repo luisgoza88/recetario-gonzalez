@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ArrowLeft, Plus, X, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, X, Save } from "lucide-react";
+import Spinner from "@/components/ui/Spinner";
 import { supabase } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
 import type { DietaryPreferences } from "@/types";
@@ -183,7 +184,7 @@ export default function DietaryPreferencesPanel({
   if (isLoading) {
     return (
       <div className="flex justify-center items-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-green-600" />
+        <Spinner size="lg" color="green" />
       </div>
     );
   }
@@ -407,7 +408,7 @@ export default function DietaryPreferencesPanel({
           >
             {isSaving ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Spinner size="md" />
                 Guardando...
               </>
             ) : (

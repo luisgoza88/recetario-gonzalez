@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { LogOut, Loader2 } from "lucide-react";
+import { LogOut } from "lucide-react";
+import Spinner from "@/components/ui/Spinner";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useHouseholdId } from "@/lib/stores/useHouseholdStore";
@@ -425,9 +426,7 @@ export default function YolimaView() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {saving && (
-                <Loader2 size={20} className="animate-spin text-gray-400" />
-              )}
+              {saving && <Spinner size="md" color="gray" />}
               <button
                 onClick={signOut}
                 className="p-3 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors"

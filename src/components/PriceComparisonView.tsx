@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Search,
   X,
@@ -14,10 +14,7 @@ import {
   ArrowDownAZ,
 } from "lucide-react";
 import {
-  COLOMBIAN_PRICES,
-  STORE_LABELS,
-  STORE_COLORS,
-  StoreKey,
+  getAggregatedPrices,
   formatCOP,
   getCheapestStore,
   getMostExpensiveStore,
@@ -25,7 +22,13 @@ import {
   calculateOptimizedTotal,
   generateOptimizedList,
   getCategories,
-} from "@/data/colombian-prices";
+  type StorePriceAggregate,
+} from "@/lib/store-prices";
+import {
+  STORE_LABELS,
+  STORE_COLORS,
+  type StoreKey,
+} from "@/lib/constants/categories";
 
 type SortField = "name" | "cheapest" | "savings";
 type SortDir = "asc" | "desc";
@@ -38,15 +41,33 @@ export default function PriceComparisonView() {
   const [showOptimized, setShowOptimized] = useState(false);
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [prices, setPrices] = useState<StorePriceAggregate[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
-    new Set(getCategories()),
+    new Set(),
   );
 
-  const categories = useMemo(() => getCategories(), []);
+  useEffect(() => {
+    const loadPrices = async () => {
+      try {
+        const data = await getAggregatedPrices();
+        setPrices(data);
+        setExpandedCategories(new Set(getCategories(data)));
+      } catch (error) {
+        console.error("Error loading prices:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadPrices();
+  }, []);
+
+  const categories = useMemo(() => getCategories(prices), [prices]);
 
   // Filtrar items
   const filteredItems = useMemo(() => {
-    let items = COLOMBIAN_PRICES;
+    let items = prices;
 
     if (selectedCategory !== "all") {
       items = items.filter((item) => item.category === selectedCategory);
@@ -94,12 +115,13 @@ export default function PriceComparisonView() {
 
   // Agrupar por categoría
   const groupedItems = useMemo(() => {
-    const groups: Record<string, typeof filteredItems> = {};
+    const groups: Record<string, StorePriceAggregate[]> = {};
     for (const item of filteredItems) {
-      if (!groups[item.category]) {
-        groups[item.category] = [];
+      const category = item.category || "Otros";
+      if (!groups[category]) {
+        groups[category] = [];
       }
-      groups[item.category].push(item);
+      groups[category].push(item);
     }
     return groups;
   }, [filteredItems]);
@@ -108,13 +130,16 @@ export default function PriceComparisonView() {
   const storeTotals = useMemo(() => {
     return ALL_STORES.map((store) => ({
       store,
-      total: calculateStoreTotal(store),
+      total: calculateStoreTotal(prices, store),
     })).sort((a, b) => a.total - b.total);
-  }, []);
+  }, [prices]);
 
   // Total optimizado
-  const optimized = useMemo(() => calculateOptimizedTotal(), []);
-  const optimizedList = useMemo(() => generateOptimizedList(), []);
+  const optimized = useMemo(() => {
+    const total = calculateOptimizedTotal(prices);
+    return { total };
+  }, [prices]);
+  const optimizedList = useMemo(() => generateOptimizedList(prices), [prices]);
 
   const toggleCategory = (category: string) => {
     setExpandedCategories((prev) => {
@@ -145,6 +170,17 @@ export default function PriceComparisonView() {
       <ChevronDown size={14} />
     );
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2" />
+          <p className="text-gray-600">Cargando precios...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -456,8 +492,8 @@ export default function PriceComparisonView() {
             <p className="text-xs text-green-600 mt-1">
               Visita{" "}
               {
-                Object.entries(optimizedList).filter(
-                  ([, items]) => items.length > 0,
+                Array.from(optimizedList.values()).filter(
+                  (items) => items.length > 0,
                 ).length
               }{" "}
               tiendas para el mejor precio en todo
@@ -465,13 +501,13 @@ export default function PriceComparisonView() {
           </div>
 
           {ALL_STORES.map((store) => {
-            const storeItems = optimizedList[store];
+            const storeItems = optimizedList.get(store) || [];
             if (storeItems.length === 0) return null;
 
-            const storeTotal = storeItems.reduce(
-              (sum, item) => sum + item.price,
-              0,
-            );
+            const storeTotal = storeItems.reduce((sum, itemName) => {
+              const item = prices.find((p) => p.item_name === itemName);
+              return sum + (getCheapestStore(item?.prices || {})?.price || 0);
+            }, 0);
 
             return (
               <div
@@ -502,24 +538,27 @@ export default function PriceComparisonView() {
                   </span>
                 </div>
                 <div className="divide-y divide-gray-50">
-                  {storeItems.map((item) => (
-                    <div
-                      key={item.item_name}
-                      className="px-4 py-2 flex items-center justify-between"
-                    >
-                      <div>
-                        <span className="text-sm text-gray-800">
-                          {item.item_name}
-                        </span>
-                        <span className="text-[10px] text-gray-400 ml-2">
-                          {item.category}
+                  {storeItems.map((itemName) => {
+                    const priceItem = prices.find(
+                      (p) => p.item_name === itemName,
+                    );
+                    const cheapest = getCheapestStore(priceItem?.prices || {});
+                    return (
+                      <div
+                        key={itemName}
+                        className="px-4 py-2 flex items-center justify-between"
+                      >
+                        <div>
+                          <span className="text-sm text-gray-800">
+                            {itemName}
+                          </span>
+                        </div>
+                        <span className="text-sm font-mono text-gray-600">
+                          {cheapest ? formatCOP(cheapest.price) : "--"}
                         </span>
                       </div>
-                      <span className="text-sm font-mono text-gray-600">
-                        {formatCOP(item.price)}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );

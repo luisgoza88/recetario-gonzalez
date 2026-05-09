@@ -25,8 +25,8 @@ import {
   ThumbsUp,
   ThumbsDown,
   ArrowLeft,
-  Loader2,
 } from "lucide-react";
+import Spinner from "@/components/ui/Spinner";
 import { supabase } from "@/lib/supabase/client";
 
 // Types
@@ -286,7 +286,7 @@ export default function AICommandCenter({
       if (!trust) {
         const defaultTrust = {
           household_id: householdId,
-          trust_level: 3,
+          trust_level: 1,
           successful_actions: 0,
           failed_actions: 0,
           rolled_back_actions: 0,
@@ -728,10 +728,7 @@ export default function AICommandCenter({
             <div className="space-y-4">
               {!trustStats ? (
                 <div className="bg-white rounded-xl p-8 text-center">
-                  <Loader2
-                    size={32}
-                    className="text-purple-500 mx-auto mb-4 animate-spin"
-                  />
+                  <Spinner size="lg" color="purple" className="mx-auto mb-4" />
                   <p className="text-gray-500">Cargando configuración...</p>
                 </div>
               ) : (

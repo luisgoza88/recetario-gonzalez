@@ -13,6 +13,8 @@ export interface ShoppingListItem {
   store?: string;
   checked: boolean;
   fromRecipe?: string; // nombre de la receta que lo necesita
+  inStock?: boolean; // true si hay stock en inventario
+  alreadyHave?: boolean; // true si la cantidad disponible cubre la necesidad (no hay que comprar)
 }
 
 export interface ShoppingList {
@@ -1070,4 +1072,32 @@ export interface ThermomixRecipe {
   vasoPrincipal: boolean;
   varoma: boolean;
   cestillo: boolean;
+}
+
+// =====================================================
+// TIPOS PARA BASE DE DATOS - PRECIOS DE TIENDAS
+// =====================================================
+
+export interface DbStorePrice {
+  id: string;
+  item_name: string;
+  store: "exito" | "d1" | "jumbo" | "carulla" | "euro";
+  price: number;
+  updated_at: string;
+}
+
+// =====================================================
+// TIPOS PARA BASE DE DATOS - SEGUIMIENTO DIARIO
+// =====================================================
+
+export interface DbDailyCompletion {
+  id: string;
+  household_id: string;
+  date: string; // YYYY-MM-DD
+  meals_completed: number; // 0-3
+  shopping_done: boolean;
+  tasks_completed?: number;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
 }

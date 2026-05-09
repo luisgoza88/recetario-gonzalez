@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
+import { Upload, X, Image as ImageIcon } from "lucide-react";
+import Spinner from "@/components/ui/Spinner";
 import { supabase } from "@/lib/supabase/client";
 
 interface ImageUploadProps {
@@ -185,7 +186,7 @@ export default function ImageUpload({
           </button>
           {isUploading && (
             <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
-              <Loader2 className="w-8 h-8 text-white animate-spin" />
+              <Spinner size="lg" color="white" />
             </div>
           )}
         </div>
@@ -198,7 +199,7 @@ export default function ImageUpload({
         >
           {isUploading ? (
             <>
-              <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+              <Spinner size="lg" color="gray" />
               <span className="text-sm text-gray-500">Subiendo...</span>
             </>
           ) : (

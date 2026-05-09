@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Camera, X, Loader2 } from "lucide-react";
+import { Camera, X } from "lucide-react";
+import Spinner from "@/components/ui/Spinner";
 import { supabase } from "@/lib/supabase/client";
 
 interface PhotoCaptureProps {
@@ -119,7 +120,7 @@ export default function PhotoCapture({
       >
         {uploading ? (
           <>
-            <Loader2 size={24} className="animate-spin" />
+            <Spinner size="md" />
             Subiendo foto...
           </>
         ) : (

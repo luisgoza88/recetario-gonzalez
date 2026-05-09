@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import dynamic from "next/dynamic";
 import {
   Send,
   Bot,
@@ -23,25 +22,17 @@ import {
   Minimize2,
   Maximize2,
   AlertCircle,
-  ChevronRight,
 } from "lucide-react";
-import {
-  useAIChat,
-  parseMessageContent,
-  type MessageAction,
-} from "@/lib/hooks/useAIChat";
+import { useAIChat } from "@/lib/hooks/useAIChat";
 import { useVoiceInput } from "@/lib/hooks/useVoiceInput";
 import { useImageInput } from "@/lib/hooks/useImageInput";
 import { useProactiveAlerts } from "@/lib/hooks/useProactiveAlerts";
 import { useAIProposal } from "@/lib/hooks/useAIProposal";
 import { ProposalCard } from "@/components/ai/ProposalCard";
 import { UndoToastContainer } from "@/components/ai/UndoToast";
-import { ContextPills } from "@/components/ai/ContextPills";
+import { ChatMessageList } from "@/components/ai/chat/ChatMessageList";
 import { useOptionalAuth } from "@/contexts/AuthContext";
 import logger from "@/lib/logger";
-
-// Lazy load react-markdown to reduce initial bundle
-const ReactMarkdown = dynamic(() => import("react-markdown"), { ssr: false });
 
 type ActiveSection = "hoy" | "recetario" | "hogar" | "ia" | "ajustes";
 
@@ -55,6 +46,9 @@ interface QuickAction {
   icon: React.ReactNode;
   prompt: string;
 }
+
+const formatTime = (date: Date) =>
+  date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 
 // Contextual quick actions based on active section
 const getContextualActions = (section: ActiveSection): QuickAction[] => {
@@ -122,60 +116,6 @@ const getContextualActions = (section: ActiveSection): QuickAction[] => {
   }
 };
 
-// Format message with ReactMarkdown (XSS-safe)
-function FormattedMessage({ content }: { content: string }) {
-  return (
-    <div className="text-sm space-y-1 prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0">
-      <ReactMarkdown
-        components={{
-          p: ({ children }) => <p className="my-1">{children}</p>,
-          ul: ({ children }) => (
-            <ul className="list-disc pl-4 my-1">{children}</ul>
-          ),
-          li: ({ children }) => <li className="my-0">{children}</li>,
-          strong: ({ children }) => (
-            <strong className="font-semibold">{children}</strong>
-          ),
-        }}
-      >
-        {content}
-      </ReactMarkdown>
-    </div>
-  );
-}
-
-// Action Button Component
-function ActionButton({
-  action,
-  onAction,
-  disabled,
-}: {
-  action: MessageAction;
-  onAction: (action: string) => void;
-  disabled?: boolean;
-}) {
-  const variants = {
-    primary: "bg-purple-600 text-white hover:bg-purple-700",
-    secondary: "bg-gray-100 text-gray-700 hover:bg-gray-200",
-    danger: "bg-red-100 text-red-700 hover:bg-red-200",
-  };
-
-  return (
-    <button
-      onClick={() => onAction(action.action)}
-      disabled={disabled}
-      className={`
-        px-2 py-1 rounded-lg text-xs font-medium transition-colors
-        flex items-center gap-1 disabled:opacity-50
-        ${variants[action.variant || "secondary"]}
-      `}
-    >
-      {action.label}
-      <ChevronRight size={12} />
-    </button>
-  );
-}
-
 export default function FloatingAIAssistant({
   activeSection = "hoy",
 }: FloatingAIAssistantProps) {
@@ -193,16 +133,12 @@ export default function FloatingAIAssistant({
   const userId = auth?.user?.id;
 
   // AI Proposal hook for managing proposals and undo actions
-  const proposal = useAIProposal({
-    householdId,
-    userId,
-  });
+  const proposal = useAIProposal({ householdId, userId });
 
-  // Custom hooks
+  // Voice input
   const voice = useVoiceInput({
     onFinalTranscript: (transcript) => {
       setInput(transcript);
-      // Auto-send after voice input
       setTimeout(() => {
         if (transcript.trim()) {
           handleSend(transcript);
@@ -211,6 +147,7 @@ export default function FloatingAIAssistant({
     },
   });
 
+  // Image input
   const {
     selectedImage,
     showImageOptions,
@@ -224,12 +161,12 @@ export default function FloatingAIAssistant({
     clearImage,
   } = useImageInput();
 
+  // Core chat hook
   const chat = useAIChat({
     onSpeakResponse: voice.speakText,
     householdId,
     userId,
     onProposal: (proposalData) => {
-      // Convert to proposal format and set active
       proposal.setActiveProposal({
         id: proposalData.proposalId,
         summary: proposalData.summary,
@@ -240,10 +177,7 @@ export default function FloatingAIAssistant({
       setShowProposalModal(true);
     },
     onExecutionMetadata: (metadata) => {
-      // Process execution metadata for undo actions
-      proposal.processAIResponse({
-        executionMetadata: metadata,
-      });
+      proposal.processAIResponse({ executionMetadata: metadata });
     },
   });
 
@@ -263,14 +197,16 @@ export default function FloatingAIAssistant({
     }
   }, [isOpen]);
 
-  const handleSend = async (content?: string) => {
-    const messageContent = content || input;
-    if ((!messageContent.trim() && !selectedImage) || chat.isLoading) return;
-
-    await chat.sendMessage(messageContent, selectedImage);
-    setInput("");
-    clearImage();
-  };
+  const handleSend = useCallback(
+    async (content?: string) => {
+      const messageContent = content || input;
+      if ((!messageContent.trim() && !selectedImage) || chat.isLoading) return;
+      await chat.sendMessage(messageContent, selectedImage);
+      setInput("");
+      clearImage();
+    },
+    [input, selectedImage, chat, clearImage],
+  );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -279,37 +215,38 @@ export default function FloatingAIAssistant({
     }
   };
 
-  const handleQuickAction = (action: QuickAction) => {
-    chat.sendMessage(action.prompt);
-  };
+  const handleAction = useCallback(
+    async (action: string) => {
+      const [actionType, ...params] = action.split(":");
+      const param = params.join(":");
 
-  const handleAction = async (action: string) => {
-    const [actionType, ...params] = action.split(":");
-    const param = params.join(":");
-
-    switch (actionType) {
-      case "confirm":
-        if (param === "yes") {
-          chat.sendMessage("Sí, agrégalo");
-        }
-        break;
-      case "view_recipe":
-        chat.sendMessage(`Muéstrame los detalles de la receta ${param}`);
-        break;
-      case "add_low_to_shopping":
-        chat.sendMessage(
-          "Agrega todos los ingredientes bajos a la lista de compras",
-        );
-        break;
-      case "add_missing_to_shopping":
-        chat.sendMessage(
-          "Agrega los ingredientes faltantes a la lista de compras",
-        );
-        break;
-      default:
-        logger.warn("Unknown action", { action });
-    }
-  };
+      switch (actionType) {
+        case "confirm":
+          if (param === "yes") {
+            await chat.sendMessage("Sí, agrégalo");
+          }
+          break;
+        case "view_recipe":
+          await chat.sendMessage(
+            `Muéstrame los detalles de la receta ${param}`,
+          );
+          break;
+        case "add_low_to_shopping":
+          await chat.sendMessage(
+            "Agrega todos los ingredientes bajos a la lista de compras",
+          );
+          break;
+        case "add_missing_to_shopping":
+          await chat.sendMessage(
+            "Agrega los ingredientes faltantes a la lista de compras",
+          );
+          break;
+        default:
+          logger.warn("Unknown action", { action });
+      }
+    },
+    [chat],
+  );
 
   const quickActions = getContextualActions(activeSection);
 
@@ -357,7 +294,6 @@ export default function FloatingAIAssistant({
           </div>
         </div>
         <div className="flex items-center gap-1">
-          {/* Alerts Button */}
           {alertsHook.alertCount > 0 && (
             <button
               onClick={alertsHook.toggleAlerts}
@@ -399,7 +335,7 @@ export default function FloatingAIAssistant({
           {quickActions.map((action) => (
             <button
               key={action.id}
-              onClick={() => handleQuickAction(action)}
+              onClick={() => chat.sendMessage(action.prompt)}
               disabled={chat.isLoading}
               className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border rounded-full text-xs font-medium whitespace-nowrap hover:bg-purple-50 hover:border-purple-300 hover:text-purple-700 transition-colors disabled:opacity-50"
             >
@@ -429,124 +365,16 @@ export default function FloatingAIAssistant({
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {chat.messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex gap-2 ${message.role === "user" ? "flex-row-reverse" : ""}`}
-              >
-                <div
-                  className={`
-                  w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0
-                  ${message.role === "user" ? "bg-green-100" : "bg-purple-100"}
-                `}
-                >
-                  {message.role === "user" ? (
-                    <User size={14} className="text-green-600" />
-                  ) : (
-                    <Sparkles size={14} className="text-purple-600" />
-                  )}
-                </div>
-
-                <div
-                  className={`
-                  max-w-[85%] rounded-xl text-sm
-                  ${
-                    message.role === "user"
-                      ? "bg-green-600 text-white rounded-br-sm p-2.5"
-                      : "bg-white shadow-sm border rounded-bl-sm"
-                  }
-                `}
-                >
-                  {message.isLoading && !message.content ? (
-                    <div className="p-2.5 space-y-2">
-                      {/* Show active tools */}
-                      {chat.activeTools.length > 0 && (
-                        <ContextPills
-                          tools={chat.activeTools}
-                          className="mb-2"
-                        />
-                      )}
-                      <div className="flex items-center gap-1.5 text-purple-600">
-                        <Loader2 size={14} className="animate-spin" />
-                        <span className="text-xs">
-                          {chat.activeTools.length > 0
-                            ? chat.activeTools.find(
-                                (t) => t.status === "running",
-                              )?.description || "Procesando..."
-                            : "Pensando..."}
-                        </span>
-                      </div>
-                    </div>
-                  ) : message.isLoading && message.content ? (
-                    <div className="p-2.5">
-                      {/* Show active tools while streaming */}
-                      {chat.activeTools.length > 0 && (
-                        <ContextPills
-                          tools={chat.activeTools}
-                          className="mb-2"
-                        />
-                      )}
-                      <FormattedMessage content={message.content} />
-                      <div className="flex items-center gap-0.5 mt-1.5 text-purple-400">
-                        <span className="w-1 h-1 bg-purple-400 rounded-full animate-bounce" />
-                        <span
-                          className="w-1 h-1 bg-purple-400 rounded-full animate-bounce"
-                          style={{ animationDelay: "150ms" }}
-                        />
-                        <span
-                          className="w-1 h-1 bg-purple-400 rounded-full animate-bounce"
-                          style={{ animationDelay: "300ms" }}
-                        />
-                      </div>
-                    </div>
-                  ) : message.role === "user" ? (
-                    <>
-                      {message.image && (
-                        <div className="mb-2 -mx-2.5 -mt-2.5">
-                          <img
-                            src={message.image}
-                            alt="Imagen enviada"
-                            className="w-full max-h-32 object-cover rounded-t-xl"
-                          />
-                        </div>
-                      )}
-                      {message.content &&
-                        message.content !== "📷 Imagen enviada" && (
-                          <p className="text-xs whitespace-pre-line">
-                            {message.content}
-                          </p>
-                        )}
-                    </>
-                  ) : (
-                    (() => {
-                      const { text, actions } = parseMessageContent(
-                        message.content,
-                      );
-                      return (
-                        <div className="p-2.5">
-                          <FormattedMessage content={text} />
-                          {actions.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-gray-100">
-                              {actions.map((action) => (
-                                <ActionButton
-                                  key={action.id}
-                                  action={action}
-                                  onAction={handleAction}
-                                  disabled={chat.isLoading}
-                                />
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()
-                  )}
-                </div>
-              </div>
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
+          <ChatMessageList
+            messages={chat.messages}
+            activeTools={chat.activeTools}
+            isLoading={chat.isLoading}
+            onAction={handleAction}
+            actionButtonSize="sm"
+            messagesEndRef={messagesEndRef}
+            formatTime={formatTime}
+            showTimestamp={false}
+          />
         )}
       </div>
 
@@ -625,7 +453,6 @@ export default function FloatingAIAssistant({
       {/* Input Area */}
       <div className="p-2 bg-white border-t flex-shrink-0">
         <div className="flex gap-1.5 items-center">
-          {/* Image Button */}
           <button
             onClick={toggleImageOptions}
             disabled={chat.isLoading || voice.isListening}
@@ -638,7 +465,6 @@ export default function FloatingAIAssistant({
             <Camera size={16} />
           </button>
 
-          {/* TTS Toggle */}
           {voice.ttsSupported && (
             <button
               onClick={voice.toggleTTS}
@@ -669,7 +495,6 @@ export default function FloatingAIAssistant({
             className="flex-1 px-3 py-2 bg-gray-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
           />
 
-          {/* Voice Button */}
           {voice.voiceSupported && (
             <button
               onClick={voice.toggleListening}
@@ -687,7 +512,6 @@ export default function FloatingAIAssistant({
             </button>
           )}
 
-          {/* Send Button */}
           <button
             onClick={() => handleSend()}
             disabled={

@@ -8,7 +8,8 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import { Undo2, X, Check, Loader2 } from "lucide-react";
+import { Undo2, X, Check } from "lucide-react";
+import Spinner from "@/components/ui/Spinner";
 
 interface UndoToastProps {
   message: string;
@@ -126,7 +127,7 @@ export function UndoToast({
               >
                 {isUndoing ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Spinner size="sm" />
                     <span>Deshaciendo...</span>
                   </>
                 ) : (

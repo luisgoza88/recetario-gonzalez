@@ -9,7 +9,6 @@
 
 import { useMemo } from "react";
 import {
-  Loader2,
   Check,
   X,
   Search,
@@ -22,6 +21,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 import type { ActiveTool } from "@/lib/hooks/useAIChat";
+import Spinner from "@/components/ui/Spinner";
 
 interface ContextPillsProps {
   tools: ActiveTool[];
@@ -97,7 +97,7 @@ function ContextPill({ tool }: { tool: ActiveTool }) {
     >
       {/* Status indicator */}
       {tool.status === "running" ? (
-        <Loader2 className="w-3 h-3 animate-spin" />
+        <Spinner size="sm" />
       ) : tool.status === "completed" ? (
         <Check className="w-3 h-3" />
       ) : (
@@ -145,7 +145,7 @@ export function ContextPillsCompact({
     >
       {runningTools.length > 0 && (
         <span className="flex items-center gap-1 text-blue-500">
-          <Loader2 className="w-3 h-3 animate-spin" />
+          <Spinner size="sm" />
           {runningTools.length} ejecutando
         </span>
       )}

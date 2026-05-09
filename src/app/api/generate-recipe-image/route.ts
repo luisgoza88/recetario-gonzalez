@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGeminiClient, GEMINI_MODELS } from "@/lib/gemini/client";
 import { requireAuth } from "@/lib/api/auth";
+import { withRateLimit } from "@/lib/rate-limit";
 import {
   createAuthenticatedClient,
   createStorageAdminClient,
@@ -19,6 +20,18 @@ interface GenerateImageRequest {
 export async function POST(request: NextRequest) {
   const auth = requireAuth(request);
   if (auth instanceof NextResponse) return auth;
+
+  const userId =
+    request.headers.get("x-user-id") ||
+    request.headers.get("x-forwarded-for") ||
+    "anonymous";
+  const rateLimit = await withRateLimit(userId, "generate-image");
+  if (!rateLimit.allowed) {
+    return NextResponse.json(rateLimit.response, {
+      status: 429,
+      headers: rateLimit.headers,
+    });
+  }
 
   try {
     const body: GenerateImageRequest = await request.json();

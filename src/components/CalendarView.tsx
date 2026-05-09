@@ -10,12 +10,12 @@ import {
   Sparkles,
   WifiOff,
   RefreshCw,
-  Loader2,
   Bot,
   ThumbsUp,
   ThumbsDown,
   Archive,
   ArrowLeftRight,
+  ShoppingCart,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import {
@@ -26,15 +26,24 @@ import {
   GeneratedDayMenu,
   GeneratedMeal,
 } from "@/types";
-import RecipeModal from "./RecipeModal";
-import FeedbackModal from "./FeedbackModal";
-import SmartSuggestions from "./SmartSuggestions";
-import MealSwapModal from "./MealSwapModal";
 import { useOnlineStatus } from "@/hooks/useOfflineSync";
 import { cacheDayMenus, getCachedDayMenus } from "@/lib/indexedDB";
 import logger from "@/lib/logger";
 import { useGoToTodaySignal } from "@/lib/stores/useAppStore";
 import { useToast } from "@/components/ui/Toast";
+import Spinner from "@/components/ui/Spinner";
+import dynamic from "next/dynamic";
+import FeedbackModal from "./FeedbackModal";
+import SmartSuggestions from "./SmartSuggestions";
+
+const RecipeModal = dynamic(() => import("./RecipeModal"), {
+  loading: () => null,
+  ssr: false,
+});
+const MealSwapModal = dynamic(() => import("./MealSwapModal"), {
+  loading: () => null,
+  ssr: false,
+});
 
 interface CalendarViewProps {
   recipes: Recipe[];
@@ -131,6 +140,8 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
   const [expandedGeneratedMeal, setExpandedGeneratedMeal] = useState<
     string | null
   >(null);
+  const [isGeneratingShoppingList, setIsGeneratingShoppingList] =
+    useState(false);
 
   // =====================================================
   // Cycle day calculation (legacy static menu)
@@ -334,6 +345,44 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
       }
     } catch (error) {
       console.error("Error archiving menu:", error);
+    }
+  };
+
+  // =====================================================
+  // Generate shopping list from current week's generated menu
+  // =====================================================
+  const generateShoppingList = async () => {
+    if (!selectedDate) return;
+    const weekMonday = getWeekMonday(selectedDate);
+    const generatedMenu = generatedMenus.get(weekMonday);
+    if (!generatedMenu) return;
+
+    setIsGeneratingShoppingList(true);
+    try {
+      const res = await fetch("/api/generate-shopping-list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          menuId: generatedMenu.id,
+          weekStartDate: weekMonday,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Error generando lista");
+      }
+
+      const itemCount = data.list?.items?.length ?? data.list?.total_items ?? 0;
+      toast.success(
+        `Lista de compras generada con ${itemCount} items. Ve a Mercado para verla.`,
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Error generando lista",
+      );
+    } finally {
+      setIsGeneratingShoppingList(false);
     }
   };
 
@@ -1103,8 +1152,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
       >
         {isGenerating ? (
           <>
-            <Loader2 size={20} className="animate-spin" /> Generando menú
-            semanal con IA...
+            <Spinner size="md" /> Generando menú semanal con IA...
           </>
         ) : (
           <>
@@ -1148,6 +1196,33 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Generate Shopping List Button — only visible when the selected week has a generated menu */}
+      {selectedDate && generatedMenus.has(getWeekMonday(selectedDate)) && (
+        <button
+          onClick={generateShoppingList}
+          disabled={isGeneratingShoppingList}
+          className={`
+              w-full p-3 rounded-xl font-semibold mb-4 flex items-center justify-center gap-2 transition-all text-sm
+              ${
+                isGeneratingShoppingList
+                  ? "bg-green-100 text-green-400 cursor-wait"
+                  : "bg-green-700 text-white hover:bg-green-800 shadow-sm hover:shadow-md"
+              }
+            `}
+        >
+          {isGeneratingShoppingList ? (
+            <>
+              <Spinner size="sm" /> Generando lista de compras...
+            </>
+          ) : (
+            <>
+              <ShoppingCart size={18} /> Generar lista de compras para esta
+              semana
+            </>
+          )}
+        </button>
       )}
 
       {/* Offline Indicator */}

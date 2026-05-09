@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { WeekSchedule } from "@/data/schedule-seed";
 import { requireAuth } from "@/lib/api/auth";
+
+// Tipo para estructura de horarios (migrado de schedule-seed.ts)
+interface WeekSchedule {
+  weekNumber: number;
+  days: Array<{
+    dayOfWeek: number;
+    tasks: Array<{
+      timeStart: string;
+      timeEnd: string;
+      taskName: string;
+      description?: string;
+      isSpecial: boolean;
+      category: string;
+    }>;
+  }>;
+}
 import { createAuthenticatedClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 import type { TaskFrequency, TaskPriority } from "@/types";
@@ -226,8 +241,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { YOLIMA_SCHEDULE, JOHN_SCHEDULE } =
-      await import("@/data/schedule-seed");
+    // Horarios de ejemplo (schedule-seed.ts fue eliminado como parte de consolidación de datos)
+    const YOLIMA_SCHEDULE: WeekSchedule[] = [];
+    const JOHN_SCHEDULE: WeekSchedule[] = [];
+
     const seedEmployees = [
       { name: "Yolima", zone: "interior" as const, schedule: YOLIMA_SCHEDULE },
       { name: "John", zone: "exterior" as const, schedule: JOHN_SCHEDULE },

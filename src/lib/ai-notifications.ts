@@ -1,6 +1,10 @@
 /**
- * AI-Powered Proactive Notifications
- * Generates intelligent alerts based on home context
+ * @deprecated Usar `src/lib/hooks/useProactiveAlerts.ts` como fuente unica de verdad.
+ *
+ * Este modulo se mantiene temporalmente porque AIChat.tsx y FloatingAIAssistant.tsx
+ * todavia lo importan. Migrar esos consumidores al hook unificado y eliminar este archivo.
+ *
+ * AI-Powered Proactive Notifications (LEGACY)
  */
 
 import { supabase } from "./supabase/client";
@@ -159,7 +163,9 @@ export async function generateProactiveAlerts(): Promise<ProactiveAlert[]> {
     updateLastCheckTime();
     return getActiveAlerts();
   } catch (error) {
-    console.error("Error generating proactive alerts:", error);
+    logger.error("Error generating proactive alerts (legacy)", {
+      error: String(error),
+    });
     return getActiveAlerts();
   }
 }

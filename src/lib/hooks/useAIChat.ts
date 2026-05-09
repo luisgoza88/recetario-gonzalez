@@ -85,36 +85,14 @@ interface UseAIChatOptions {
   onProposal?: (proposal: AIProposalResponse) => void;
   onExecutionMetadata?: (metadata: AIExecutionMetadata) => void;
   onToolEvent?: (tool: ActiveTool) => void;
+  /** Ref to an optional snapshot string that gets injected as context on every request (Sprint 3.13). */
+  snapshotRef?: React.RefObject<string | null>;
 }
 
-// Helper para detectar si el mensaje es una acción (write) o consulta (read)
-function isActionMessage(content: string): boolean {
-  const actionPatterns = [
-    // Acciones de escritura
-    /\b(agrega|agregar|añade|añadir)\b/i,
-    /\b(crea|crear|nuevo|nueva)\b/i,
-    /\b(elimina|eliminar|borra|borrar|quita|quitar)\b/i,
-    /\b(cambia|cambiar|modifica|modificar|actualiza|actualizar)\b/i,
-    /\b(marca|marcar|desmarca|desmarcar)\b/i,
-    /\b(mueve|mover|reprograma|reprogramar)\b/i,
-    /\b(registra|registrar)\b/i,
-    /\b(asigna|asignar)\b/i,
-    /\b(completa|completar)\b/i,
-    // Comandos directos
-    /\b(pon|poner)\s+(en|a)\b/i,
-    /\b(quiero|necesito)\s+(agregar|crear|cambiar)\b/i,
-    // Acciones con "la lista de compras"
-    /agreg[ao]\s+.+\s+a\s+(la\s+)?lista/i,
-    /quita\s+.+\s+de\s+(la\s+)?lista/i,
-  ];
-
-  for (const pattern of actionPatterns) {
-    if (pattern.test(content)) {
-      return true;
-    }
-  }
-  return false;
-}
+// TODO Sprint-N: el endpoint /api/ai-assistant/chat maneja consultas y
+// function calling read-only. Las mutations (crear, modificar, eliminar)
+// deben implementarse en ese mismo endpoint usando create_proposal tool.
+// Por ahora todo el tráfico va a /api/ai-assistant/chat.
 
 export function useAIChat(options: UseAIChatOptions = {}) {
   const {
@@ -125,6 +103,7 @@ export function useAIChat(options: UseAIChatOptions = {}) {
     onProposal,
     onExecutionMetadata,
     onToolEvent,
+    snapshotRef,
   } = options;
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -139,7 +118,10 @@ export function useAIChat(options: UseAIChatOptions = {}) {
   useEffect(() => {
     const loadHistory = async () => {
       try {
-        const history = await loadConversationHistory(maxHistoryMessages);
+        const history = await loadConversationHistory(
+          maxHistoryMessages,
+          householdId,
+        );
         if (history.length > 0) {
           const loadedMessages: Message[] = history.map(
             (msg: ConversationMessage) => ({
@@ -160,7 +142,7 @@ export function useAIChat(options: UseAIChatOptions = {}) {
     };
 
     loadHistory();
-  }, [maxHistoryMessages]);
+  }, [maxHistoryMessages, householdId]);
 
   const sendMessage = useCallback(
     async (content: string, image?: string | null) => {
@@ -187,9 +169,11 @@ export function useAIChat(options: UseAIChatOptions = {}) {
       setMessages((prev) => [...prev, userMessage, loadingMessage]);
       setIsLoading(true);
 
-      // Save user message to database
-      saveMessage("user", userMessage.content).catch(console.error);
-      updateContextFromMessage(userMessage.content, "user").catch(
+      // Save user message to database (anchored to householdId)
+      saveMessage("user", userMessage.content, undefined, householdId).catch(
+        console.error,
+      );
+      updateContextFromMessage(userMessage.content, "user", householdId).catch(
         console.error,
       );
 
@@ -209,27 +193,24 @@ export function useAIChat(options: UseAIChatOptions = {}) {
         };
 
         const history = [...historyMessages, currentMessage];
-        const conversationContext = await getAIContext();
+        const conversationContext = await getAIContext(householdId);
 
-        // Determinar qué endpoint usar basado en si es consulta o acción
-        const isAction = isActionMessage(userMessage.content);
-        const endpoint = isAction
-          ? "/api/ai-assistant"
-          : "/api/ai-assistant/chat";
+        // Adjuntar snapshot del hogar si fue cargado en background (Sprint 3.13).
+        const contextWithSnapshot = snapshotRef?.current
+          ? { ...conversationContext, snapshot: snapshotRef.current }
+          : conversationContext;
 
-        console.log(
-          `[useAIChat] Using ${isAction ? "action" : "query"} endpoint for: "${userMessage.content.substring(0, 50)}..."`,
-        );
-
-        const response = await fetch(endpoint, {
+        // Todo el tráfico va al endpoint de chat unificado.
+        // Gemini con function calling decide si responder texto o llamar funciones.
+        const response = await fetch("/api/ai-assistant/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             messages: history,
-            conversationContext,
+            conversationContext: contextWithSnapshot,
             stream: true,
-            // Solo enviar householdId/userId para acciones (endpoint principal)
-            ...(isAction && { householdId, userId }),
+            householdId,
+            userId,
           }),
         });
 
@@ -345,10 +326,17 @@ export function useAIChat(options: UseAIChatOptions = {}) {
           const assistantContent =
             fullContent || "No pude procesar tu solicitud.";
 
-          saveMessage("assistant", assistantContent).catch(console.error);
-          updateContextFromMessage(assistantContent, "assistant").catch(
-            console.error,
-          );
+          saveMessage(
+            "assistant",
+            assistantContent,
+            undefined,
+            householdId,
+          ).catch(console.error);
+          updateContextFromMessage(
+            assistantContent,
+            "assistant",
+            householdId,
+          ).catch(console.error);
 
           onSpeakResponse?.(assistantContent);
 
@@ -378,7 +366,12 @@ export function useAIChat(options: UseAIChatOptions = {}) {
             // Show a message indicating a proposal was created
             const proposalMessage = `He preparado una propuesta con ${data.proposal.actions?.length || 0} acción(es): "${data.proposal.summary}". Por favor, revísala y apruébala si estás de acuerdo.`;
 
-            saveMessage("assistant", proposalMessage).catch(console.error);
+            saveMessage(
+              "assistant",
+              proposalMessage,
+              undefined,
+              householdId,
+            ).catch(console.error);
 
             setMessages((prev) =>
               prev.map((m) =>
@@ -401,10 +394,17 @@ export function useAIChat(options: UseAIChatOptions = {}) {
               onExecutionMetadata?.(data.executionMetadata);
             }
 
-            saveMessage("assistant", assistantContent).catch(console.error);
-            updateContextFromMessage(assistantContent, "assistant").catch(
-              console.error,
-            );
+            saveMessage(
+              "assistant",
+              assistantContent,
+              undefined,
+              householdId,
+            ).catch(console.error);
+            updateContextFromMessage(
+              assistantContent,
+              "assistant",
+              householdId,
+            ).catch(console.error);
 
             onSpeakResponse?.(assistantContent);
 
@@ -447,9 +447,9 @@ export function useAIChat(options: UseAIChatOptions = {}) {
   const clearChat = useCallback(async () => {
     setMessages([]);
     setShowWelcome(true);
-    await clearConversationHistory();
-    resetSession();
-  }, []);
+    await clearConversationHistory(householdId);
+    resetSession(householdId);
+  }, [householdId]);
 
   return {
     messages,

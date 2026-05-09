@@ -405,31 +405,28 @@ export function useSmartFABContext(
     }
 
     // ========================================
-    // CROSS-SECTION: Proactive Alerts
+    // CROSS-SECTION: Proactive Alerts (unified — Alert type from useProactiveAlerts)
     // ========================================
     alerts.slice(0, 2).forEach((alert) => {
+      const isCritical = alert.severity === "critical";
       smartActions.push({
         id: `alert-${alert.id}`,
-        icon:
-          alert.priority === "high"
-            ? React.createElement(AlertTriangle, { size: 18 })
-            : React.createElement(Sparkles, { size: 18 }),
+        icon: isCritical
+          ? React.createElement(AlertTriangle, { size: 18 })
+          : React.createElement(Sparkles, { size: 18 }),
         label:
           alert.title.length > 25
             ? alert.title.substring(0, 25) + "..."
             : alert.title,
-        variant: alert.priority === "high" ? "alert" : "ai",
-        priority: alert.priority === "high" ? 98 : 75,
+        variant: isCritical ? "alert" : "ai",
+        priority: isCritical ? 98 : 75,
         onClick: () => {
-          // Alert actions are handled by the alert system itself;
-          // navigation-based alerts use the store directly
-          if (alert.actionable) {
-            const action = alert.actionable.action;
-            // Try to interpret common alert actions as navigation
-            if (typeof action === "string" && action.startsWith("navigate:")) {
-              const [, section, tab] = action.split(":");
-              navigateTo(section, tab);
-            }
+          if (alert.action) {
+            const payload = alert.action.payload as
+              | { tab?: string; section?: string }
+              | undefined;
+            if (payload?.section) navigateTo(payload.section, payload.tab);
+            else if (payload?.tab) navigateTo("recetario", payload.tab);
           }
         },
       });

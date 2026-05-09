@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   ShoppingCart,
-  Loader2,
   X,
   Check,
   TrendingDown,
@@ -17,6 +16,7 @@ import {
 import { supabase } from "@/lib/supabase/client";
 import type { ShoppingList, ShoppingListItem } from "@/types";
 import PriceLogModal from "./PriceLogModal";
+import Spinner from "@/components/ui/Spinner";
 
 interface SmartShoppingSectionProps {
   onRefreshMarket: () => void;
@@ -244,11 +244,7 @@ export default function SmartShoppingSection({
             disabled={loading}
             className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
           >
-            {loading ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <ShoppingCart size={16} />
-            )}
+            {loading ? <Spinner size="sm" /> : <ShoppingCart size={16} />}
             Generar
           </button>
         </div>
@@ -380,11 +376,7 @@ export default function SmartShoppingSection({
               disabled={loading}
               className="text-blue-600 text-sm font-medium flex items-center gap-1 hover:text-blue-700"
             >
-              {loading ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <ShoppingCart size={14} />
-              )}
+              {loading ? <Spinner size="sm" /> : <ShoppingCart size={14} />}
               Regenerar
             </button>
 

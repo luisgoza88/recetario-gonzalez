@@ -1,11 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, Wifi, WifiOff } from "lucide-react";
-import {
-  initNotificationChecks,
-  stopNotificationChecks,
-} from "@/lib/notifications";
+import { Bell, WifiOff } from "lucide-react";
+import { requestNotificationPermission } from "@/lib/notifications";
 import logger from "@/lib/logger";
 
 export default function ServiceWorkerRegistration() {
@@ -28,7 +25,7 @@ export default function ServiceWorkerRegistration() {
         });
     }
 
-    // Detectar estado de conexión
+    // Detectar estado de conexion
     setIsOnline(navigator.onLine);
 
     const handleOnline = () => {
@@ -50,14 +47,8 @@ export default function ServiceWorkerRegistration() {
     if ("Notification" in window) {
       setNotificationPermission(Notification.permission);
 
-      // Si ya están permitidas, inicializar checks
-      if (Notification.permission === "granted") {
-        initNotificationChecks();
-      }
-
       // Mostrar prompt solo si no se ha decidido
       if (Notification.permission === "default") {
-        // Esperar un poco antes de mostrar
         promptTimer = setTimeout(() => {
           setShowNotificationPrompt(true);
         }, 5000);
@@ -67,27 +58,22 @@ export default function ServiceWorkerRegistration() {
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
-      stopNotificationChecks();
       if (promptTimer) clearTimeout(promptTimer);
+      // Las alertas proactivas son gestionadas por useProactiveAlerts
+      // con cleanup propio — no hay intervals que limpiar aqui.
     };
   }, []);
 
-  const requestNotificationPermission = async () => {
-    if ("Notification" in window) {
-      const permission = await Notification.requestPermission();
-      setNotificationPermission(permission);
-      setShowNotificationPrompt(false);
+  const handleRequestPermission = async () => {
+    const granted = await requestNotificationPermission();
+    setNotificationPermission(granted ? "granted" : "denied");
+    setShowNotificationPrompt(false);
 
-      if (permission === "granted") {
-        // Mostrar notificación de prueba
-        new Notification("Notificaciones activadas", {
-          body: "Recibirás recordatorios del recetario.",
-          icon: "/icon.svg",
-        });
-
-        // Inicializar verificaciones de notificaciones
-        initNotificationChecks();
-      }
+    if (granted) {
+      new Notification("Notificaciones activadas", {
+        body: "Recibiras recordatorios del recetario.",
+        icon: "/icon.svg",
+      });
     }
   };
 
@@ -103,7 +89,7 @@ export default function ServiceWorkerRegistration() {
           <div className="bg-orange-500 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 max-w-md mx-auto">
             <WifiOff size={20} />
             <div className="flex-1">
-              <p className="font-medium">Sin conexión</p>
+              <p className="font-medium">Sin conexion</p>
               <p className="text-sm opacity-90">Usando datos guardados</p>
             </div>
             <button
@@ -116,15 +102,8 @@ export default function ServiceWorkerRegistration() {
         </div>
       )}
 
-      {/* Banner de reconexión */}
-      {isOnline && showOfflineToast === false && (
-        <div className="hidden">
-          {/* Placeholder para animación de reconexión si se desea */}
-        </div>
-      )}
-
       {/* Prompt de notificaciones */}
-      {showNotificationPrompt && (
+      {showNotificationPrompt && notificationPermission === "default" && (
         <div className="fixed bottom-24 left-4 right-4 z-50 animate-slide-up">
           <div className="bg-white border border-gray-200 px-4 py-4 rounded-xl shadow-lg max-w-md mx-auto">
             <div className="flex items-start gap-3">
@@ -133,14 +112,14 @@ export default function ServiceWorkerRegistration() {
               </div>
               <div className="flex-1">
                 <p className="font-medium text-gray-800">
-                  ¿Activar notificaciones?
+                  Activar notificaciones?
                 </p>
                 <p className="text-sm text-gray-600 mt-1">
                   Recibe recordatorios de comidas y alertas de stock bajo.
                 </p>
                 <div className="flex gap-2 mt-3">
                   <button
-                    onClick={requestNotificationPermission}
+                    onClick={handleRequestPermission}
                     className="flex-1 bg-green-700 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-green-800"
                   >
                     Activar
@@ -158,7 +137,7 @@ export default function ServiceWorkerRegistration() {
         </div>
       )}
 
-      {/* Indicador de estado offline en header (opcional) */}
+      {/* Indicador de estado offline */}
       {!isOnline && (
         <div className="fixed top-0 left-0 right-0 bg-orange-500 text-white text-center py-1 text-xs z-[60]">
           <WifiOff size={12} className="inline mr-1" /> Modo offline

@@ -20,6 +20,7 @@ describe("RATE_LIMIT_CONFIG", () => {
     const expectedActions = [
       "generate-recipe",
       "generate-image",
+      "analyze-image",
       "scan-pantry",
       "ai-chat",
       "ai-assistant",

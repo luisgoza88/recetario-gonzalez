@@ -1,21 +1,30 @@
-import { supabase } from "./supabase/client";
-import logger from "@/lib/logger";
+/**
+ * notifications.ts — Primitivas de Web Notifications API.
+ *
+ * Este modulo expone SOLO las primitivas de bajo nivel:
+ *   - canNotify()
+ *   - showNotification()
+ *   - scheduleNotification()
+ *   - requestNotificationPermission()
+ *
+ * La logica de CUANDO notificar (stock bajo, menus, tareas) vive en:
+ *   src/lib/hooks/useProactiveAlerts.ts
+ *
+ * Las funciones initNotificationChecks / stopNotificationChecks /
+ * checkLowStockAndNotify / checkTomorrowMealAndNotify fueron eliminadas
+ * para resolver el memory leak del setInterval y la triplicacion de alertas.
+ */
 
-// Tipos para notificaciones
-export interface ScheduledNotification {
-  id: string;
-  title: string;
-  body: string;
-  scheduledFor: Date;
-  type: "meal_reminder" | "low_stock" | "prep_reminder";
-}
-
-// Verificar si las notificaciones están soportadas y permitidas
+// Verificar si las notificaciones estan soportadas y permitidas
 export function canNotify(): boolean {
-  return "Notification" in window && Notification.permission === "granted";
+  return (
+    typeof window !== "undefined" &&
+    "Notification" in window &&
+    Notification.permission === "granted"
+  );
 }
 
-// Mostrar notificación local
+// Mostrar notificacion local
 export function showNotification(
   title: string,
   body: string,
@@ -34,7 +43,6 @@ export function showNotification(
     ...options,
   };
 
-  // Vibrate y renotify son propiedades extendidas (móvil)
   if ("vibrate" in Notification.prototype) {
     (notificationOptions as Record<string, unknown>).vibrate = [200, 100, 200];
   }
@@ -50,166 +58,20 @@ export function showNotification(
   return notification;
 }
 
-// Verificar stock bajo y notificar
-export async function checkLowStockAndNotify() {
-  if (!canNotify()) return;
-
-  try {
-    // Obtener items con bajo stock
-    const { data: items } = await supabase
-      .from("market_items")
-      .select("id, name, quantity");
-
-    const { data: inventory } = await supabase
-      .from("inventory")
-      .select("item_id, current_number");
-
-    if (!items || !inventory) return;
-
-    const inventoryMap = new Map(
-      inventory.map((i) => [i.item_id, i.current_number || 0]),
-    );
-
-    const lowStockItems: string[] = [];
-
-    for (const item of items) {
-      const currentNum = inventoryMap.get(item.id) || 0;
-      const requiredMatch = item.quantity.match(/[\d.]+/);
-      const required = requiredMatch ? parseFloat(requiredMatch[0]) : 0;
-
-      if (required > 0 && currentNum < required * 0.2) {
-        lowStockItems.push(item.name);
-      }
-    }
-
-    if (lowStockItems.length > 0) {
-      const itemList = lowStockItems.slice(0, 3).join(", ");
-      const more =
-        lowStockItems.length > 3 ? ` y ${lowStockItems.length - 3} más` : "";
-
-      showNotification(
-        "Stock bajo",
-        `Productos con poco stock: ${itemList}${more}`,
-        { tag: "low-stock" },
-      );
-    }
-  } catch (error) {
-    console.error("Error checking low stock:", error);
+// Solicitar permiso de notificaciones al usuario
+export async function requestNotificationPermission(): Promise<boolean> {
+  if (typeof window === "undefined" || !("Notification" in window)) {
+    return false;
   }
+
+  if (Notification.permission === "granted") return true;
+  if (Notification.permission === "denied") return false;
+
+  const permission = await Notification.requestPermission();
+  return permission === "granted";
 }
 
-// Verificar menú de mañana y notificar para preparación
-export async function checkTomorrowMealAndNotify() {
-  if (!canNotify()) return;
-
-  try {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    // Calcular día del ciclo para mañana
-    const CYCLE_START = new Date(2026, 0, 6);
-    const diffTime = tomorrow.getTime() - CYCLE_START.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0 || tomorrow.getDay() === 0) return;
-
-    // Contar días laborales
-    let workingDays = 0;
-    const tempDate = new Date(CYCLE_START);
-    while (tempDate <= tomorrow) {
-      if (tempDate.getDay() !== 0) workingDays++;
-      tempDate.setDate(tempDate.getDate() + 1);
-    }
-    const cycleDay = (workingDays - 1) % 12;
-
-    // Obtener menú de mañana
-    const { data: menu } = await supabase
-      .from("day_menu")
-      .select("lunch_id, reminder")
-      .eq("day_number", cycleDay)
-      .single();
-
-    if (!menu) return;
-
-    // Obtener nombre de la receta
-    const { data: recipe } = await supabase
-      .from("recipes")
-      .select("name")
-      .eq("id", menu.lunch_id)
-      .single();
-
-    if (recipe) {
-      let body = `Mañana toca: ${recipe.name}`;
-      if (menu.reminder) {
-        body += `. Recordatorio: ${menu.reminder}`;
-      }
-
-      showNotification("Prepara para mañana", body, { tag: "meal-prep" });
-    }
-  } catch (error) {
-    console.error("Error checking tomorrow meal:", error);
-  }
-}
-
-// Track active interval IDs for cleanup
-let stockCheckInterval: ReturnType<typeof setInterval> | null = null;
-let mealPrepInterval: ReturnType<typeof setInterval> | null = null;
-let initialCheckTimeout: ReturnType<typeof setTimeout> | null = null;
-
-// Inicializar verificaciones periódicas
-export function initNotificationChecks() {
-  if (!canNotify()) return;
-
-  // Clean up any existing intervals before creating new ones
-  stopNotificationChecks();
-
-  // Verificar stock bajo cada 4 horas
-  stockCheckInterval = setInterval(
-    () => {
-      checkLowStockAndNotify();
-    },
-    4 * 60 * 60 * 1000,
-  );
-
-  // Verificar a las 7pm para preparar comida de mañana
-  const checkMealPrepTime = () => {
-    const now = new Date();
-    const targetHour = 19; // 7pm
-
-    if (now.getHours() === targetHour && now.getMinutes() < 5) {
-      checkTomorrowMealAndNotify();
-    }
-  };
-
-  // Verificar cada minuto si es hora de la notificación
-  mealPrepInterval = setInterval(checkMealPrepTime, 60 * 1000);
-
-  // También verificar al iniciar
-  initialCheckTimeout = setTimeout(() => {
-    checkLowStockAndNotify();
-    initialCheckTimeout = null;
-  }, 5000);
-
-  logger.info("Notification checks initialized");
-}
-
-// Detener todas las verificaciones periódicas
-export function stopNotificationChecks() {
-  if (stockCheckInterval !== null) {
-    clearInterval(stockCheckInterval);
-    stockCheckInterval = null;
-  }
-  if (mealPrepInterval !== null) {
-    clearInterval(mealPrepInterval);
-    mealPrepInterval = null;
-  }
-  if (initialCheckTimeout !== null) {
-    clearTimeout(initialCheckTimeout);
-    initialCheckTimeout = null;
-  }
-}
-
-// Programar notificación local (para timers, etc.)
+// Programar notificacion local con delay (para timers, etc.)
 export function scheduleNotification(
   title: string,
   body: string,

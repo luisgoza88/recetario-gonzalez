@@ -13,8 +13,8 @@ import {
   Lightbulb,
   ImageIcon,
   ChefHat,
-  Loader2,
 } from "lucide-react";
+import Spinner from "@/components/ui/Spinner";
 import { Recipe, Ingredient, ThermomixRecipe } from "@/types";
 import NutritionDisplay, {
   DietaryTags,
@@ -25,7 +25,7 @@ import SmartSubstitutionPanel from "./SmartSubstitutionPanel";
 import ThermomixView from "./ThermomixView";
 import { useEscapeKey } from "@/hooks/useEscapeKey";
 import FocusTrap from "@/components/ui/FocusTrap";
-import { findThermomixRecipe } from "@/data/thermomix-recipes";
+// findThermomixRecipe is loaded lazily inside the handler to avoid 40KB in initial bundle
 
 interface RecipeModalProps {
   recipe: Recipe;
@@ -72,7 +72,8 @@ export default function RecipeModal({
       return;
     }
 
-    // Check library for pre-adapted recipes
+    // Check library for pre-adapted recipes (lazy import to keep 40KB out of initial bundle)
+    const { findThermomixRecipe } = await import("@/data/thermomix-recipes");
     const libraryRecipe = findThermomixRecipe(recipe.name);
     if (libraryRecipe) {
       thermomixCache.set(cacheKey, libraryRecipe);
@@ -377,8 +378,7 @@ export default function RecipeModal({
                 >
                   {isAdaptingThermomix ? (
                     <>
-                      <Loader2 size={18} className="animate-spin" /> Adaptando a
-                      Thermomix...
+                      <Spinner size="md" /> Adaptando a Thermomix...
                     </>
                   ) : (
                     <>

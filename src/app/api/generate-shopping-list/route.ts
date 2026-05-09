@@ -249,7 +249,6 @@ export async function POST(request: NextRequest) {
           break;
         }
       }
-      if (inStock) continue;
 
       // Determine category
       const marketCategory = marketCatMap.get(key);
@@ -268,9 +267,12 @@ export async function POST(request: NextRequest) {
         store: priceInfo?.bestStore,
         checked: false,
         fromRecipe: data.recipes.join(", "),
+        inStock,
+        alreadyHave: inStock,
       };
 
-      if (priceInfo?.avgPrice) {
+      // Only add estimated price to total for items that still need to be bought
+      if (!inStock && priceInfo?.avgPrice) {
         totalEstimated += priceInfo.avgPrice;
       }
 

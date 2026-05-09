@@ -14,7 +14,6 @@ import {
   AIProposal,
   AIProposedAction,
   AIProposalStatus,
-  HouseholdAITrust,
   AI_RISK_LEVELS,
   ProposalExecutionResult,
   RollbackResult,
@@ -27,9 +26,13 @@ import {
   recordFailedAction,
   recordRollback,
   getTrustStats,
+  getHouseholdTrust,
   TrustDecision,
   RateLimitCheck,
 } from "./trust-service";
+
+// Re-export so callers can import from either service
+export { getHouseholdTrust } from "./trust-service";
 import { logger } from "@/lib/logger";
 
 async function getClient(): Promise<SupabaseClient> {
@@ -125,29 +128,6 @@ export async function isReversible(functionName: string): Promise<boolean> {
 // ============================================
 // TRUST SCORE
 // ============================================
-
-/**
- * Obtiene la configuración de trust de un household
- */
-export async function getHouseholdTrust(
-  householdId: string,
-): Promise<HouseholdAITrust | null> {
-  const db = await getClient();
-  const { data, error } = await db
-    .from("household_ai_trust")
-    .select("*")
-    .eq("household_id", householdId)
-    .single();
-
-  if (error) {
-    logger.error("Error getting household trust", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return null;
-  }
-
-  return data as HouseholdAITrust;
-}
 
 /**
  * Verifica si una acción debe auto-aprobarse basado en el trust level

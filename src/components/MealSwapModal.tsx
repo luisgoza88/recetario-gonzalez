@@ -1,20 +1,19 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   X,
   Search,
   Sparkles,
-  Loader2,
   ChefHat,
   Clock,
   ArrowLeftRight,
 } from "lucide-react";
+import Spinner from "@/components/ui/Spinner";
 import { Recipe, MealType } from "@/types";
-import {
-  expandedRecipes,
-  CATEGORY_CONFIG,
-  type RecipeCategory as ExpandedCategory,
+import type {
+  ExpandedRecipe,
+  RecipeCategory as ExpandedCategory,
 } from "@/data/expanded-recipes";
 import { INITIAL_RECIPES } from "@/data/recipes";
 import { useEscapeKey } from "@/hooks/useEscapeKey";
@@ -64,6 +63,11 @@ const DIFFICULTY_COLORS: Record<string, string> = {
 // Component
 // =====================================================
 
+type CategoryConfigMap = Record<
+  string,
+  { icon: string; color: string; label: string }
+>;
+
 export default function MealSwapModal({
   isOpen,
   onClose,
@@ -77,8 +81,26 @@ export default function MealSwapModal({
     ExpandedCategory | "all"
   >("all");
   const [isLoadingAI, setIsLoadingAI] = useState(false);
+  const [lazyExpandedRecipes, setLazyExpandedRecipes] = useState<
+    ExpandedRecipe[]
+  >([]);
+  const [categoryConfig, setCategoryConfig] = useState<CategoryConfigMap>({});
 
   useEscapeKey(onClose, isOpen);
+
+  // Lazy load expanded-recipes (90KB) only when modal is open
+  useEffect(() => {
+    if (!isOpen) return;
+    let mounted = true;
+    import("@/data/expanded-recipes").then((mod) => {
+      if (!mounted) return;
+      setLazyExpandedRecipes(mod.expandedRecipes);
+      setCategoryConfig(mod.CATEGORY_CONFIG as CategoryConfigMap);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [isOpen]);
 
   // Combine initial recipes + expanded recipes, filtered by meal type
   const allRecipes = useMemo(() => {
@@ -86,7 +108,7 @@ export default function MealSwapModal({
       (r) => r.type === mealType,
     ).map((r) => ({ ...r }) as Recipe);
 
-    const expanded: Recipe[] = expandedRecipes
+    const expanded: Recipe[] = lazyExpandedRecipes
       .filter((r) => r.type === mealType)
       .map(
         (r) =>
@@ -108,7 +130,7 @@ export default function MealSwapModal({
     }
 
     return merged;
-  }, [mealType]);
+  }, [mealType, lazyExpandedRecipes]);
 
   // Filter recipes based on search and category
   const filteredRecipes = useMemo(() => {
@@ -255,7 +277,7 @@ export default function MealSwapModal({
                 }`}
               >
                 {cat.value !== "all" &&
-                  CATEGORY_CONFIG[cat.value as ExpandedCategory]?.icon + " "}
+                  categoryConfig[cat.value as ExpandedCategory]?.icon + " "}
                 {cat.label}
               </button>
             ))}
@@ -269,7 +291,7 @@ export default function MealSwapModal({
           >
             {isLoadingAI ? (
               <>
-                <Loader2 size={16} className="animate-spin" />
+                <Spinner size="sm" />
                 Generando sugerencia...
               </>
             ) : (
@@ -305,6 +327,7 @@ export default function MealSwapModal({
                 <RecipeSwapCard
                   key={recipe.id}
                   recipe={recipe}
+                  categoryConfig={categoryConfig}
                   onSelect={() => handleSelectRecipe(recipe)}
                 />
               ))}
@@ -322,9 +345,11 @@ export default function MealSwapModal({
 
 function RecipeSwapCard({
   recipe,
+  categoryConfig,
   onSelect,
 }: {
   recipe: Recipe;
+  categoryConfig: CategoryConfigMap;
   onSelect: () => void;
 }) {
   const category = (recipe as Recipe & { category?: ExpandedCategory })
@@ -357,12 +382,11 @@ function RecipeSwapCard({
 
           {/* Badges row */}
           <div className="flex flex-wrap gap-1 mt-1">
-            {category && CATEGORY_CONFIG[category] && (
+            {category && categoryConfig[category] && (
               <span
-                className={`text-[0.65rem] px-1.5 py-0.5 rounded-full ${CATEGORY_CONFIG[category].color}`}
+                className={`text-[0.65rem] px-1.5 py-0.5 rounded-full ${categoryConfig[category].color}`}
               >
-                {CATEGORY_CONFIG[category].icon}{" "}
-                {CATEGORY_CONFIG[category].label}
+                {categoryConfig[category].icon} {categoryConfig[category].label}
               </span>
             )}
             {difficulty && difficultyKey && (

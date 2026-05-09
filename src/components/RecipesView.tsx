@@ -1,25 +1,25 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import Image from "next/image";
 import { Search, Plus, Edit2, Trash2, ImageIcon } from "lucide-react";
 import { Recipe, Ingredient, RecipeCategory, ColombianRegion } from "@/types";
-import {
-  expandedRecipes,
-  CATEGORY_CONFIG,
-  ExpandedRecipe,
-} from "@/data/expanded-recipes";
-import {
-  regionalRecipes,
-  REGION_CONFIG,
-  RegionalRecipe,
-} from "@/data/regional-colombian-recipes";
-import RecipeModal from "./RecipeModal";
-import RecipeForm from "./forms/RecipeForm";
+import type { ExpandedRecipe } from "@/data/expanded-recipes";
+import type { RegionalRecipe } from "@/data/regional-colombian-recipes";
 import { CanEdit } from "@/components/auth/RoleGate";
 import { supabase } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import dynamic from "next/dynamic";
+
+const RecipeModal = dynamic(() => import("./RecipeModal"), {
+  loading: () => null,
+  ssr: false,
+});
+const RecipeForm = dynamic(() => import("./forms/RecipeForm"), {
+  loading: () => null,
+  ssr: false,
+});
 
 interface RecipesViewProps {
   recipes: Recipe[];
@@ -64,6 +64,43 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
   const [showForm, setShowForm] = useState(false);
+
+  // Lazy-loaded data to avoid including large static files in the initial bundle
+  const [expandedRecipes, setExpandedRecipes] = useState<ExpandedRecipe[]>([]);
+  const [categoryConfig, setCategoryConfig] = useState<
+    Record<string, { icon: string; color: string; label: string }>
+  >({});
+  const [regionalRecipes, setRegionalRecipes] = useState<RegionalRecipe[]>([]);
+  const [regionConfig, setRegionConfig] = useState<
+    Record<string, { icon: string; color: string; label: string }>
+  >({});
+
+  useEffect(() => {
+    let mounted = true;
+    Promise.all([
+      import("@/data/expanded-recipes"),
+      import("@/data/regional-colombian-recipes"),
+    ]).then(([expandedMod, regionalMod]) => {
+      if (!mounted) return;
+      setExpandedRecipes(expandedMod.expandedRecipes);
+      setCategoryConfig(
+        expandedMod.CATEGORY_CONFIG as Record<
+          string,
+          { icon: string; color: string; label: string }
+        >,
+      );
+      setRegionalRecipes(regionalMod.regionalRecipes);
+      setRegionConfig(
+        regionalMod.REGION_CONFIG as Record<
+          string,
+          { icon: string; color: string; label: string }
+        >,
+      );
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
   const [filter, setFilter] = useState<
     "all" | "breakfast" | "lunch" | "dinner"
   >("all");
@@ -187,13 +224,13 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
     if (recipe.category === "rapida") {
       badges.push({ label: "⚡", className: "bg-blue-100 text-blue-700" });
     }
-    if (recipe.category && CATEGORY_CONFIG[recipe.category as RecipeCategory]) {
-      const cfg = CATEGORY_CONFIG[recipe.category as RecipeCategory];
+    if (recipe.category && categoryConfig[recipe.category as RecipeCategory]) {
+      const cfg = categoryConfig[recipe.category as RecipeCategory];
       badges.push({ label: cfg.icon, className: cfg.color });
     }
     // Region badge for Colombian regional recipes
-    if (recipe.region && REGION_CONFIG[recipe.region]) {
-      const regionCfg = REGION_CONFIG[recipe.region];
+    if (recipe.region && regionConfig[recipe.region]) {
+      const regionCfg = regionConfig[recipe.region];
       badges.push({
         label: `${regionCfg.icon} ${regionCfg.label}`,
         className: regionCfg.color,

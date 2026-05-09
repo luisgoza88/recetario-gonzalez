@@ -5,6 +5,7 @@ import {
   cleanJsonResponse,
 } from "@/lib/gemini/client";
 import { requireAuth } from "@/lib/api/auth";
+import { withRateLimit } from "@/lib/rate-limit";
 import { createAuthenticatedClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 
@@ -34,6 +35,18 @@ interface LibraryImage {
 export async function POST(request: NextRequest) {
   const auth = requireAuth(request);
   if (auth instanceof NextResponse) return auth;
+
+  const userId =
+    request.headers.get("x-user-id") ||
+    request.headers.get("x-forwarded-for") ||
+    "anonymous";
+  const rateLimit = await withRateLimit(userId, "analyze-image");
+  if (!rateLimit.allowed) {
+    return NextResponse.json(rateLimit.response, {
+      status: 429,
+      headers: rateLimit.headers,
+    });
+  }
 
   const supabase = await createAuthenticatedClient();
 
