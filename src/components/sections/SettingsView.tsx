@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Settings,
   Bell,
@@ -14,6 +15,9 @@ import {
   Smartphone,
   Brain,
   UtensilsCrossed,
+  LogOut,
+  User,
+  Mail,
 } from "lucide-react";
 import AICommandCenter from "@/components/ai/AICommandCenter";
 import DietaryPreferencesPanel from "@/components/settings/DietaryPreferencesPanel";
@@ -23,6 +27,7 @@ import {
   useHouseholdId,
   useCurrentHousehold,
 } from "@/lib/stores/useHouseholdStore";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface SettingsSectionProps {
   icon: React.ReactNode;
@@ -73,8 +78,93 @@ export default function SettingsView() {
   const [showAICommandCenter, setShowAICommandCenter] = useState(false);
   const [showDietaryPreferences, setShowDietaryPreferences] = useState(false);
   const [showCookingProfile, setShowCookingProfile] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const householdId = useHouseholdId();
   const household = useCurrentHousehold();
+  const { user, signOut } = useAuth();
+  const router = useRouter();
+
+  /**
+   * Cierra sesión limpiando TODO: cookies, localStorage,
+   * IndexedDB cache y service worker. Después redirige a /auth/login.
+   */
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    const confirmed = window.confirm(
+      "¿Seguro que quieres cerrar sesión? Tendrás que volver a ingresar.",
+    );
+    if (!confirmed) return;
+
+    setSigningOut(true);
+    try {
+      // 1. Sign out de Supabase (limpia cookies + localStorage)
+      await signOut();
+
+      // 2. Limpiar IndexedDB (cache offline de la app)
+      try {
+        const dbs = await window.indexedDB.databases?.();
+        if (dbs) {
+          await Promise.all(
+            dbs.map(
+              (db) =>
+                new Promise<void>((resolve) => {
+                  if (!db.name) return resolve();
+                  const req = window.indexedDB.deleteDatabase(db.name);
+                  req.onsuccess = () => resolve();
+                  req.onerror = () => resolve();
+                  req.onblocked = () => resolve();
+                }),
+            ),
+          );
+        }
+      } catch {
+        /* ignore IndexedDB cleanup errors */
+      }
+
+      // 3. Limpiar localStorage residual (excepto preferencias mínimas)
+      try {
+        Object.keys(localStorage).forEach((key) => {
+          if (
+            key.startsWith("supabase.") ||
+            key.startsWith("sb-") ||
+            key.startsWith("ai_session_") ||
+            key.startsWith("recetario.")
+          ) {
+            localStorage.removeItem(key);
+          }
+        });
+      } catch {
+        /* ignore */
+      }
+
+      // 4. Desregistrar service workers
+      try {
+        if ("serviceWorker" in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((r) => r.unregister()));
+        }
+      } catch {
+        /* ignore SW unregister errors */
+      }
+
+      // 5. Limpiar caches del browser
+      try {
+        if ("caches" in window) {
+          const names = await caches.keys();
+          await Promise.all(names.map((n) => caches.delete(n)));
+        }
+      } catch {
+        /* ignore cache cleanup */
+      }
+
+      // 6. Redirigir a login con hard reload para asegurar estado limpio
+      window.location.href = "/auth/login";
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error);
+      // Forzar redirect aunque falle algo
+      window.location.href = "/auth/login";
+    }
+  };
 
   // Show AI Command Center as full screen
   if (showAICommandCenter) {
@@ -138,17 +228,40 @@ export default function SettingsView() {
         </button>
       </div>
 
+      {/* Cuenta Section - Usuario logueado */}
+      <div className="mb-6">
+        <p className="text-sm font-medium text-gray-500 mb-2 px-1">CUENTA</p>
+        <div className="space-y-2">
+          <div className="bg-white rounded-xl p-4 flex items-center gap-4">
+            <div className="w-14 h-14 bg-gradient-to-br from-purple-400 to-indigo-600 rounded-full flex items-center justify-center text-white text-xl font-bold">
+              {(user?.email?.charAt(0) || "U").toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-base truncate">
+                {user?.full_name || user?.email?.split("@")[0] || "Usuario"}
+              </p>
+              <p className="text-gray-500 text-sm truncate flex items-center gap-1">
+                <Mail size={12} />
+                {user?.email || "Sin sesión"}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Profile Section */}
       <div className="mb-6">
-        <p className="text-sm font-medium text-gray-500 mb-2 px-1">PERFIL</p>
+        <p className="text-sm font-medium text-gray-500 mb-2 px-1">HOGAR</p>
         <div className="space-y-2">
           <div className="bg-white rounded-xl p-4 flex items-center gap-4">
             <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-              MH
+              {(household?.name?.charAt(0) || "H").toUpperCase()}
             </div>
             <div className="flex-1">
-              <p className="font-semibold text-lg">Mi Hogar</p>
-              <p className="text-gray-500 text-sm">2 miembros</p>
+              <p className="font-semibold text-lg">
+                {household?.name || "Mi Hogar"}
+              </p>
+              <p className="text-gray-500 text-sm">Hogar activo</p>
             </div>
             <ChevronRight size={20} className="text-gray-400" />
           </div>
@@ -281,10 +394,27 @@ export default function SettingsView() {
         </div>
       </div>
 
+      {/* Cerrar Sesión - Botón rojo prominente */}
+      <div className="mb-6">
+        <p className="text-sm font-medium text-gray-500 mb-2 px-1">SESIÓN</p>
+        <button
+          onClick={handleSignOut}
+          disabled={signingOut}
+          className="w-full flex items-center justify-center gap-3 p-4 bg-red-50 hover:bg-red-100 active:bg-red-200 disabled:opacity-60 disabled:cursor-not-allowed text-red-600 font-semibold rounded-xl border border-red-200 transition-colors"
+        >
+          <LogOut size={20} />
+          <span>{signingOut ? "Cerrando sesión..." : "Cerrar Sesión"}</span>
+        </button>
+        <p className="text-xs text-gray-500 text-center mt-2 px-2">
+          Al cerrar sesión se limpiará la caché local y deberás iniciar sesión
+          de nuevo
+        </p>
+      </div>
+
       {/* Footer */}
       <div className="text-center text-gray-400 text-sm mt-8">
-        <p>Hecho con ❤️ para la Familia González</p>
-        <p className="mt-1">© 2025 Recetario App</p>
+        <p>Hecho con ❤️ para tu hogar</p>
+        <p className="mt-1">© 2026 Recetario App</p>
       </div>
     </div>
   );
