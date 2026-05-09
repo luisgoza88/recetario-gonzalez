@@ -22,7 +22,12 @@ const PUBLIC_PATHS = [
 ];
 
 // Rutas de API públicas (no requieren auth)
-const PUBLIC_API_PATHS = ["/api/auth", "/api/validate-invitation"];
+const PUBLIC_API_PATHS = [
+  "/api/auth",
+  "/api/validate-invitation",
+  "/api/pwa-icon", // PWA manifest necesita iconos sin sesión
+  "/api/cron", // Cron jobs validan via CRON_SECRET header
+];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

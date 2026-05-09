@@ -20,11 +20,13 @@ const nextConfig: NextConfig = {
     const cspDirectives = [
       "default-src 'self'",
       // unsafe-inline necesario para Next.js inline styles; unsafe-eval solo en dev (hot reload)
-      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://us.i.posthog.com https://us-assets.i.posthog.com`,
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://*.supabase.co https://us.i.posthog.com",
-      "font-src 'self' data:",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://generativelanguage.googleapis.com https://us.i.posthog.com https://us.posthog.com",
+      // vercel.live: feedback widget en deploys; pexels: imagenes de comida
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://us.i.posthog.com https://us-assets.i.posthog.com https://vercel.live`,
+      "style-src 'self' 'unsafe-inline' https://vercel.live https://fonts.googleapis.com",
+      "img-src 'self' data: blob: https://*.supabase.co https://us.i.posthog.com https://images.pexels.com https://images.unsplash.com https://vercel.live https://vercel.com",
+      "font-src 'self' data: https://vercel.live https://fonts.gstatic.com",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://generativelanguage.googleapis.com https://us.i.posthog.com https://us-assets.i.posthog.com https://us.posthog.com https://api.pexels.com https://vercel.live wss://ws-us3.pusher.com",
+      "frame-src https://vercel.live",
       "object-src 'none'",
       "frame-ancestors 'none'",
       "base-uri 'self'",
