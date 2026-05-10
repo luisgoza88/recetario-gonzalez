@@ -56,6 +56,11 @@ export const RATE_LIMIT_CONFIG = {
     limit: 20, // 20 requests
     windowMs: 60 * 60 * 1000, // por hora
   },
+  // Búsqueda externa en Spoonacular (150 req/día en plan gratis)
+  "external-recipe-search": {
+    limit: 30, // 30 requests
+    windowMs: 60 * 60 * 1000, // por hora
+  },
 } as const;
 
 export type RateLimitAction = keyof typeof RATE_LIMIT_CONFIG;
