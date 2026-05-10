@@ -18,6 +18,7 @@ import {
   getLocationString,
 } from "@/lib/cooking-profile";
 import { type Mood, MOODS } from "@/lib/moods";
+import { getAvoidPromptSection } from "@/lib/recipe-recommendations";
 
 // Zod schemas for input validation
 const IngredientWithContextSchema = z.object({
@@ -292,11 +293,13 @@ export async function POST(request: NextRequest) {
       return sanitizeUserInput(text, 200); // Limitar longitud por ingrediente
     });
 
-    // Obtener preparaciones disponibles y recetas recientes
-    const [availablePreparations, dbRecentRecipes] = await Promise.all([
-      getAvailablePreparations(ingredientsList),
-      getRecentRecipeNames(),
-    ]);
+    // Obtener preparaciones disponibles, recetas recientes y recetas a evitar
+    const [availablePreparations, dbRecentRecipes, lowRatedSection] =
+      await Promise.all([
+        getAvailablePreparations(ingredientsList),
+        getRecentRecipeNames(),
+        getAvoidPromptSection(householdId),
+      ]);
 
     // Combinar recetas recientes del request y de la base de datos
     const allRecentRecipes = [
@@ -386,7 +389,7 @@ Trabajas para ${familyName} ${location}. Cocinas para ${cookingProfile.family_si
 
 INGREDIENTES DISPONIBLES EN LA DESPENSA:
 ${ingredientsSection}
-${customSection}${preparationsSection}${avoidSection}${moodSection}
+${customSection}${preparationsSection}${avoidSection}${lowRatedSection}${moodSection}
 REQUERIMIENTOS:
 - Tipo de comida: ${mealTypeLabels[mealType]}
 - Porciones totales: ${servings}

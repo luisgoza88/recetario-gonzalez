@@ -23,6 +23,7 @@ import {
   getHouseholdMoodPatterns,
   formatMoodPatternsForPrompt,
 } from "@/lib/mood-learning";
+import { getAvoidPromptSection } from "@/lib/recipe-recommendations";
 
 // =====================================================
 // Input validation
@@ -331,6 +332,7 @@ export async function POST(request: NextRequest) {
       cookingProfile,
       dietaryPreferences,
       moodPatterns,
+      avoidSection,
     ] = await Promise.all([
       getAvailableInventory(),
       getMarketItems(),
@@ -343,6 +345,7 @@ export async function POST(request: NextRequest) {
       householdId
         ? getHouseholdMoodPatterns(householdId)
         : Promise.resolve(null),
+      getAvoidPromptSection(householdId),
     ]);
 
     const weekDays = getWeekDates(weekStartDate);
@@ -362,6 +365,7 @@ export async function POST(request: NextRequest) {
       dietaryPreferences,
       desiredMoods: desiredMoods as Record<string, Mood> | undefined,
       moodPatterns: formatMoodPatternsForPrompt(moodPatterns),
+      avoidSection,
     });
 
     // Call Gemini
@@ -533,6 +537,7 @@ function buildPrompt(ctx: {
   dietaryPreferences?: DietaryPreferencesRow | null;
   desiredMoods?: Record<string, Mood>;
   moodPatterns?: string;
+  avoidSection?: string;
 }): string {
   const {
     weekDays,
@@ -547,6 +552,7 @@ function buildPrompt(ctx: {
     dietaryPreferences,
     desiredMoods,
     moodPatterns,
+    avoidSection,
   } = ctx;
 
   const familyName = getFamilyDisplayName(cookingProfile);
@@ -576,6 +582,8 @@ function buildPrompt(ctx: {
     feedback.disliked.length > 0
       ? `\nRECETAS QUE NO LES GUSTARON (evitar estilos similares):\n${feedback.disliked.map((r) => `- ${r}`).join("\n")}`
       : "";
+
+  const lowRatedSection = avoidSection || "";
 
   const expandedSection =
     expandedRecipeNames && expandedRecipeNames.length > 0
@@ -622,6 +630,7 @@ ${preparationsSection}
 ${recentSection}
 ${likedSection}
 ${dislikedSection}
+${lowRatedSection}
 ${expandedSection}
 ${getSeasonalPromptText()}
 ${moodPatternsSection}

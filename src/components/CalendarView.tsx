@@ -571,6 +571,59 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
         .from("completed_days")
         .upsert({ date: dateKey, completed: true });
       setCompletedDays((prev) => new Set([...prev, dateKey]));
+
+      // Auto-prompt feedback for the first meal of the day
+      // unless the user already skipped feedback for this date
+      const skipKey = `feedback-skipped-${dateKey}`;
+      const alreadySkipped =
+        typeof sessionStorage !== "undefined" &&
+        sessionStorage.getItem(skipKey) === "1";
+
+      if (!alreadySkipped) {
+        setTimeout(() => {
+          // Try static menu first
+          const menu = getMenuForDate(selectedDate);
+          if (menu) {
+            const firstRecipe =
+              getRecipeById(menu.breakfast_id) ||
+              getRecipeById(menu.lunch_id) ||
+              (menu.dinner_id ? getRecipeById(menu.dinner_id) : undefined);
+            const firstMeal = firstRecipe
+              ? menu.breakfast_id === firstRecipe.id
+                ? "breakfast"
+                : menu.lunch_id === firstRecipe.id
+                  ? "lunch"
+                  : "dinner"
+              : null;
+            if (firstRecipe && firstMeal) {
+              setFeedbackRecipe({
+                recipe: firstRecipe,
+                mealType: firstMeal as MealType,
+              });
+              return;
+            }
+          }
+          // Try generated menu
+          const genInfo = getGeneratedMenuForDate(selectedDate);
+          if (genInfo) {
+            const meal =
+              genInfo.dayData.breakfast ||
+              genInfo.dayData.lunch ||
+              genInfo.dayData.dinner;
+            const mealType = genInfo.dayData.breakfast
+              ? "breakfast"
+              : genInfo.dayData.lunch
+                ? "lunch"
+                : "dinner";
+            if (meal) {
+              setFeedbackRecipe({
+                recipe: generatedMealToRecipe(meal, mealType as MealType),
+                mealType: mealType as MealType,
+              });
+            }
+          }
+        }, 800);
+      }
     }
   };
 
@@ -1349,8 +1402,15 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
           date={selectedDate.toISOString().split("T")[0]}
           mealType={feedbackRecipe.mealType}
           recipe={feedbackRecipe.recipe}
-          onClose={() => setFeedbackRecipe(null)}
-          onSaved={() => {}}
+          onClose={() => {
+            // Mark as skipped so the auto-prompt doesn't fire again this session
+            const dateKey = selectedDate.toISOString().split("T")[0];
+            if (typeof sessionStorage !== "undefined") {
+              sessionStorage.setItem(`feedback-skipped-${dateKey}`, "1");
+            }
+            setFeedbackRecipe(null);
+          }}
+          onSaved={() => setFeedbackRecipe(null)}
         />
       )}
 
