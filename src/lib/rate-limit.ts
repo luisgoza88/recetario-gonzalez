@@ -46,6 +46,16 @@ export const RATE_LIMIT_CONFIG = {
     limit: 5, // 5 intentos
     windowMs: 15 * 60 * 1000, // por 15 minutos
   },
+  // Sustituciones IA en linea
+  "suggest-substitution": {
+    limit: 30, // 30 requests
+    windowMs: 60 * 60 * 1000, // por hora
+  },
+  // Que cocino con esto
+  "cook-with-this": {
+    limit: 20, // 20 requests
+    windowMs: 60 * 60 * 1000, // por hora
+  },
 } as const;
 
 export type RateLimitAction = keyof typeof RATE_LIMIT_CONFIG;
