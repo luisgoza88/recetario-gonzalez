@@ -48,6 +48,8 @@ import BudgetWidget from "./BudgetWidget";
 import { SupermarketMode } from "./SupermarketMode";
 import { PriceComparisonCard } from "./PriceComparisonCard";
 import { groupByAisle } from "@/lib/supermarket-aisle-order";
+import { ShareShoppingListButton } from "@/components/share/ShareShoppingListButton";
+import { CookWithThisButton } from "@/components/recipe/CookWithThisButton";
 
 const AddCustomItemModal = dynamic(() => import("./AddCustomItemModal"), {
   loading: () => null,
@@ -744,6 +746,31 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
 
           {/* Comparador automatico de precios */}
           <PriceComparisonCard items={items} minItems={5} />
+
+          {/* Acciones rapidas: compartir lista + cocinar con inventario */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+            <ShareShoppingListButton
+              items={items
+                .filter((i) => !i.checked)
+                .map((i) => ({
+                  name: i.name,
+                  quantity: i.quantity || undefined,
+                  category: i.category || undefined,
+                  price: undefined,
+                  checked: false,
+                }))}
+              weekLabel={new Date().toLocaleDateString("es-CO", {
+                day: "numeric",
+                month: "long",
+              })}
+            />
+            <CookWithThisButton
+              ingredients={items
+                .filter((i) => (i.currentNumber || 0) > 0)
+                .slice(0, 15)
+                .map((i) => i.name)}
+            />
+          </div>
 
           {/* Layout toggle: Categoria vs Pasillo */}
           <div className="flex items-center gap-2 mb-3">

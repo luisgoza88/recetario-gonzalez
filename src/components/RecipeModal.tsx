@@ -23,6 +23,8 @@ import NutritionDisplay, {
   DifficultyDisplay,
 } from "./NutritionDisplay";
 import SmartSubstitutionPanel from "./SmartSubstitutionPanel";
+import { FavoriteButton } from "@/components/recipe/FavoriteButton";
+import { ShareRecipeButton } from "@/components/share/ShareRecipeButton";
 import ThermomixView from "./ThermomixView";
 import { useEscapeKey } from "@/hooks/useEscapeKey";
 import FocusTrap from "@/components/ui/FocusTrap";
@@ -284,17 +286,29 @@ export default function RecipeModal({
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="p-4 border-b flex justify-between items-center sticky top-0 bg-white z-10">
-            <h3 id="recipe-modal-title" className="font-semibold text-lg pr-2">
+          <div className="p-4 border-b dark:border-gray-800 flex justify-between items-center sticky top-0 bg-white dark:bg-gray-900 z-10">
+            <h3
+              id="recipe-modal-title"
+              className="font-semibold text-lg pr-2 dark:text-white flex-1 truncate"
+            >
               {recipe.name}
             </h3>
-            <button
-              onClick={onClose}
-              aria-label="Cerrar"
-              className="text-gray-500 hover:text-gray-700 p-1 flex-shrink-0"
-            >
-              <X size={24} />
-            </button>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {recipe.id && <FavoriteButton recipeId={recipe.id} size={20} />}
+              {recipe.id && (
+                <ShareRecipeButton
+                  recipeId={recipe.id}
+                  recipeName={recipe.name}
+                />
+              )}
+              <button
+                onClick={onClose}
+                aria-label="Cerrar"
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 p-2 ml-1"
+              >
+                <X size={24} />
+              </button>
+            </div>
           </div>
 
           {/* Content - Scrollable area including image */}

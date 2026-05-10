@@ -18,10 +18,16 @@ import {
   LogOut,
   User,
   Mail,
+  BarChart3,
+  Sparkles,
+  Crown,
 } from "lucide-react";
 import AICommandCenter from "@/components/ai/AICommandCenter";
 import DietaryPreferencesPanel from "@/components/settings/DietaryPreferencesPanel";
 import CookingProfilePanel from "@/components/settings/CookingProfilePanel";
+import MonthlyReportView from "@/components/reports/MonthlyReportView";
+import { KidsMode } from "@/components/kids/KidsMode";
+import { useSubscription } from "@/lib/hooks/useSubscription";
 import { AdminOnly } from "@/components/auth/RoleGate";
 import {
   useHouseholdId,
@@ -78,7 +84,10 @@ export default function SettingsView() {
   const [showAICommandCenter, setShowAICommandCenter] = useState(false);
   const [showDietaryPreferences, setShowDietaryPreferences] = useState(false);
   const [showCookingProfile, setShowCookingProfile] = useState(false);
+  const [showMonthlyReport, setShowMonthlyReport] = useState(false);
+  const [showKidsMode, setShowKidsMode] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const { tier, isPremium } = useSubscription();
   const householdId = useHouseholdId();
   const household = useCurrentHousehold();
   const { user, signOut } = useAuth();
@@ -368,6 +377,58 @@ export default function SettingsView() {
           </div>
         </div>
       </AdminOnly>
+
+      {/* Funciones extras */}
+      <div className="mb-6">
+        <p className="text-sm font-medium text-gray-500 mb-2 px-1">
+          MIS FUNCIONES
+        </p>
+        <div className="space-y-2">
+          <SettingsSection
+            icon={<BarChart3 size={20} />}
+            title="Mi reporte mensual"
+            description="Estadísticas de cocina, gasto y ahorro del mes"
+            onClick={() => setShowMonthlyReport(true)}
+          />
+          <SettingsSection
+            icon={<Sparkles size={20} />}
+            title="Modo Niños"
+            description="Pantalla simple para que los chicos ayuden en cocina"
+            onClick={() => setShowKidsMode(true)}
+          />
+          <SettingsSection
+            icon={<Crown size={20} />}
+            title={isPremium ? `Plan ${tier}` : "Actualizar a Premium"}
+            description={
+              isPremium
+                ? "✓ Funciones premium activas"
+                : "Recetas e imágenes ilimitadas, asistente de voz"
+            }
+            onClick={() => {
+              if (!isPremium) {
+                window.alert(
+                  "Premium llega pronto. Por ahora puedes activarlo manualmente desde la BD.",
+                );
+              }
+            }}
+            rightContent={
+              isPremium ? (
+                <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full font-bold">
+                  ⭐ {tier.toUpperCase()}
+                </span>
+              ) : undefined
+            }
+          />
+        </div>
+      </div>
+
+      {/* Modal Reporte Mensual */}
+      {showMonthlyReport && (
+        <MonthlyReportView onClose={() => setShowMonthlyReport(false)} />
+      )}
+
+      {/* Modal Modo Niños */}
+      {showKidsMode && <KidsMode onClose={() => setShowKidsMode(false)} />}
 
       {/* Información */}
       <div className="mb-6">
