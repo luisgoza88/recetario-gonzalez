@@ -12,6 +12,7 @@ import { createServerClient } from "@supabase/ssr";
 const PUBLIC_PATHS = [
   "/auth",
   "/join",
+  "/r/", // Páginas públicas de recetas compartidas
   "/_next",
   "/favicon",
   "/manifest",
