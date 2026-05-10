@@ -26,6 +26,7 @@ import SmartSubstitutionPanel from "./SmartSubstitutionPanel";
 import ThermomixView from "./ThermomixView";
 import { useEscapeKey } from "@/hooks/useEscapeKey";
 import FocusTrap from "@/components/ui/FocusTrap";
+import { CookingMode } from "@/components/CookingMode";
 // findThermomixRecipe is loaded lazily inside the handler to avoid 40KB in initial bundle
 
 interface RecipeModalProps {
@@ -54,6 +55,7 @@ export default function RecipeModal({
   const [selectedSubstitutions, setSelectedSubstitutions] = useState<
     Map<string, string>
   >(new Map());
+  const [showCookingMode, setShowCookingMode] = useState(false);
   const [showThermomix, setShowThermomix] = useState(false);
   const [thermomixRecipe, setThermomixRecipe] =
     useState<ThermomixRecipe | null>(null);
@@ -388,6 +390,18 @@ export default function RecipeModal({
                 </div>
               )}
 
+              {/* Cooking Mode Button */}
+              {recipe.steps && recipe.steps.length > 0 && (
+                <div className="mb-4">
+                  <button
+                    onClick={() => setShowCookingMode(true)}
+                    className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 px-4 rounded-xl font-semibold flex items-center justify-center gap-2 hover:from-purple-700 hover:to-indigo-700 transition-all shadow-md"
+                  >
+                    Empezar a cocinar
+                  </button>
+                </div>
+              )}
+
               {/* Thermomix Adapt Button */}
               <div className="mb-4">
                 <button
@@ -618,6 +632,14 @@ export default function RecipeModal({
           />
         )}
       </div>
+
+      {/* Cooking Mode — full-screen overlay */}
+      {showCookingMode && (
+        <CookingMode
+          recipe={recipe}
+          onClose={() => setShowCookingMode(false)}
+        />
+      )}
     </FocusTrap>
   );
 }

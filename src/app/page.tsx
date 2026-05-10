@@ -65,6 +65,14 @@ const FloatingAIAssistant = dynamic(
   },
 );
 
+const ProactiveSuggestionToast = dynamic(
+  () =>
+    import("@/components/ai/ProactiveSuggestionToast").then(
+      (m) => m.ProactiveSuggestionToast,
+    ),
+  { ssr: false },
+);
+
 const YolimaView = dynamic(() => import("@/components/yolima/YolimaView"), {
   loading: () => <DynamicLoadingSpinner />,
   ssr: false,
@@ -73,6 +81,8 @@ import { useAppStore } from "@/lib/stores/useAppStore";
 import { useHouseholdId } from "@/lib/stores/useHouseholdStore";
 import { useOptionalAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase/client";
+import { useProactiveAlerts } from "@/lib/hooks/useProactiveAlerts";
+import logger from "@/lib/logger";
 
 export default function Home() {
   // Check if user is employee → render YolimaView (simplified mode)
@@ -95,6 +105,39 @@ export default function Home() {
   const [showAICommandCenter, setShowAICommandCenter] = useState(false);
   const [pendingAIProposals, setPendingAIProposals] = useState(0);
   const householdId = useHouseholdId();
+
+  // ─── Proactive alerts ────────────────────────────────────────────────────────
+  const { alerts: proactiveAlerts, dismissForHours } = useProactiveAlerts({
+    autoGenerateOnMount: !isEmployee,
+    refreshIntervalMs: 30 * 60 * 1000,
+  });
+
+  // Alerta de mayor prioridad (top 1) para mostrar en el toast
+  const topAlert = proactiveAlerts[0] ?? null;
+  const [toastDismissedId, setToastDismissedId] = useState<string | null>(null);
+  const visibleToast =
+    topAlert && topAlert.id !== toastDismissedId ? topAlert : null;
+
+  /** Maneja la accion del toast y navega al destino correcto */
+  const handleToastAction = () => {
+    if (!visibleToast?.action) return;
+    const { type, payload } = visibleToast.action;
+    const p = payload as Record<string, string> | undefined;
+
+    if (type === "navigate" && p?.tab) {
+      navigateToRecetario(
+        p.tab as "calendar" | "market" | "recipes" | "suggestions",
+      );
+    } else if (type === "add_to_shopping_list") {
+      // Navega al mercado; la lista se gestiona alli
+      navigateToRecetario("market");
+    } else {
+      logger.warn("ProactiveSuggestionToast: accion desconocida", {
+        type,
+        payload,
+      });
+    }
+  };
 
   // Fetch pending AI proposals count
   useEffect(() => {
@@ -221,6 +264,18 @@ export default function Home() {
           </ErrorBoundary>
         )}
       </main>
+
+      {/* Proactive AI Suggestion Toast — top-priority alert */}
+      {visibleToast && (
+        <ProactiveSuggestionToast
+          alert={visibleToast}
+          onDismiss={() => {
+            setToastDismissedId(visibleToast.id);
+            dismissForHours(visibleToast.id, 4);
+          }}
+          onAction={handleToastAction}
+        />
+      )}
 
       {/* Floating AI Assistant Chat */}
       <FloatingAIAssistant activeSection={activeSection} />

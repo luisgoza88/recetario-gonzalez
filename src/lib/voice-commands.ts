@@ -84,7 +84,7 @@ export function createSpeechRecognition(): SpeechRecognition | null {
   const recognition = new SpeechRecognitionClass();
   recognition.continuous = false;
   recognition.interimResults = true;
-  recognition.lang = "es-ES";
+  recognition.lang = "es-ES"; // Spanish (Spain/neutral)
   recognition.maxAlternatives = 1;
 
   return recognition;
