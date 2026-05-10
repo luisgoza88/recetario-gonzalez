@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   RotateCcw,
   ShoppingCart,
@@ -19,6 +19,9 @@ import {
   PlusIcon,
   ListChecks,
   TrendingDown,
+  ShoppingBasket,
+  LayoutList,
+  Map,
 } from "lucide-react";
 import Spinner from "@/components/ui/Spinner";
 import { supabase } from "@/lib/supabase/client";
@@ -42,6 +45,9 @@ import {
 import dynamic from "next/dynamic";
 import SmartShoppingSection from "./SmartShoppingSection";
 import BudgetWidget from "./BudgetWidget";
+import { SupermarketMode } from "./SupermarketMode";
+import { PriceComparisonCard } from "./PriceComparisonCard";
+import { groupByAisle } from "@/lib/supermarket-aisle-order";
 
 const AddCustomItemModal = dynamic(() => import("./AddCustomItemModal"), {
   loading: () => null,
@@ -93,6 +99,22 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
     estimated_meals: number;
     summary: string;
   } | null>(null);
+
+  // Lista por pasillo vs por categoria
+  const [listLayout, setListLayout] = useState<"category" | "aisle">(() => {
+    if (typeof window !== "undefined") {
+      return (
+        (localStorage.getItem("market_list_layout") as
+          | "category"
+          | "aisle"
+          | null) ?? "aisle"
+      );
+    }
+    return "aisle";
+  });
+
+  // Modo supermercado pantalla completa
+  const [showSupermarketMode, setShowSupermarketMode] = useState(false);
 
   const [priceLogItem, setPriceLogItem] = useState<{
     id: string;
@@ -174,16 +196,13 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
     const query = searchQuery
       .toLowerCase()
       .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
+      .replace(/[̀-ͯ]/g, "");
     return items.filter((item) => {
-      const name = item.name
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
+      const name = item.name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
       const category = item.category
         .toLowerCase()
         .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
+        .replace(/[̀-ͯ]/g, "");
       return name.includes(query) || category.includes(query);
     });
   }, [items, searchQuery]);
@@ -278,6 +297,12 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
     } finally {
       setLoading(null);
     }
+  };
+
+  // Handler para SupermarketMode (recibe id de string)
+  const toggleItemById = (id: string) => {
+    const item = items.find((i) => i.id === id);
+    if (item) toggleItem(item, true);
   };
 
   const handlePriceLog = async (price: number, store: string) => {
@@ -446,6 +471,11 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
     return getItemIcon(item.name, item.category_id, item.category, baseIcon);
   };
 
+  const handleListLayoutChange = (layout: "category" | "aisle") => {
+    setListLayout(layout);
+    localStorage.setItem("market_list_layout", layout);
+  };
+
   // Contar items personalizados
   const customItemsCount = items.filter((i) => i.is_custom).length;
 
@@ -478,7 +508,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
     };
   }, [items, currentMonth]);
 
-  // Agrupar items filtrados por categoría
+  // Agrupar items filtrados por categoría (modo categoria)
   const categories = filteredItems.reduce(
     (acc, item) => {
       if (!acc[item.category]) {
@@ -488,6 +518,12 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
       return acc;
     },
     {} as Record<string, MarketItem[]>,
+  );
+
+  // Agrupar por pasillo (modo aisle)
+  const aisleGroups = useMemo(
+    () => groupByAisle(filteredItems),
+    [filteredItems],
   );
 
   return (
@@ -706,81 +742,93 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
             </div>
           )}
 
-          {/* Shopping List - Simplified: Only checkboxes */}
-          {Object.entries(categories).map(([category, categoryItems]) => (
-            <div key={category} className="mb-4">
-              <div className="bg-green-700 text-white px-4 py-3 rounded-t-lg font-semibold flex items-center gap-2">
-                <span>{getCategoryEmoji(categoryItems[0])}</span>
-                {category}
-              </div>
-              <div className="bg-white rounded-b-lg shadow-sm overflow-hidden">
-                {categoryItems.map((item) => {
-                  return (
-                    <div
-                      key={item.id}
-                      className={`
-                        flex items-center p-4 border-b last:border-b-0 transition-colors cursor-pointer
-                        ${item.checked ? "bg-green-50" : "hover:bg-gray-50"}
-                        ${item.is_custom ? "border-l-4 border-l-purple-400" : ""}
-                      `}
-                      onClick={() => !loading && toggleItem(item)}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={item.checked}
-                        onChange={() => toggleItem(item)}
-                        disabled={loading === item.id}
-                        className="w-6 h-6 mr-3 accent-green-700 cursor-pointer"
-                        onClick={(e) => e.stopPropagation()}
+          {/* Comparador automatico de precios */}
+          <PriceComparisonCard items={items} minItems={5} />
+
+          {/* Layout toggle: Categoria vs Pasillo */}
+          <div className="flex items-center gap-2 mb-3">
+            <button
+              onClick={() => handleListLayoutChange("category")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                listLayout === "category"
+                  ? "bg-green-700 text-white"
+                  : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
+              }`}
+            >
+              <LayoutList size={14} />
+              Categoria
+            </button>
+            <button
+              onClick={() => handleListLayoutChange("aisle")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                listLayout === "aisle"
+                  ? "bg-green-700 text-white"
+                  : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
+              }`}
+            >
+              <Map size={14} />
+              Pasillo del super
+            </button>
+          </div>
+
+          {/* Boton "Estoy comprando" */}
+          <button
+            onClick={() => setShowSupermarketMode(true)}
+            className="w-full flex items-center justify-center gap-2 py-3 mb-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold rounded-xl shadow-sm hover:shadow-md active:scale-[0.98] transition-all"
+          >
+            <ShoppingBasket size={20} />
+            Estoy comprando
+          </button>
+
+          {/* Shopping List - Aisle mode */}
+          {listLayout === "aisle"
+            ? aisleGroups.map(({ aisle, items: aisleItems }) => (
+                <div key={aisle} className="mb-4">
+                  <div className="bg-green-700 text-white px-4 py-3 rounded-t-lg font-semibold flex items-center gap-2">
+                    <span>{getCategoryEmoji(aisleItems[0])}</span>
+                    {aisle}
+                  </div>
+                  <div className="bg-white rounded-b-lg shadow-sm overflow-hidden">
+                    {aisleItems.map((item) => (
+                      <ShoppingItemRow
+                        key={item.id}
+                        item={item}
+                        loading={loading}
+                        onToggle={toggleItem}
+                        onDelete={(i) =>
+                          setConfirmAction({ type: "delete-item", item: i })
+                        }
                       />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span
-                            className={`font-medium truncate ${item.checked ? "line-through text-gray-400" : ""}`}
-                          >
-                            {item.name}
-                          </span>
-                          {item.is_custom && (
-                            <span className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                              <Sparkles size={10} />
-                              nuevo
-                            </span>
-                          )}
-                          <SeasonalBadge itemName={item.name} compact />
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`
-                          text-sm px-3 py-1 rounded-full font-medium
-                          ${
-                            item.checked
-                              ? "bg-green-100 text-green-700"
-                              : "bg-gray-100 text-gray-600"
-                          }
-                        `}
-                        >
-                          {item.quantity}
-                        </span>
-                        {item.is_custom && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setConfirmAction({ type: "delete-item", item });
-                            }}
-                            disabled={loading === item.id}
-                            className="w-7 h-7 flex items-center justify-center bg-gray-100 text-gray-500 rounded-md hover:bg-red-100 hover:text-red-600 disabled:opacity-30 text-sm"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+                    ))}
+                  </div>
+                </div>
+              ))
+            : null}
+
+          {/* Shopping List - Category mode */}
+          {listLayout === "category"
+            ? Object.entries(categories).map(([category, categoryItems]) => (
+                <div key={category} className="mb-4">
+                  <div className="bg-green-700 text-white px-4 py-3 rounded-t-lg font-semibold flex items-center gap-2">
+                    <span>{getCategoryEmoji(categoryItems[0])}</span>
+                    {category}
+                  </div>
+                  <div className="bg-white rounded-b-lg shadow-sm overflow-hidden">
+                    {categoryItems.map((item) => (
+                      <ShoppingItemRow
+                        key={item.id}
+                        item={item}
+                        loading={loading}
+                        onToggle={toggleItem}
+                        onDelete={(i) =>
+                          setConfirmAction({ type: "delete-item", item: i })
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))
+            : null}
         </>
       ) : viewMode === "pantry" ? (
         <>
@@ -939,6 +987,21 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
       ) : (
         /* Price Comparison View */
         <PriceComparisonView />
+      )}
+
+      {/* Modo supermercado pantalla completa */}
+      {showSupermarketMode && (
+        <SupermarketMode
+          items={items.map((i) => ({
+            id: i.id,
+            name: i.name,
+            quantity: i.quantity,
+            checked: i.checked,
+            category: i.category,
+          }))}
+          onToggleItem={toggleItemById}
+          onClose={() => setShowSupermarketMode(false)}
+        />
       )}
 
       {/* Speed Dial FAB */}
@@ -1148,6 +1211,77 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
         }
         variant="danger"
       />
+    </div>
+  );
+}
+
+// Fila reutilizable para la lista de compras (modo categoria y modo pasillo)
+function ShoppingItemRow({
+  item,
+  loading,
+  onToggle,
+  onDelete,
+}: {
+  item: MarketItem;
+  loading: string | null;
+  onToggle: (item: MarketItem) => void;
+  onDelete: (item: MarketItem) => void;
+}) {
+  return (
+    <div
+      className={`
+        flex items-center p-4 border-b last:border-b-0 transition-colors cursor-pointer
+        ${item.checked ? "bg-green-50" : "hover:bg-gray-50"}
+        ${item.is_custom ? "border-l-4 border-l-purple-400" : ""}
+      `}
+      onClick={() => !loading && onToggle(item)}
+    >
+      <input
+        type="checkbox"
+        checked={item.checked}
+        onChange={() => onToggle(item)}
+        disabled={loading === item.id}
+        className="w-6 h-6 mr-3 accent-green-700 cursor-pointer"
+        onClick={(e) => e.stopPropagation()}
+      />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span
+            className={`font-medium truncate ${item.checked ? "line-through text-gray-400" : ""}`}
+          >
+            {item.name}
+          </span>
+          {item.is_custom && (
+            <span className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+              <Sparkles size={10} />
+              nuevo
+            </span>
+          )}
+          <SeasonalBadge itemName={item.name} compact />
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <span
+          className={`
+            text-sm px-3 py-1 rounded-full font-medium
+            ${item.checked ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}
+          `}
+        >
+          {item.quantity}
+        </span>
+        {item.is_custom && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(item);
+            }}
+            disabled={loading === item.id}
+            className="w-7 h-7 flex items-center justify-center bg-gray-100 text-gray-500 rounded-md hover:bg-red-100 hover:text-red-600 disabled:opacity-30 text-sm"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
