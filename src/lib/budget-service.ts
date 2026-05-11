@@ -79,12 +79,14 @@ export async function getCurrentBudget(
   const endStr = periodEnd.toISOString().split("T")[0];
 
   // Buscar presupuesto existente
-  const { data, error } = await supabase
+  // .maybeSingle() en vez de .single() para que devuelva null sin error 406
+  // cuando no hay presupuesto (caso normal hasta que el usuario cree uno).
+  const { data } = await supabase
     .from("budgets")
     .select("*")
     .eq("period_type", periodType)
     .eq("period_start", startStr)
-    .single();
+    .maybeSingle();
 
   if (data) return data as Budget;
 
