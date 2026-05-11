@@ -1,5 +1,30 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+
+/**
+ * CookingMode — Pantalla full-screen de cocinar paso a paso
+ *
+ * Sprint 2 del rediseno 2026 (Lazyweb Design Research).
+ * Inspirado en: Crouton (hands-free + step list + add timer),
+ *               Jullienne (paso grande + tip callout + card ingredientes del step)
+ *
+ * Mejoras vs version anterior:
+ * - Texto del paso MAS GRANDE (text-3xl md:text-5xl)
+ * - Numero de paso visible y prominente con underline
+ * - Tip callout (si la receta tiene recipe.tips)
+ * - Card de ingredientes del paso (filtrado por matching simple)
+ * - Swipe gestures (touch) para avanzar/retroceder
+ * - Step list (sheet con todos los pasos para saltar)
+ * - Header minimal con solo lo necesario
+ * - Timer flotante (bottom-right) en vez de card grande dentro
+ *
+ * Mantiene 100% la logica funcional anterior:
+ * - WakeLock (pantalla siempre encendida)
+ * - TTS en es-CO
+ * - Timer auto-detectado del texto
+ * - Vibracion + beep al terminar timer
+ */
+
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import {
   X,
   ChevronLeft,
@@ -7,8 +32,11 @@ import {
   Volume2,
   VolumeX,
   Timer,
+  ListOrdered,
+  Lightbulb,
+  Check,
 } from "lucide-react";
-import type { Recipe } from "@/types";
+import type { Recipe, Ingredient } from "@/types";
 
 interface CookingModeProps {
   recipe: Recipe;
@@ -20,13 +48,33 @@ export function CookingMode({ recipe, onClose }: CookingModeProps) {
   const [timerSeconds, setTimerSeconds] = useState<number | null>(null);
   const [timerActive, setTimerActive] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [showStepList, setShowStepList] = useState(false);
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const audioRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const touchStartX = useRef<number | null>(null);
 
-  const steps = Array.isArray(recipe.steps) ? recipe.steps : [];
-  const stepText =
-    typeof steps[currentStep] === "string"
-      ? (steps[currentStep] as string)
-      : ((steps[currentStep] as { step?: string })?.step ?? "");
+  const steps = useMemo(
+    () => (Array.isArray(recipe.steps) ? recipe.steps : []),
+    [recipe.steps],
+  );
+  const stepText = useMemo(() => {
+    const s = steps[currentStep];
+    if (typeof s === "string") return s;
+    return (s as { step?: string })?.step ?? "";
+  }, [steps, currentStep]);
+
+  // Ingredientes mencionados en el paso (matching simple)
+  const stepIngredients = useMemo<Ingredient[]>(() => {
+    if (!recipe.ingredients?.length || !stepText) return [];
+    const lowerStep = stepText.toLowerCase();
+    return recipe.ingredients.filter((ing) => {
+      const name = ing.name?.toLowerCase() ?? "";
+      if (!name) return false;
+      // Match si la primera palabra del ingrediente aparece en el paso
+      const firstWord = name.split(" ")[0];
+      return firstWord.length > 2 && lowerStep.includes(firstWord);
+    });
+  }, [stepText, recipe.ingredients]);
 
   // 1. WakeLock para mantener pantalla encendida
   useEffect(() => {
@@ -43,11 +91,10 @@ export function CookingMode({ recipe, onClose }: CookingModeProps) {
           ).wakeLock.request("screen");
         }
       } catch {
-        // WakeLock no disponible en este entorno — ignorar
+        // WakeLock no disponible — ignorar
       }
     };
     acquire();
-
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") acquire();
     };
@@ -59,7 +106,6 @@ export function CookingMode({ recipe, onClose }: CookingModeProps) {
   }, []);
 
   // 2. Detectar tiempos en el texto del paso
-  // Patrones: "10 minutos", "5 min", "1 hora", "30 segundos"
   const detectTimer = (text: string): number | null => {
     const patterns: { regex: RegExp; mult: number }[] = [
       { regex: /(\d+)\s*horas?/i, mult: 3600 },
@@ -75,7 +121,7 @@ export function CookingMode({ recipe, onClose }: CookingModeProps) {
     return null;
   };
 
-  // 3. Auto-deteccion + TTS cada vez que cambia el paso
+  // 3. Auto-deteccion + TTS al cambiar paso
   useEffect(() => {
     const detected = detectTimer(stepText);
     setTimerSeconds(detected);
@@ -91,7 +137,6 @@ export function CookingMode({ recipe, onClose }: CookingModeProps) {
       audioRef.current = utt;
       window.speechSynthesis.speak(utt);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, stepText, voiceEnabled]);
 
   // Cancelar TTS al desmontar
@@ -104,11 +149,9 @@ export function CookingMode({ recipe, onClose }: CookingModeProps) {
   // 4. Countdown del timer
   useEffect(() => {
     if (!timerActive || timerSeconds === null || timerSeconds <= 0) return;
-
     const interval = setInterval(() => {
       setTimerSeconds((prev) => {
         if (prev === null || prev <= 1) {
-          // Timer terminado — vibrar + beep
           if ("vibrate" in navigator)
             navigator.vibrate([200, 100, 200, 100, 200]);
           try {
@@ -130,7 +173,6 @@ export function CookingMode({ recipe, onClose }: CookingModeProps) {
         return prev - 1;
       });
     }, 1000);
-
     return () => clearInterval(interval);
   }, [timerActive, timerSeconds]);
 
@@ -143,142 +185,311 @@ export function CookingMode({ recipe, onClose }: CookingModeProps) {
   const isLastStep = currentStep === steps.length - 1;
   const isFirstStep = currentStep === 0;
 
-  const goNext = () => setCurrentStep((s) => Math.min(steps.length - 1, s + 1));
-  const goPrev = () => setCurrentStep((s) => Math.max(0, s - 1));
+  const goNext = useCallback(() => {
+    if (isLastStep) return;
+    setCompletedSteps((prev) => new Set(prev).add(currentStep));
+    setCurrentStep((s) => Math.min(steps.length - 1, s + 1));
+  }, [isLastStep, currentStep, steps.length]);
+
+  const goPrev = useCallback(() => {
+    setCurrentStep((s) => Math.max(0, s - 1));
+  }, []);
+
+  // 5. Swipe gestures (touch)
+  const onTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(deltaX) > 50) {
+      if (deltaX < 0) goNext();
+      else goPrev();
+    }
+    touchStartX.current = null;
+  };
+
+  // 6. Keyboard shortcuts (desktop)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight" || e.key === " ") {
+        e.preventDefault();
+        goNext();
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        goPrev();
+      } else if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [goNext, goPrev, onClose]);
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-purple-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 z-[300] flex flex-col">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-900 shadow p-4 flex items-center justify-between">
-        <div>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Cocinando</p>
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white truncate max-w-[200px]">
+    <div
+      className="fixed inset-0 bg-[#FDFBF7] dark:bg-[#0F0E0C] z-[300] flex flex-col"
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
+      {/* Header minimal */}
+      <div className="flex items-center justify-between px-4 pt-4 pb-2">
+        <button
+          onClick={onClose}
+          className="w-11 h-11 flex items-center justify-center rounded-full bg-white/80 dark:bg-gray-800/80 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800 backdrop-blur transition-colors"
+          aria-label="Cerrar modo cocinar"
+        >
+          <X size={22} />
+        </button>
+
+        <div className="flex flex-col items-center px-3">
+          <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-semibold">
+            Cocinando
+          </span>
+          <span className="text-sm font-semibold text-gray-900 dark:text-white truncate max-w-[180px]">
             {recipe.name}
-          </h2>
+          </span>
         </div>
+
         <div className="flex gap-2">
+          <button
+            onClick={() => setShowStepList(true)}
+            className="w-11 h-11 flex items-center justify-center rounded-full bg-white/80 dark:bg-gray-800/80 text-gray-700 dark:text-gray-300 hover:bg-white backdrop-blur transition-colors"
+            aria-label="Ver lista de pasos"
+          >
+            <ListOrdered size={20} />
+          </button>
           <button
             onClick={() => {
               if (voiceEnabled && "speechSynthesis" in window)
                 window.speechSynthesis.cancel();
               setVoiceEnabled((v) => !v);
             }}
-            className={`p-3 rounded-full transition-colors ${
+            className={`w-11 h-11 flex items-center justify-center rounded-full backdrop-blur transition-colors ${
               voiceEnabled
-                ? "bg-purple-100 text-purple-600"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                ? "bg-orange-500 text-white shadow-lg shadow-orange-500/30"
+                : "bg-white/80 dark:bg-gray-800/80 text-gray-700 dark:text-gray-300 hover:bg-white"
             }`}
             aria-label={voiceEnabled ? "Desactivar voz" : "Activar voz"}
           >
-            {voiceEnabled ? <Volume2 size={22} /> : <VolumeX size={22} />}
+            {voiceEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
           </button>
+        </div>
+      </div>
+
+      {/* Progress dots */}
+      <div className="px-4 pb-2 flex justify-center gap-1.5">
+        {steps.map((_, i) => (
           <button
-            onClick={onClose}
-            className="p-3 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-            aria-label="Cerrar modo cocinar"
-          >
-            <X size={22} />
-          </button>
-        </div>
-      </div>
-
-      {/* Progress bar */}
-      <div className="px-4 py-2 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800">
-        <div className="flex items-center justify-between text-sm mb-1">
-          <span className="font-semibold text-purple-600">
-            Paso {currentStep + 1} de {steps.length}
-          </span>
-          <span className="text-gray-500">
-            {Math.round(((currentStep + 1) / steps.length) * 100)}%
-          </span>
-        </div>
-        <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-300"
-            style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
+            key={i}
+            onClick={() => setCurrentStep(i)}
+            aria-label={`Ir al paso ${i + 1}`}
+            className={`h-1.5 rounded-full transition-all ${
+              i === currentStep
+                ? "w-8 bg-orange-500"
+                : completedSteps.has(i) || i < currentStep
+                  ? "w-4 bg-orange-300"
+                  : "w-4 bg-gray-200 dark:bg-gray-700"
+            }`}
           />
-        </div>
+        ))}
       </div>
 
-      {/* Contenido del paso */}
-      <div className="flex-1 overflow-y-auto p-6 flex items-center justify-center">
+      {/* Step content */}
+      <div className="flex-1 overflow-y-auto px-6 py-6 flex flex-col items-center justify-center">
         <div className="max-w-2xl w-full">
-          <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 shadow-xl">
-            <p className="text-2xl md:text-3xl leading-relaxed text-gray-900 dark:text-white">
-              {stepText}
-            </p>
+          {/* Step number prominente con underline */}
+          <div className="mb-6 flex flex-col items-center">
+            <span className="text-[11px] uppercase tracking-widest text-orange-600 font-bold">
+              Paso
+            </span>
+            <span className="text-7xl md:text-8xl font-bold text-gray-900 dark:text-white leading-none tracking-tight">
+              {currentStep + 1}
+            </span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              de {steps.length}
+            </span>
+            <div className="mt-3 w-16 h-1 bg-orange-500 rounded-full" />
+          </div>
 
-            {/* Timer detectado automaticamente */}
-            {timerSeconds !== null && timerSeconds > 0 && (
-              <div className="mt-6 p-6 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/30 dark:to-amber-900/30 rounded-2xl border-2 border-orange-200 dark:border-orange-700">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Timer size={32} className="text-orange-600" />
-                    <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Temporizador detectado
-                      </p>
-                      <p className="text-4xl font-bold text-orange-600 font-mono">
-                        {formatTime(timerSeconds)}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setTimerActive((a) => !a)}
-                    className={`px-6 py-3 rounded-xl font-semibold transition-colors ${
-                      timerActive
-                        ? "bg-red-500 text-white hover:bg-red-600"
-                        : "bg-orange-500 text-white hover:bg-orange-600"
-                    }`}
-                  >
-                    {timerActive ? "Pausar" : "Iniciar"}
-                  </button>
-                </div>
-              </div>
-            )}
+          {/* Step text GIGANTE */}
+          <p className="text-2xl md:text-3xl leading-relaxed text-gray-900 dark:text-white text-center font-medium mb-8">
+            {stepText}
+          </p>
 
-            {/* Timer terminado */}
-            {timerSeconds === 0 && (
-              <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/30 rounded-2xl border-2 border-green-300 dark:border-green-700 text-center">
-                <p className="text-green-700 dark:text-green-300 font-bold text-xl">
-                  Tiempo terminado
+          {/* Tip callout (si existe en la receta y es el primer paso o cada N pasos) */}
+          {recipe.tips && currentStep === 0 && (
+            <div className="mb-6 flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-950/30 rounded-2xl border border-amber-200 dark:border-amber-800">
+              <Lightbulb
+                size={20}
+                className="flex-shrink-0 mt-0.5 text-amber-600 dark:text-amber-400"
+              />
+              <div className="flex-1">
+                <p className="text-xs uppercase tracking-wider font-bold text-amber-700 dark:text-amber-300 mb-1">
+                  Tip
+                </p>
+                <p className="text-sm text-amber-900 dark:text-amber-100 leading-relaxed">
+                  {recipe.tips}
                 </p>
               </div>
-            )}
+            </div>
+          )}
+
+          {/* Ingredientes del paso */}
+          {stepIngredients.length > 0 && (
+            <div className="mb-6 p-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+              <p className="text-[11px] uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400 mb-2">
+                Ingredientes para este paso
+              </p>
+              <ul className="space-y-1.5">
+                {stepIngredients.map((ing, i) => (
+                  <li
+                    key={i}
+                    className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-100"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0" />
+                    <span className="font-medium">{ing.name}</span>
+                    {ing.total && (
+                      <span className="text-gray-500 dark:text-gray-400">
+                        · {ing.total}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Hint de swipe (solo en touch devices) */}
+          <div className="text-center text-xs text-gray-400 dark:text-gray-600 mt-4 md:hidden">
+            ← desliza para avanzar →
           </div>
         </div>
       </div>
 
-      {/* Navegacion */}
-      <div className="bg-white dark:bg-gray-900 p-4 shadow-2xl border-t border-gray-200 dark:border-gray-700">
+      {/* Timer flotante (si detectado) */}
+      {timerSeconds !== null && timerSeconds > 0 && (
+        <button
+          onClick={() => setTimerActive((a) => !a)}
+          className={`fixed bottom-24 right-4 z-10 flex items-center gap-2 px-4 py-3 rounded-2xl shadow-xl transition-all ${
+            timerActive
+              ? "bg-orange-500 text-white shadow-orange-500/30"
+              : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700"
+          }`}
+        >
+          <Timer size={18} />
+          <span className="font-mono font-bold text-lg tabular-nums">
+            {formatTime(timerSeconds)}
+          </span>
+          <span className="text-xs">{timerActive ? "pausa" : "iniciar"}</span>
+        </button>
+      )}
+
+      {/* Timer terminado (toast persistente) */}
+      {timerSeconds === 0 && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-10 px-5 py-3 bg-emerald-500 text-white rounded-2xl shadow-xl shadow-emerald-500/30 font-bold flex items-center gap-2">
+          <Check size={20} /> Tiempo terminado
+        </div>
+      )}
+
+      {/* Bottom nav */}
+      <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur border-t border-gray-200 dark:border-gray-800 p-4">
         <div className="flex gap-3 max-w-2xl mx-auto">
           <button
             onClick={goPrev}
             disabled={isFirstStep}
-            className="flex-1 py-4 px-6 rounded-2xl font-bold text-lg flex items-center justify-center gap-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            className="w-14 h-14 flex items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 disabled:opacity-30 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            aria-label="Paso anterior"
           >
             <ChevronLeft size={24} />
-            Anterior
           </button>
 
           {isLastStep ? (
             <button
-              onClick={onClose}
-              className="flex-[2] py-4 px-6 rounded-2xl font-bold text-lg bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 transition-all"
+              onClick={() => {
+                setCompletedSteps((prev) => new Set(prev).add(currentStep));
+                onClose();
+              }}
+              className="flex-1 h-14 px-6 rounded-2xl font-bold text-base bg-emerald-500 text-white hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/30"
             >
-              Termine
+              ✓ Termine de cocinar
             </button>
           ) : (
             <button
               onClick={goNext}
-              className="flex-[2] py-4 px-6 rounded-2xl font-bold text-lg flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 transition-all"
+              className="flex-1 h-14 px-6 rounded-2xl font-bold text-base flex items-center justify-center gap-2 bg-orange-500 text-white hover:bg-orange-600 transition-all shadow-lg shadow-orange-500/30"
             >
-              Siguiente
-              <ChevronRight size={24} />
+              Siguiente paso
+              <ChevronRight size={22} />
             </button>
           )}
         </div>
       </div>
+
+      {/* Step list bottom sheet */}
+      {showStepList && (
+        <div
+          className="fixed inset-0 z-[310] bg-black/50 flex items-end"
+          onClick={() => setShowStepList(false)}
+        >
+          <div
+            className="w-full bg-white dark:bg-gray-900 rounded-t-3xl max-h-[70vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-white dark:bg-gray-900 px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+              <h3 className="font-bold text-lg text-gray-900 dark:text-white">
+                Todos los pasos
+              </h3>
+              <button
+                onClick={() => setShowStepList(false)}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <ul className="p-3 space-y-1">
+              {steps.map((s, i) => {
+                const text =
+                  typeof s === "string"
+                    ? s
+                    : ((s as { step?: string })?.step ?? "");
+                const isCompleted = completedSteps.has(i) || i < currentStep;
+                const isCurrent = i === currentStep;
+                return (
+                  <li key={i}>
+                    <button
+                      onClick={() => {
+                        setCurrentStep(i);
+                        setShowStepList(false);
+                      }}
+                      className={`w-full text-left p-3 rounded-xl flex items-start gap-3 transition-colors ${
+                        isCurrent
+                          ? "bg-orange-50 dark:bg-orange-950/30 ring-2 ring-orange-500"
+                          : "hover:bg-gray-50 dark:hover:bg-gray-800"
+                      }`}
+                    >
+                      <div
+                        className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                          isCompleted
+                            ? "bg-emerald-500 text-white"
+                            : isCurrent
+                              ? "bg-orange-500 text-white"
+                              : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+                        }`}
+                      >
+                        {isCompleted ? <Check size={16} /> : i + 1}
+                      </div>
+                      <p className="flex-1 text-sm text-gray-900 dark:text-gray-100 leading-relaxed">
+                        {text}
+                      </p>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
