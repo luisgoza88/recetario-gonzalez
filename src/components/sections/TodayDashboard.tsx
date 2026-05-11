@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import {
   Sun,
   Moon,
@@ -22,8 +23,11 @@ import {
   Lightbulb,
   X,
   ChevronRight,
+  Play,
+  Image as ImageIcon,
 } from "lucide-react";
-import { ScheduledTask } from "@/types";
+import { MoodChip } from "@/components/ui/MoodChip";
+import { ScheduledTask, Recipe } from "@/types";
 import ProactiveAlerts from "@/components/ProactiveAlerts";
 import EmployeeCompletionBanner from "@/components/yolima/EmployeeCompletionBanner";
 import ShareButton from "@/components/ShareButton";
@@ -123,116 +127,172 @@ export default function TodayDashboard({
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
-        {/* Menú de Hoy */}
-        <section className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 bg-green-50 border-b">
-            <div className="flex items-center gap-2">
-              <ChefHat size={20} className="text-green-700" />
-              <h2 className="font-semibold text-green-800">Menú de Hoy</h2>
-            </div>
-            <div className="flex items-center gap-2">
-              {todayMenu && (
-                <ShareButton
-                  message={formatDayMenuForWhatsApp({
-                    breakfast: todayMenu.breakfast?.name,
-                    lunch: todayMenu.lunch?.name,
-                    dinner: todayMenu.dinner?.name || null,
-                  })}
-                  title="Compartir menú"
-                  variant="icon"
-                  className="text-green-600"
-                />
-              )}
-              <button
-                onClick={() => onNavigateToRecetario("calendar")}
-                className="text-green-600 text-sm flex items-center gap-1 hover:text-green-700"
-              >
-                Ver <ArrowRight size={16} />
-              </button>
-            </div>
-          </div>
+        {/* Sprint 3 - Today Hero (Lazyweb research: NYT Cooking + FitOn pattern):
+            Hero gigante con foto del LUNCH (comida principal) + chips de info +
+            acciones primarias. Separa visualmente la comida principal del
+            resto del dia. */}
+        {(() => {
+          const heroMeal: Recipe | undefined =
+            todayMenu?.lunch ?? todayMenu?.dinner ?? todayMenu?.breakfast;
+          const heroLabel = todayMenu?.lunch
+            ? "Hoy almuerzas"
+            : todayMenu?.dinner
+              ? "Hoy cenas"
+              : todayMenu?.breakfast
+                ? "Hoy desayunas"
+                : null;
 
-          <div className="divide-y">
-            {/* Desayuno */}
-            <div className="p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {getMealIcon("breakfast")}
-                <div>
-                  <p className="text-xs text-gray-500 uppercase">
-                    {getMealLabel("breakfast")}
-                  </p>
-                  <p className="font-medium text-gray-800">
-                    {todayMenu?.breakfast?.name || "Sin definir"}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => onNavigateToRecetario("calendar")}
-                className="text-gray-400 hover:text-green-600"
-              >
-                <ArrowRight size={18} />
-              </button>
-            </div>
-
-            {/* Almuerzo */}
-            <div className="p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {getMealIcon("lunch")}
-                <div>
-                  <p className="text-xs text-gray-500 uppercase">
-                    {getMealLabel("lunch")}
-                  </p>
-                  <p className="font-medium text-gray-800">
-                    {todayMenu?.lunch?.name || "Sin definir"}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => onNavigateToRecetario("calendar")}
-                className="text-gray-400 hover:text-green-600"
-              >
-                <ArrowRight size={18} />
-              </button>
-            </div>
-
-            {/* Cena */}
-            <div className="p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {getMealIcon("dinner")}
-                <div>
-                  <p className="text-xs text-gray-500 uppercase">
-                    {getMealLabel("dinner")}
-                  </p>
-                  {todayMenu?.dinner ? (
-                    <p className="font-medium text-gray-800">
-                      {todayMenu.dinner.name}
-                    </p>
-                  ) : (
-                    <p className="text-gray-400 italic">
-                      No hay cena programada
-                    </p>
-                  )}
-                </div>
-              </div>
-              {!todayMenu?.dinner ? (
-                <button
-                  onClick={() => onNavigateToRecetario("suggestions")}
-                  className="bg-purple-100 text-purple-700 px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 hover:bg-purple-200"
-                >
-                  <Sparkles size={14} />
-                  Generar
-                </button>
-              ) : (
+          if (!heroMeal || !heroLabel) {
+            return (
+              <section className="bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/40 dark:to-amber-950/40 rounded-3xl p-6 text-center border border-orange-100 dark:border-orange-900/50">
+                <ChefHat size={48} className="mx-auto mb-3 text-orange-400" />
+                <h2 className="font-bold text-lg text-gray-900 dark:text-white mb-2">
+                  Sin menú definido para hoy
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  Configura tu menú o genera uno con IA
+                </p>
                 <button
                   onClick={() => onNavigateToRecetario("calendar")}
-                  className="text-gray-400 hover:text-green-600"
+                  className="bg-orange-500 text-white font-semibold px-5 py-2.5 rounded-xl hover:bg-orange-600 transition-colors"
                 >
-                  <ArrowRight size={18} />
+                  Ir al calendario
                 </button>
+              </section>
+            );
+          }
+
+          const cookTime = heroMeal.cook_time ?? heroMeal.total_time;
+          const mood = heroMeal.moods?.[0];
+
+          return (
+            <section className="rounded-3xl overflow-hidden bg-white dark:bg-gray-800 shadow-sm border border-gray-100 dark:border-gray-700">
+              {/* Hero photo (4:3) */}
+              <div className="relative w-full aspect-[4/3] bg-gradient-to-br from-orange-100 to-amber-100 dark:from-orange-900/30 dark:to-amber-900/30">
+                {heroMeal.image_url ? (
+                  <Image
+                    src={heroMeal.image_url}
+                    alt={heroMeal.name}
+                    fill
+                    sizes="(max-width: 512px) 100vw, 512px"
+                    className="object-cover"
+                    priority
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <ImageIcon
+                      size={48}
+                      className="text-orange-300 dark:text-orange-700"
+                    />
+                  </div>
+                )}
+                {/* Share button overlay */}
+                {todayMenu && (
+                  <div className="absolute top-3 right-3">
+                    <ShareButton
+                      message={formatDayMenuForWhatsApp({
+                        breakfast: todayMenu.breakfast?.name,
+                        lunch: todayMenu.lunch?.name,
+                        dinner: todayMenu.dinner?.name || null,
+                      })}
+                      title="Compartir menú del día"
+                      variant="icon"
+                      className="bg-white/90 dark:bg-gray-900/90 backdrop-blur rounded-full p-2 text-gray-700 dark:text-gray-300 shadow-md"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Info + actions */}
+              <div className="p-5">
+                <p className="text-xs uppercase tracking-wider font-bold text-orange-600 mb-1">
+                  {heroLabel}
+                </p>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white leading-tight mb-3">
+                  {heroMeal.name}
+                </h2>
+
+                {/* Chips: tiempo, mood */}
+                <div className="flex flex-wrap items-center gap-2 mb-4">
+                  {cookTime && (
+                    <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                      <Clock size={12} /> {cookTime} min
+                    </span>
+                  )}
+                  {mood && <MoodChip mood={mood} size="sm" />}
+                  {heroMeal.difficulty && (
+                    <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 capitalize">
+                      {heroMeal.difficulty}
+                    </span>
+                  )}
+                </div>
+
+                {/* Acciones primarias */}
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => onNavigateToRecetario("calendar")}
+                    className="w-full h-12 rounded-xl bg-orange-500 text-white font-semibold flex items-center justify-center gap-2 hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20"
+                  >
+                    <Play size={18} fill="currentColor" />
+                    Empezar a cocinar
+                  </button>
+                  <button
+                    onClick={() => onNavigateToRecetario("market")}
+                    className="w-full h-11 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium flex items-center justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    <ShoppingCart size={16} />
+                    Ver lista de mercado
+                  </button>
+                </div>
+              </div>
+
+              {/* Otros tiempos del dia (compactos) */}
+              {(todayMenu?.breakfast ||
+                todayMenu?.dinner ||
+                todayMenu?.lunch) && (
+                <div className="border-t border-gray-100 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700">
+                  {todayMenu?.breakfast && heroMeal !== todayMenu.breakfast && (
+                    <CompactMealRow
+                      label="Desayuno"
+                      meal={todayMenu.breakfast}
+                      icon={<Coffee size={16} className="text-amber-600" />}
+                      onClick={() => onNavigateToRecetario("calendar")}
+                    />
+                  )}
+                  {todayMenu?.dinner && heroMeal !== todayMenu.dinner && (
+                    <CompactMealRow
+                      label="Cena"
+                      meal={todayMenu.dinner}
+                      icon={<Moon size={16} className="text-indigo-600" />}
+                      onClick={() => onNavigateToRecetario("calendar")}
+                    />
+                  )}
+                  {!todayMenu?.dinner && (
+                    <button
+                      onClick={() => onNavigateToRecetario("suggestions")}
+                      className="w-full p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Moon size={16} className="text-indigo-600" />
+                        <div className="text-left">
+                          <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-semibold">
+                            Cena
+                          </p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                            No hay cena · genera con IA
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-xs font-semibold text-purple-600 dark:text-purple-400 inline-flex items-center gap-1 bg-purple-100 dark:bg-purple-950/40 px-2.5 py-1 rounded-full">
+                        <Sparkles size={12} /> Generar
+                      </span>
+                    </button>
+                  )}
+                </div>
               )}
-            </div>
-          </div>
-        </section>
+            </section>
+          );
+        })()}
 
         {/* Hogar Hoy */}
         <section className="bg-white rounded-2xl shadow-sm border overflow-hidden">
@@ -795,5 +855,62 @@ export default function TodayDashboard({
         </div>
       )}
     </div>
+  );
+}
+
+// =====================================================
+// Sub-componentes (Sprint 3 - Today Hero)
+// =====================================================
+
+interface CompactMealRowProps {
+  label: string;
+  meal: Recipe;
+  icon: React.ReactNode;
+  onClick: () => void;
+}
+
+function CompactMealRow({ label, meal, icon, onClick }: CompactMealRowProps) {
+  const cookTime = meal.cook_time ?? meal.total_time;
+  return (
+    <button
+      onClick={onClick}
+      className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors text-left"
+    >
+      {/* Thumbnail compact */}
+      <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-gradient-to-br from-orange-100 to-amber-100 dark:from-orange-900/30 dark:to-amber-900/30 flex-shrink-0">
+        {meal.image_url ? (
+          <Image
+            src={meal.image_url}
+            alt={meal.name}
+            fill
+            sizes="48px"
+            className="object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            {icon}
+          </div>
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-semibold flex items-center gap-1">
+          {icon} {label}
+        </p>
+        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+          {meal.name}
+        </p>
+      </div>
+
+      {cookTime && (
+        <span className="text-xs text-gray-500 dark:text-gray-400 inline-flex items-center gap-0.5 flex-shrink-0">
+          <Clock size={11} /> {cookTime}m
+        </span>
+      )}
+      <ChevronRight
+        size={16}
+        className="text-gray-300 dark:text-gray-600 flex-shrink-0"
+      />
+    </button>
   );
 }

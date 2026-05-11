@@ -47,6 +47,9 @@ const MealSwapModal = dynamic(() => import("./MealSwapModal"), {
   loading: () => null,
   ssr: false,
 });
+// Sprint 1 (Lazyweb design research mayo 2026): vista alternativa
+// con cards visuales por dia (patron Crouton/Blue Apron/Amie).
+import WeeklyCardsView from "./WeeklyCardsView";
 
 interface CalendarViewProps {
   recipes: Recipe[];
@@ -102,6 +105,22 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
   const goToTodaySignal = useGoToTodaySignal();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  // Sprint 1 (mayo 2026): toggle entre vista mensual (grid clasico)
+  // y vista semanal (cards visuales con foto, recomendado por research)
+  const [viewMode, setViewMode] = useState<"month" | "week">(() => {
+    if (typeof window === "undefined") return "week";
+    return (
+      (localStorage.getItem("calendar-view-mode") as "month" | "week") ?? "week"
+    );
+  });
+  const [weekStart, setWeekStart] = useState<Date>(() => {
+    const d = new Date();
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    d.setDate(diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
   const [dayMenu, setDayMenu] = useState<DayMenu[]>([]);
   const [completedDays, setCompletedDays] = useState<Set<string>>(new Set());
   const [expandedRecipe, setExpandedRecipe] = useState<string | null>(null);
@@ -1356,35 +1375,105 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
         genera semanas personalizadas
       </div>
 
-      {/* Calendar Grid */}
-      <div className="bg-white rounded-xl p-4 shadow-sm">
-        <div className="grid grid-cols-7 text-center text-xs text-gray-500 font-semibold mb-2">
-          <div>Lu</div>
-          <div>Ma</div>
-          <div>Mi</div>
-          <div>Ju</div>
-          <div>Vi</div>
-          <div>Sá</div>
-          <div>Do</div>
+      {/* View toggle: Semana (cards visuales) vs Mes (grid clasico) */}
+      <div className="flex justify-center mb-3">
+        <div className="inline-flex p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
+          <button
+            onClick={() => {
+              setViewMode("week");
+              if (typeof window !== "undefined") {
+                localStorage.setItem("calendar-view-mode", "week");
+              }
+            }}
+            className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+              viewMode === "week"
+                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                : "text-gray-600 dark:text-gray-400"
+            }`}
+          >
+            Semana
+          </button>
+          <button
+            onClick={() => {
+              setViewMode("month");
+              if (typeof window !== "undefined") {
+                localStorage.setItem("calendar-view-mode", "month");
+              }
+            }}
+            className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+              viewMode === "month"
+                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                : "text-gray-600 dark:text-gray-400"
+            }`}
+          >
+            Mes
+          </button>
         </div>
-        <div className="grid grid-cols-7 gap-1">{renderCalendar()}</div>
       </div>
 
-      {/* Legend */}
-      <div className="flex justify-center gap-4 mt-4 text-xs flex-wrap">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-green-50 border-2 border-green-700 rounded" />
-          <span>Estático</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-indigo-50 border-2 border-indigo-600 rounded" />
-          <span>IA Generado</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-purple-50 border border-purple-300 rounded" />
-          <span>Domingo</span>
-        </div>
-      </div>
+      {viewMode === "week" ? (
+        <WeeklyCardsView
+          weekStart={weekStart}
+          recipes={recipes}
+          dayMenu={dayMenu}
+          getDayOfCycle={getDayOfCycle}
+          getGeneratedMenuForDate={getGeneratedMenuForDate}
+          completedDays={completedDays}
+          selectedDate={selectedDate}
+          onSelectDate={(date) => selectDate(date)}
+          onPrevWeek={() => {
+            const d = new Date(weekStart);
+            d.setDate(d.getDate() - 7);
+            setWeekStart(d);
+          }}
+          onNextWeek={() => {
+            const d = new Date(weekStart);
+            d.setDate(d.getDate() + 7);
+            setWeekStart(d);
+          }}
+          onJumpToday={() => {
+            const d = new Date();
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            d.setDate(diff);
+            d.setHours(0, 0, 0, 0);
+            setWeekStart(d);
+            selectDate(new Date());
+          }}
+        />
+      ) : (
+        <>
+          {/* Calendar Grid (vista clasica mensual) */}
+          <div className="bg-white rounded-xl p-4 shadow-sm">
+            <div className="grid grid-cols-7 text-center text-xs text-gray-500 font-semibold mb-2">
+              <div>Lu</div>
+              <div>Ma</div>
+              <div>Mi</div>
+              <div>Ju</div>
+              <div>Vi</div>
+              <div>Sá</div>
+              <div>Do</div>
+            </div>
+            <div className="grid grid-cols-7 gap-1">{renderCalendar()}</div>
+          </div>
+
+          {/* Legend */}
+          <div className="flex justify-center gap-4 mt-4 text-xs flex-wrap">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-green-50 border-2 border-green-700 rounded" />
+              <span>Estático</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-indigo-50 border-2 border-indigo-600 rounded" />
+              <span>IA Generado</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-purple-50 border border-purple-300 rounded" />
+              <span>Domingo</span>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Day Detail */}
       <div id="day-detail">{renderDayDetail()}</div>
