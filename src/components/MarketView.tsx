@@ -50,6 +50,11 @@ import { PriceComparisonCard } from "./PriceComparisonCard";
 import { groupByAisle } from "@/lib/supermarket-aisle-order";
 import { ShareShoppingListButton } from "@/components/share/ShareShoppingListButton";
 import { CookWithThisButton } from "@/components/recipe/CookWithThisButton";
+// Sprint 6 (Lazyweb research mayo 2026): Whole Foods pattern - sugerir
+// items recurrentes basados en purchase_patterns arriba de la lista
+import { RecurringItemsCard } from "@/components/market/RecurringItemsCard";
+import { useHouseholdId } from "@/lib/stores/useHouseholdStore";
+import type { DueItem } from "@/lib/recurring-items";
 
 const AddCustomItemModal = dynamic(() => import("./AddCustomItemModal"), {
   loading: () => null,
@@ -123,6 +128,10 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
     name: string;
   } | null>(null);
 
+  // Sprint 6: items recurrentes (purchase_patterns)
+  const householdId = useHouseholdId();
+  const [dueItems, setDueItems] = useState<DueItem[]>([]);
+
   const [confirmAction, setConfirmAction] = useState<{
     type: "reset-market" | "delete-item";
     item?: MarketItem;
@@ -147,6 +156,25 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
       setCategoryData(catMap);
     }
   };
+
+  // Sprint 6 (Whole Foods pattern): cargar items recurrentes del hogar
+  useEffect(() => {
+    if (!householdId) return;
+    let cancelled = false;
+    fetch(`/api/recurring-items?household_id=${householdId}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data) => {
+        if (!cancelled && Array.isArray(data?.items)) {
+          setDueItems(data.items);
+        }
+      })
+      .catch(() => {
+        // Silenciar - sin recurring items no rompe el resto
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [householdId]);
 
   // Cache items cuando están online para uso offline posterior
   useEffect(() => {
@@ -653,6 +681,28 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
           <div className="mb-4">
             <BudgetWidget compact />
           </div>
+
+          {/* Sprint 6 (Whole Foods pattern): items que probablemente
+              se acabaron pronto basado en purchase_patterns historicos.
+              Se renderiza solo si hay items due (RecurringItemsCard
+              retorna null si lista vacia). */}
+          {dueItems.length > 0 && (
+            <div className="mb-4">
+              <RecurringItemsCard
+                items={dueItems}
+                onAddItem={(item) => {
+                  toast.info(
+                    `Agregar "${item.itemName}" — usa el boton + arriba`,
+                  );
+                }}
+                onAddAll={(items) => {
+                  toast.info(
+                    `${items.length} items recurrentes — usa el modal de agregar`,
+                  );
+                }}
+              />
+            </div>
+          )}
 
           {/* Smart Shopping Section (AI Weekly List) */}
           <SmartShoppingSection onRefreshMarket={onUpdate} />
