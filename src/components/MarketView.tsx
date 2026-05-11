@@ -536,7 +536,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
           onClick={() => setViewMode("shopping")}
           className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-medium transition-colors ${
             viewMode === "shopping"
-              ? "bg-green-700 text-white"
+              ? "bg-orange-500 text-white"
               : "bg-white text-gray-600 hover:bg-gray-50"
           }`}
         >
@@ -700,7 +700,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
           {/* De temporada este mes */}
           {(seasonalData.peak.length > 0 ||
             seasonalData.inSeason.length > 0) && (
-            <div className="bg-gradient-to-r from-amber-50 to-green-50 border border-amber-200 rounded-xl p-4 mb-4">
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 mb-4">
               <h3 className="font-semibold text-amber-800 text-sm mb-2 flex items-center gap-2">
                 <span aria-hidden="true">&#x1F33E;</span>
                 De temporada en {seasonalData.monthName}
@@ -778,7 +778,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
               onClick={() => handleListLayoutChange("category")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 listLayout === "category"
-                  ? "bg-green-700 text-white"
+                  ? "bg-orange-500 text-white"
                   : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
               }`}
             >
@@ -789,7 +789,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
               onClick={() => handleListLayoutChange("aisle")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 listLayout === "aisle"
-                  ? "bg-green-700 text-white"
+                  ? "bg-orange-500 text-white"
                   : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
               }`}
             >
@@ -801,7 +801,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
           {/* Boton "Estoy comprando" */}
           <button
             onClick={() => setShowSupermarketMode(true)}
-            className="w-full flex items-center justify-center gap-2 py-3 mb-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold rounded-xl shadow-sm hover:shadow-md active:scale-[0.98] transition-all"
+            className="w-full flex items-center justify-center gap-2 py-3 mb-4 bg-gradient-to-r from-orange-500 to-emerald-600 text-white font-semibold rounded-xl shadow-sm hover:shadow-md active:scale-[0.98] transition-all"
           >
             <ShoppingBasket size={20} />
             Estoy comprando
@@ -811,7 +811,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
           {listLayout === "aisle"
             ? aisleGroups.map(({ aisle, items: aisleItems }) => (
                 <div key={aisle} className="mb-4">
-                  <div className="bg-green-700 text-white px-4 py-3 rounded-t-lg font-semibold flex items-center gap-2">
+                  <div className="bg-orange-500 text-white px-4 py-3 rounded-t-lg font-semibold flex items-center gap-2">
                     <span>{getCategoryEmoji(aisleItems[0])}</span>
                     {aisle}
                   </div>
@@ -836,7 +836,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
           {listLayout === "category"
             ? Object.entries(categories).map(([category, categoryItems]) => (
                 <div key={category} className="mb-4">
-                  <div className="bg-green-700 text-white px-4 py-3 rounded-t-lg font-semibold flex items-center gap-2">
+                  <div className="bg-orange-500 text-white px-4 py-3 rounded-t-lg font-semibold flex items-center gap-2">
                     <span>{getCategoryEmoji(categoryItems[0])}</span>
                     {category}
                   </div>
@@ -1087,7 +1087,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
           {/* Main FAB Button */}
           <button
             onClick={() => setFabOpen(!fabOpen)}
-            className={`bg-gradient-to-br from-green-500 to-emerald-600 text-white p-4 rounded-full shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-105 ${
+            className={`bg-gradient-to-br from-orange-500 to-emerald-600 text-white p-4 rounded-full shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-105 ${
               fabOpen ? "rotate-45" : "rotate-0"
             }`}
             aria-label={fabOpen ? "Cerrar opciones" : "Abrir opciones"}
@@ -1117,7 +1117,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
       {showSmartList && smartListData && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
           <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col">
-            <div className="p-4 border-b flex items-center justify-between bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-t-2xl">
+            <div className="p-4 border-b flex items-center justify-between bg-gradient-to-r from-blue-500 to-orange-500 text-white rounded-t-2xl">
               <div>
                 <h3 className="font-bold text-lg">Lista Inteligente</h3>
                 <p className="text-sm text-white/80">

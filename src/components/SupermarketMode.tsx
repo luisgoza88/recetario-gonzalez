@@ -74,7 +74,7 @@ export function SupermarketMode({
   return (
     <div className="fixed inset-0 bg-white dark:bg-gray-900 z-50 flex flex-col">
       {/* Header con progreso */}
-      <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white p-4 sticky top-0 z-10 shadow-md">
+      <div className="bg-gradient-to-r from-orange-500 to-emerald-600 text-white p-4 sticky top-0 z-10 shadow-md">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-xl font-bold">Modo Supermercado</h2>

@@ -226,7 +226,7 @@ export default function RecipeForm({
               <button
                 type="submit"
                 disabled={state.loading}
-                className="flex-1 py-3 bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:opacity-50"
+                className="flex-1 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50"
               >
                 {state.loading
                   ? "Guardando..."

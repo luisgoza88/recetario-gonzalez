@@ -337,7 +337,7 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
               flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border
               ${
                 categoryFilter === cat.key
-                  ? "bg-green-700 text-white border-green-700"
+                  ? "bg-orange-500 text-white border-green-700"
                   : "bg-white text-gray-600 hover:bg-gray-50 border-gray-200"
               }
             `}
@@ -385,7 +385,7 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
           onClick={() => setMoodFilters([])}
           className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border ${
             moodFilters.length === 0
-              ? "bg-green-700 text-white border-green-700"
+              ? "bg-orange-500 text-white border-green-700"
               : "bg-white text-gray-600 hover:bg-gray-50 border-gray-200"
           }`}
         >
@@ -412,7 +412,7 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
               px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors
               ${
                 filter === type
-                  ? "bg-green-700 text-white"
+                  ? "bg-orange-500 text-white"
                   : "bg-white text-gray-600 hover:bg-gray-100"
               }
             `}

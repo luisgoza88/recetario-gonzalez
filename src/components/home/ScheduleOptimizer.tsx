@@ -414,7 +414,7 @@ export default function ScheduleOptimizer({
             <div
               className={`h-full transition-all duration-500 ${
                 utilizationPercent <= 100
-                  ? "bg-gradient-to-r from-green-500 to-blue-500"
+                  ? "bg-gradient-to-r from-orange-500 to-blue-500"
                   : "bg-red-500"
               }`}
               style={{ width: `${Math.min(utilizationPercent, 100)}%` }}

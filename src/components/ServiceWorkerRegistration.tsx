@@ -120,7 +120,7 @@ export default function ServiceWorkerRegistration() {
                 <div className="flex gap-2 mt-3">
                   <button
                     onClick={handleRequestPermission}
-                    className="flex-1 bg-green-700 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-green-800"
+                    className="flex-1 bg-orange-500 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-orange-600"
                   >
                     Activar
                   </button>

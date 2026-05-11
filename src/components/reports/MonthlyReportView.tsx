@@ -186,7 +186,7 @@ export default function MonthlyReportView({ onClose }: MonthlyReportViewProps) {
             </div>
 
             {/* Spending */}
-            <div className="bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-2xl p-5 shadow-xl">
+            <div className="bg-gradient-to-br from-orange-500 to-emerald-600 text-white rounded-2xl p-5 shadow-xl">
               <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
                 <DollarSign size={20} />
                 Gasto y Ahorro

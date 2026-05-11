@@ -90,7 +90,7 @@ export default function TodayDashboard({
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-blue-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-blue-50">
         <div className="text-center">
           <Spinner size="xl" className="mx-auto mb-4" />
           <p className="text-gray-600">Cargando tu día...</p>
@@ -100,7 +100,7 @@ export default function TodayDashboard({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-blue-50">
       {/* Header con saludo */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-lg mx-auto px-4 py-4">

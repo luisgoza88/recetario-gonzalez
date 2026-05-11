@@ -680,7 +680,7 @@ export default function ScheduleGenerator({
                 {/* Intelligence Metrics */}
                 {useIntelligence &&
                   (learnedTasksCount > 0 || employeeScores.length > 0) && (
-                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-3 space-y-2">
+                    <div className="bg-gradient-to-r from-orange-50 to-emerald-50 rounded-xl p-3 space-y-2">
                       <div className="flex items-center gap-2 text-green-700 font-medium text-sm">
                         <Brain size={16} />
                         Datos de Inteligencia Aplicados

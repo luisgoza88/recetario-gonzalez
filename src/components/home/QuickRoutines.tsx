@@ -188,7 +188,7 @@ const QUICK_ROUTINES: Routine[] = [
     name: "Llegó el Bebé",
     description: "Preparar espacio para bebé/niño",
     icon: <Baby size={24} />,
-    color: "from-green-500 to-green-600",
+    color: "from-orange-500 to-green-600",
     totalMinutes: 20,
     tasks: [
       {

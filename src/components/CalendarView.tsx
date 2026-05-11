@@ -692,7 +692,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
             ${isToday ? "ring-2 ring-green-700" : ""}
             ${isSelected && hasGenerated ? "bg-indigo-600 text-white" : ""}
             ${isSelected && isSunday && !hasGenerated ? "bg-purple-600 text-white" : ""}
-            ${isSelected && !isSunday && !hasGenerated ? "bg-green-700 text-white" : ""}
+            ${isSelected && !isSunday && !hasGenerated ? "bg-orange-500 text-white" : ""}
           `}
         >
           <span>{day}</span>
@@ -1020,7 +1020,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
 
     return (
       <div className="mt-4">
-        <div className="bg-green-700 text-white p-4 rounded-t-xl flex justify-between items-center">
+        <div className="bg-orange-500 text-white p-4 rounded-t-xl flex justify-between items-center">
           <h3 className="font-semibold">
             📅 {dayName} {selectedDate.getDate()}{" "}
             {MONTHS[selectedDate.getMonth()]}
@@ -1205,7 +1205,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
             ${
               isCompleted
                 ? "bg-green-50 text-green-700 border-2 border-green-200"
-                : "bg-green-700 text-white hover:bg-green-800"
+                : "bg-orange-500 text-white hover:bg-orange-600"
             }
           `}
         >
@@ -1340,7 +1340,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
               ${
                 isGeneratingShoppingList
                   ? "bg-green-100 text-green-400 cursor-wait"
-                  : "bg-green-700 text-white hover:bg-green-800 shadow-sm hover:shadow-md"
+                  : "bg-orange-500 text-white hover:bg-orange-600 shadow-sm hover:shadow-md"
               }
             `}
         >

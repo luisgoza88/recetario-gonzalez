@@ -130,14 +130,14 @@ export default function BottomNavigation({
                     transition-all duration-200 relative
                     ${
                       isActive
-                        ? "text-green-700 bg-white"
+                        ? "text-orange-700 bg-white"
                         : "text-gray-500 hover:text-gray-700"
                     }
                   `}
                 >
                   {/* Indicador activo */}
                   {isActive && (
-                    <div className="absolute top-0 left-2 right-2 h-0.5 bg-green-600 rounded-full" />
+                    <div className="absolute top-0 left-2 right-2 h-0.5 bg-orange-600 rounded-full" />
                   )}
                   {tab.icon}
                   <span className="text-xs font-medium hidden sm:inline">
@@ -176,8 +176,8 @@ export default function BottomNavigation({
             label="Recetario"
             active={activeSection === "recetario"}
             onClick={() => onSectionChange("recetario")}
-            activeColor="text-green-700"
-            activeBg="bg-green-50"
+            activeColor="text-orange-600"
+            activeBg="bg-orange-50"
           />
 
           {/* FAB - Center elevated AI button */}
