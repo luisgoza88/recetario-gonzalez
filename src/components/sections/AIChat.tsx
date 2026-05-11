@@ -345,30 +345,33 @@ export default function AIChat() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-4 flex-shrink-0">
+    <div className="flex flex-col h-full bg-[#FDFBF7] dark:bg-[#0F0E0C] overflow-hidden">
+      {/* Header - Sprint 7 (ChatGPT pattern):
+          minimal blanco con accent lavender suave (vs purple-indigo agresivo) */}
+      <div className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 px-4 py-3 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-              <Bot size={24} />
+            <div className="w-9 h-9 bg-violet-100 dark:bg-violet-950/50 rounded-full flex items-center justify-center">
+              <Bot size={20} className="text-violet-600 dark:text-violet-400" />
             </div>
             <div>
-              <h1 className="font-semibold">Asistente IA</h1>
-              <p className="text-sm text-purple-200">
-                Tu ayudante para el hogar
+              <h1 className="font-semibold text-gray-900 dark:text-white text-sm">
+                Asistente IA
+              </h1>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                Listo para ayudar
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <button
               onClick={() => setShowAlertsPanel(!showAlertsPanel)}
-              className="relative p-2 hover:bg-white/20 rounded-lg transition-colors"
+              className="relative p-2 text-gray-500 dark:text-gray-400 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-950/30 rounded-lg transition-colors"
               title="Alertas"
             >
-              <AlertCircle size={20} />
+              <AlertCircle size={18} />
               {alerts.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
+                <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-medium">
                   {alerts.length}
                 </span>
               )}
@@ -376,10 +379,10 @@ export default function AIChat() {
             {chat.messages.length > 0 && (
               <button
                 onClick={chat.clearChat}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                className="p-2 text-gray-500 dark:text-gray-400 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-950/30 rounded-lg transition-colors"
                 title="Nueva conversación"
               >
-                <RefreshCw size={20} />
+                <RefreshCw size={18} />
               </button>
             )}
           </div>
@@ -644,7 +647,7 @@ export default function AIChat() {
                 ? "Describe la imagen (opcional)..."
                 : voice.isListening
                   ? "Escuchando..."
-                  : "Escribe tu pregunta..."
+                  : "Pregúntame lo que quieras..."
             }
             disabled={chat.isLoading || voice.isListening}
             className="flex-1 px-4 py-3 bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
