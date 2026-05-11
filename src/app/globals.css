@@ -7,6 +7,86 @@
   letter-spacing: -0.02em;
 }
 
+/* Sprint 11 (Lazyweb research mayo 2026): BottomSheet animations
+   Sin dependencia de tailwindcss-animate. */
+@keyframes sheet-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sheet-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.sheet-backdrop {
+  animation: sheet-fade-in 200ms ease-out;
+}
+
+.sheet-content {
+  animation: sheet-slide-up 300ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Sprint 13 (Lazyweb research mayo 2026): paleta warm globalmente.
+   Light: cream (#FDFBF7) en vez de white puro - mas calido para comida.
+   Dark: warm dark (#0F0E0C) en vez de black - mejor para cocinar de noche.
+   Backgrounds elevados: #1C1A17 (elev-1) y #2A2722 (elev-2). */
+.bg-app-base {
+  background-color: #fdfbf7;
+}
+.dark .bg-app-base {
+  background-color: #0f0e0c;
+}
+.bg-app-elev-1 {
+  background-color: #ffffff;
+}
+.dark .bg-app-elev-1 {
+  background-color: #1c1a17;
+}
+.bg-app-elev-2 {
+  background-color: #faf7f2;
+}
+.dark .bg-app-elev-2 {
+  background-color: #2a2722;
+}
+.text-app-primary {
+  color: #18120a;
+}
+.dark .text-app-primary {
+  color: #faf7f2;
+}
+.text-app-secondary {
+  color: #78716c;
+}
+.dark .text-app-secondary {
+  color: #a8a29e;
+}
+.border-app-stroke {
+  border-color: #f1eee8;
+}
+.dark .border-app-stroke {
+  border-color: #2a2722;
+}
+
+/* Aplicar warm globally al body */
+body.warm-mode {
+  background-color: #fdfbf7;
+  color: #18120a;
+}
+.dark body.warm-mode,
+body.warm-mode.dark {
+  background-color: #0f0e0c;
+  color: #faf7f2;
+}
+
 :root {
   /* Sprint 4 (Lazyweb): paleta brand actualizada a orange warm */
   --primary: #ff6b35;
