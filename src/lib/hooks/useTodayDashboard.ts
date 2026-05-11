@@ -213,14 +213,27 @@ export function useTodayAlerts() {
         .eq("status", "pending");
 
       // Suministros bajos
-      const { count: suppliesCount } = await supabase
-        .from("cleaning_supplies")
-        .select("*", { count: "exact", head: true })
-        .lt("current_quantity", "min_quantity");
+      // NOTA: PostgREST no soporta comparar dos columnas en filtros.
+      // Hacemos la comparación en cliente. Si la tabla no existe, fallback a 0.
+      let lowSuppliesCount = 0;
+      try {
+        const { data: supplies } = await supabase
+          .from("cleaning_supplies")
+          .select("current_quantity, min_quantity");
+        if (supplies) {
+          lowSuppliesCount = supplies.filter(
+            (s: { current_quantity: number; min_quantity: number }) =>
+              Number(s.current_quantity) <= Number(s.min_quantity),
+          ).length;
+        }
+      } catch {
+        // Tabla no existe o sin permisos — silenciar (modulo opcional)
+        lowSuppliesCount = 0;
+      }
 
       setAlerts({
         pendingSuggestions: suggestionsCount || 0,
-        lowSupplies: suppliesCount || 0,
+        lowSupplies: lowSuppliesCount,
       });
     } catch (error) {
       console.error("Error loading alerts:", error);
