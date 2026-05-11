@@ -82,7 +82,7 @@ export default function MonthlyReportView({ onClose }: MonthlyReportViewProps) {
       {/* Header */}
       <div className="sticky top-0 z-10 bg-gradient-to-r from-purple-600 to-indigo-700 text-white p-4 flex items-center justify-between shadow-lg">
         <div>
-          <h1 className="text-xl font-bold">📊 Mi Reporte Mensual</h1>
+          <h1 className="text-xl font-bold">Mi Reporte Mensual</h1>
           {report?.period && (
             <p className="text-xs text-purple-100">
               {new Date(report.period.start).toLocaleDateString("es-CO", {
@@ -186,7 +186,7 @@ export default function MonthlyReportView({ onClose }: MonthlyReportViewProps) {
             </div>
 
             {/* Spending */}
-            <div className="bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-2xl p-5 shadow-xl">
+            <div className="bg-gradient-to-br from-orange-500 to-emerald-600 text-white rounded-2xl p-5 shadow-xl">
               <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
                 <DollarSign size={20} />
                 Gasto y Ahorro

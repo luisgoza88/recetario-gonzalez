@@ -190,7 +190,7 @@ export default function TaskCard({
           {!isCompleted && !isInProgress && (
             <button
               onClick={onStart}
-              className="p-2.5 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 rounded-xl text-white shadow-sm"
+              className="p-2.5 bg-gradient-to-r from-orange-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 rounded-xl text-white shadow-sm"
               title="¡Empezar!"
             >
               <Play size={18} />

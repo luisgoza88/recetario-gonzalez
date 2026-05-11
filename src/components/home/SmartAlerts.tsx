@@ -153,7 +153,7 @@ export default function SmartAlerts({
       <div
         className={`p-4 flex items-center justify-between cursor-pointer ${
           healthScore >= 80
-            ? "bg-gradient-to-r from-green-50 to-emerald-50"
+            ? "bg-gradient-to-r from-orange-50 to-emerald-50"
             : healthScore >= 50
               ? "bg-gradient-to-r from-yellow-50 to-amber-50"
               : "bg-gradient-to-r from-red-50 to-orange-50"

@@ -334,7 +334,7 @@ export default function SuggestionsPanel({
                     expandedSection === "proactive" ? null : "proactive",
                   )
                 }
-                className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-green-50 hover:from-blue-100 hover:to-green-100 transition-colors"
+                className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-orange-50 hover:from-blue-100 hover:to-orange-100 transition-colors"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">

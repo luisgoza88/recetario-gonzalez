@@ -120,7 +120,7 @@ export function PriceComparisonCard({
   return (
     <div className="bg-white rounded-xl shadow-sm border border-green-100 overflow-hidden mb-4">
       {/* Header */}
-      <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 border-b border-green-100">
+      <div className="bg-gradient-to-r from-orange-50 to-emerald-50 p-4 border-b border-green-100">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <TrendingDown size={18} className="text-green-600" />

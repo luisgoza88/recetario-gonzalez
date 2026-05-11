@@ -25,7 +25,7 @@ export function MoodChip({
     size === "sm" ? "px-2 py-0.5 text-[10px]" : "px-3 py-1.5 text-xs";
 
   const stateClasses = selected
-    ? "bg-green-700 text-white border-green-700 shadow-sm"
+    ? "bg-orange-500 text-white border-green-700 shadow-sm"
     : onClick
       ? "bg-white text-gray-600 border-gray-200 hover:bg-green-50 hover:border-green-300 hover:text-green-700 cursor-pointer"
       : "bg-gray-50 text-gray-600 border-gray-200";

@@ -226,7 +226,7 @@ export default function SmartShoppingSection({
 
   if (!list && !loading) {
     return (
-      <div className="mb-4 bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-xl p-4">
+      <div className="mb-4 bg-gradient-to-r from-blue-50 to-orange-50 border border-blue-200 rounded-xl p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
@@ -256,7 +256,7 @@ export default function SmartShoppingSection({
     <div className="mb-4">
       {/* Header */}
       <div
-        className="bg-gradient-to-r from-blue-500 to-green-500 text-white p-4 rounded-t-xl cursor-pointer"
+        className="bg-gradient-to-r from-blue-500 to-orange-500 text-white p-4 rounded-t-xl cursor-pointer"
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex items-center justify-between">

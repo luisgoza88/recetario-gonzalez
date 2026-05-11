@@ -92,7 +92,7 @@ export default function SmartFAB({
             onClick: () => {
               navigateTo("recetario", "market");
             },
-            color: "from-green-500 to-emerald-500",
+            color: "from-orange-500 to-emerald-500",
           },
           {
             id: "hogar",
@@ -124,7 +124,7 @@ export default function SmartFAB({
               navigateTo("recetario", "recipes");
               setTimeout(() => storeOpenModal("newRecipe"), 100);
             },
-            color: "from-green-500 to-emerald-500",
+            color: "from-orange-500 to-emerald-500",
           },
           {
             id: "add-market",
@@ -174,7 +174,7 @@ export default function SmartFAB({
             onClick: () => {
               storeOpenModal("employeesPanel");
             },
-            color: "from-green-500 to-emerald-500",
+            color: "from-orange-500 to-emerald-500",
           },
           {
             id: "new-task",
@@ -205,7 +205,7 @@ export default function SmartFAB({
             onClick: () => {
               navigateTo("recetario", "recipes");
             },
-            color: "from-green-500 to-emerald-500",
+            color: "from-orange-500 to-emerald-500",
           },
           {
             id: "hogar",
@@ -372,7 +372,7 @@ export default function SmartFAB({
 
           {/* Glow ring effect when idle */}
           {!showQuickActions && (
-            <span className="absolute inset-0 rounded-full bg-gradient-to-br from-emerald-400 to-green-500 opacity-0 animate-pulse-slow" />
+            <span className="absolute inset-0 rounded-full bg-gradient-to-br from-emerald-400 to-orange-500 opacity-0 animate-pulse-slow" />
           )}
 
           {/* Badge for pending proposals */}

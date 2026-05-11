@@ -33,6 +33,7 @@ import EmployeeCompletionBanner from "@/components/yolima/EmployeeCompletionBann
 import ShareButton from "@/components/ShareButton";
 import { formatDayMenuForWhatsApp } from "@/lib/whatsapp-share";
 import Spinner from "@/components/ui/Spinner";
+import { SkeletonTodayHero, Skeleton } from "@/components/ui/Skeleton";
 import {
   useTodayDashboard,
   useGreeting,
@@ -89,18 +90,26 @@ export default function TodayDashboard({
   };
 
   if (loading) {
+    // Sprint 8 (Lazyweb): skeleton screens en vez de spinner solo.
+    // Mejor percepcion de performance - el usuario ve la estructura.
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-blue-50">
-        <div className="text-center">
-          <Spinner size="xl" className="mx-auto mb-4" />
-          <p className="text-gray-600">Cargando tu día...</p>
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-blue-50">
+        <div className="bg-white shadow-sm border-b">
+          <div className="max-w-lg mx-auto px-4 py-4 space-y-2">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-4 w-40" />
+          </div>
+        </div>
+        <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
+          <SkeletonTodayHero />
+          <Skeleton className="h-32 w-full rounded-2xl" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-blue-50">
       {/* Header con saludo */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-lg mx-auto px-4 py-4">

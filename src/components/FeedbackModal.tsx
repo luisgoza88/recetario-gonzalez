@@ -221,7 +221,7 @@ export default function FeedbackModal({
       >
         <div className="bg-white rounded-2xl w-full max-w-md flex flex-col shadow-xl">
           {/* Header */}
-          <div className="bg-green-700 text-white p-4 rounded-t-2xl flex justify-between items-center">
+          <div className="bg-orange-500 text-white p-4 rounded-t-2xl flex justify-between items-center">
             <div>
               <p className="text-sm opacity-80">{mealLabels[mealType]}</p>
               <h2
@@ -391,7 +391,7 @@ export default function FeedbackModal({
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex-[2] bg-green-700 text-white py-3 rounded-xl font-semibold text-sm hover:bg-green-800 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+                className="flex-[2] bg-orange-500 text-white py-3 rounded-xl font-semibold text-sm hover:bg-orange-600 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
               >
                 {saving ? (
                   <>

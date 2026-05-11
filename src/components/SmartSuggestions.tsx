@@ -732,7 +732,7 @@ export default function SmartSuggestions({
                         <button
                           onClick={saveAIRecipe}
                           disabled={savingRecipe}
-                          className="flex-1 bg-green-700 text-white py-2 rounded-xl font-semibold hover:bg-green-800 flex items-center justify-center gap-2"
+                          className="flex-1 bg-orange-500 text-white py-2 rounded-xl font-semibold hover:bg-orange-600 flex items-center justify-center gap-2"
                         >
                           <Save size={18} />
                           Usar esta receta
