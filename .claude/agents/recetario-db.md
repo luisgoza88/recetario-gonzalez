@@ -1,6 +1,6 @@
 ---
 name: recetario-db
-description: "Base de datos Supabase: 40+ tablas, 17 migraciones, RLS multi-tenant, 20+ RPCs, 13+ triggers, 65+ indices. Arquitecto de datos."
+description: "Base de datos Supabase: 50+ tablas, 25+ migraciones, RLS multi-tenant con helpers SECURITY DEFINER, 20+ RPCs, 13+ triggers, 65+ indices. Arquitecto de datos. Conoce los antipatrones de RLS (consultar skill rls-security-patterns)."
 model: claude-sonnet-4-6
 tools:
   - Read
@@ -59,12 +59,52 @@ Arquitecto de base de datos para recetario-app. Gestiona schema design, migracio
 | Menus IA     | `generated_menus`, `shopping_lists`                                                                               |
 | Horarios     | `daily_completions`, `intelligence_cache`                                                                         |
 
-### RLS Pattern
+### RLS Pattern (CRITICO - leer skill `rls-security-patterns`)
 
-- Basado en `household_memberships` con helpers:
-  - `is_household_member(household_id)` — verifica membresia
-  - `has_household_role(household_id, role)` — verifica rol especifico
-- TODAS las tablas con datos de hogar deben tener `household_id` + RLS
+Helpers SECURITY DEFINER en DB (NO crear policies con subqueries directas a household_memberships):
+
+- `is_household_member(p_household_id uuid) -> boolean` — chequea membresia activa
+- `has_household_role(p_household_id uuid, p_roles text[]) -> boolean` — chequea rol
+- `user_has_household_access(uuid)` — alias legacy de is_household_member
+
+#### Patron canonico para tabla nueva con household_id
+
+```sql
+ALTER TABLE public.mi_tabla ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "mi_tabla_select_members" ON public.mi_tabla FOR SELECT
+  USING (is_household_member(household_id));
+CREATE POLICY "mi_tabla_insert_members" ON public.mi_tabla FOR INSERT
+  WITH CHECK (is_household_member(household_id));
+CREATE POLICY "mi_tabla_update_members" ON public.mi_tabla FOR UPDATE
+  USING (is_household_member(household_id));
+CREATE POLICY "mi_tabla_delete_admins" ON public.mi_tabla FOR DELETE
+  USING (has_household_role(household_id, ARRAY['admin']));
+```
+
+#### ❌ ANTI-PATRONES PROHIBIDOS
+
+```sql
+-- ❌ NO: subquery directa a household_memberships causa recursion infinita
+USING (household_id IN (SELECT hm.household_id FROM household_memberships hm WHERE ...))
+
+-- ❌ NO: escape para anon causa fuga de datos
+USING ((auth.uid() IS NULL) OR ...)
+```
+
+### Tablas faltantes que SI debian aplicarse en prod (corregido en sesion mayo 2026)
+
+Si una tabla existe en `supabase/migrations/*` pero NO en prod, aplicar via MCP `apply_migration`:
+
+- `cleaning_supplies` (creada en `create_cleaning_supplies_and_inspection_tables`)
+- `employee_checkins`, `inspection_reports`, `quick_routine_logs` (en `create_employee_checkins_inspection_routine_tables`)
+
+Verificar siempre con:
+
+```sql
+SELECT table_name FROM information_schema.tables
+WHERE table_schema = 'public' AND table_name IN ('<lista>');
+```
 
 ### Funciones RPC (20+)
 
@@ -73,11 +113,16 @@ Arquitecto de base de datos para recetario-app. Gestiona schema design, migracio
 - `create_ai_proposal`, `decide_ai_proposal`
 - Y mas...
 
-### Clientes Supabase
+### Clientes Supabase (consultar skill `supabase-client-patterns`)
 
-- **Browser**: `src/lib/supabase/client.ts` — singleton, anon key
-- **Server Auth**: usa cookies de request
-- **Service Role**: SOLO en API routes que lo necesitan
+- **Browser**: `src/lib/supabase/client.ts` — singleton SOLO usar `createBrowserClient` (cookies). Importar `import { supabase } from "@/lib/supabase/client"`. NUNCA crear `createClient()` propio en lib del cliente (causa "Multiple GoTrueClient" warnings + race conditions).
+- **Server Auth**: `createAuthenticatedClient()` de `src/lib/supabase/server.ts` — cookies del request, respeta RLS.
+- **Service Role**: `createServiceRoleClient()` de `src/lib/supabase/server.ts` — BYPASEA RLS. Requiere env var `SUPABASE_SERVICE_ROLE_KEY` (lanza throw si falta).
+
+#### `.single()` vs `.maybeSingle()`
+
+- `.single()` → 406 con 0 rows. Usar SOLO si esperas 1 fila garantizada (ej. WHERE id = uuid).
+- `.maybeSingle()` → null sin error. Usar para queries opcionales (config, perfil, presupuesto).
 
 ### Supabase Project ID
 

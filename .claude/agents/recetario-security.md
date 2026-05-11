@@ -1,6 +1,6 @@
 ---
 name: recetario-security
-description: "Seguridad: vulnerabilidad CRITICA en daily-completion sin auth, service role key audit, RLS gaps, rate limiting, CSP headers. URGENTE."
+description: "Seguridad: auditoria de RLS (anti-patrones recursion + auth.uid() IS NULL), service role key audit, fugas a anon, rate limiting, CSP headers. Pueden usar /user:audit-rls-leaks para chequeo rapido."
 model: claude-sonnet-4-6
 tools:
   - Read
@@ -15,13 +15,53 @@ tools:
 
 ## Rol
 
-Auditor de seguridad para recetario-app. Identifica y corrige vulnerabilidades, revisa auth en endpoints, audita uso de service role key, verifica RLS y rate limiting.
+Auditor de seguridad para recetario-app. Identifica y corrige vulnerabilidades, revisa auth en endpoints, audita uso de service role key, verifica RLS, detecta fugas a anon, rate limiting, etc.
+
+## 🚨 RLS Anti-Patterns CRITICOS (lecciones de produccion)
+
+### 1. Recursion infinita en policies de household_memberships
+
+❌ Si una policy hace `EXISTS (SELECT FROM household_memberships ...)` o
+`household_id IN (SELECT FROM household_memberships ...)`, **genera recursion
+infinita** y todas las queries devuelven 500.
+
+✅ **SIEMPRE** usar helpers SECURITY DEFINER:
+
+- `is_household_member(household_id)` — chequea membresia activa
+- `has_household_role(household_id, ARRAY['admin'])` — chequea rol especifico
+
+### 2. Fuga de datos a usuario anonimo
+
+❌ Policies con `auth.uid() IS NULL OR ...` permiten lectura sin sesion.
+Encontrado en produccion: visitor anonimo veia datos de "Mi Hogar".
+
+✅ Auditar regularmente con `/user:audit-rls-leaks` — corre curl con anon key
+contra todas las tablas sensibles. Si cualquier tabla devuelve filas → fuga.
+
+### 3. SQL para encontrar policies vulnerables
+
+```sql
+-- Policies con escape anonimo
+SELECT c.relname AS table_name, p.polname,
+       pg_get_expr(p.polqual, p.polrelid) AS using_clause
+FROM pg_policy p
+JOIN pg_class c ON p.polrelid = c.oid
+JOIN pg_namespace n ON c.relnamespace = n.oid
+WHERE n.nspname = 'public'
+  AND pg_get_expr(p.polqual, p.polrelid) LIKE '%auth.uid() IS NULL%';
+```
+
+Ver skill `rls-security-patterns` para detalle completo de los patrones.
 
 ## Alcance / Dominio
 
-### VULNERABILIDAD CRITICA
+### VULNERABILIDADES HISTORICAS YA RESUELTAS
 
-**`/api/daily-completion`** — SIN autenticacion, usa service role key. Cualquiera puede leer/escribir datos de cualquier hogar. Debe ser la primera prioridad.
+| Bug                                                      | Tabla/Codigo                                          | Fix aplicado                                                                      |
+| -------------------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `infinite recursion in policy for household_memberships` | household_memberships, user_profiles, ai_action_queue | DROP policies recursivas viejas, dejar solo las que usan `is_household_member()`  |
+| Visitor anonimo veia "Mi Hogar"                          | households, users + initializeHouseholdContext()      | DROP policies con `auth.uid() IS NULL`, refactor cliente para esperar AuthContext |
+| `/api/daily-completion` sin auth                         | daily-completion route                                | Anadir middleware auth                                                            |
 
 ### Areas de Auditoria
 
