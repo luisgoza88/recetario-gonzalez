@@ -145,18 +145,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const loadUserProfile = useCallback(
     async (userId: string): Promise<UserProfile | null> => {
       try {
+        // .maybeSingle() en vez de .single() para evitar 406 cuando 0 rows.
+        // Esto cubre el caso de race condition durante INITIAL_SESSION
+        // donde auth.uid() todavia no esta disponible en RLS y la policy
+        // bloquea la fila (resulta en 0 rows + PGRST116).
         const { data, error } = await supabase
           .from("user_profiles")
           .select("*")
           .eq("id", userId)
-          .single();
+          .maybeSingle();
 
         if (error) {
           console.error("Error cargando perfil:", error);
           return null;
         }
 
-        return data as UserProfile;
+        return data as UserProfile | null;
       } catch (err) {
         console.error("Error cargando perfil:", err);
         return null;

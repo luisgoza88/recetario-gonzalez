@@ -3,7 +3,6 @@
  * Genera sugerencias inteligentes basadas en patrones del feedback
  */
 
-import { createClient } from "@supabase/supabase-js";
 import {
   MealFeedback,
   AdjustmentSuggestion,
@@ -11,10 +10,9 @@ import {
   LeftoverRating,
   MealType,
 } from "@/types";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Usa el singleton del browser (createBrowserClient con cookies) para
+// que comparta la misma sesion auth y evite "Multiple GoTrueClient instances".
+import { supabase } from "@/lib/supabase/client";
 
 // Configuración del sistema de aprendizaje
 const CONFIG = {

@@ -276,11 +276,12 @@ export default function AICommandCenter({
 
     try {
       // Fetch trust stats
+      // .maybeSingle() en vez de .single() para evitar 406 cuando 0 rows.
       let { data: trust } = await supabase
         .from("household_ai_trust")
         .select("*")
         .eq("household_id", householdId)
-        .single();
+        .maybeSingle();
 
       // Si no existe, crear registro de trust por defecto
       if (!trust) {
