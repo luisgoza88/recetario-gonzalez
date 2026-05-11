@@ -3,13 +3,11 @@
  * Gestiona presupuestos, compras y estimaciones de costos
  */
 
-import { createClient } from "@supabase/supabase-js";
 import { Budget, Purchase, BudgetSummary, MarketItem } from "@/types";
 import { normalizeQuantity } from "./units";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Usa el singleton del browser (createBrowserClient con cookies) para
+// que comparta la misma sesion auth y evite "Multiple GoTrueClient instances".
+import { supabase } from "@/lib/supabase/client";
 
 // Precios estimados por defecto (COP) - si no hay precio en DB
 const DEFAULT_PRICES: Record<string, number> = {

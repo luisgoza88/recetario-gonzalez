@@ -3,12 +3,10 @@
  * Genera tareas de preparación de comidas basadas en el menú planificado
  */
 
-import { createClient } from "@supabase/supabase-js";
 import { Recipe, DayMenu, Ingredient } from "@/types";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Usa el singleton del browser (createBrowserClient con cookies) para
+// que comparta la misma sesion auth y evite "Multiple GoTrueClient instances".
+import { supabase } from "@/lib/supabase/client";
 
 // Tipos de tareas de cocina
 export interface KitchenTask {
