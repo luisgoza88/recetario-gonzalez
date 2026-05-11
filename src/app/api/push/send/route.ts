@@ -1,41 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import webpush from "web-push";
 
 /**
  * API endpoint para enviar push notifications
  *
  * Endpoint: POST /api/push/send
  *
- * Autenticación:
- * - Requiere header: Authorization: Bearer {CRON_SECRET}
- * - O: autenticación interna (edge functions, webhooks)
+ * Auth: Authorization: Bearer {CRON_SECRET}
  *
  * Body:
  * {
  *   "title": "string",
  *   "body": "string",
  *   "url": "string (opcional)",
- *   "userIds": ["uuid[]"] (opcional, si no se envía es broadcast)
+ *   "userIds": ["uuid[]"] (opcional, broadcast si no se envía)
  * }
  *
- * Respuesta:
- * {
- *   "sent": number,
- *   "failed": number,
- *   "note": "Instalar web-push para envío real"
- * }
- *
- * TODO PRODUCCIÓN:
- * 1. npm install web-push
- * 2. Generar VAPID keys: npx web-push generate-vapid-keys
- * 3. Configurar env vars: VAPID_PRIVATE_KEY, VAPID_PUBLIC_KEY
- * 4. Reemplazar console.log con web-push.sendNotification()
- * 5. Agregar manejo de errores (suscripciones expiradas, endpoints inválidos)
+ * Variables de entorno requeridas:
+ * - VAPID_PUBLIC_KEY (también en NEXT_PUBLIC_VAPID_PUBLIC_KEY para el cliente)
+ * - VAPID_PRIVATE_KEY
+ * - VAPID_SUBJECT (mailto:tu@email.com)
+ * - CRON_SECRET
+ * - SUPABASE_SERVICE_ROLE_KEY
  */
+
+// Configurar VAPID al cargar el módulo
+const VAPID_PUBLIC =
+  process.env.VAPID_PUBLIC_KEY || process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY;
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:lmg880@gmail.com";
+
+if (VAPID_PUBLIC && VAPID_PRIVATE) {
+  try {
+    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
+  } catch (err) {
+    console.error("[push/send] Error setting VAPID details:", err);
+  }
+}
+
+interface PushSubscriptionRow {
+  id: string;
+  user_id: string;
+  endpoint: string;
+  p256dh_key: string;
+  auth_key: string;
+}
 
 export async function POST(request: NextRequest) {
   try {
-    // Verificar autenticación
+    // Auth
     const authHeader = request.headers.get("authorization");
     const cronSecret = process.env.CRON_SECRET;
 
@@ -45,7 +59,6 @@ export async function POST(request: NextRequest) {
         { status: 401 },
       );
     }
-
     const token = authHeader.slice(7);
     if (!cronSecret || token !== cronSecret) {
       return NextResponse.json(
@@ -54,8 +67,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Parsear body
-    const { title, body, url, userIds } = await request.json();
+    // Verificar configuracion VAPID
+    if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
+      return NextResponse.json(
+        {
+          error: "VAPID keys not configured",
+          help: "Set VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT in environment variables",
+        },
+        { status: 503 },
+      );
+    }
+
+    // Parse body
+    const { title, body, url, userIds, householdId } = await request.json();
 
     if (!title || !body) {
       return NextResponse.json(
@@ -64,7 +88,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Obtener suscripciones de la BD
+    // Obtener suscripciones
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -74,12 +98,28 @@ export async function POST(request: NextRequest) {
 
     if (userIds && userIds.length > 0) {
       query = query.in("user_id", userIds);
+    } else if (householdId) {
+      // Si pasaron householdId, buscar miembros activos del hogar
+      const { data: members } = await supabase
+        .from("household_memberships")
+        .select("user_id")
+        .eq("household_id", householdId)
+        .eq("is_active", true);
+      const memberIds = (members || []).map((m) => m.user_id);
+      if (memberIds.length === 0) {
+        return NextResponse.json({
+          sent: 0,
+          failed: 0,
+          note: "No active members in household",
+        });
+      }
+      query = query.in("user_id", memberIds);
     }
 
     const { data: subscriptions, error: dbError } = await query;
 
     if (dbError) {
-      console.error("Database error:", dbError);
+      console.error("[push/send] DB error:", dbError);
       return NextResponse.json(
         { error: "Failed to fetch subscriptions" },
         { status: 500 },
@@ -90,56 +130,85 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         sent: 0,
         failed: 0,
-        note: "No active subscriptions found",
+        note: "No active subscriptions",
       });
     }
 
-    // TODO: Implementar envío real con web-push
-    // Por ahora, solo loguear que se hubiera enviado
-    console.log(`[PUSH] Would send ${subscriptions.length} notifications:`, {
+    // Payload del push
+    const payload = JSON.stringify({
       title,
       body,
       url: url || "/",
-      recipients: subscriptions.length,
+      timestamp: Date.now(),
     });
 
-    // Actualizar last_used_at para cada suscripción
-    const now = new Date().toISOString();
-    const updatePromises = subscriptions.map(async (sub) => {
-      try {
-        await supabase
-          .from("push_subscriptions")
-          .update({ last_used_at: now })
-          .eq("id", sub.id);
-        return { success: true };
-      } catch (error) {
-        console.error(`Failed to update subscription ${sub.id}:`, error);
-        return { success: false };
-      }
-    });
+    let sent = 0;
+    let failed = 0;
+    const expiredIds: string[] = [];
 
-    const results = await Promise.all(updatePromises);
-    const successCount = results.filter((r) => r.success).length;
+    // Enviar a cada suscripción
+    await Promise.all(
+      (subscriptions as PushSubscriptionRow[]).map(async (sub) => {
+        try {
+          await webpush.sendNotification(
+            {
+              endpoint: sub.endpoint,
+              keys: {
+                p256dh: sub.p256dh_key,
+                auth: sub.auth_key,
+              },
+            },
+            payload,
+          );
+          sent++;
+
+          // Actualizar last_used_at
+          await supabase
+            .from("push_subscriptions")
+            .update({ last_used_at: new Date().toISOString() })
+            .eq("id", sub.id);
+        } catch (err: unknown) {
+          failed++;
+          const status = (err as { statusCode?: number })?.statusCode;
+          // 410 Gone = endpoint expirado, 404 Not Found = inválido
+          if (status === 410 || status === 404) {
+            expiredIds.push(sub.id);
+          } else {
+            console.error(`[push/send] Failed to send to ${sub.id}:`, err);
+          }
+        }
+      }),
+    );
+
+    // Limpiar suscripciones expiradas
+    if (expiredIds.length > 0) {
+      await supabase.from("push_subscriptions").delete().in("id", expiredIds);
+    }
 
     return NextResponse.json({
-      sent: successCount,
-      failed: results.length - successCount,
-      note: "Install web-push package for real notifications. See code comments for TODO steps.",
-      subscriptions_count: subscriptions.length,
-      push_payload: {
-        title,
-        body,
-        url: url || "/",
-      },
+      sent,
+      failed,
+      expired_removed: expiredIds.length,
+      total_subscriptions: subscriptions.length,
     });
   } catch (error) {
-    console.error("Push send error:", error);
+    console.error("[push/send] Unhandled error:", error);
     return NextResponse.json(
       {
         error: "Internal server error",
-        details: String(error),
+        message: error instanceof Error ? error.message : String(error),
       },
       { status: 500 },
     );
   }
+}
+
+/**
+ * Health check / info
+ */
+export async function GET() {
+  return NextResponse.json({
+    configured: !!(VAPID_PUBLIC && VAPID_PRIVATE),
+    vapid_public_key: VAPID_PUBLIC || null,
+  });
 }
