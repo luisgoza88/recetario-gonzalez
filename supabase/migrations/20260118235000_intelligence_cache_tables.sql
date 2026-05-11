@@ -1,11 +1,16 @@
 -- Intelligence System Cache Tables
 -- These tables cache learned data for faster access and analytics
+--
+-- NOTA (Mayo 2026): esta migracion fue reescrita para usar los nombres
+-- correctos de tablas en produccion. Las queries originales referenciaban
+-- `space_tasks` y `schedule_tasks` que NO existen — los nombres correctos
+-- son `task_templates` y `scheduled_tasks`.
 
 -- 1. Learned Task Durations Cache
 -- Stores computed average durations for each task to avoid recalculating
 CREATE TABLE IF NOT EXISTS learned_task_durations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  task_id UUID NOT NULL REFERENCES space_tasks(id) ON DELETE CASCADE,
+  task_template_id UUID NOT NULL REFERENCES task_templates(id) ON DELETE CASCADE,
   space_id UUID NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
   estimated_minutes INT NOT NULL DEFAULT 30,
   learned_minutes INT NOT NULL DEFAULT 30,
@@ -16,7 +21,7 @@ CREATE TABLE IF NOT EXISTS learned_task_durations (
   updated_at TIMESTAMPTZ DEFAULT now(),
 
   -- Unique constraint on task + space
-  UNIQUE(task_id, space_id)
+  UNIQUE(task_template_id, space_id)
 );
 
 -- 2. Employee Performance Scores Cache
@@ -56,7 +61,7 @@ CREATE TABLE IF NOT EXISTS workload_predictions_log (
 );
 
 -- Indexes for performance
-CREATE INDEX IF NOT EXISTS idx_learned_durations_task ON learned_task_durations(task_id);
+CREATE INDEX IF NOT EXISTS idx_learned_durations_task ON learned_task_durations(task_template_id);
 CREATE INDEX IF NOT EXISTS idx_learned_durations_space ON learned_task_durations(space_id);
 CREATE INDEX IF NOT EXISTS idx_employee_scores_employee ON employee_performance_scores(employee_id);
 CREATE INDEX IF NOT EXISTS idx_predictions_household ON workload_predictions_log(household_id);
@@ -67,15 +72,78 @@ ALTER TABLE learned_task_durations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE employee_performance_scores ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workload_predictions_log ENABLE ROW LEVEL SECURITY;
 
--- Permissive policies (adjust based on auth needs)
-CREATE POLICY "Allow all operations on learned_task_durations"
-  ON learned_task_durations FOR ALL USING (true) WITH CHECK (true);
+-- Policies basadas en household membership (siguiendo el skill rls-security-patterns).
+-- Para learned_task_durations: el acceso depende del household del space.
+DROP POLICY IF EXISTS "household_member_read_learned_durations" ON learned_task_durations;
+CREATE POLICY "household_member_read_learned_durations"
+  ON learned_task_durations FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM spaces s
+      WHERE s.id = learned_task_durations.space_id
+        AND is_household_member(s.household_id)
+    )
+  );
 
-CREATE POLICY "Allow all operations on employee_performance_scores"
-  ON employee_performance_scores FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "household_member_write_learned_durations" ON learned_task_durations;
+CREATE POLICY "household_member_write_learned_durations"
+  ON learned_task_durations FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM spaces s
+      WHERE s.id = learned_task_durations.space_id
+        AND is_household_member(s.household_id)
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM spaces s
+      WHERE s.id = learned_task_durations.space_id
+        AND is_household_member(s.household_id)
+    )
+  );
 
-CREATE POLICY "Allow all operations on workload_predictions_log"
-  ON workload_predictions_log FOR ALL USING (true) WITH CHECK (true);
+-- Para employee_performance_scores: acceso depende del household del empleado.
+DROP POLICY IF EXISTS "household_member_read_employee_scores" ON employee_performance_scores;
+CREATE POLICY "household_member_read_employee_scores"
+  ON employee_performance_scores FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM home_employees e
+      WHERE e.id = employee_performance_scores.employee_id
+        AND is_household_member(e.household_id)
+    )
+  );
+
+DROP POLICY IF EXISTS "household_member_write_employee_scores" ON employee_performance_scores;
+CREATE POLICY "household_member_write_employee_scores"
+  ON employee_performance_scores FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM home_employees e
+      WHERE e.id = employee_performance_scores.employee_id
+        AND is_household_member(e.household_id)
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM home_employees e
+      WHERE e.id = employee_performance_scores.employee_id
+        AND is_household_member(e.household_id)
+    )
+  );
+
+-- Para workload_predictions_log: acceso directo via household_id.
+DROP POLICY IF EXISTS "household_member_read_predictions" ON workload_predictions_log;
+CREATE POLICY "household_member_read_predictions"
+  ON workload_predictions_log FOR SELECT
+  USING (is_household_member(household_id));
+
+DROP POLICY IF EXISTS "household_member_write_predictions" ON workload_predictions_log;
+CREATE POLICY "household_member_write_predictions"
+  ON workload_predictions_log FOR ALL
+  USING (is_household_member(household_id))
+  WITH CHECK (is_household_member(household_id));
 
 -- Trigger for updated_at on learned_task_durations
 CREATE OR REPLACE FUNCTION update_learned_durations_updated_at()
@@ -86,6 +154,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS learned_task_durations_updated_at ON learned_task_durations;
 CREATE TRIGGER learned_task_durations_updated_at
   BEFORE UPDATE ON learned_task_durations
   FOR EACH ROW
@@ -100,13 +169,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS employee_performance_scores_updated_at ON employee_performance_scores;
 CREATE TRIGGER employee_performance_scores_updated_at
   BEFORE UPDATE ON employee_performance_scores
   FOR EACH ROW
   EXECUTE FUNCTION update_employee_scores_updated_at();
 
--- Add actual_minutes column to scheduled_tasks if it doesn't exist
--- This is where we store the real time taken to complete a task
+-- Add actual_minutes y rating a scheduled_tasks si faltan
+-- (Necesarios para calcular learned durations y performance scores)
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
@@ -126,6 +196,6 @@ BEGIN
 END $$;
 
 -- Comments
-COMMENT ON TABLE learned_task_durations IS 'Cache of learned task durations computed from historical completion data';
+COMMENT ON TABLE learned_task_durations IS 'Cache of learned task durations computed from historical completion data. References task_templates (not space_tasks).';
 COMMENT ON TABLE employee_performance_scores IS 'Cache of employee performance scores computed from task completion history';
 COMMENT ON TABLE workload_predictions_log IS 'Log of workload predictions for tracking and analysis';

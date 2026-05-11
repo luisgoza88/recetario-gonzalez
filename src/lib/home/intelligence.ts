@@ -76,6 +76,10 @@ const WORK_MINUTES_PER_DAY = DEFAULT_WORK_MINUTES_PER_DAY;
 
 /**
  * Calculate learned duration for a task based on historical completion data
+ *
+ * NOTA (Mayo 2026): renombrado de `space_tasks` -> `task_templates` y
+ * `schedule_tasks` -> `scheduled_tasks` para coincidir con los nombres reales
+ * en produccion.
  */
 export async function calculateLearnedDuration(
   taskId: string,
@@ -83,10 +87,10 @@ export async function calculateLearnedDuration(
 ): Promise<TaskDurationData | null> {
   // Get task info
   const { data: task } = await supabase
-    .from("space_tasks")
+    .from("task_templates")
     .select("id, name, estimated_minutes")
     .eq("id", taskId)
-    .single();
+    .maybeSingle();
 
   if (!task) return null;
 
@@ -95,13 +99,15 @@ export async function calculateLearnedDuration(
     .from("spaces")
     .select("id, name")
     .eq("id", spaceId)
-    .single();
+    .maybeSingle();
 
-  // Get historical actual_minutes from schedule_tasks
+  // Get historical actual_minutes from scheduled_tasks
+  // NOTA: la columna se llama `task_template_id` (no `task_id`) y `rating`
+  // puede no existir todavia en algunos environments — se trata defensivamente.
   const { data: history } = await supabase
-    .from("schedule_tasks")
-    .select("actual_minutes, rating")
-    .eq("task_id", taskId)
+    .from("scheduled_tasks")
+    .select("actual_minutes")
+    .eq("task_template_id", taskId)
     .eq("space_id", spaceId)
     .eq("status", "completed")
     .not("actual_minutes", "is", null)
@@ -115,7 +121,7 @@ export async function calculateLearnedDuration(
     .from("spaces")
     .select("space_type:space_types(name)")
     .eq("id", spaceId)
-    .single();
+    .maybeSingle();
 
   const spaceTypeName =
     (spaceDetails?.space_type as { name?: string } | null)?.name || "";
@@ -178,7 +184,7 @@ export async function getSpaceTaskDurations(
   spaceId: string,
 ): Promise<TaskDurationData[]> {
   const { data: tasks } = await supabase
-    .from("space_tasks")
+    .from("task_templates")
     .select("id")
     .eq("space_id", spaceId);
 
@@ -204,25 +210,27 @@ export async function calculateEmployeeScore(
     .from("home_employees")
     .select("id, name, zone")
     .eq("id", employeeId)
-    .single();
+    .maybeSingle();
 
   if (!employee) return null;
 
   // Get all completed tasks for this employee
+  // NOTA: en scheduled_tasks la columna se llama `employee_id` (no
+  // `assigned_to`) y el join va via `task_template_id` -> task_templates.
   const { data: tasks } = await supabase
-    .from("schedule_tasks")
+    .from("scheduled_tasks")
     .select(
       `
       id,
       actual_minutes,
       rating,
       status,
-      space_tasks (
+      task_templates (
         estimated_minutes
       )
     `,
     )
-    .eq("assigned_to", employeeId)
+    .eq("employee_id", employeeId)
     .order("completed_at", { ascending: false })
     .limit(100);
 
@@ -263,8 +271,8 @@ export async function calculateEmployeeScore(
   if (tasksWithActualTime.length > 0) {
     const speedRatios = tasksWithActualTime.map((t) => {
       const estimated =
-        (t.space_tasks as { estimated_minutes?: number })?.estimated_minutes ||
-        30;
+        (t.task_templates as { estimated_minutes?: number })
+          ?.estimated_minutes || 30;
       const actual = t.actual_minutes || estimated;
       return estimated / actual; // > 1 means faster than expected
     });
@@ -339,13 +347,15 @@ export async function calculateWorkloadBalance(
   if (!employees) return [];
 
   // Get scheduled tasks for this date
+  // NOTA: en scheduled_tasks la columna se llama `employee_id` (no
+  // `assigned_to`) y el join va via `task_templates`.
   const { data: scheduledTasks } = await supabase
-    .from("schedule_tasks")
+    .from("scheduled_tasks")
     .select(
       `
       id,
-      assigned_to,
-      space_tasks (
+      employee_id,
+      task_templates (
         id,
         name,
         estimated_minutes
@@ -355,8 +365,8 @@ export async function calculateWorkloadBalance(
     .eq("household_id", householdId)
     .eq("scheduled_date", date);
 
-  // Type for space_tasks relation
-  type SpaceTaskData = {
+  // Type for task_templates relation
+  type TaskTemplateData = {
     id: string;
     name: string;
     estimated_minutes?: number | null;
@@ -367,10 +377,10 @@ export async function calculateWorkloadBalance(
   if (scheduledTasks) {
     for (const st of scheduledTasks) {
       // Handle both array and single object cases from Supabase
-      const rawTaskData = st.space_tasks;
-      const taskData: SpaceTaskData | null = Array.isArray(rawTaskData)
-        ? (rawTaskData[0] as SpaceTaskData) || null
-        : (rawTaskData as SpaceTaskData | null);
+      const rawTaskData = st.task_templates;
+      const taskData: TaskTemplateData | null = Array.isArray(rawTaskData)
+        ? (rawTaskData[0] as TaskTemplateData) || null
+        : (rawTaskData as TaskTemplateData | null);
       if (taskData) {
         // Try to get learned duration
         const learned = await calculateLearnedDuration(
@@ -386,13 +396,13 @@ export async function calculateWorkloadBalance(
   // Build workload for each employee
   const workloads: WorkloadBalance[] = employees.map((emp) => {
     const empTasks =
-      scheduledTasks?.filter((t) => t.assigned_to === emp.id) || [];
+      scheduledTasks?.filter((t) => t.employee_id === emp.id) || [];
     const tasks = empTasks.map((t) => {
       // Handle both array and single object cases from Supabase
-      const rawTaskData = t.space_tasks;
-      const taskData: SpaceTaskData | null = Array.isArray(rawTaskData)
-        ? (rawTaskData[0] as SpaceTaskData) || null
-        : (rawTaskData as SpaceTaskData | null);
+      const rawTaskData = t.task_templates;
+      const taskData: TaskTemplateData | null = Array.isArray(rawTaskData)
+        ? (rawTaskData[0] as TaskTemplateData) || null
+        : (rawTaskData as TaskTemplateData | null);
       return {
         taskId: taskData?.id || "",
         taskName: taskData?.name || "Unknown",
