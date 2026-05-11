@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import Image from "next/image";
-import { Search, Plus, Edit2, Trash2, ImageIcon } from "lucide-react";
+import { Search, Plus, Edit2, Trash2, ImageIcon, Clock } from "lucide-react";
 import { Recipe, Ingredient, RecipeCategory, ColombianRegion } from "@/types";
 import type { ExpandedRecipe } from "@/data/expanded-recipes";
 import type { RegionalRecipe } from "@/data/regional-colombian-recipes";
@@ -442,101 +442,125 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
         </button>
       </CanEdit>
 
-      {/* Recipe List */}
-      <div className="space-y-3">
+      {/* Recipe List - Sprint 5: patron Jullienne (cards limpias con
+          jerarquia visual mejorada y menos ruido) */}
+      <div className="space-y-2.5">
         {filteredRecipes.map((recipe) => {
           const badges = getRecipeBadges(recipe);
           const isLibrary = isExpandedRecipe(recipe);
+          const totalTime = (recipe.prep_time || 0) + (recipe.cook_time || 0);
 
           return (
             <div
               key={recipe.id}
-              className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden"
+              className="group bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 hover:border-orange-200 dark:hover:border-orange-800 hover:shadow-md transition-all overflow-hidden"
             >
-              <div className="flex">
-                {/* Thumbnail */}
-                <div
-                  className="w-24 h-24 flex-shrink-0 cursor-pointer"
-                  onClick={() => setSelectedRecipe(recipe)}
-                >
+              <button
+                onClick={() => setSelectedRecipe(recipe)}
+                className="w-full text-left flex items-center gap-3 p-2.5"
+              >
+                {/* Thumbnail mas grande y prominente (Jullienne pattern) */}
+                <div className="w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-orange-100 to-amber-50 dark:from-orange-900/30 dark:to-amber-900/30">
                   {recipe.image_url ? (
                     <Image
                       src={recipe.image_url}
                       alt={recipe.name}
-                      width={96}
-                      height={96}
-                      className="w-full h-full object-cover"
+                      width={80}
+                      height={80}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       loading="lazy"
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-orange-100 to-amber-50 flex items-center justify-center">
-                      <ImageIcon className="w-8 h-8 text-gray-300" />
+                    <div className="w-full h-full flex items-center justify-center">
+                      <ImageIcon className="w-7 h-7 text-orange-300 dark:text-orange-700" />
                     </div>
                   )}
                 </div>
 
-                {/* Content */}
-                <div className="flex-1 p-3 flex justify-between items-start">
-                  <div
-                    className="flex-1 cursor-pointer"
-                    onClick={() => setSelectedRecipe(recipe)}
-                  >
-                    <h3 className="font-semibold mb-1 line-clamp-2 text-sm">
-                      {recipe.name}
-                    </h3>
-                    <div className="flex flex-wrap gap-1 mb-1">
-                      <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full ${getTypeClass(recipe.type)}`}
-                      >
-                        {getTypeLabel(recipe.type)}
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  {/* Type pill (small, secundario) */}
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span
+                      className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md ${getTypeClass(recipe.type)}`}
+                    >
+                      {getTypeLabel(recipe.type)}
+                    </span>
+                    {badges.length > 0 && (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+                        {badges[0].label}
                       </span>
-                      {badges.slice(0, 3).map((badge, i) => (
-                        <span
-                          key={i}
-                          className={`text-[10px] px-2 py-0.5 rounded-full ${badge.className}`}
-                        >
-                          {badge.label}
-                        </span>
-                      ))}
-                    </div>
-                    {recipe.prep_time !== undefined &&
-                      recipe.cook_time !== undefined && (
-                        <p className="text-[10px] text-gray-400">
-                          ⏱️ {(recipe.prep_time || 0) + (recipe.cook_time || 0)}{" "}
-                          min
-                        </p>
-                      )}
+                    )}
                   </div>
-                  {!isLibrary && (
-                    <CanEdit what="recipes">
-                      <div className="flex gap-1 ml-2">
-                        <button
-                          onClick={() => handleEdit(recipe)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                          title="Editar"
-                        >
-                          <Edit2 size={18} />
-                        </button>
-                        <button
-                          onClick={() => setConfirmDeleteRecipe(recipe)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                          title="Eliminar"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </CanEdit>
-                  )}
+
+                  {/* Title - mas grande y legible (Jullienne) */}
+                  <h3 className="font-semibold text-gray-900 dark:text-white text-base leading-snug line-clamp-2 mb-1">
+                    {recipe.name}
+                  </h3>
+
+                  {/* Footer: time + region/difficulty */}
+                  <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                    {totalTime > 0 && (
+                      <span className="inline-flex items-center gap-0.5">
+                        <Clock size={11} /> {totalTime} min
+                      </span>
+                    )}
+                    {recipe.difficulty && (
+                      <span className="capitalize">· {recipe.difficulty}</span>
+                    )}
+                    {recipe.region && (
+                      <span className="capitalize">· {recipe.region}</span>
+                    )}
+                  </div>
                 </div>
-              </div>
+
+                {/* Action overflow (solo si editable) */}
+                {!isLibrary && (
+                  <CanEdit what="recipes">
+                    <div className="flex flex-col gap-0.5 ml-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit(recipe);
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/30 rounded-lg transition-colors"
+                        title="Editar"
+                        aria-label="Editar receta"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmDeleteRecipe(recipe);
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
+                        title="Eliminar"
+                        aria-label="Eliminar receta"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </CanEdit>
+                )}
+              </button>
             </div>
           );
         })}
 
         {filteredRecipes.length === 0 && (
-          <div className="text-center py-12 text-gray-500">
-            <span className="text-4xl block mb-4">🍽️</span>
-            {search ? "No se encontraron recetas" : "No hay recetas aún"}
+          <div className="text-center py-16 px-4">
+            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-orange-50 dark:bg-orange-950/30 flex items-center justify-center">
+              <ImageIcon size={32} className="text-orange-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+              {search ? "Sin resultados" : "Sin recetas aún"}
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {search
+                ? `No encontramos nada para "${search}"`
+                : "Empezá agregando tu primera receta"}
+            </p>
           </div>
         )}
       </div>
