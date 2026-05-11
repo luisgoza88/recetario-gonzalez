@@ -28,6 +28,7 @@ const PUBLIC_API_PATHS = [
   "/api/validate-invitation",
   "/api/pwa-icon", // PWA manifest necesita iconos sin sesión
   "/api/cron", // Cron jobs validan via CRON_SECRET header
+  "/api/push/send", // GET es health check (solo VAPID public key); POST se auto-autentica via CRON_SECRET
 ];
 
 export async function middleware(request: NextRequest) {
