@@ -278,13 +278,16 @@ export default function ScheduleGenerator({
         const durationKey = `${space.id}-${taskName}`;
 
         if (useIntelligence && !learnedDurations.has(durationKey)) {
-          // Try to find existing space_task for this
+          // Try to find existing template for this task in this space.
+          // NOTA (Mayo 2026): la tabla se llama `task_templates`, no
+          // `space_tasks`. Usamos `.maybeSingle()` para tolerar 0 resultados
+          // sin lanzar error 406.
           const { data: existingTask } = await supabase
-            .from("space_tasks")
+            .from("task_templates")
             .select("id, estimated_minutes")
             .eq("space_id", space.id)
             .ilike("name", taskName)
-            .single();
+            .maybeSingle();
 
           if (existingTask) {
             try {
