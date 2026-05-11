@@ -552,56 +552,80 @@ async function createDefaultHousehold(): Promise<{
 }
 
 /**
- * Initialize household context
- * Called on app load to set up the current household and user
+ * Initialize household context for the AUTHENTICATED user.
+ *
+ * SECURITY: requiere `authUserId` (auth.uid() del usuario logueado).
+ * Si no hay auth, devuelve { household: null, user: null } INMEDIATAMENTE
+ * sin tocar la DB. Esto previene la fuga del primer hogar al visitor anonimo
+ * que existia en la version "Phase A" pre-auth de esta funcion.
  */
-export async function initializeHouseholdContext(): Promise<{
+export async function initializeHouseholdContext(authUserId?: string): Promise<{
   household: Household | null;
   user: User | null;
 }> {
   logger.info("[Household] Initializing context...");
 
-  // For now, get the first/default household (no auth yet)
-  // In Phase B, this will use Supabase Auth
-  const { data: households, error: fetchError } = await supabase
-    .from("households")
-    .select("*")
-    .limit(1);
-
-  if (fetchError) {
-    logger.error("[Household] Error fetching households", {
-      error:
-        fetchError instanceof Error ? fetchError.message : String(fetchError),
-    });
-  }
-
-  // If no households exist, create a default one
-  if (!households || households.length === 0) {
-    logger.info("[Household] No households found, creating default...");
-    const result = await createDefaultHousehold();
-    if (result) {
-      logger.info("[Household] Default household created successfully");
-      return result;
-    }
-    logger.error("[Household] Failed to create default household");
+  // Sin sesion = no cargar nada. La pagina rendera UI publica/login.
+  if (!authUserId) {
+    logger.info("[Household] No authenticated user, skipping household fetch");
     return { household: null, user: null };
   }
 
-  const household = households[0] as Household;
-  logger.info("[Household] Found household", {
+  // Buscar membresias activas del usuario y tomar el household mas reciente
+  // (un usuario puede pertenecer a varios hogares; UI permite cambiar).
+  const { data: memberships, error: memErr } = await supabase
+    .from("household_memberships")
+    .select("household:households(*)")
+    .eq("user_id", authUserId)
+    .eq("is_active", true)
+    .order("joined_at", { ascending: false })
+    .limit(1);
+
+  if (memErr) {
+    logger.error("[Household] Error fetching memberships", {
+      error: memErr instanceof Error ? memErr.message : String(memErr),
+    });
+    return { household: null, user: null };
+  }
+
+  if (!memberships || memberships.length === 0) {
+    logger.info(
+      "[Household] User has no active memberships - waiting for invitation",
+    );
+    return { household: null, user: null };
+  }
+
+  // Supabase devuelve `household` como objeto cuando es FK; tipear adecuadamente
+  const membershipHousehold = (
+    memberships[0] as unknown as { household: Household | null }
+  ).household;
+  if (!membershipHousehold) {
+    return { household: null, user: null };
+  }
+
+  const household = membershipHousehold;
+  logger.info("[Household] Found household for user", {
     id: household.id,
     name: household.name,
   });
 
-  // Get first user in household (temporary until auth)
+  // Buscar el row de la tabla legacy `users` que corresponda al auth_id.
+  // Si no existe, devolvemos household sin user (el AuthContext maneja
+  // user_profiles separadamente para datos de la nueva tabla).
   const { data: users } = await supabase
     .from("users")
     .select("*")
+    .eq("auth_id", authUserId)
     .eq("household_id", household.id)
     .limit(1);
 
-  const user = users?.[0] as User | null;
-  logger.info("[Household] Found user", { id: user?.id, name: user?.name });
+  const user = (users?.[0] as User | undefined) ?? null;
+  if (user) {
+    logger.info("[Household] Found legacy user row", {
+      id: user.id,
+      name: user.name,
+    });
+  }
 
   return { household, user };
 }
