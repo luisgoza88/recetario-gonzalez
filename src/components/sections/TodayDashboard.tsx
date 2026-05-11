@@ -40,6 +40,11 @@ import {
   getMealLabel,
   EmployeeTaskSummary,
 } from "@/lib/hooks/useTodayDashboard";
+// Sprint 12 (Lazyweb research mayo 2026): NYT Cooking pattern -
+// "Cocinada N veces · ⭐ 4.8" en hero
+import { useRecipeStats } from "@/lib/hooks/useRecipeStats";
+import { useHouseholdId } from "@/lib/stores/useHouseholdStore";
+import { Star } from "lucide-react";
 
 interface TodayDashboardProps {
   onNavigateToRecetario: (tab?: string) => void;
@@ -66,6 +71,12 @@ export default function TodayDashboard({
   } = useTodayDashboard();
 
   const { greeting, timeOfDay, dayOfWeek, formattedDate } = useGreeting();
+
+  // Sprint 12: stats de la comida principal del dia (lunch primary)
+  const householdId = useHouseholdId();
+  const heroMealForStats =
+    todayMenu?.lunch ?? todayMenu?.dinner ?? todayMenu?.breakfast;
+  const heroStats = useRecipeStats(heroMealForStats?.id, householdId);
 
   // Íconos basados en hora del día
   const getGreetingIcon = () => {
@@ -217,9 +228,40 @@ export default function TodayDashboard({
                 <p className="text-xs uppercase tracking-wider font-bold text-orange-600 mb-1">
                   {heroLabel}
                 </p>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white leading-tight mb-3">
+                <h2 className="font-display text-3xl font-semibold text-gray-900 dark:text-white leading-tight mb-2">
                   {heroMeal.name}
                 </h2>
+
+                {/* Sprint 12: NYT Cooking pattern - "Cocinada N veces" */}
+                {heroStats && heroStats.timesCooked > 0 && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-1.5">
+                    <span>
+                      Cocinada <strong>{heroStats.timesCooked}</strong>{" "}
+                      {heroStats.timesCooked === 1 ? "vez" : "veces"}
+                    </span>
+                    {heroStats.avgRating !== null && (
+                      <>
+                        <span className="text-gray-300">·</span>
+                        <span className="inline-flex items-center gap-0.5">
+                          <Star
+                            size={11}
+                            className="text-amber-500 fill-amber-500"
+                          />
+                          <strong>{heroStats.avgRating.toFixed(1)}</strong>
+                        </span>
+                      </>
+                    )}
+                    {heroStats.wouldRepeatPct !== null &&
+                      heroStats.wouldRepeatPct >= 50 && (
+                        <>
+                          <span className="text-gray-300">·</span>
+                          <span className="text-emerald-600 dark:text-emerald-400">
+                            {heroStats.wouldRepeatPct}% repetiría
+                          </span>
+                        </>
+                      )}
+                  </p>
+                )}
 
                 {/* Chips: tiempo, mood */}
                 <div className="flex flex-wrap items-center gap-2 mb-4">

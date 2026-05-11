@@ -35,6 +35,7 @@ import {
   ListOrdered,
   Lightbulb,
   Check,
+  HandMetal,
 } from "lucide-react";
 import type { Recipe, Ingredient } from "@/types";
 
@@ -48,6 +49,10 @@ export function CookingMode({ recipe, onClose }: CookingModeProps) {
   const [timerSeconds, setTimerSeconds] = useState<number | null>(null);
   const [timerActive, setTimerActive] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
+  // Sprint 14 (Lazyweb research): hands-free mode con tap zones grandes
+  // (Crouton hands-free pattern). Cuando activo: tap izq=prev, der=next, sin
+  // riesgo de hits accidentales en otros botones.
+  const [handsFreeEnabled, setHandsFreeEnabled] = useState(false);
   const [showStepList, setShowStepList] = useState(false);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const audioRef = useRef<SpeechSynthesisUtterance | null>(null);
@@ -259,6 +264,23 @@ export function CookingMode({ recipe, onClose }: CookingModeProps) {
           >
             <ListOrdered size={20} />
           </button>
+          {/* Sprint 14: hands-free toggle (Crouton pattern) */}
+          <button
+            onClick={() => setHandsFreeEnabled((h) => !h)}
+            className={`w-11 h-11 flex items-center justify-center rounded-full backdrop-blur transition-colors ${
+              handsFreeEnabled
+                ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"
+                : "bg-white/80 dark:bg-gray-800/80 text-gray-700 dark:text-gray-300 hover:bg-white"
+            }`}
+            aria-label={
+              handsFreeEnabled
+                ? "Desactivar manos libres"
+                : "Activar manos libres"
+            }
+            title="Manos libres: tap izq/der para navegar"
+          >
+            <HandMetal size={20} />
+          </button>
           <button
             onClick={() => {
               if (voiceEnabled && "speechSynthesis" in window)
@@ -294,6 +316,38 @@ export function CookingMode({ recipe, onClose }: CookingModeProps) {
           />
         ))}
       </div>
+
+      {/* Sprint 14: hands-free tap zones overlay
+          Solo activos cuando handsFreeEnabled. z-index alto para
+          captar taps antes que cualquier boton accidental. */}
+      {handsFreeEnabled && (
+        <>
+          <button
+            onClick={goPrev}
+            disabled={isFirstStep}
+            aria-label="Paso anterior (manos libres)"
+            className="fixed left-0 top-20 bottom-32 w-1/3 z-[200] disabled:opacity-50 group"
+          >
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 bg-emerald-500/90 text-white rounded-2xl px-4 py-3 backdrop-blur shadow-2xl shadow-emerald-500/40 opacity-40 group-hover:opacity-100 group-active:opacity-100 transition-opacity">
+              <ChevronLeft size={28} />
+            </div>
+          </button>
+          <button
+            onClick={goNext}
+            aria-label="Siguiente paso (manos libres)"
+            className="fixed right-0 top-20 bottom-32 w-1/3 z-[200] group"
+          >
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-emerald-500/90 text-white rounded-2xl px-4 py-3 backdrop-blur shadow-2xl shadow-emerald-500/40 opacity-40 group-hover:opacity-100 group-active:opacity-100 transition-opacity">
+              <ChevronRight size={28} />
+            </div>
+          </button>
+          {/* Hint banner top */}
+          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[201] bg-emerald-500 text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg shadow-emerald-500/40 inline-flex items-center gap-1.5 animate-pulse">
+            <HandMetal size={12} />
+            Manos libres · tap izq / der
+          </div>
+        </>
+      )}
 
       {/* Step content */}
       <div className="flex-1 overflow-y-auto px-6 py-6 flex flex-col items-center justify-center">
