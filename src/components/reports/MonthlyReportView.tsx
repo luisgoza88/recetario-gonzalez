@@ -82,7 +82,7 @@ export default function MonthlyReportView({ onClose }: MonthlyReportViewProps) {
       {/* Header */}
       <div className="sticky top-0 z-10 bg-gradient-to-r from-purple-600 to-indigo-700 text-white p-4 flex items-center justify-between shadow-lg">
         <div>
-          <h1 className="text-xl font-bold">📊 Mi Reporte Mensual</h1>
+          <h1 className="text-xl font-bold">Mi Reporte Mensual</h1>
           {report?.period && (
             <p className="text-xs text-purple-100">
               {new Date(report.period.start).toLocaleDateString("es-CO", {

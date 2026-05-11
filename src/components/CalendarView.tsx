@@ -747,7 +747,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
         {/* Day Header */}
         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 rounded-t-xl flex justify-between items-center">
           <h3 className="font-semibold">
-            📅 {dayName} {selectedDate.getDate()}{" "}
+            {dayName} {selectedDate.getDate()}{" "}
             {MONTHS[selectedDate.getMonth()]}
           </h3>
           <span className="bg-white/20 px-3 py-1 rounded-full text-sm flex items-center gap-1">
@@ -929,7 +929,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
       <div className="mt-4">
         <div className="bg-gradient-to-r from-purple-600 to-purple-500 text-white p-4 rounded-t-xl flex justify-between items-center">
           <h3 className="font-semibold">
-            📅 {dayName} {selectedDate.getDate()}{" "}
+            {dayName} {selectedDate.getDate()}{" "}
             {MONTHS[selectedDate.getMonth()]}
           </h3>
           <span className="bg-white/20 px-3 py-1 rounded-full text-sm flex items-center gap-1">
@@ -1022,7 +1022,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
       <div className="mt-4">
         <div className="bg-orange-500 text-white p-4 rounded-t-xl flex justify-between items-center">
           <h3 className="font-semibold">
-            📅 {dayName} {selectedDate.getDate()}{" "}
+            {dayName} {selectedDate.getDate()}{" "}
             {MONTHS[selectedDate.getMonth()]}
           </h3>
           <span className="bg-white/20 px-3 py-1 rounded-full text-sm">
@@ -1371,7 +1371,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
 
       {/* Cycle Info */}
       <div className="bg-blue-50 text-blue-700 p-3 rounded-lg mb-4 text-sm">
-        📅 Menú estático: ciclo desde <strong>6 Ene 2026</strong> • Menú IA:
+        Menú estático: ciclo desde <strong>6 Ene 2026</strong> • Menú IA:
         genera semanas personalizadas
       </div>
 
