@@ -1,8 +1,13 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+// .trim() defensivo: si la env var en Vercel se pegó con un \n al final,
+// el realtime websocket termina con apikey=...AK7Q%0A&vsn=1.0.0 y la
+// conexión falla (JWT inválido). Trim previene eso.
+const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
+const supabaseAnonKey = (
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+).trim();
 
 /**
  * Cliente Supabase del browser.

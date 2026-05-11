@@ -329,11 +329,12 @@ export async function calculateWorkloadBalance(
   employeeWorkHours?: Record<string, number>, // Optional custom hours per employee
 ): Promise<WorkloadBalance[]> {
   // Get all employees for this household
+  // NOTA: la columna se llama `active` (no `is_active`) en home_employees
   const { data: employees } = await supabase
     .from("home_employees")
     .select("id, name, zone")
     .eq("household_id", householdId)
-    .eq("is_active", true);
+    .eq("active", true);
 
   if (!employees) return [];
 
@@ -667,11 +668,12 @@ export async function getIntelligenceSummary(householdId: string): Promise<{
   }
 
   // Get employee scores
+  // NOTA: la columna se llama `active` (no `is_active`) en home_employees
   const { data: employees } = await supabase
     .from("home_employees")
     .select("id")
     .eq("household_id", householdId)
-    .eq("is_active", true);
+    .eq("active", true);
 
   const employeeScores: EmployeeScore[] = [];
   if (employees) {
