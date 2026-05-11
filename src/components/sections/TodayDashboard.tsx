@@ -217,7 +217,7 @@ export default function TodayDashboard({
                 <p className="text-xs uppercase tracking-wider font-bold text-orange-600 mb-1">
                   {heroLabel}
                 </p>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white leading-tight mb-3">
+                <h2 className="font-display text-3xl font-semibold text-gray-900 dark:text-white leading-tight mb-3">
                   {heroMeal.name}
                 </h2>
 

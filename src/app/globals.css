@@ -1,8 +1,16 @@
 @import "tailwindcss";
 
+/* Sprint 10 (Lazyweb research mayo 2026): font-display utility para heros
+   editoriales. Usar en h1 hero de Today, RecipeModal, MonthlyReport. */
+.font-display {
+  font-family: var(--font-display), Georgia, "Times New Roman", serif;
+  letter-spacing: -0.02em;
+}
+
 :root {
-  --primary: #2e7d32;
-  --primary-light: #e8f5e9;
+  /* Sprint 4 (Lazyweb): paleta brand actualizada a orange warm */
+  --primary: #ff6b35;
+  --primary-light: #fff4ee;
   --secondary: #1565c0;
   --secondary-light: #e3f2fd;
   --danger: #c62828;
