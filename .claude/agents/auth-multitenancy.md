@@ -78,15 +78,77 @@ const { can, isAdmin } = useRoleCheck();
 - `console.log('Auth state changed')` en produccion en AuthContext.tsx
 - Middleware solo protege /api/, paginas no protegidas server-side
 
+## 🚨 LECCIONES CRITICAS DE PRODUCCION (mayo 2026)
+
+### 1. HouseholdProvider DEBE esperar AuthContext
+
+❌ **Bug encontrado**: `initializeHouseholdContext()` cargaba el primer hogar de la DB sin verificar sesion. Combinado con policies RLS con `auth.uid() IS NULL`, cualquier visitor anonimo veia datos de "Mi Hogar".
+
+✅ **Fix obligatorio**: HouseholdProvider espera a que `AuthContext.isLoading=false` y `user != null` antes de hacer cualquier fetch.
+
+```tsx
+const { user: authUser, isLoading: authLoading } = useAuth();
+
+useEffect(() => {
+  if (authLoading) return; // esperar a que auth resuelva
+  if (!authUser) {
+    setHousehold(null);
+    setUser(null);
+    setInitialized(true);
+    return; // sin sesion = no fetch
+  }
+  // ... initialize con authUser.id
+}, [authUser, authLoading]);
+```
+
+### 2. initializeHouseholdContext requiere authUserId
+
+❌ **Antes** (legacy "Phase A"):
+
+```typescript
+// "For now, get the first/default household (no auth yet)"
+const { data: households } = await supabase
+  .from("households")
+  .select("*")
+  .limit(1);
+```
+
+✅ **Ahora**:
+
+```typescript
+export async function initializeHouseholdContext(authUserId?: string) {
+  if (!authUserId) return { household: null, user: null }; // sin auth = no fetch
+
+  // Buscar household via household_memberships del usuario logueado
+  const { data: memberships } = await supabase
+    .from("household_memberships")
+    .select("household:households(*)")
+    .eq("user_id", authUserId)
+    .eq("is_active", true)
+    .order("joined_at", { ascending: false })
+    .limit(1);
+  // ...
+}
+```
+
+### 3. RLS no puede tener escape `auth.uid() IS NULL`
+
+Si una policy en una tabla con datos de hogar tiene `(auth.uid() IS NULL) OR ...`, hay fuga. Ver skill `rls-security-patterns`. Auditar con `/user:audit-rls-leaks`.
+
+### 4. Cliente Supabase = singleton (NO crear createClient propio)
+
+Ver skill `supabase-client-patterns`. Importar `import { supabase } from "@/lib/supabase/client"` siempre en lib del cliente.
+
 ## Reglas
 
 1. **SIEMPRE** verificar auth con `supabase.auth.getUser()` (no `getSession()`)
 2. Middleware inyecta `x-user-id` — endpoints deben leerlo de headers
-3. Rutas publicas: `/auth`, `/join`, `/api/validate-invitation`
+3. Rutas publicas: `/auth`, `/join`, `/api/validate-invitation`, `/api/push/send` (GET solo)
 4. RoleGate en UI es solo UX — la seguridad real esta en RLS y middleware
 5. Un usuario puede pertenecer a multiples hogares
 6. Invitaciones expiran y tienen uso unico
-7. Consultar skill `recetario-auth-patterns` antes de modificar
+7. Providers que dependen de auth (HouseholdProvider, FavoritesProvider, etc.) DEBEN esperar `AuthContext`
+8. Consultar skill `recetario-auth-patterns` antes de modificar
 
 ## Checklist Pre-Commit
 
