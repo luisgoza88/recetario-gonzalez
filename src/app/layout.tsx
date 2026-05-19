@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Fraunces } from "next/font/google";
+import { Geist, Geist_Mono, Fraunces, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 import Providers from "@/lib/providers/Providers";
@@ -7,7 +7,7 @@ import Providers from "@/lib/providers/Providers";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
-  display: "swap", // Evita FOIT (Flash of Invisible Text)
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
@@ -16,13 +16,18 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
-// Sprint 10 (Lazyweb research): serif moderna para heros editoriales
-// (NYT Cooking pattern). Solo se usa via la clase .font-display.
 const fraunces = Fraunces({
   variable: "--font-display",
   subsets: ["latin"],
   display: "swap",
   weight: ["500", "600", "700"],
+});
+
+const plusJakarta = Plus_Jakarta_Sans({
+  variable: "--font-jakarta",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -36,7 +41,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#FF6B35", // orange brand 2026 (Lazyweb research)
+  themeColor: "#15803d",
   width: "device-width",
   initialScale: 1,
 };
@@ -49,7 +54,14 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} antialiased warm-mode min-h-screen`}
+        className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} ${plusJakarta.variable} antialiased warm-mode min-h-screen`}
+        style={{
+          fontFamily: "var(--font-jakarta), var(--font-geist-sans)",
+          background: "var(--bg)",
+          color: "var(--ink)",
+          paddingBottom: "96px",
+          lineHeight: 1.5,
+        }}
       >
         <Providers>
           <ServiceWorkerRegistration />

@@ -1,183 +1,40 @@
 @import "tailwindcss";
 
-/* Sprint 10 (Lazyweb research mayo 2026): font-display utility para heros
-   editoriales. Usar en h1 hero de Today, RecipeModal, MonthlyReport. */
-.font-display {
-  font-family: var(--font-display), Georgia, "Times New Roman", serif;
-  letter-spacing: -0.02em;
-}
-
-/* Sprint 11 (Lazyweb research mayo 2026): BottomSheet animations
-   Sin dependencia de tailwindcss-animate. */
-@keyframes sheet-fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes sheet-slide-up {
-  from {
-    transform: translateY(100%);
-  }
-  to {
-    transform: translateY(0);
-  }
-}
-
-.sheet-backdrop {
-  animation: sheet-fade-in 200ms ease-out;
-}
-
-.sheet-content {
-  animation: sheet-slide-up 300ms cubic-bezier(0.32, 0.72, 0, 1);
-}
-
-/* Sprint 13 (Lazyweb research mayo 2026): paleta warm globalmente.
-   Light: cream (#FDFBF7) en vez de white puro - mas calido para comida.
-   Dark: warm dark (#0F0E0C) en vez de black - mejor para cocinar de noche.
-   Backgrounds elevados: #1C1A17 (elev-1) y #2A2722 (elev-2). */
-.bg-app-base {
-  background-color: #fdfbf7;
-}
-.dark .bg-app-base {
-  background-color: #0f0e0c;
-}
-.bg-app-elev-1 {
-  background-color: #ffffff;
-}
-.dark .bg-app-elev-1 {
-  background-color: #1c1a17;
-}
-.bg-app-elev-2 {
-  background-color: #faf7f2;
-}
-.dark .bg-app-elev-2 {
-  background-color: #2a2722;
-}
-.text-app-primary {
-  color: #18120a;
-}
-.dark .text-app-primary {
-  color: #faf7f2;
-}
-.text-app-secondary {
-  color: #78716c;
-}
-.dark .text-app-secondary {
-  color: #a8a29e;
-}
-.border-app-stroke {
-  border-color: #f1eee8;
-}
-.dark .border-app-stroke {
-  border-color: #2a2722;
-}
-
-/* Aplicar warm globally al body */
-body.warm-mode {
-  background-color: #fdfbf7;
-  color: #18120a;
-}
-.dark body.warm-mode,
-body.warm-mode.dark {
-  background-color: #0f0e0c;
-  color: #faf7f2;
-}
-
 :root {
-  /* Sprint 4 (Lazyweb): paleta brand actualizada a orange warm */
-  --primary: #ff6b35;
-  --primary-light: #fff4ee;
-  --secondary: #1565c0;
-  --secondary-light: #e3f2fd;
+  --accent: #15803d;
+  --accent-soft: #f0fdf4;
+  --bg: #FAFAF7;
+  --ink: #1c1917;
+  --ink-soft: #78716c;
+  --border: #e7e5e4;
+  --primary: #15803d;
+  --primary-light: #f0fdf4;
+  --secondary: #1d4ed8;
+  --secondary-light: #eff6ff;
   --danger: #c62828;
   --danger-light: #ffebee;
   --warning: #f57c00;
   --warning-light: #fff3e0;
 }
 
-* {
-  -webkit-tap-highlight-color: transparent;
-}
+* { -webkit-tap-highlight-color: transparent; }
 
-body {
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background: #f5f5f5;
-  color: #333;
-  line-height: 1.5;
-  min-height: 100vh;
-  padding-bottom: 80px;
-}
+@keyframes animate-fade-in { from { opacity: 0 } to { opacity: 1 } }
+@keyframes animate-slide-up { from { transform: translateY(100%) } to { transform: translateY(0) } }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
+.animate-fade-in { animation: animate-fade-in 200ms ease-out both }
+.animate-slide-up { animation: animate-slide-up 280ms cubic-bezier(0.2,0.7,0.2,1) both }
 
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
+@keyframes slide-down { from { transform: translateY(-100%); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+@keyframes slide-up { from { transform: translateY(100%); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+.animate-slide-down { animation: slide-down 0.3s ease-out }
 
-::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 3px;
-}
+::-webkit-scrollbar { width: 6px; height: 6px }
+::-webkit-scrollbar-track { background: #f1f1f1 }
+::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px }
+::-webkit-scrollbar-thumb:hover { background: #a1a1a1 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
-}
-
-/* Animaciones para notificaciones */
-@keyframes slide-down {
-  from {
-    transform: translateY(-100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes slide-up {
-  from {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.animate-slide-down {
-  animation: slide-down 0.3s ease-out;
-}
-
-.animate-slide-up {
-  animation: slide-up 0.3s ease-out;
-}
-
-/* Hide scrollbar but keep functionality */
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-
-/* Safe area padding for notch/home indicator */
-.pb-safe {
-  padding-bottom: env(safe-area-inset-bottom, 0);
-}
-
-.safe-area-pb {
-  padding-bottom: env(safe-area-inset-bottom, 0);
-}
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none }
+.scrollbar-hide::-webkit-scrollbar { display: none }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0) }
+.safe-area-pb { padding-bottom: env(safe-area-inset-bottom, 0) }

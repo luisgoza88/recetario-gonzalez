@@ -21,71 +21,28 @@ interface BottomNavigationProps {
   fabOpen: boolean;
   onFabToggle: () => void;
   fabActions: FABAction[];
-  // Props para tabs secundarios de recetario
   recetarioTab?: RecetarioTab;
   onRecetarioTabChange?: (tab: RecetarioTab) => void;
   pendingSuggestions?: number;
-  // AI Command Center
   onOpenAICommandCenter?: () => void;
   pendingAIProposals?: number;
 }
 
-interface NavItemProps {
-  icon: React.ReactNode;
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  badge?: number;
-  activeColor: string;
-  activeBg: string;
-}
+const SECTION_ACCENTS: Record<
+  MainSection,
+  { activeClass: string; bgClass: string }
+> = {
+  hoy: { activeClass: "text-orange-600", bgClass: "bg-orange-50" },
+  recetario: { activeClass: "text-[var(--accent)]", bgClass: "bg-[var(--accent-soft)]" },
+  hogar: { activeClass: "text-blue-700", bgClass: "bg-blue-50" },
+  ajustes: { activeClass: "text-stone-700", bgClass: "bg-stone-100" },
+};
 
-function NavItem({
-  icon,
-  label,
-  active,
-  onClick,
-  badge,
-  activeColor,
-  activeBg,
-}: NavItemProps) {
-  const showBadge = typeof badge === "number" && badge > 0;
-
-  return (
-    <button
-      onClick={onClick}
-      role="tab"
-      aria-selected={active}
-      aria-current={active ? "page" : undefined}
-      className={`
-        flex flex-col items-center justify-center py-2 px-3 rounded-xl
-        transition-all duration-200 min-w-[64px]
-        ${active ? `${activeColor} ${activeBg}` : "text-gray-500"}
-      `}
-    >
-      <div className="relative">
-        {icon}
-        {showBadge && (
-          <span className="absolute -top-1 -right-2 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
-            {badge > 9 ? "9+" : badge}
-          </span>
-        )}
-      </div>
-      <span className="text-xs mt-1 font-medium">{label}</span>
-    </button>
-  );
-}
-
-// Tabs secundarios del Recetario
-const RECETARIO_TABS: {
-  id: RecetarioTab;
-  label: string;
-  icon: React.ReactNode;
-}[] = [
-  { id: "calendar", label: "Calendario", icon: <Calendar size={20} /> },
-  { id: "market", label: "Mercado", icon: <ShoppingCart size={20} /> },
-  { id: "recipes", label: "Recetas", icon: <BookOpen size={20} /> },
-  { id: "suggestions", label: "Sugerencias", icon: <Lightbulb size={20} /> },
+const RECETARIO_TABS: { id: RecetarioTab; label: string; icon: React.ReactNode }[] = [
+  { id: "calendar", label: "Calendario", icon: <Calendar size={16} /> },
+  { id: "market", label: "Mercado", icon: <ShoppingCart size={16} /> },
+  { id: "recipes", label: "Recetas", icon: <BookOpen size={16} /> },
+  { id: "suggestions", label: "Sugerencias", icon: <Lightbulb size={16} /> },
 ];
 
 export default function BottomNavigation({
@@ -103,116 +60,60 @@ export default function BottomNavigation({
   return (
     <nav
       aria-label="Navegación principal"
-      className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 safe-area-pb"
+      className="fixed bottom-0 inset-x-0 bg-white border-t border-[var(--border)] z-50"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)" }}
     >
-      <div className="max-w-lg mx-auto">
-        {/* Tabs secundarios del Recetario - Solo visible cuando está activo */}
-        {activeSection === "recetario" && onRecetarioTabChange && (
-          <div
-            className="flex border-b border-gray-100 bg-gray-50/80"
-            role="tablist"
-            aria-label="Secciones del recetario"
-          >
-            {RECETARIO_TABS.map((tab) => {
-              const isActive = recetarioTab === tab.id;
-              const showBadge =
-                tab.id === "suggestions" && pendingSuggestions > 0;
-
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => onRecetarioTabChange(tab.id)}
-                  role="tab"
-                  aria-selected={isActive}
-                  aria-label={tab.label}
-                  className={`
-                    flex-1 flex items-center justify-center gap-2 py-3.5 px-2
-                    transition-all duration-200 relative
-                    ${
-                      isActive
-                        ? "text-orange-700 bg-white"
-                        : "text-gray-500 hover:text-gray-700"
-                    }
-                  `}
-                >
-                  {/* Indicador activo */}
-                  {isActive && (
-                    <div className="absolute top-0 left-2 right-2 h-0.5 bg-orange-600 rounded-full" />
-                  )}
+      {activeSection === "recetario" && onRecetarioTabChange && (
+        <div className="flex border-b border-[var(--border)] bg-stone-50" role="tablist">
+          {RECETARIO_TABS.map((tab) => {
+            const isActive = recetarioTab === tab.id;
+            const showBadge = tab.id === "suggestions" && pendingSuggestions > 0;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => onRecetarioTabChange(tab.id)}
+                role="tab"
+                aria-selected={isActive}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-1 relative transition-colors ${
+                  isActive ? "text-[var(--accent)] bg-white" : "text-stone-500"
+                }`}
+              >
+                {isActive && (
+                  <span className="absolute top-0 left-3 right-3 h-0.5 bg-[var(--accent)] rounded-full" />
+                )}
+                <div className="relative">
                   {tab.icon}
-                  <span className="text-xs font-medium hidden sm:inline">
-                    {tab.label}
-                  </span>
                   {showBadge && (
-                    <span className="w-4 h-4 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold">
+                    <span className="absolute -top-1.5 -right-2 min-w-[14px] h-[14px] px-1 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold">
                       {pendingSuggestions > 9 ? "9+" : pendingSuggestions}
                     </span>
                   )}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Navegación principal */}
-        <div
-          className="flex items-end justify-around py-2 px-1"
-          role="tablist"
-          aria-label="Secciones principales"
-        >
-          {/* Hoy */}
-          <NavItem
-            icon={<Sun size={22} />}
-            label="Hoy"
-            active={activeSection === "hoy"}
-            onClick={() => onSectionChange("hoy")}
-            activeColor="text-orange-600"
-            activeBg="bg-orange-50"
-          />
-
-          {/* Recetario */}
-          <NavItem
-            icon={<UtensilsCrossed size={22} />}
-            label="Recetario"
-            active={activeSection === "recetario"}
-            onClick={() => onSectionChange("recetario")}
-            activeColor="text-orange-600"
-            activeBg="bg-orange-50"
-          />
-
-          {/* FAB - Center elevated AI button */}
-          <div className="relative -top-5">
-            <SmartFAB
-              open={fabOpen}
-              onToggle={onFabToggle}
-              actions={fabActions}
-              activeSection={activeSection}
-              onOpenAICommandCenter={onOpenAICommandCenter}
-              pendingProposals={pendingAIProposals}
-            />
-          </div>
-
-          {/* Hogar */}
-          <NavItem
-            icon={<Home size={22} />}
-            label="Hogar"
-            active={activeSection === "hogar"}
-            onClick={() => onSectionChange("hogar")}
-            activeColor="text-blue-700"
-            activeBg="bg-blue-50"
-          />
-
-          {/* Ajustes */}
-          <NavItem
-            icon={<Settings size={22} />}
-            label="Ajustes"
-            active={activeSection === "ajustes"}
-            onClick={() => onSectionChange("ajustes")}
-            activeColor="text-gray-700"
-            activeBg="bg-gray-100"
-          />
+                </div>
+                <span className="text-[10.5px] font-medium">{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
+      )}
+
+      <div className="flex items-end justify-around px-2 pt-2 pb-1 relative" role="tablist">
+        <NavTab icon={<Sun size={20} />} label="Hoy" active={activeSection === "hoy"} onClick={() => onSectionChange("hoy")} accent={SECTION_ACCENTS.hoy} />
+        <NavTab icon={<UtensilsCrossed size={20} />} label="Recetario" active={activeSection === "recetario"} onClick={() => onSectionChange("recetario")} accent={SECTION_ACCENTS.recetario} />
+        <div className="relative -mt-7">
+          <SmartFAB open={fabOpen} onToggle={onFabToggle} actions={fabActions} activeSection={activeSection} onOpenAICommandCenter={onOpenAICommandCenter} pendingProposals={pendingAIProposals} />
+        </div>
+        <NavTab icon={<Home size={20} />} label="Hogar" active={activeSection === "hogar"} onClick={() => onSectionChange("hogar")} accent={SECTION_ACCENTS.hogar} />
+        <NavTab icon={<Settings size={20} />} label="Ajustes" active={activeSection === "ajustes"} onClick={() => onSectionChange("ajustes")} accent={SECTION_ACCENTS.ajustes} />
       </div>
     </nav>
+  );
+}
+
+function NavTab({ icon, label, active, onClick, accent }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void; accent: { activeClass: string; bgClass: string } }) {
+  return (
+    <button onClick={onClick} role="tab" aria-selected={active} className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl min-w-[58px] transition-colors ${active ? `${accent.activeClass} ${accent.bgClass}` : "text-stone-400"}`}>
+      {icon}
+      <span className="text-[10px] mt-0.5 font-medium">{label}</span>
+    </button>
   );
 }
