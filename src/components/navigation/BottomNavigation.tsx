@@ -33,12 +33,19 @@ const SECTION_ACCENTS: Record<
   { activeClass: string; bgClass: string }
 > = {
   hoy: { activeClass: "text-orange-600", bgClass: "bg-orange-50" },
-  recetario: { activeClass: "text-[var(--accent)]", bgClass: "bg-[var(--accent-soft)]" },
+  recetario: {
+    activeClass: "text-[var(--accent)]",
+    bgClass: "bg-[var(--accent-soft)]",
+  },
   hogar: { activeClass: "text-blue-700", bgClass: "bg-blue-50" },
   ajustes: { activeClass: "text-stone-700", bgClass: "bg-stone-100" },
 };
 
-const RECETARIO_TABS: { id: RecetarioTab; label: string; icon: React.ReactNode }[] = [
+const RECETARIO_TABS: {
+  id: RecetarioTab;
+  label: string;
+  icon: React.ReactNode;
+}[] = [
   { id: "calendar", label: "Calendario", icon: <Calendar size={16} /> },
   { id: "market", label: "Mercado", icon: <ShoppingCart size={16} /> },
   { id: "recipes", label: "Recetas", icon: <BookOpen size={16} /> },
@@ -64,10 +71,14 @@ export default function BottomNavigation({
       style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)" }}
     >
       {activeSection === "recetario" && onRecetarioTabChange && (
-        <div className="flex border-b border-[var(--border)] bg-stone-50" role="tablist">
+        <div
+          className="flex border-b border-[var(--border)] bg-stone-50"
+          role="tablist"
+        >
           {RECETARIO_TABS.map((tab) => {
             const isActive = recetarioTab === tab.id;
-            const showBadge = tab.id === "suggestions" && pendingSuggestions > 0;
+            const showBadge =
+              tab.id === "suggestions" && pendingSuggestions > 0;
             return (
               <button
                 key={tab.id}
@@ -96,22 +107,73 @@ export default function BottomNavigation({
         </div>
       )}
 
-      <div className="flex items-end justify-around px-2 pt-2 pb-1 relative" role="tablist">
-        <NavTab icon={<Sun size={20} />} label="Hoy" active={activeSection === "hoy"} onClick={() => onSectionChange("hoy")} accent={SECTION_ACCENTS.hoy} />
-        <NavTab icon={<UtensilsCrossed size={20} />} label="Recetario" active={activeSection === "recetario"} onClick={() => onSectionChange("recetario")} accent={SECTION_ACCENTS.recetario} />
+      <div
+        className="flex items-end justify-around px-2 pt-2 pb-1 relative"
+        role="tablist"
+      >
+        <NavTab
+          icon={<Sun size={20} />}
+          label="Hoy"
+          active={activeSection === "hoy"}
+          onClick={() => onSectionChange("hoy")}
+          accent={SECTION_ACCENTS.hoy}
+        />
+        <NavTab
+          icon={<UtensilsCrossed size={20} />}
+          label="Recetario"
+          active={activeSection === "recetario"}
+          onClick={() => onSectionChange("recetario")}
+          accent={SECTION_ACCENTS.recetario}
+        />
         <div className="relative -mt-7">
-          <SmartFAB open={fabOpen} onToggle={onFabToggle} actions={fabActions} activeSection={activeSection} onOpenAICommandCenter={onOpenAICommandCenter} pendingProposals={pendingAIProposals} />
+          <SmartFAB
+            open={fabOpen}
+            onToggle={onFabToggle}
+            actions={fabActions}
+            activeSection={activeSection}
+            onOpenAICommandCenter={onOpenAICommandCenter}
+            pendingProposals={pendingAIProposals}
+          />
         </div>
-        <NavTab icon={<Home size={20} />} label="Hogar" active={activeSection === "hogar"} onClick={() => onSectionChange("hogar")} accent={SECTION_ACCENTS.hogar} />
-        <NavTab icon={<Settings size={20} />} label="Ajustes" active={activeSection === "ajustes"} onClick={() => onSectionChange("ajustes")} accent={SECTION_ACCENTS.ajustes} />
+        <NavTab
+          icon={<Home size={20} />}
+          label="Hogar"
+          active={activeSection === "hogar"}
+          onClick={() => onSectionChange("hogar")}
+          accent={SECTION_ACCENTS.hogar}
+        />
+        <NavTab
+          icon={<Settings size={20} />}
+          label="Ajustes"
+          active={activeSection === "ajustes"}
+          onClick={() => onSectionChange("ajustes")}
+          accent={SECTION_ACCENTS.ajustes}
+        />
       </div>
     </nav>
   );
 }
 
-function NavTab({ icon, label, active, onClick, accent }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void; accent: { activeClass: string; bgClass: string } }) {
+function NavTab({
+  icon,
+  label,
+  active,
+  onClick,
+  accent,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  accent: { activeClass: string; bgClass: string };
+}) {
   return (
-    <button onClick={onClick} role="tab" aria-selected={active} className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl min-w-[58px] transition-colors ${active ? `${accent.activeClass} ${accent.bgClass}` : "text-stone-400"}`}>
+    <button
+      onClick={onClick}
+      role="tab"
+      aria-selected={active}
+      className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl min-w-[58px] transition-colors ${active ? `${accent.activeClass} ${accent.bgClass}` : "text-stone-400"}`}
+    >
       {icon}
       <span className="text-[10px] mt-0.5 font-medium">{label}</span>
     </button>

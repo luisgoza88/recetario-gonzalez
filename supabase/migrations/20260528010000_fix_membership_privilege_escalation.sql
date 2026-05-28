@@ -1,0 +1,15 @@
+-- =====================================================
+-- CRÍTICO: escalada de privilegios cross-tenant en household_memberships
+-- =====================================================
+-- La policy permisiva "Allow membership creation" (WITH CHECK true) se combina
+-- con OR con la policy segura `memberships_insert`, anulándola. En RLS las
+-- policies permisivas para el mismo comando se OR-ean, así que el efecto neto
+-- era `true` -> cualquier usuario autenticado podía insertar una membresía
+-- arbitraria (incluyéndose como admin de CUALQUIER hogar) = toma de control
+-- total de los datos de otra familia.
+--
+-- La policy segura `memberships_insert` (admin del hogar OR user_id propio) +
+-- las RPC SECURITY DEFINER (use_invitation_code, create_invitation, que
+-- bypasean RLS) cubren todos los flujos legítimos. Se elimina la abierta.
+-- =====================================================
+DROP POLICY IF EXISTS "Allow membership creation" ON household_memberships;

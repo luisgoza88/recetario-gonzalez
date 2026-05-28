@@ -259,7 +259,7 @@ export async function executeMultiStepTask(
 
       for (const recipe of recipes || []) {
         const ingredients = Array.isArray(recipe.ingredients)
-          ? recipe.ingredients
+          ? (recipe.ingredients as Array<{ name?: string } | string>)
           : [];
         const { matchPercent } = countIngredientMatches(
           ingredients,
@@ -269,8 +269,9 @@ export async function executeMultiStepTask(
         if (matchPercent >= 60) {
           suggestions.push({
             name: recipe.name,
-            prep_time: recipe.prep_time,
-            category: recipe.category,
+            prep_time:
+              recipe.prep_time !== null ? String(recipe.prep_time) : undefined,
+            category: recipe.category ?? undefined,
             match_percent: matchPercent,
           });
         }

@@ -544,10 +544,10 @@ export default function SmartSuggestions({
                             {Math.round(alt.availablePercent)}% listo
                           </span>
                         </div>
-                        {alt.missingIngredients.length > 0 && (
+                        {(alt.missingIngredients?.length ?? 0) > 0 && (
                           <p className="text-xs text-gray-500 mt-1">
                             Falta:{" "}
-                            {alt.missingIngredients
+                            {(alt.missingIngredients ?? [])
                               .map((i) => i.name)
                               .join(", ")}
                           </p>

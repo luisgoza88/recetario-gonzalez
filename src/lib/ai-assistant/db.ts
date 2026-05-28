@@ -7,12 +7,14 @@
 
 import { SupabaseClient } from "@supabase/supabase-js";
 import { createAuthenticatedClient } from "@/lib/supabase/server";
+import type { Database } from "@/types/database.types";
 
 /**
  * Creates an authenticated Supabase client for AI Assistant operations.
  * Respects RLS policies based on the current user's session.
+ * Tipado con Database para que los joins se infieran y no haga falta castear.
  */
-export async function createAIClient(): Promise<SupabaseClient> {
+export async function createAIClient(): Promise<SupabaseClient<Database>> {
   return createAuthenticatedClient();
 }
 

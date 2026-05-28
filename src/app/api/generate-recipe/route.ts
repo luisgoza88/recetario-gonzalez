@@ -68,6 +68,20 @@ const GenerateRecipeRequestSchema = z.object({
   mood: MoodSchema.optional(),
 });
 
+// Schema del OUTPUT del modelo. Validamos la respuesta de Gemini antes de
+// usarla/persistirla: el LLM puede devolver tipos inesperados (ej. quantity
+// como objeto, ingredients ausente). `.passthrough()` conserva campos extra
+// (luis, mariana, moods, available, etc.) sin imponer un esquema rigido.
+const GeneratedRecipeSchema = z
+  .object({
+    name: z.string().min(1),
+    ingredients: z
+      .array(z.object({ name: z.string().min(1) }).passthrough())
+      .min(1),
+    steps: z.array(z.unknown()).min(1),
+  })
+  .passthrough();
+
 function getSupabase() {
   return createServiceRoleClient();
 }
@@ -470,12 +484,22 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura exacta:
     // Parse JSON response with robust cleaning
     try {
       const jsonContent = cleanJsonResponse(content);
-      const recipe = JSON.parse(jsonContent);
+      const rawRecipe = JSON.parse(jsonContent);
 
-      // Validate essential fields
-      if (!recipe.name || !recipe.ingredients || !recipe.steps) {
-        throw new Error("Missing required recipe fields");
+      // Validar forma y tipos del output del modelo (no solo truthy)
+      const parsedRecipe = GeneratedRecipeSchema.safeParse(rawRecipe);
+      if (!parsedRecipe.success) {
+        logger.error("AI recipe failed schema validation", {
+          issues: parsedRecipe.error.issues
+            .slice(0, 5)
+            .map((i) => `${i.path.join(".")}: ${i.message}`),
+        });
+        return NextResponse.json(
+          { error: "La IA devolvió una receta con formato inválido" },
+          { status: 502 },
+        );
       }
+      const recipe = parsedRecipe.data;
 
       // Si se solicitó generar imagen, hacerlo de forma asíncrona
       let recipeImage = null;

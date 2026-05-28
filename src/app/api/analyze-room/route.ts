@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import {
   getGeminiClient,
   GEMINI_MODELS,
@@ -42,6 +43,23 @@ interface RoomAnalysis {
   specialConsiderations?: string[];
   confidence: number;
 }
+
+// Schema del OUTPUT del modelo. Validamos la respuesta de Gemini antes de
+// devolverla como `analysis`: el LLM puede omitir campos clave o devolver
+// tipos inesperados (ej. roomType ausente, suggestedTasks no array). Tipamos
+// solo los campos esenciales que el consumidor espera; `.passthrough()`
+// conserva el resto (attributes, cleaningZones, confidence, etc.) sin imponer
+// un esquema rigido. Arrays opcionales por si el modelo los omite.
+const RoomAnalysisSchema = z
+  .object({
+    roomType: z.string().min(1),
+    roomTypeId: z.string().min(1),
+    furniture: z.array(z.unknown()).optional(),
+    surfaces: z.array(z.unknown()).optional(),
+    suggestedTasks: z.array(z.unknown()).optional(),
+    description: z.string().optional(),
+  })
+  .passthrough();
 
 // Dimensiones de referencia para estimación de área
 const REFERENCE_DIMENSIONS: Record<
@@ -254,7 +272,22 @@ Sé PRÁCTICO y ÚTIL. Un ama de llaves profesional no limpia "el lapicero", lim
     let analysis: RoomAnalysis;
     try {
       const cleanContent = cleanJsonResponse(content);
-      analysis = JSON.parse(cleanContent);
+      const raw = JSON.parse(cleanContent);
+
+      // Validar forma y tipos del output del modelo antes de devolverlo
+      const parsed = RoomAnalysisSchema.safeParse(raw);
+      if (!parsed.success) {
+        logger.error("AI room analysis failed schema validation", {
+          issues: parsed.error.issues
+            .slice(0, 5)
+            .map((i) => `${i.path.join(".")}: ${i.message}`),
+        });
+        return NextResponse.json(
+          { error: "La IA devolvió un análisis con formato inválido" },
+          { status: 502 },
+        );
+      }
+      analysis = parsed.data as unknown as RoomAnalysis;
     } catch {
       logger.error(`Error parsing AI response: ${content}`);
       return NextResponse.json(

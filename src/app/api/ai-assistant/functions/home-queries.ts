@@ -13,10 +13,27 @@ export async function getTodayTasks() {
     const { data: tasks, error } = await supabase
       .from("scheduled_tasks")
       .select(
-        "*, task_template:task_templates(name, category, estimated_minutes), employee:home_employees(name)",
+        "id, status, task_template_id, employee_id, scheduled_date, created_at, task_template:task_templates(name, category, estimated_minutes)",
       )
       .eq("scheduled_date", today)
       .order("created_at");
+
+    // Fetch employee names separately to avoid ambiguity
+    let employeeNames: Record<string, string> = {};
+    if (tasks && tasks.length > 0) {
+      const empIds = [
+        ...new Set(tasks.map((t) => t.employee_id).filter(Boolean)),
+      ];
+      if (empIds.length > 0) {
+        const { data: emps } = await supabase
+          .from("home_employees")
+          .select("id, name")
+          .in("id", empIds as string[]);
+        emps?.forEach((e) => {
+          employeeNames[e.id] = e.name;
+        });
+      }
+    }
 
     if (error) {
       logger.error("Error fetching tasks", {
@@ -33,19 +50,13 @@ export async function getTodayTasks() {
       message: `${tasks.length} tareas para hoy`,
       tasks: tasks.map((t) => ({
         id: t.id,
-        task:
-          (t.task_template as unknown as { name: string } | null)?.name ||
-          "Tarea",
+        task: t.task_template?.name || "Tarea",
         employee:
-          (t.employee as unknown as { name: string } | null)?.name ||
+          (t.employee_id ? employeeNames[t.employee_id] : undefined) ||
           "Sin asignar",
         status: t.status || "pendiente",
-        category:
-          (t.task_template as unknown as { category: string } | null)
-            ?.category || "general",
-        estimated_minutes: (
-          t.task_template as unknown as { estimated_minutes: number } | null
-        )?.estimated_minutes,
+        category: t.task_template?.category || "general",
+        estimated_minutes: t.task_template?.estimated_minutes,
       })),
     };
   } catch (err) {
@@ -88,16 +99,10 @@ export async function getEmployeeSchedule(
     tasks:
       tasks?.map((t) => ({
         id: t.id,
-        task:
-          (t.task_template as unknown as { name: string } | null)?.name ||
-          "Tarea",
+        task: t.task_template?.name || "Tarea",
         status: t.status,
-        category:
-          (t.task_template as unknown as { category: string } | null)
-            ?.category || "general",
-        estimated_minutes: (
-          t.task_template as unknown as { estimated_minutes: number } | null
-        )?.estimated_minutes,
+        category: t.task_template?.category || "general",
+        estimated_minutes: t.task_template?.estimated_minutes,
       })) || [],
   };
 }
@@ -233,7 +238,7 @@ export async function getSpaceDetails(spaceId?: string, spaceName?: string) {
         usage_level: space.usage_level,
         has_bathroom: space.has_bathroom,
         area_sqm: space.area_sqm,
-        attributes: space.attributes,
+        characteristics: space.characteristics,
         notes: space.notes,
         default_tasks: space.space_type?.default_tasks || [],
       },
@@ -285,7 +290,6 @@ export async function listEmployees(
           zone: e.zone,
           work_days: e.work_days,
           hours_per_day: e.hours_per_day,
-          schedule: e.schedule,
           phone: e.phone,
           active: e.active,
           notes: e.notes,
@@ -337,7 +341,6 @@ export async function getEmployeeDetails(
         zone: employee.zone,
         work_days: employee.work_days,
         hours_per_day: employee.hours_per_day,
-        schedule: employee.schedule,
         phone: employee.phone,
         active: employee.active,
         notes: employee.notes,

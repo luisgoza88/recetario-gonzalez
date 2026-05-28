@@ -42,6 +42,32 @@ const GenerateWeeklyMenuRequestSchema = z.object({
   desiredMoods: z.record(z.string(), z.string()).optional(),
 });
 
+// Schema del OUTPUT del modelo. Validamos la respuesta de Gemini antes de
+// persistirla en `generated_menus`: el LLM puede devolver `days` ausente o no
+// array, o dias con meals de forma inesperada. Tipamos solo lo esencial
+// (`days` y la forma minima de cada meal que se lee downstream); todo lo demas
+// con `.passthrough()` y opcionales generosos (dinner puede ser null en
+// viernes/sabado, meals enteros pueden faltar).
+const WeeklyMenuMealSchema = z
+  .object({
+    name: z.string().optional(),
+  })
+  .passthrough();
+
+const WeeklyMenuDaySchema = z
+  .object({
+    breakfast: WeeklyMenuMealSchema.nullable().optional(),
+    lunch: WeeklyMenuMealSchema.nullable().optional(),
+    dinner: WeeklyMenuMealSchema.nullable().optional(),
+  })
+  .passthrough();
+
+const WeeklyMenuOutputSchema = z
+  .object({
+    days: z.array(WeeklyMenuDaySchema).min(1),
+  })
+  .passthrough();
+
 // =====================================================
 // Supabase client (server-side, service role for DB ops)
 // =====================================================
@@ -391,15 +417,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse the response
-    let menuData;
+    let menuData: z.infer<typeof WeeklyMenuOutputSchema>;
     try {
       const jsonContent = cleanJsonResponse(content);
-      menuData = JSON.parse(jsonContent);
+      const rawMenu = JSON.parse(jsonContent);
 
-      // Validate structure
-      if (!menuData.days || !Array.isArray(menuData.days)) {
-        throw new Error("Invalid menu structure: missing days array");
+      // Validar forma y tipos del output del modelo antes de persistir
+      const parsedMenu = WeeklyMenuOutputSchema.safeParse(rawMenu);
+      if (!parsedMenu.success) {
+        logger.error("AI weekly menu failed schema validation", {
+          issues: parsedMenu.error.issues
+            .slice(0, 5)
+            .map((i) => `${i.path.join(".")}: ${i.message}`),
+        });
+        return NextResponse.json(
+          { error: "La IA devolvió un menú con formato inválido" },
+          { status: 502 },
+        );
       }
+      menuData = parsedMenu.data;
     } catch (parseError) {
       logger.error("JSON parse error for weekly menu", {
         error:

@@ -48,6 +48,31 @@ export async function requirePermission(
 }
 
 /**
+ * Verify the authenticated user is an active member of the given household.
+ * Use to block cross-tenant access in routes that read/write household data
+ * with the service-role client (which bypasses RLS).
+ */
+export async function requireHouseholdMembership(
+  householdId: string,
+): Promise<boolean> {
+  if (!householdId) return false;
+  const supabase = await createAuthenticatedClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return false;
+  const { data, error } = await supabase
+    .from("household_memberships")
+    .select("id")
+    .eq("household_id", householdId)
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (error) return false;
+  return !!data;
+}
+
+/**
  * Helper to return a 403 Forbidden response.
  */
 export function forbiddenResponse(message = "Insufficient permissions") {

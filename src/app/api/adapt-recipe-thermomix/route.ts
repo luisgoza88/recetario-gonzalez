@@ -22,6 +22,26 @@ const AdaptRecipeRequestSchema = z.object({
   servings: z.number().optional().default(5),
 });
 
+// Schema del OUTPUT del modelo. Validamos la respuesta de Gemini antes de
+// devolverla como `thermomixRecipe`: el LLM puede omitir `thermomixSteps` o
+// devolverlo con forma inesperada. Tipamos solo lo esencial que el consumidor
+// renderiza por paso (stepNumber/description); `.passthrough()` conserva el
+// resto (speed, temperature, time, accessory, totalTimeMinutes, etc.) sin
+// imponer un esquema rigido. Generoso con opcionales para no rechazar
+// respuestas validas.
+const ThermomixStepSchema = z
+  .object({
+    description: z.string().optional(),
+    stepNumber: z.union([z.number(), z.string()]).optional(),
+  })
+  .passthrough();
+
+const ThermomixRecipeOutputSchema = z
+  .object({
+    thermomixSteps: z.array(ThermomixStepSchema).min(1),
+  })
+  .passthrough();
+
 // =====================================================
 // POST handler
 // =====================================================
@@ -103,17 +123,22 @@ export async function POST(request: NextRequest) {
     let thermomixRecipe: ThermomixRecipe;
     try {
       const jsonContent = cleanJsonResponse(content);
-      thermomixRecipe = JSON.parse(jsonContent);
+      const raw = JSON.parse(jsonContent);
 
-      // Validate structure
-      if (
-        !thermomixRecipe.thermomixSteps ||
-        !Array.isArray(thermomixRecipe.thermomixSteps)
-      ) {
-        throw new Error(
-          "Invalid Thermomix recipe structure: missing thermomixSteps",
+      // Validar forma y tipos del output del modelo antes de devolverlo
+      const parsed = ThermomixRecipeOutputSchema.safeParse(raw);
+      if (!parsed.success) {
+        logger.error("AI Thermomix adaptation failed schema validation", {
+          issues: parsed.error.issues
+            .slice(0, 5)
+            .map((i) => `${i.path.join(".")}: ${i.message}`),
+        });
+        return NextResponse.json(
+          { error: "La IA devolvió una adaptación con formato inválido" },
+          { status: 502 },
         );
       }
+      thermomixRecipe = parsed.data as unknown as ThermomixRecipe;
     } catch (parseError) {
       logger.error("JSON parse error for Thermomix adaptation", {
         error:
