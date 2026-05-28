@@ -1,9 +1,21 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
-import Image from "next/image";
-import { Search, Plus, Edit2, Trash2, ImageIcon, Clock } from "lucide-react";
+import {
+  Search,
+  Plus,
+  Edit2,
+  Trash2,
+  ImageIcon,
+  BookOpen,
+  Coffee,
+  UtensilsCrossed,
+  Moon,
+  Soup,
+  Sparkles,
+} from "lucide-react";
 import { Recipe, Ingredient, RecipeCategory, ColombianRegion } from "@/types";
+import RecipeCard from "@/components/ui/RecipeCard";
 import type { ExpandedRecipe } from "@/data/expanded-recipes";
 import type { RegionalRecipe } from "@/data/regional-colombian-recipes";
 import { CanEdit } from "@/components/auth/RoleGate";
@@ -104,7 +116,7 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
     };
   }, []);
   const [filter, setFilter] = useState<
-    "all" | "breakfast" | "lunch" | "dinner"
+    "all" | "breakfast" | "lunch" | "dinner" | "thermomix"
   >("all");
   const [categoryFilter, setCategoryFilter] = useState<"all" | RecipeCategory>(
     "all",
@@ -174,7 +186,14 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
         false;
       const matchesSearch =
         !search || matchesName || matchesIngredient || matchesTag;
-      const matchesFilter = filter === "all" || recipe.type === filter;
+      // Meal type filter. El chip "thermomix" (TM6) filtra por el campo
+      // existente recipe.thermomixCompatible (no por un set de IDs).
+      const matchesFilter =
+        filter === "all"
+          ? true
+          : filter === "thermomix"
+            ? recipe.thermomixCompatible === true
+            : recipe.type === filter;
 
       // Category filter
       const matchesCategory =
@@ -203,61 +222,27 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
     });
   }, [allRecipes, search, filter, categoryFilter, regionFilter, moodFilters]);
 
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case "breakfast":
-        return "Desayuno";
-      case "lunch":
-        return "Almuerzo";
-      case "dinner":
-        return "Cena";
-      default:
-        return type;
-    }
-  };
+  // Total de recetas TM6 disponibles (para el banner del filtro Thermomix)
+  const thermomixCount = useMemo(
+    () => allRecipes.filter((r) => r.thermomixCompatible === true).length,
+    [allRecipes],
+  );
 
-  const getTypeClass = (type: string) => {
-    switch (type) {
-      case "breakfast":
-        return "bg-orange-100 text-orange-700";
-      case "lunch":
-        return "bg-green-100 text-green-700";
-      case "dinner":
-        return "bg-blue-100 text-blue-700";
-      default:
-        return "bg-gray-100 text-gray-700";
-    }
-  };
+  const isThermomix = filter === "thermomix";
 
-  // Get badge info for a recipe
-  const getRecipeBadges = (recipe: Recipe) => {
-    const badges: Array<{ label: string; className: string }> = [];
-    if (recipe.thermomixCompatible) {
-      badges.push({
-        label: "🤖 TM6",
-        className: "bg-purple-100 text-purple-700",
-      });
-    }
-    if (recipe.category === "fitness") {
-      badges.push({ label: "💪", className: "bg-green-100 text-green-700" });
-    }
-    if (recipe.category === "rapida") {
-      badges.push({ label: "⚡", className: "bg-blue-100 text-blue-700" });
-    }
-    if (recipe.category && categoryConfig[recipe.category as RecipeCategory]) {
-      const cfg = categoryConfig[recipe.category as RecipeCategory];
-      badges.push({ label: cfg.icon, className: cfg.color });
-    }
-    // Region badge for Colombian regional recipes
-    if (recipe.region && regionConfig[recipe.region]) {
-      const regionCfg = regionConfig[recipe.region];
-      badges.push({
-        label: `${regionCfg.icon} ${regionCfg.label}`,
-        className: regionCfg.color,
-      });
-    }
-    return badges;
-  };
+  // Meal-type chips (incluye TM6 dark)
+  const TYPE_CHIPS: Array<{
+    id: "all" | "breakfast" | "lunch" | "dinner" | "thermomix";
+    label: string;
+    Icon: typeof BookOpen;
+    dark?: boolean;
+  }> = [
+    { id: "all", label: "Todas", Icon: BookOpen },
+    { id: "breakfast", label: "Desayunos", Icon: Coffee },
+    { id: "lunch", label: "Almuerzos", Icon: UtensilsCrossed },
+    { id: "dinner", label: "Cenas", Icon: Moon },
+    { id: "thermomix", label: "TM6", Icon: Soup, dark: true },
+  ];
 
   // Memoizar handlers para evitar re-renders de componentes hijos
   const handleDelete = useCallback(
@@ -402,28 +387,55 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
         ))}
       </div>
 
-      {/* Meal Type Filter Tabs */}
-      <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-        {(["all", "breakfast", "lunch", "dinner"] as const).map((type) => (
-          <button
-            key={type}
-            onClick={() => setFilter(type)}
-            className={`
-              px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors
-              ${
-                filter === type
-                  ? "bg-orange-500 text-white"
-                  : "bg-white text-gray-600 hover:bg-gray-100"
-              }
-            `}
-          >
-            {type === "all" ? "Todas" : getTypeLabel(type)}
-          </button>
-        ))}
+      {/* Meal Type Filter Chips (incluye TM6 dark) */}
+      <div
+        className="flex gap-1.5 mb-4 overflow-x-auto pb-2 scrollbar-hide"
+        style={{ WebkitOverflowScrolling: "touch" }}
+        role="group"
+        aria-label="Filtrar por tipo de comida"
+      >
+        {TYPE_CHIPS.map((chip) => {
+          const active = filter === chip.id;
+          return (
+            <button
+              key={chip.id}
+              onClick={() => setFilter(chip.id)}
+              aria-pressed={active}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11.5px] font-medium whitespace-nowrap transition-colors ${
+                active
+                  ? chip.dark
+                    ? "bg-slate-900 text-white"
+                    : "bg-[var(--ink)] text-white"
+                  : "bg-stone-100 text-[var(--ink-soft)] hover:bg-stone-200"
+              }`}
+            >
+              <chip.Icon size={11} />
+              {chip.label}
+            </button>
+          );
+        })}
       </div>
 
+      {/* TM6 banner full-width cuando el filtro Thermomix está activo */}
+      {isThermomix && (
+        <div className="mb-4 bg-slate-900 text-white rounded-2xl px-4 py-3 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center">
+            <Soup size={16} />
+          </div>
+          <div className="flex-1">
+            <p className="text-[12.5px] font-semibold">
+              Recetas adaptadas a Thermomix
+            </p>
+            <p className="text-[10.5px] text-white/70 tabular-nums">
+              {thermomixCount} receta{thermomixCount !== 1 ? "s" : ""} TM6
+            </p>
+          </div>
+          <Sparkles size={14} className="text-white/80" />
+        </div>
+      )}
+
       {/* Results count */}
-      <p className="text-xs text-gray-400 mb-3">
+      <p className="text-xs text-gray-400 mb-3 tabular-nums">
         {filteredRecipes.length} receta{filteredRecipes.length !== 1 ? "s" : ""}
         {categoryFilter !== "all" &&
           ` en ${CATEGORY_FILTERS.find((c) => c.key === categoryFilter)?.label}`}
@@ -442,128 +454,65 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
         </button>
       </CanEdit>
 
-      {/* Recipe List - Sprint 5: patron Jullienne (cards limpias con
-          jerarquia visual mejorada y menos ruido) */}
-      <div className="space-y-2.5">
+      {/* Recipe Grid - 2 columnas de RecipeCard */}
+      <div className="grid grid-cols-2 gap-3">
         {filteredRecipes.map((recipe) => {
-          const badges = getRecipeBadges(recipe);
           const isLibrary = isExpandedRecipe(recipe);
-          const totalTime = (recipe.prep_time || 0) + (recipe.cook_time || 0);
-
           return (
-            <div
-              key={recipe.id}
-              className="group bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 hover:border-orange-200 dark:hover:border-orange-800 hover:shadow-md transition-all overflow-hidden"
-            >
-              <button
+            <div key={recipe.id} className="relative">
+              <RecipeCard
+                recipe={recipe}
                 onClick={() => setSelectedRecipe(recipe)}
-                className="w-full text-left flex items-center gap-3 p-2.5"
-              >
-                {/* Thumbnail mas grande y prominente (Jullienne pattern) */}
-                <div className="w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-orange-100 to-amber-50 dark:from-orange-900/30 dark:to-amber-900/30">
-                  {recipe.image_url ? (
-                    <Image
-                      src={recipe.image_url}
-                      alt={recipe.name}
-                      width={80}
-                      height={80}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <ImageIcon className="w-7 h-7 text-orange-300 dark:text-orange-700" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  {/* Type pill (small, secundario) */}
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span
-                      className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md ${getTypeClass(recipe.type)}`}
+              />
+              {/* Acciones de edición (solo recetas propias / editables) */}
+              {!isLibrary && (
+                <CanEdit what="recipes">
+                  <div className="absolute top-2 left-2 flex gap-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEdit(recipe);
+                      }}
+                      className="w-7 h-7 rounded-full bg-white/90 backdrop-blur text-stone-600 hover:text-orange-600 flex items-center justify-center shadow-sm transition-colors"
+                      title="Editar"
+                      aria-label="Editar receta"
                     >
-                      {getTypeLabel(recipe.type)}
-                    </span>
-                    {badges.length > 0 && (
-                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
-                        {badges[0].label}
-                      </span>
-                    )}
+                      <Edit2 size={13} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConfirmDeleteRecipe(recipe);
+                      }}
+                      className="w-7 h-7 rounded-full bg-white/90 backdrop-blur text-stone-600 hover:text-red-600 flex items-center justify-center shadow-sm transition-colors"
+                      title="Eliminar"
+                      aria-label="Eliminar receta"
+                    >
+                      <Trash2 size={13} />
+                    </button>
                   </div>
-
-                  {/* Title - mas grande y legible (Jullienne) */}
-                  <h3 className="font-semibold text-gray-900 dark:text-white text-base leading-snug line-clamp-2 mb-1">
-                    {recipe.name}
-                  </h3>
-
-                  {/* Footer: time + region/difficulty */}
-                  <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                    {totalTime > 0 && (
-                      <span className="inline-flex items-center gap-0.5">
-                        <Clock size={11} /> {totalTime} min
-                      </span>
-                    )}
-                    {recipe.difficulty && (
-                      <span className="capitalize">· {recipe.difficulty}</span>
-                    )}
-                    {recipe.region && (
-                      <span className="capitalize">· {recipe.region}</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Action overflow (solo si editable) */}
-                {!isLibrary && (
-                  <CanEdit what="recipes">
-                    <div className="flex flex-col gap-0.5 ml-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEdit(recipe);
-                        }}
-                        className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/30 rounded-lg transition-colors"
-                        title="Editar"
-                        aria-label="Editar receta"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setConfirmDeleteRecipe(recipe);
-                        }}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
-                        title="Eliminar"
-                        aria-label="Eliminar receta"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </CanEdit>
-                )}
-              </button>
+                </CanEdit>
+              )}
             </div>
           );
         })}
-
-        {filteredRecipes.length === 0 && (
-          <div className="text-center py-16 px-4">
-            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-orange-50 dark:bg-orange-950/30 flex items-center justify-center">
-              <ImageIcon size={32} className="text-orange-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
-              {search ? "Sin resultados" : "Sin recetas aún"}
-            </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {search
-                ? `No encontramos nada para "${search}"`
-                : "Empezá agregando tu primera receta"}
-            </p>
-          </div>
-        )}
       </div>
+
+      {filteredRecipes.length === 0 && (
+        <div className="text-center py-16 px-4">
+          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-orange-50 dark:bg-orange-950/30 flex items-center justify-center">
+            <ImageIcon size={32} className="text-orange-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+            {search ? "Sin resultados" : "Sin recetas aún"}
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {search
+              ? `No encontramos nada para "${search}"`
+              : "Empezá agregando tu primera receta"}
+          </p>
+        </div>
+      )}
 
       {/* Recipe Modal */}
       {selectedRecipe && (
