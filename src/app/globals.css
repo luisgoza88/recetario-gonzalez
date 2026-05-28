@@ -3,7 +3,7 @@
 :root {
   --accent: #15803d;
   --accent-soft: #f0fdf4;
-  --bg: #FAFAF7;
+  --bg: #fafaf7;
   --ink: #1c1917;
   --ink-soft: #78716c;
   --border: #e7e5e4;
@@ -17,24 +17,83 @@
   --warning-light: #fff3e0;
 }
 
-* { -webkit-tap-highlight-color: transparent; }
+* {
+  -webkit-tap-highlight-color: transparent;
+}
 
-@keyframes animate-fade-in { from { opacity: 0 } to { opacity: 1 } }
-@keyframes animate-slide-up { from { transform: translateY(100%) } to { transform: translateY(0) } }
+@keyframes animate-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes animate-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
 
-.animate-fade-in { animation: animate-fade-in 200ms ease-out both }
-.animate-slide-up { animation: animate-slide-up 280ms cubic-bezier(0.2,0.7,0.2,1) both }
+.animate-fade-in {
+  animation: animate-fade-in 200ms ease-out both;
+}
+.animate-slide-up {
+  animation: animate-slide-up 280ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
 
-@keyframes slide-down { from { transform: translateY(-100%); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
-@keyframes slide-up { from { transform: translateY(100%); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
-.animate-slide-down { animation: slide-down 0.3s ease-out }
+@keyframes slide-down {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.animate-slide-down {
+  animation: slide-down 0.3s ease-out;
+}
 
-::-webkit-scrollbar { width: 6px; height: 6px }
-::-webkit-scrollbar-track { background: #f1f1f1 }
-::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px }
-::-webkit-scrollbar-thumb:hover { background: #a1a1a1 }
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
 
-.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none }
-.scrollbar-hide::-webkit-scrollbar { display: none }
-.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0) }
-.safe-area-pb { padding-bottom: env(safe-area-inset-bottom, 0) }
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}

@@ -1,5 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Fraunces, Plus_Jakarta_Sans } from "next/font/google";
+import {
+  Geist,
+  Geist_Mono,
+  Fraunces,
+  Plus_Jakarta_Sans,
+} from "next/font/google";
 import "./globals.css";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 import Providers from "@/lib/providers/Providers";
