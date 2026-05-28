@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import {
   Lightbulb,
   Check,
-  X,
   TrendingDown,
   TrendingUp,
   ShoppingCart,
@@ -14,22 +13,105 @@ import {
   Package,
   Sparkles,
   MessageSquare,
-  ChevronDown,
-  ChevronUp,
   AlertTriangle,
-  Clock,
+  Zap,
+  CheckCircle2,
+  ArrowRight,
+  type LucideIcon,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { AdjustmentSuggestion, Recipe, Ingredient } from "@/types";
 import {
   useProactiveSuggestions,
   ProactiveSuggestion,
+  ProactiveSuggestionType,
+  ProactiveSuggestionPriority,
 } from "@/hooks/useProactiveSuggestions";
 
 interface SuggestionsPanelProps {
   onUpdate?: () => void;
   onNavigate?: (tab: string, mode?: string) => void;
 }
+
+// ─── Metadatos de tipo (chip coloreado) ──────────────────────────────────────
+const PROACTIVE_TYPE_META: Record<
+  ProactiveSuggestionType,
+  { label: string; Icon: LucideIcon; chip: string }
+> = {
+  menu_today: {
+    label: "Menú de hoy",
+    Icon: Calendar,
+    chip: "bg-blue-100 text-blue-700",
+  },
+  menu_tomorrow: {
+    label: "Preparación",
+    Icon: AlertTriangle,
+    chip: "bg-orange-100 text-orange-700",
+  },
+  low_stock: {
+    label: "Stock bajo",
+    Icon: Package,
+    chip: "bg-red-100 text-red-700",
+  },
+  high_stock: {
+    label: "Inventario alto",
+    Icon: Sparkles,
+    chip: "bg-purple-100 text-purple-700",
+  },
+  missing_ingredient: {
+    label: "Falta ingrediente",
+    Icon: ShoppingCart,
+    chip: "bg-amber-100 text-amber-700",
+  },
+  weekly_prep: {
+    label: "Plan semanal",
+    Icon: Calendar,
+    chip: "bg-blue-100 text-blue-700",
+  },
+  recipe_discovery: {
+    label: "Descubre recetas",
+    Icon: ChefHat,
+    chip: "bg-green-100 text-green-700",
+  },
+  no_feedback: {
+    label: "Feedback",
+    Icon: MessageSquare,
+    chip: "bg-yellow-100 text-yellow-700",
+  },
+};
+
+const REACTIVE_TYPE_META: Record<
+  string,
+  { label: string; Icon: LucideIcon; chip: string }
+> = {
+  portion: {
+    label: "Ajustar porción",
+    Icon: ChefHat,
+    chip: "bg-purple-100 text-purple-700",
+  },
+  market: {
+    label: "Ajustar mercado",
+    Icon: ShoppingCart,
+    chip: "bg-blue-100 text-blue-700",
+  },
+  ingredient: {
+    label: "Ajustar ingrediente",
+    Icon: Lightbulb,
+    chip: "bg-amber-100 text-amber-700",
+  },
+};
+
+const PRIORITY_LABEL: Record<ProactiveSuggestionPriority, string> = {
+  high: "alta prioridad",
+  medium: "prioridad media",
+  low: "prioridad baja",
+};
+
+const PRIORITY_COLOR: Record<ProactiveSuggestionPriority, string> = {
+  high: "text-red-700",
+  medium: "text-amber-700",
+  low: "text-stone-500",
+};
 
 export default function SuggestionsPanel({
   onUpdate,
@@ -50,11 +132,6 @@ export default function SuggestionsPanel({
     dismissSuggestion: dismissProactive,
     refresh: refreshProactive,
   } = useProactiveSuggestions();
-
-  // Estados de UI
-  const [expandedSection, setExpandedSection] = useState<
-    "proactive" | "reactive" | null
-  >("proactive");
 
   useEffect(() => {
     loadReactiveData();
@@ -236,300 +313,215 @@ export default function SuggestionsPanel({
     }
   };
 
-  const getProactiveIcon = (type: string) => {
-    switch (type) {
-      case "menu_today":
-      case "menu_tomorrow":
-        return <Calendar size={20} />;
-      case "low_stock":
-        return <AlertTriangle size={20} />;
-      case "high_stock":
-        return <Package size={20} />;
-      case "missing_ingredient":
-        return <ShoppingCart size={20} />;
-      case "recipe_discovery":
-        return <ChefHat size={20} />;
-      case "no_feedback":
-        return <MessageSquare size={20} />;
-      default:
-        return <Lightbulb size={20} />;
-    }
-  };
-
-  const getReactiveIcon = (type: string) => {
-    switch (type) {
-      case "portion":
-        return <ChefHat size={20} />;
-      case "market":
-        return <ShoppingCart size={20} />;
-      default:
-        return <Lightbulb size={20} />;
-    }
-  };
-
-  const getReactiveColor = (type: string) => {
-    switch (type) {
-      case "portion":
-        return "bg-purple-100 text-purple-700 border-purple-200";
-      case "market":
-        return "bg-blue-100 text-blue-700 border-blue-200";
-      default:
-        return "bg-yellow-100 text-yellow-700 border-yellow-200";
-    }
-  };
-
   const isLoading = loadingReactive || loadingProactive;
   const totalProactive = proactiveSuggestions.length;
   const totalReactive = reactiveSuggestions.length;
-  const hasAnySuggestion = totalProactive > 0 || totalReactive > 0;
+  const totalNew = totalProactive + totalReactive;
+  const hasAnySuggestion = totalNew > 0;
 
-  if (isLoading) {
-    return (
-      <div className="p-4 text-center text-gray-500">
-        <RefreshCw className="animate-spin mx-auto mb-2" size={24} />
-        Cargando sugerencias...
-      </div>
-    );
-  }
+  const refreshAll = () => {
+    refreshProactive();
+    loadReactiveData();
+  };
 
   return (
-    <div className="space-y-4">
-      {/* Header con refresh */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-          <Lightbulb className="text-yellow-500" size={22} />
-          Centro de Sugerencias
-        </h2>
+    <div className="min-h-screen bg-[var(--bg)]">
+      {/* Header */}
+      <div className="flex items-end justify-between border-b border-[var(--border)] bg-white px-5 pt-4 pb-3">
+        <div>
+          <h1 className="text-[22px] font-semibold leading-tight tracking-tight text-[var(--ink)]">
+            Sugerencias
+          </h1>
+          <p className="mt-0.5 text-[13px] text-[var(--ink-soft)]">
+            IA proactiva · {totalNew} nueva{totalNew === 1 ? "" : "s"}
+          </p>
+        </div>
         <button
-          onClick={() => {
-            refreshProactive();
-            loadReactiveData();
-          }}
-          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-          title="Actualizar sugerencias"
+          onClick={refreshAll}
+          className="flex items-center gap-1 text-[13px] font-medium text-[var(--accent)]"
         >
-          <RefreshCw size={18} />
+          <RefreshCw size={13} className={isLoading ? "animate-spin" : ""} />{" "}
+          Refrescar
         </button>
       </div>
 
-      {!hasAnySuggestion ? (
-        <div className="p-6 text-center bg-white rounded-xl border">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Check size={32} className="text-green-600" />
+      {/* Banner IA morado */}
+      <div className="border-b border-purple-100 bg-gradient-to-br from-purple-50 to-violet-50 px-5 py-3">
+        <div className="flex items-center gap-2">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-purple-600 text-white">
+            <Sparkles size={16} />
           </div>
-          <h3 className="font-semibold text-gray-700 mb-2">¡Todo en orden!</h3>
-          <p className="text-sm text-gray-500">
-            No hay sugerencias pendientes. El sistema te avisará cuando haya
-            algo importante.
-          </p>
+          <div className="flex-1">
+            <p className="text-[13px] font-semibold text-purple-900">
+              Asistente analizó tu cocina
+            </p>
+            <p className="text-[11.5px] text-purple-700">
+              {isLoading
+                ? "Analizando…"
+                : "Actualizado · hace unos momentos"}
+            </p>
+          </div>
         </div>
-      ) : (
-        <>
-          {/* SECCIÓN PROACTIVA */}
-          {totalProactive > 0 && (
-            <div className="bg-white rounded-xl border overflow-hidden">
-              <button
-                onClick={() =>
-                  setExpandedSection(
-                    expandedSection === "proactive" ? null : "proactive",
-                  )
-                }
-                className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-orange-50 hover:from-blue-100 hover:to-orange-100 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <Sparkles className="text-blue-600" size={20} />
-                  </div>
-                  <div className="text-left">
-                    <span className="font-semibold text-gray-800">
-                      Alertas del Día
-                    </span>
-                    <p className="text-xs text-gray-500">
-                      {totalProactive} sugerencia{totalProactive > 1 ? "s" : ""}{" "}
-                      activa{totalProactive > 1 ? "s" : ""}
-                    </p>
-                  </div>
-                </div>
-                {expandedSection === "proactive" ? (
-                  <ChevronUp size={20} />
-                ) : (
-                  <ChevronDown size={20} />
-                )}
-              </button>
+      </div>
 
-              {expandedSection === "proactive" && (
-                <div className="p-3 space-y-3">
-                  {proactiveSuggestions.map((suggestion) => (
-                    <div
-                      key={suggestion.id}
-                      className={`border-2 rounded-xl p-4 ${suggestion.color}`}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          {getProactiveIcon(suggestion.type)}
-                          <span className="font-semibold">
-                            {suggestion.title}
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => dismissProactive(suggestion.id)}
-                          className="p-1 hover:bg-white/50 rounded transition-colors"
-                          title="Descartar"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-
-                      <p className="text-sm whitespace-pre-line mb-3 opacity-90">
-                        {suggestion.description}
-                      </p>
-
-                      {suggestion.action && (
-                        <button
-                          onClick={() => handleProactiveAction(suggestion)}
-                          className="bg-white/80 hover:bg-white py-2 px-4 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors"
-                        >
-                          {suggestion.action.label}
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* SECCIÓN REACTIVA */}
-          {totalReactive > 0 && (
-            <div className="bg-white rounded-xl border overflow-hidden">
-              <button
-                onClick={() =>
-                  setExpandedSection(
-                    expandedSection === "reactive" ? null : "reactive",
-                  )
-                }
-                className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-yellow-50 to-orange-50 hover:from-yellow-100 hover:to-orange-100 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
-                    <TrendingUp className="text-yellow-600" size={20} />
-                  </div>
-                  <div className="text-left">
-                    <span className="font-semibold text-gray-800">
-                      Ajustes Sugeridos
-                    </span>
-                    <p className="text-xs text-gray-500">
-                      Basados en tu feedback ({totalReactive})
-                    </p>
-                  </div>
-                </div>
-                {expandedSection === "reactive" ? (
-                  <ChevronUp size={20} />
-                ) : (
-                  <ChevronDown size={20} />
-                )}
-              </button>
-
-              {expandedSection === "reactive" && (
-                <div className="p-3 space-y-3">
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-700">
-                    <p>
-                      Estas sugerencias se generaron analizando tu feedback de
-                      las últimas semanas.
-                    </p>
-                  </div>
-
-                  {reactiveSuggestions.map((suggestion) => {
-                    const recipe = suggestion.recipe_id
-                      ? recipes[suggestion.recipe_id]
-                      : null;
-                    const isPositive = (suggestion.change_percent || 0) > 0;
-
-                    return (
-                      <div
-                        key={suggestion.id}
-                        className={`border-2 rounded-xl p-4 ${getReactiveColor(suggestion.suggestion_type)}`}
+      {/* Contenido */}
+      <div className="space-y-3 px-5 py-4 pb-32">
+        {isLoading ? (
+          <div className="py-12 text-center text-[var(--ink-soft)]">
+            <RefreshCw className="mx-auto mb-2 animate-spin" size={24} />
+            <p className="text-[14px]">Cargando sugerencias…</p>
+          </div>
+        ) : !hasAnySuggestion ? (
+          <div className="py-12 text-center">
+            <CheckCircle2 size={32} className="mx-auto mb-2 text-stone-300" />
+            <p className="text-[14px] text-stone-500">
+              Sin sugerencias pendientes
+            </p>
+            <p className="mt-1 text-[12px] text-stone-400">
+              El sistema te avisará cuando haya algo importante.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Sugerencias PROACTIVAS */}
+            {proactiveSuggestions.map((s) => {
+              const meta = PROACTIVE_TYPE_META[s.type];
+              const Icon = meta?.Icon ?? Lightbulb;
+              return (
+                <article
+                  key={s.id}
+                  className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white"
+                >
+                  <div className="px-4 pt-3.5 pb-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${meta?.chip ?? "bg-stone-100 text-stone-700"}`}
                       >
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            {getReactiveIcon(suggestion.suggestion_type)}
-                            <span className="font-semibold">
-                              {suggestion.suggestion_type === "portion" &&
-                                "Ajustar Porción"}
-                              {suggestion.suggestion_type === "market" &&
-                                "Ajustar Mercado"}
-                              {suggestion.suggestion_type === "ingredient" &&
-                                "Ajustar Ingrediente"}
-                            </span>
-                          </div>
-                          <span className="text-xs bg-white/50 px-2 py-1 rounded-full">
-                            {suggestion.feedback_count} reportes
-                          </span>
-                        </div>
+                        <Icon size={11} /> {meta?.label ?? "Sugerencia"}
+                      </span>
+                      <span
+                        className={`text-[10px] font-semibold uppercase tracking-wider ${PRIORITY_COLOR[s.priority]}`}
+                      >
+                        {PRIORITY_LABEL[s.priority]}
+                      </span>
+                    </div>
+                    <h3 className="text-[15px] font-semibold leading-tight text-[var(--ink)]">
+                      {s.title}
+                    </h3>
+                    <p className="mt-1.5 whitespace-pre-line text-[13px] leading-relaxed text-[var(--ink-soft)]">
+                      {s.description}
+                    </p>
+                  </div>
+                  <div className="flex divide-x divide-[var(--border)] border-t border-[var(--border)]">
+                    <button
+                      onClick={() => dismissProactive(s.id)}
+                      className="flex-1 py-2.5 text-[13px] font-medium text-stone-500 active:bg-stone-50"
+                    >
+                      Descartar
+                    </button>
+                    {s.action ? (
+                      <button
+                        onClick={() => handleProactiveAction(s)}
+                        className="flex flex-1 items-center justify-center gap-1.5 py-2.5 text-[13px] font-semibold text-[var(--accent)] active:bg-stone-50"
+                      >
+                        {s.action.label} <ArrowRight size={14} />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => dismissProactive(s.id)}
+                        className="flex flex-1 items-center justify-center gap-1.5 py-2.5 text-[13px] font-semibold text-[var(--accent)] active:bg-stone-50"
+                      >
+                        <Check size={14} /> Entendido
+                      </button>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
 
-                        {recipe && (
-                          <div className="font-medium mb-2">{recipe.name}</div>
+            {/* Sugerencias REACTIVAS (basadas en feedback) */}
+            {reactiveSuggestions.map((s) => {
+              const meta =
+                REACTIVE_TYPE_META[s.suggestion_type] ??
+                REACTIVE_TYPE_META.ingredient;
+              const Icon = meta.Icon;
+              const recipe = s.recipe_id ? recipes[s.recipe_id] : null;
+              const isPositive = (s.change_percent || 0) > 0;
+              const isApplying = applying === s.id;
+              const impactText = s.change_percent
+                ? `${isPositive ? "Aumentar" : "Reducir"} cantidades en ${Math.abs(s.change_percent)}%`
+                : `${s.feedback_count} reporte${s.feedback_count === 1 ? "" : "s"} de feedback`;
+              return (
+                <article
+                  key={s.id}
+                  className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white"
+                >
+                  <div className="px-4 pt-3.5 pb-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${meta.chip}`}
+                      >
+                        <Icon size={11} /> {meta.label}
+                      </span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-stone-500">
+                        basado en feedback
+                      </span>
+                    </div>
+                    <h3 className="text-[15px] font-semibold leading-tight text-[var(--ink)]">
+                      {recipe?.name ?? "Ajuste sugerido"}
+                    </h3>
+                    {s.change_percent ? (
+                      <div
+                        className={`mt-1.5 flex items-center gap-1.5 text-[13px] font-medium ${isPositive ? "text-green-700" : "text-red-700"}`}
+                      >
+                        {isPositive ? (
+                          <TrendingUp size={14} />
+                        ) : (
+                          <TrendingDown size={14} />
                         )}
-
-                        {suggestion.change_percent && (
-                          <div
-                            className={`flex items-center gap-2 text-sm mb-3 ${
-                              isPositive ? "text-green-700" : "text-red-700"
-                            }`}
-                          >
-                            {isPositive ? (
-                              <TrendingUp size={16} />
-                            ) : (
-                              <TrendingDown size={16} />
-                            )}
-                            <span>
-                              {isPositive ? "Aumentar" : "Reducir"} cantidades
-                              en {Math.abs(suggestion.change_percent)}%
-                            </span>
-                          </div>
-                        )}
-
-                        <p className="text-sm opacity-80 mb-4">
-                          {suggestion.reason}
-                        </p>
-
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => applySuggestion(suggestion)}
-                            disabled={applying === suggestion.id}
-                            className="flex-1 bg-white/80 hover:bg-white py-2 px-4 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-                          >
-                            {applying === suggestion.id ? (
-                              <RefreshCw className="animate-spin" size={16} />
-                            ) : (
-                              <Check size={16} />
-                            )}
-                            Aplicar
-                          </button>
-                          <button
-                            onClick={() =>
-                              dismissReactiveSuggestion(suggestion.id)
-                            }
-                            className="py-2 px-4 rounded-lg hover:bg-white/50 transition-colors"
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
+                        <span>{impactText}</span>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+                    ) : null}
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--ink-soft)]">
+                      {s.reason}
+                    </p>
+                    <div className="mt-3 flex items-center gap-1.5 text-[11.5px] text-stone-500">
+                      <Zap size={11} className="text-amber-500" />{" "}
+                      <span>{impactText}</span>
+                    </div>
+                  </div>
+                  <div className="flex divide-x divide-[var(--border)] border-t border-[var(--border)]">
+                    <button
+                      onClick={() => dismissReactiveSuggestion(s.id)}
+                      disabled={isApplying}
+                      className="flex-1 py-2.5 text-[13px] font-medium text-stone-500 active:bg-stone-50 disabled:opacity-50"
+                    >
+                      Descartar
+                    </button>
+                    <button
+                      onClick={() => applySuggestion(s)}
+                      disabled={isApplying}
+                      className="flex flex-1 items-center justify-center gap-1.5 py-2.5 text-[13px] font-semibold text-[var(--accent)] active:bg-stone-50 disabled:opacity-50"
+                    >
+                      {isApplying ? (
+                        <RefreshCw size={14} className="animate-spin" />
+                      ) : (
+                        <Check size={14} />
+                      )}{" "}
+                      Aplicar
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
 
-          {/* Info footer */}
-          <p className="text-xs text-gray-500 text-center px-4">
-            Las alertas se actualizan automáticamente. Los ajustes aplicados
-            modifican recetas y cantidades.
-          </p>
-        </>
-      )}
+            <p className="px-4 pt-1 text-center text-[11.5px] text-stone-400">
+              Las alertas se actualizan automáticamente. Los ajustes aplicados
+              modifican recetas y cantidades.
+            </p>
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -3,24 +3,21 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Settings,
+  ChefHat,
+  Heart,
   Bell,
+  Bot,
+  ShieldCheck,
   Database,
-  Info,
-  ChevronRight,
-  Moon,
   Globe,
-  Shield,
-  HelpCircle,
-  Smartphone,
-  Brain,
-  UtensilsCrossed,
-  LogOut,
-  User,
-  Mail,
+  Moon,
   BarChart3,
   Sparkles,
   Crown,
+  User,
+  LogOut,
+  ChevronRight,
+  Mail,
 } from "lucide-react";
 import AICommandCenter from "@/components/ai/AICommandCenter";
 import DietaryPreferencesPanel from "@/components/settings/DietaryPreferencesPanel";
@@ -34,50 +31,6 @@ import {
   useCurrentHousehold,
 } from "@/lib/stores/useHouseholdStore";
 import { useAuth } from "@/contexts/AuthContext";
-
-interface SettingsSectionProps {
-  icon: React.ReactNode;
-  title: string;
-  description?: string;
-  onClick?: () => void;
-  rightContent?: React.ReactNode;
-  danger?: boolean;
-}
-
-function SettingsSection({
-  icon,
-  title,
-  description,
-  onClick,
-  rightContent,
-  danger,
-}: SettingsSectionProps) {
-  return (
-    <button
-      onClick={onClick}
-      className={`
-        w-full flex items-center gap-4 p-4 bg-white rounded-xl
-        ${onClick ? "hover:bg-gray-50 active:bg-gray-100" : ""}
-        transition-colors text-left
-      `}
-    >
-      <div
-        className={`
-        w-10 h-10 rounded-full flex items-center justify-center
-        ${danger ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-600"}
-      `}
-      >
-        {icon}
-      </div>
-      <div className="flex-1">
-        <p className={`font-medium ${danger ? "text-red-600" : ""}`}>{title}</p>
-        {description && <p className="text-sm text-gray-500">{description}</p>}
-      </div>
-      {rightContent ||
-        (onClick && <ChevronRight size={20} className="text-gray-400" />)}
-    </button>
-  );
-}
 
 export default function SettingsView() {
   const [notifications, setNotifications] = useState(true);
@@ -205,128 +158,88 @@ export default function SettingsView() {
     );
   }
 
+  const householdName = household?.name || "Mi Hogar";
+  const userName =
+    user?.full_name || user?.email?.split("@")[0] || "Usuario";
+  const userEmail = user?.email || "Sin sesión";
+
   return (
-    <div className="p-4 max-w-lg mx-auto pb-24">
+    <div className="min-h-screen bg-[var(--bg)] pb-32">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-          <Settings size={28} className="text-gray-600" />
+      <div className="bg-white px-5 pt-4 pb-3 border-b border-[var(--border)]">
+        <h1 className="text-[22px] leading-tight font-semibold tracking-tight text-[var(--ink)]">
           Ajustes
         </h1>
-        <p className="text-gray-500 mt-1">Configura tu aplicación</p>
+        <p className="text-[13px] text-[var(--ink-soft)] mt-0.5">
+          Personaliza tu Recetario
+        </p>
       </div>
 
-      {/* AI Command Center - Prominent Card */}
-      <div className="mb-6">
-        <button
-          onClick={() => setShowAICommandCenter(true)}
-          className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl p-4 text-white text-left hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg"
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
-              <Brain size={28} />
-            </div>
-            <div className="flex-1">
-              <p className="font-bold text-lg">Centro de Comando IA</p>
-              <p className="text-purple-200 text-sm">
-                Monitorea, controla y configura tu asistente
-              </p>
-            </div>
-            <ChevronRight size={24} className="text-purple-200" />
-          </div>
-        </button>
-      </div>
-
-      {/* Cuenta Section - Usuario logueado */}
-      <div className="mb-6">
-        <p className="text-sm font-medium text-gray-500 mb-2 px-1">CUENTA</p>
-        <div className="space-y-2">
-          <div className="bg-white rounded-xl p-4 flex items-center gap-4">
-            <div className="w-14 h-14 bg-gradient-to-br from-purple-400 to-indigo-600 rounded-full flex items-center justify-center text-white text-xl font-bold">
-              {(user?.email?.charAt(0) || "U").toUpperCase()}
+      <div className="px-5 py-4 space-y-3 max-w-lg mx-auto">
+        {/* Household / family card */}
+        <section className="bg-white rounded-2xl border border-[var(--border)] p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[var(--accent)] to-green-800 text-white flex items-center justify-center font-bold text-[20px]">
+              {householdName.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-base truncate">
-                {user?.full_name || user?.email?.split("@")[0] || "Usuario"}
+              <p className="text-[15px] font-semibold text-[var(--ink)] truncate">
+                {householdName}
               </p>
-              <p className="text-gray-500 text-sm truncate flex items-center gap-1">
+              <p className="text-[12px] text-[var(--ink-soft)]">
+                Hogar activo
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Account card */}
+        <section className="bg-white rounded-2xl border border-[var(--border)] p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-stone-100 text-stone-700 flex items-center justify-center font-bold text-[16px]">
+              {userName.charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[14px] font-semibold text-[var(--ink)] truncate">
+                {userName}
+              </p>
+              <p className="text-[12px] text-[var(--ink-soft)] truncate flex items-center gap-1">
                 <Mail size={12} />
-                {user?.email || "Sin sesión"}
+                {userEmail}
               </p>
             </div>
           </div>
-        </div>
-      </div>
+        </section>
 
-      {/* Profile Section */}
-      <div className="mb-6">
-        <p className="text-sm font-medium text-gray-500 mb-2 px-1">HOGAR</p>
-        <div className="space-y-2">
-          <div className="bg-white rounded-xl p-4 flex items-center gap-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-              {(household?.name?.charAt(0) || "H").toUpperCase()}
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-lg">
-                {household?.name || "Mi Hogar"}
-              </p>
-              <p className="text-gray-500 text-sm">Hogar activo</p>
-            </div>
-            <ChevronRight size={20} className="text-gray-400" />
-          </div>
-        </div>
-      </div>
-
-      {/* Porciones */}
-      <div className="mb-6">
-        <p className="text-sm font-medium text-gray-500 mb-2 px-1">PORCIONES</p>
-        <div className="bg-white rounded-xl overflow-hidden">
-          <div className="p-4 border-b border-gray-100">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-lg">🍽️</span>
-                </div>
-                <div>
-                  <p className="font-medium">Porción grande</p>
-                  <p className="text-sm text-gray-500">Plato principal</p>
-                </div>
-              </div>
-              <span className="text-2xl font-bold text-blue-600">3</span>
-            </div>
-          </div>
-          <div className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                  <span className="text-lg">🥗</span>
-                </div>
-                <div>
-                  <p className="font-medium">Porción pequeña</p>
-                  <p className="text-sm text-gray-500">Plato ligero</p>
-                </div>
-              </div>
-              <span className="text-2xl font-bold text-green-600">2</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Preferencias */}
-      <div className="mb-6">
-        <p className="text-sm font-medium text-gray-500 mb-2 px-1">
-          PREFERENCIAS
-        </p>
-        <div className="space-y-2">
-          <SettingsSection
-            icon={<Bell size={20} />}
-            title="Notificaciones"
-            description={notifications ? "Activadas" : "Desactivadas"}
+        {/* Preferencias */}
+        <Group title="Preferencias">
+          <Row
+            Icon={ChefHat}
+            color="text-amber-600"
+            label="Perfil de cocina"
+            sub="Cocina, restricciones y porciones"
+            onClick={() => setShowCookingProfile(true)}
+          />
+          <Row
+            Icon={Heart}
+            color="text-rose-600"
+            label="Preferencias dietéticas"
+            sub="Restricciones, alergias y preferencias"
+            onClick={() => setShowDietaryPreferences(true)}
+          />
+          <Row
+            Icon={Bell}
+            color="text-orange-600"
+            label="Notificaciones"
+            sub={notifications ? "Activadas" : "Desactivadas"}
             rightContent={
               <button
-                onClick={() => setNotifications(!notifications)}
-                className={`w-12 h-7 rounded-full transition-colors ${
-                  notifications ? "bg-green-500" : "bg-gray-300"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setNotifications(!notifications);
+                }}
+                className={`w-12 h-7 rounded-full transition-colors flex-shrink-0 ${
+                  notifications ? "bg-[var(--accent)]" : "bg-stone-300"
                 }`}
               >
                 <div
@@ -337,71 +250,78 @@ export default function SettingsView() {
               </button>
             }
           />
-          <SettingsSection
-            icon={<UtensilsCrossed size={20} />}
-            title="Preferencias Dietéticas"
-            description="Restricciones, alergias y preferencias"
-            onClick={() => setShowDietaryPreferences(true)}
-          />
-          <SettingsSection
-            icon={<Moon size={20} />}
-            title="Tema oscuro"
-            description="Próximamente"
-          />
-          <SettingsSection
-            icon={<Globe size={20} />}
-            title="Idioma"
-            description="Español"
+          <Row
+            Icon={Globe}
+            color="text-blue-600"
+            label="Idioma"
+            sub="Español"
             onClick={() => {}}
           />
-        </div>
-      </div>
+          <Row
+            Icon={Moon}
+            color="text-indigo-600"
+            label="Tema oscuro"
+            sub="Próximamente"
+            last
+          />
+        </Group>
 
-      {/* Datos - Solo visible para admin */}
-      <AdminOnly>
-        <div className="mb-6">
-          <p className="text-sm font-medium text-gray-500 mb-2 px-1">DATOS</p>
-          <div className="space-y-2">
-            <SettingsSection
-              icon={<Database size={20} />}
-              title="Exportar datos"
-              description="Descarga tus recetas y menús"
+        {/* Tecnología */}
+        <Group title="Tecnología">
+          <Row
+            Icon={Bot}
+            color="text-purple-600"
+            label="Centro de Comando IA"
+            sub="Monitorea, controla y configura tu asistente"
+            onClick={() => setShowAICommandCenter(true)}
+            last
+          />
+        </Group>
+
+        {/* Datos — solo admin */}
+        <AdminOnly>
+          <Group title="Datos">
+            <Row
+              Icon={Database}
+              color="text-cyan-600"
+              label="Exportar datos"
+              sub="Descarga tus recetas y menús"
               onClick={() => {}}
             />
-            <SettingsSection
-              icon={<Shield size={20} />}
-              title="Privacidad"
-              description="Gestiona tus datos"
+            <Row
+              Icon={ShieldCheck}
+              color="text-green-600"
+              label="Privacidad"
+              sub="Gestiona tus datos"
               onClick={() => {}}
+              last
             />
-          </div>
-        </div>
-      </AdminOnly>
+          </Group>
+        </AdminOnly>
 
-      {/* Funciones extras */}
-      <div className="mb-6">
-        <p className="text-sm font-medium text-gray-500 mb-2 px-1">
-          MIS FUNCIONES
-        </p>
-        <div className="space-y-2">
-          <SettingsSection
-            icon={<BarChart3 size={20} />}
-            title="Mi reporte mensual"
-            description="Estadísticas de cocina, gasto y ahorro del mes"
+        {/* Vistas de demo / Mis funciones */}
+        <Group title="Vistas de demo">
+          <Row
+            Icon={BarChart3}
+            color="text-blue-600"
+            label="Mi reporte mensual"
+            sub="Estadísticas de cocina, gasto y ahorro del mes"
             onClick={() => setShowMonthlyReport(true)}
           />
-          <SettingsSection
-            icon={<Sparkles size={20} />}
-            title="Modo Niños"
-            description="Pantalla simple para que los chicos ayuden en cocina"
+          <Row
+            Icon={Sparkles}
+            color="text-pink-600"
+            label="Modo Niños"
+            sub="Pantalla simple para que los chicos ayuden en cocina"
             onClick={() => setShowKidsMode(true)}
           />
-          <SettingsSection
-            icon={<Crown size={20} />}
-            title={isPremium ? `Plan ${tier}` : "Actualizar a Premium"}
-            description={
+          <Row
+            Icon={Crown}
+            color="text-yellow-600"
+            label={isPremium ? `Plan ${tier}` : "Actualizar a Premium"}
+            sub={
               isPremium
-                ? "✓ Funciones premium activas"
+                ? "Funciones premium activas"
                 : "Recetas e imágenes ilimitadas, asistente de voz"
             }
             onClick={() => {
@@ -413,70 +333,120 @@ export default function SettingsView() {
             }}
             rightContent={
               isPremium ? (
-                <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full font-bold">
+                <span className="text-[10px] px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full font-bold flex-shrink-0">
                   ⭐ {tier.toUpperCase()}
                 </span>
               ) : undefined
             }
+            last
           />
-        </div>
-      </div>
+        </Group>
 
-      {/* Modal Reporte Mensual */}
-      {showMonthlyReport && (
-        <MonthlyReportView onClose={() => setShowMonthlyReport(false)} />
-      )}
+        {/* Modal Reporte Mensual */}
+        {showMonthlyReport && (
+          <MonthlyReportView onClose={() => setShowMonthlyReport(false)} />
+        )}
 
-      {/* Modal Modo Niños */}
-      {showKidsMode && <KidsMode onClose={() => setShowKidsMode(false)} />}
+        {/* Modal Modo Niños */}
+        {showKidsMode && <KidsMode onClose={() => setShowKidsMode(false)} />}
 
-      {/* Información */}
-      <div className="mb-6">
-        <p className="text-sm font-medium text-gray-500 mb-2 px-1">
-          INFORMACIÓN
+        {/* Cuenta */}
+        <Group title="Cuenta">
+          <Row
+            Icon={User}
+            color="text-stone-600"
+            label="Mi cuenta"
+            sub={userEmail}
+          />
+          <Row
+            Icon={LogOut}
+            color="text-red-600"
+            label={signingOut ? "Cerrando sesión..." : "Cerrar sesión"}
+            sub="Limpia la caché local de este dispositivo"
+            onClick={handleSignOut}
+            disabled={signingOut}
+            danger
+            last
+          />
+        </Group>
+
+        <p className="text-center text-[11px] text-stone-400 py-2">
+          Recetario v1.0.0 · {householdName}
         </p>
-        <div className="space-y-2">
-          <SettingsSection
-            icon={<Smartphone size={20} />}
-            title="Versión de la app"
-            description="1.0.0"
-          />
-          <SettingsSection
-            icon={<HelpCircle size={20} />}
-            title="Ayuda y soporte"
-            onClick={() => {}}
-          />
-          <SettingsSection
-            icon={<Info size={20} />}
-            title="Acerca de"
-            description="Recetario Familia González"
-            onClick={() => {}}
-          />
-        </div>
-      </div>
-
-      {/* Cerrar Sesión - Botón rojo prominente */}
-      <div className="mb-6">
-        <p className="text-sm font-medium text-gray-500 mb-2 px-1">SESIÓN</p>
-        <button
-          onClick={handleSignOut}
-          disabled={signingOut}
-          className="w-full flex items-center justify-center gap-3 p-4 bg-red-50 hover:bg-red-100 active:bg-red-200 disabled:opacity-60 disabled:cursor-not-allowed text-red-600 font-semibold rounded-xl border border-red-200 transition-colors"
-        >
-          <LogOut size={20} />
-          <span>{signingOut ? "Cerrando sesión..." : "Cerrar Sesión"}</span>
-        </button>
-        <p className="text-xs text-gray-500 text-center mt-2 px-2">
-          Al cerrar sesión se limpiará la caché local y deberás iniciar sesión
-          de nuevo
-        </p>
-      </div>
-
-      {/* Footer */}
-      <div className="text-center text-gray-400 text-sm mt-8">
-        <p>Hecho con ❤️ para tu hogar</p>
-        <p className="mt-1">© 2026 Recetario App</p>
       </div>
     </div>
+  );
+}
+
+function Group({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <p className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-2 px-1">
+        {title}
+      </p>
+      <div className="bg-white rounded-2xl border border-[var(--border)] overflow-hidden">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function Row({
+  Icon,
+  color,
+  label,
+  sub,
+  last,
+  danger,
+  disabled,
+  onClick,
+  rightContent,
+}: {
+  Icon: React.ComponentType<{ size?: number; className?: string }>;
+  color: string;
+  label: string;
+  sub?: string;
+  last?: boolean;
+  danger?: boolean;
+  disabled?: boolean;
+  onClick?: () => void;
+  rightContent?: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`w-full px-4 py-3 flex items-center gap-3 text-left ${
+        !last ? "border-b border-[var(--border)]" : ""
+      } ${onClick ? "active:bg-stone-50" : ""} disabled:opacity-60 disabled:cursor-not-allowed`}
+    >
+      <div
+        className={`w-9 h-9 rounded-xl bg-stone-50 flex items-center justify-center flex-shrink-0 ${color}`}
+      >
+        <Icon size={16} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p
+          className={`text-[14px] font-medium ${
+            danger ? "text-red-600" : "text-[var(--ink)]"
+          }`}
+        >
+          {label}
+        </p>
+        {sub && (
+          <p className="text-[12px] text-[var(--ink-soft)] truncate">{sub}</p>
+        )}
+      </div>
+      {rightContent ??
+        (onClick && (
+          <ChevronRight size={14} className="text-stone-300 flex-shrink-0" />
+        ))}
+    </button>
   );
 }

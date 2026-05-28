@@ -54,12 +54,10 @@ export default function RecetarioSection({
         )}
 
         {activeTab === "suggestions" && (
-          <div className="p-4 max-w-lg mx-auto">
-            <SuggestionsPanel
-              onUpdate={onUpdate}
-              onNavigate={handleNavigateFromSuggestions}
-            />
-          </div>
+          <SuggestionsPanel
+            onUpdate={onUpdate}
+            onNavigate={handleNavigateFromSuggestions}
+          />
         )}
       </div>
     </div>

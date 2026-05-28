@@ -39,16 +39,16 @@ export function ChatMessageList({
           <div
             className={`
               w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center flex-shrink-0
-              ${message.role === "user" ? "bg-green-100" : "bg-purple-100"}
+              ${message.role === "user" ? "bg-stone-200" : "bg-purple-100"}
             `}
           >
             {message.role === "user" ? (
-              <User size={14} className="text-green-600 md:hidden" />
+              <User size={14} className="text-stone-600 md:hidden" />
             ) : (
               <Sparkles size={14} className="text-purple-600 md:hidden" />
             )}
             {message.role === "user" ? (
-              <User size={18} className="text-green-600 hidden md:block" />
+              <User size={18} className="text-stone-600 hidden md:block" />
             ) : (
               <Sparkles size={18} className="text-purple-600 hidden md:block" />
             )}
@@ -57,11 +57,11 @@ export function ChatMessageList({
           {/* Message Bubble */}
           <div
             className={`
-              max-w-[85%] rounded-2xl
+              max-w-[85%] rounded-2xl text-[13.5px] leading-relaxed
               ${
                 message.role === "user"
-                  ? "bg-green-600 text-white rounded-br-md p-2.5 md:p-3"
-                  : "bg-white shadow-sm border rounded-bl-md"
+                  ? "bg-[var(--ink)] text-white rounded-br-md p-2.5 md:p-3"
+                  : "bg-white shadow-sm border border-[var(--border)] rounded-bl-md text-[var(--ink)]"
               }
             `}
           >
@@ -118,12 +118,12 @@ export function ChatMessageList({
                   </p>
                 )}
                 {message.content === "📷 Imagen enviada" && (
-                  <p className="text-xs md:text-sm text-green-200 italic">
+                  <p className="text-xs md:text-sm text-white/70 italic">
                     Analiza esta imagen
                   </p>
                 )}
                 {showTimestamp && (
-                  <p className="text-xs mt-1 text-green-200">
+                  <p className="text-xs mt-1 text-white/70">
                     {formatTime(message.timestamp)}
                   </p>
                 )}
