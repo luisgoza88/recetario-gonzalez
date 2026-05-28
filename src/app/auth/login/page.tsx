@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff, Mail, Lock, ChefHat, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, AlertCircle, ArrowRight, Ticket } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import Spinner from "@/components/ui/Spinner";
 
@@ -46,67 +46,80 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100 p-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-600 rounded-full mb-4">
-            <ChefHat className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-800">
-            Recetario Familiar
-          </h1>
-          <p className="text-gray-600 mt-1">Inicia sesion para continuar</p>
+    <div className="min-h-screen flex flex-col bg-[var(--bg)] text-[var(--ink)]">
+      {/* Logo + titulo */}
+      <div className="pt-16 pb-8 px-6 text-center">
+        <div className="w-16 h-16 rounded-2xl mx-auto bg-gradient-to-br from-[var(--accent)] to-green-800 text-white flex items-center justify-center text-[28px] font-bold shadow-lg shadow-green-200">
+          R
         </div>
+        <h1 className="text-[26px] font-bold tracking-tight mt-4">
+          Recetario Familiar
+        </h1>
+        <p className="text-[14px] text-[var(--ink-soft)] mt-1">
+          Tu cocina, tu hogar, tu IA
+        </p>
+      </div>
 
-        {/* Formulario */}
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="px-6 flex-1 w-full max-w-md mx-auto">
+        <div className="bg-white rounded-2xl border border-[var(--border)] p-5">
+          {/* Tabs login / registro */}
+          <div className="flex bg-stone-100 rounded-xl p-1 mb-5">
+            <span className="flex-1 py-2 rounded-lg text-[13px] font-semibold text-center bg-white shadow-sm text-[var(--ink)]">
+              Iniciar sesion
+            </span>
+            <Link
+              href="/auth/register"
+              className="flex-1 py-2 rounded-lg text-[13px] font-semibold text-center text-stone-500 transition-all hover:text-[var(--ink)]"
+            >
+              Crear cuenta
+            </Link>
+          </div>
+
+          <form onSubmit={handleSubmit}>
             {/* Error message */}
             {error && (
-              <div className="flex items-center gap-2 p-3 bg-red-50 text-red-700 rounded-lg">
+              <div className="flex items-center gap-2 p-3 mb-4 bg-[var(--danger-light)] text-[var(--danger)] rounded-xl">
                 <AlertCircle className="w-5 h-5 flex-shrink-0" />
                 <span className="text-sm">{error}</span>
               </div>
             )}
 
             {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="mb-3">
+              <label className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold">
                 Email
               </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                  placeholder="tu@email.com"
-                  autoComplete="email"
-                />
-              </div>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full mt-1 bg-stone-50 border border-[var(--border)] rounded-xl px-3 py-2.5 text-[14px] focus:outline-none focus:border-[var(--accent)] transition-colors"
+                placeholder="tu@email.com"
+                autoComplete="email"
+              />
             </div>
 
             {/* Password */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="mb-2">
+              <label className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold">
                 Contrasena
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                  className="w-full mt-1 bg-stone-50 border border-[var(--border)] rounded-xl px-3 py-2.5 pr-11 text-[14px] focus:outline-none focus:border-[var(--accent)] transition-colors"
                   placeholder="Tu contrasena"
                   autoComplete="current-password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 mt-0.5 text-stone-400 hover:text-stone-600"
+                  aria-label={
+                    showPassword ? "Ocultar contrasena" : "Mostrar contrasena"
+                  }
                 >
                   {showPassword ? (
                     <EyeOff className="w-5 h-5" />
@@ -121,7 +134,7 @@ export default function LoginPage() {
             <div className="text-right">
               <Link
                 href="/auth/forgot-password"
-                className="text-sm text-green-600 hover:text-green-700"
+                className="text-[12px] text-[var(--accent)] font-medium hover:underline"
               >
                 Olvidaste tu contrasena?
               </Link>
@@ -131,45 +144,51 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 focus:ring-4 focus:ring-green-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full mt-4 bg-[var(--accent)] text-white py-3 rounded-xl text-[14px] font-semibold flex items-center justify-center gap-2 transition-all active:scale-[0.99] hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
-                <span className="flex items-center justify-center gap-2">
+                <>
                   <Spinner size="md" color="white" />
                   Iniciando...
-                </span>
+                </>
               ) : (
-                "Iniciar Sesion"
+                <>
+                  Entrar
+                  <ArrowRight className="w-4 h-4" />
+                </>
               )}
             </button>
           </form>
 
           {/* Divider */}
-          <div className="my-6 flex items-center">
-            <div className="flex-1 border-t border-gray-200" />
-            <span className="px-4 text-sm text-gray-500">o</span>
-            <div className="flex-1 border-t border-gray-200" />
+          <div className="flex items-center gap-3 my-4">
+            <div className="flex-1 h-px bg-[var(--border)]" />
+            <span className="text-[11px] text-stone-400 uppercase tracking-wider">
+              o
+            </span>
+            <div className="flex-1 h-px bg-[var(--border)]" />
           </div>
 
           {/* Join with code */}
           <Link
             href="/join"
-            className="block w-full py-3 text-center border-2 border-green-600 text-green-600 font-semibold rounded-xl hover:bg-green-50 transition-all"
+            className="w-full bg-white border border-[var(--border)] py-2.5 rounded-xl text-[13px] font-medium flex items-center justify-center gap-2 hover:bg-stone-50 transition-colors"
           >
+            <Ticket className="w-4 h-4 text-[var(--accent)]" />
             Tengo un codigo de invitacion
           </Link>
-
-          {/* Register link */}
-          <p className="mt-6 text-center text-gray-600">
-            No tienes cuenta?{" "}
-            <Link
-              href="/auth/register"
-              className="text-green-600 font-semibold hover:text-green-700"
-            >
-              Registrate
-            </Link>
-          </p>
         </div>
+
+        {/* Register link */}
+        <p className="mt-6 text-center text-[13px] text-[var(--ink-soft)]">
+          No tienes cuenta?{" "}
+          <Link
+            href="/auth/register"
+            className="text-[var(--accent)] font-semibold hover:underline"
+          >
+            Registrate
+          </Link>
+        </p>
       </div>
     </div>
   );
