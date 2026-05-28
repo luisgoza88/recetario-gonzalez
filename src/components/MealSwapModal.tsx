@@ -2,21 +2,21 @@
 
 import { useState, useMemo, useEffect } from "react";
 import {
-  X,
   Search,
-  Sparkles,
+  Wand2,
   ChefHat,
-  Clock,
-  ArrowLeftRight,
+  Timer,
+  ChevronRight,
+  UtensilsCrossed,
 } from "lucide-react";
 import Spinner from "@/components/ui/Spinner";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Recipe, MealType } from "@/types";
 import type {
   ExpandedRecipe,
   RecipeCategory as ExpandedCategory,
 } from "@/data/expanded-recipes";
 import { INITIAL_RECIPES } from "@/data/recipes";
-import { useEscapeKey } from "@/hooks/useEscapeKey";
 import { useToast } from "@/components/ui/Toast";
 
 // =====================================================
@@ -42,6 +42,12 @@ const MEAL_TYPE_LABELS: Record<MealType, string> = {
   dinner: "Cena",
 };
 
+const MEAL_TYPE_EMOJI: Record<MealType, string> = {
+  breakfast: "🍳",
+  lunch: "🥗",
+  dinner: "🍲",
+};
+
 const ALL_CATEGORIES: { value: ExpandedCategory | "all"; label: string }[] = [
   { value: "all", label: "Todas" },
   { value: "colombiana", label: "Colombiana" },
@@ -52,12 +58,6 @@ const ALL_CATEGORIES: { value: ExpandedCategory | "all"; label: string }[] = [
   { value: "meal-prep", label: "Meal Prep" },
   { value: "cena-ligera", label: "Cena Ligera" },
 ];
-
-const DIFFICULTY_COLORS: Record<string, string> = {
-  facil: "bg-green-100 text-green-700",
-  media: "bg-yellow-100 text-yellow-700",
-  dificil: "bg-red-100 text-red-700",
-};
 
 // =====================================================
 // Component
@@ -85,8 +85,6 @@ export default function MealSwapModal({
     ExpandedRecipe[]
   >([]);
   const [categoryConfig, setCategoryConfig] = useState<CategoryConfigMap>({});
-
-  useEscapeKey(onClose, isOpen);
 
   // Lazy load expanded-recipes (90KB) only when modal is open
   useEffect(() => {
@@ -217,125 +215,116 @@ export default function MealSwapModal({
     onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
-      <div className="bg-white w-full max-w-lg max-h-[90vh] rounded-t-2xl sm:rounded-2xl flex flex-col overflow-hidden animate-slide-up">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2">
-            <ArrowLeftRight size={20} />
-            <div>
-              <h3 className="font-semibold text-lg">
-                Cambiar {MEAL_TYPE_LABELS[mealType]}
-              </h3>
-              {currentRecipe && (
-                <p className="text-white/80 text-sm truncate max-w-[250px]">
-                  Actual: {currentRecipe.name}
-                </p>
-              )}
+    <BottomSheet
+      open={isOpen}
+      onClose={onClose}
+      title={`Cambiar ${MEAL_TYPE_LABELS[mealType].toLowerCase()}`}
+      description={currentRecipe ? `Actual: ${currentRecipe.name}` : undefined}
+      maxHeight="88vh"
+      footer={
+        <button
+          onClick={handleAISuggestion}
+          disabled={isLoadingAI}
+          className="w-full flex items-center justify-center gap-2 py-3 bg-purple-50 border border-purple-200 text-purple-700 rounded-xl text-[13px] font-semibold hover:bg-purple-100 disabled:opacity-50 transition-colors"
+        >
+          {isLoadingAI ? (
+            <>
+              <Spinner size="sm" />
+              Generando receta...
+            </>
+          ) : (
+            <>
+              <Wand2 size={14} />
+              Generar receta nueva con IA
+            </>
+          )}
+        </button>
+      }
+    >
+      <div className="space-y-4">
+        {/* Current recipe summary */}
+        {currentRecipe && (
+          <div className="bg-stone-100 rounded-xl p-3">
+            <p className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1.5">
+              Actualmente
+            </p>
+            <div className="flex items-center gap-2.5">
+              <UtensilsCrossed size={16} className="text-[var(--accent)]" />
+              <p className="text-[13.5px] font-semibold text-[var(--ink)] leading-tight">
+                {currentRecipe.name}
+              </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-            aria-label="Cerrar"
-          >
-            <X size={20} />
-          </button>
+        )}
+
+        {/* Search bar */}
+        <div className="relative">
+          <Search
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ink-soft)]"
+          />
+          <input
+            type="text"
+            placeholder="Buscar receta por nombre o ingrediente..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-stone-50 border border-[var(--border)] focus:border-[var(--accent)] focus:outline-none text-[14px]"
+          />
         </div>
 
-        {/* Search + Filters */}
-        <div className="p-4 space-y-3 border-b shrink-0">
-          {/* Search bar */}
-          <div className="relative">
-            <Search
-              size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-            <input
-              type="text"
-              placeholder="Buscar receta por nombre o ingrediente..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none text-sm"
-              autoFocus
-            />
-          </div>
-
-          {/* Category filters */}
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
-            {ALL_CATEGORIES.map((cat) => (
-              <button
-                key={cat.value}
-                onClick={() => setSelectedCategory(cat.value)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                  selectedCategory === cat.value
-                    ? "bg-indigo-600 text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                {cat.value !== "all" &&
-                  categoryConfig[cat.value as ExpandedCategory]?.icon + " "}
-                {cat.label}
-              </button>
-            ))}
-          </div>
-
-          {/* AI suggestion button */}
-          <button
-            onClick={handleAISuggestion}
-            disabled={isLoadingAI}
-            className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-xl text-sm font-medium hover:from-purple-600 hover:to-indigo-600 disabled:opacity-50 transition-all"
-          >
-            {isLoadingAI ? (
-              <>
-                <Spinner size="sm" />
-                Generando sugerencia...
-              </>
-            ) : (
-              <>
-                <Sparkles size={16} />
-                Sugerencia IA (basada en inventario)
-              </>
-            )}
-          </button>
+        {/* Category filters */}
+        <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+          {ALL_CATEGORIES.map((cat) => (
+            <button
+              key={cat.value}
+              onClick={() => setSelectedCategory(cat.value)}
+              className={`px-2.5 py-1.5 rounded-full text-[11.5px] font-medium whitespace-nowrap transition-colors ${
+                selectedCategory === cat.value
+                  ? "bg-[var(--ink)] text-white"
+                  : "bg-stone-100 text-stone-500 hover:bg-stone-200"
+              }`}
+            >
+              {cat.value !== "all" &&
+                categoryConfig[cat.value as ExpandedCategory]?.icon + " "}
+              {cat.label}
+            </button>
+          ))}
         </div>
 
         {/* Recipe list */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {filteredRecipes.length === 0 ? (
-            <div className="text-center py-8 text-gray-400">
-              <ChefHat size={40} className="mx-auto mb-2 opacity-50" />
-              <p className="text-sm">
-                No se encontraron recetas
-                {searchQuery ? ` para "${searchQuery}"` : ""}
-              </p>
-              <p className="text-xs mt-1">
-                Intenta con otra busqueda o categoria
-              </p>
-            </div>
-          ) : (
-            <>
-              <p className="text-xs text-gray-400 mb-2">
-                {filteredRecipes.length} receta
-                {filteredRecipes.length !== 1 ? "s" : ""} disponible
-                {filteredRecipes.length !== 1 ? "s" : ""}
-              </p>
+        {filteredRecipes.length === 0 ? (
+          <div className="text-center py-8 text-[var(--ink-soft)]">
+            <ChefHat size={40} className="mx-auto mb-2 opacity-50" />
+            <p className="text-sm">
+              No se encontraron recetas
+              {searchQuery ? ` para "${searchQuery}"` : ""}
+            </p>
+            <p className="text-xs mt-1">
+              Intenta con otra busqueda o categoria
+            </p>
+          </div>
+        ) : (
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-2 px-1">
+              {filteredRecipes.length} alternativa
+              {filteredRecipes.length !== 1 ? "s" : ""}
+            </p>
+            <div className="space-y-2">
               {filteredRecipes.map((recipe) => (
                 <RecipeSwapCard
                   key={recipe.id}
                   recipe={recipe}
+                  mealType={mealType}
                   categoryConfig={categoryConfig}
                   onSelect={() => handleSelectRecipe(recipe)}
                 />
               ))}
-            </>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+    </BottomSheet>
   );
 }
 
@@ -345,16 +334,17 @@ export default function MealSwapModal({
 
 function RecipeSwapCard({
   recipe,
+  mealType,
   categoryConfig,
   onSelect,
 }: {
   recipe: Recipe;
+  mealType: MealType;
   categoryConfig: CategoryConfigMap;
   onSelect: () => void;
 }) {
   const category = (recipe as Recipe & { category?: ExpandedCategory })
     .category;
-  const difficulty = recipe.difficulty;
   const prepTime = recipe.prep_time;
   const cookTime = recipe.cook_time;
   const totalTime =
@@ -366,60 +356,46 @@ function RecipeSwapCard({
     .map((ing) => ing.name)
     .join(", ");
 
-  // Normalize difficulty for color lookup (remove accents)
-  const difficultyKey = difficulty
-    ?.normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-
   return (
-    <div className="border border-gray-200 rounded-xl p-3 hover:border-indigo-300 hover:shadow-sm transition-all group">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <h4 className="font-semibold text-sm text-gray-800 truncate">
-            {recipe.name}
-          </h4>
+    <button
+      onClick={onSelect}
+      className="w-full bg-white rounded-xl border border-[var(--border)] p-3 text-left hover:border-[var(--accent)] active:bg-stone-50 transition-colors flex items-center gap-3"
+    >
+      {/* Emoji thumbnail */}
+      <div className="w-14 h-14 shrink-0 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-2xl">
+        {MEAL_TYPE_EMOJI[mealType]}
+      </div>
 
-          {/* Badges row */}
-          <div className="flex flex-wrap gap-1 mt-1">
-            {category && categoryConfig[category] && (
-              <span
-                className={`text-[0.65rem] px-1.5 py-0.5 rounded-full ${categoryConfig[category].color}`}
-              >
-                {categoryConfig[category].icon} {categoryConfig[category].label}
-              </span>
-            )}
-            {difficulty && difficultyKey && (
-              <span
-                className={`text-[0.65rem] px-1.5 py-0.5 rounded-full ${DIFFICULTY_COLORS[difficultyKey] || "bg-gray-100 text-gray-600"}`}
-              >
-                {difficulty}
-              </span>
-            )}
-            {totalTime && (
-              <span className="text-[0.65rem] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 flex items-center gap-0.5">
-                <Clock size={10} />
-                {totalTime} min
-              </span>
-            )}
-          </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[13.5px] font-semibold text-[var(--ink)] leading-tight truncate">
+          {recipe.name}
+        </p>
 
-          {/* Ingredient preview */}
-          <p className="text-xs text-gray-400 mt-1 truncate">
-            {ingredientPreview}
-            {recipe.ingredients.length > 3
-              ? ` +${recipe.ingredients.length - 3} mas`
-              : ""}
-          </p>
+        {/* Meta row */}
+        <div className="flex items-center gap-2 mt-1 flex-wrap">
+          {totalTime && (
+            <span className="text-[10.5px] text-[var(--ink-soft)] flex items-center gap-0.5 tabular-nums">
+              <Timer size={9} />
+              {totalTime}m
+            </span>
+          )}
+          {category && categoryConfig[category] && (
+            <span className="text-[10.5px] text-[var(--ink-soft)]">
+              {categoryConfig[category].icon} {categoryConfig[category].label}
+            </span>
+          )}
         </div>
 
-        <button
-          onClick={onSelect}
-          className="shrink-0 bg-indigo-50 text-indigo-600 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-indigo-100 transition-colors group-hover:bg-indigo-600 group-hover:text-white"
-        >
-          Seleccionar
-        </button>
+        {/* Ingredient preview */}
+        <p className="text-[11px] text-[var(--ink-soft)] mt-1 truncate">
+          {ingredientPreview}
+          {recipe.ingredients.length > 3
+            ? ` +${recipe.ingredients.length - 3} mas`
+            : ""}
+        </p>
       </div>
-    </div>
+
+      <ChevronRight size={16} className="text-stone-300 shrink-0" />
+    </button>
   );
 }

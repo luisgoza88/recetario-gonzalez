@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import {
-  X,
   Plus,
   Sparkles,
   Mic,
@@ -31,6 +30,7 @@ import {
 import { useEscapeKey } from "@/hooks/useEscapeKey";
 import Spinner from "@/components/ui/Spinner";
 import FocusTrap from "@/components/ui/FocusTrap";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 
 interface AddCustomItemModalProps {
   onClose: () => void;
@@ -562,38 +562,63 @@ export default function AddCustomItemModal({
 
   return (
     <FocusTrap active={true}>
-      <div
-        className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="add-item-modal-title"
-      >
-        <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-4">
-            <div className="flex justify-between items-center mb-3">
-              <div className="flex items-center gap-2">
-                <Sparkles size={20} />
-                <span id="add-item-modal-title" className="font-semibold">
-                  Agregar Productos
-                </span>
-              </div>
-              <button
-                onClick={onClose}
-                className="p-2 hover:bg-white/20 rounded-lg"
-              >
-                <X size={20} />
-              </button>
-            </div>
+      <BottomSheet
+        open={true}
+        onClose={onClose}
+        title="Agregar al mercado"
+        footer={
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="flex-1 bg-white border border-[var(--border)] py-2.5 rounded-xl text-[13px] font-medium text-[var(--ink)] hover:bg-stone-50 transition-colors"
+            >
+              Cancelar
+            </button>
 
-            {/* Mode Tabs */}
-            <div className="flex bg-white/20 rounded-xl p-1 gap-1">
+            {mode === "manual" ? (
+              <button
+                onClick={handleSaveManual}
+                disabled={saving || !name.trim()}
+                className="flex-1 bg-[var(--accent)] text-white py-2.5 rounded-xl text-[13px] font-semibold hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2 transition-opacity"
+              >
+                {saving ? (
+                  <Spinner size="md" />
+                ) : (
+                  <>
+                    <Plus size={16} />
+                    Agregar al mercado
+                  </>
+                )}
+              </button>
+            ) : showResults ? (
+              <button
+                onClick={handleSaveItems}
+                disabled={saving || selectedCount === 0}
+                className="flex-1 bg-[var(--accent)] text-white py-2.5 rounded-xl text-[13px] font-semibold hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2 transition-opacity"
+              >
+                {saving ? (
+                  <Spinner size="md" />
+                ) : (
+                  <>
+                    <Plus size={16} />
+                    Agregar {selectedCount > 0 ? `(${selectedCount})` : ""}
+                  </>
+                )}
+              </button>
+            ) : null}
+          </div>
+        }
+      >
+        <div className="-mx-5 -my-4">
+          {/* Mode Tabs */}
+          <div className="px-5 pb-3">
+            <div className="flex bg-stone-100 rounded-xl p-1 gap-1">
               <button
                 onClick={() => setMode("smart")}
-                className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-1 ${
+                className={`flex-1 py-2 px-2 rounded-lg text-[11px] font-medium transition-all flex flex-col items-center gap-1 ${
                   mode === "smart"
-                    ? "bg-white text-purple-600"
-                    : "text-white/80 hover:text-white"
+                    ? "bg-white text-[var(--accent)] shadow-sm"
+                    : "text-[var(--ink-soft)] hover:text-[var(--ink)]"
                 }`}
               >
                 <Sparkles size={16} />
@@ -602,10 +627,10 @@ export default function AddCustomItemModal({
               <button
                 onClick={() => setMode("voice")}
                 disabled={!voiceSupported}
-                className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-1 ${
+                className={`flex-1 py-2 px-2 rounded-lg text-[11px] font-medium transition-all flex flex-col items-center gap-1 ${
                   mode === "voice"
-                    ? "bg-white text-purple-600"
-                    : "text-white/80 hover:text-white"
+                    ? "bg-white text-[var(--accent)] shadow-sm"
+                    : "text-[var(--ink-soft)] hover:text-[var(--ink)]"
                 } ${!voiceSupported ? "opacity-50" : ""}`}
               >
                 <Mic size={16} />
@@ -613,10 +638,10 @@ export default function AddCustomItemModal({
               </button>
               <button
                 onClick={() => setMode("barcode")}
-                className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-1 ${
+                className={`flex-1 py-2 px-2 rounded-lg text-[11px] font-medium transition-all flex flex-col items-center gap-1 ${
                   mode === "barcode"
-                    ? "bg-white text-purple-600"
-                    : "text-white/80 hover:text-white"
+                    ? "bg-white text-[var(--accent)] shadow-sm"
+                    : "text-[var(--ink-soft)] hover:text-[var(--ink)]"
                 }`}
               >
                 <ScanBarcode size={16} />
@@ -624,10 +649,10 @@ export default function AddCustomItemModal({
               </button>
               <button
                 onClick={() => setMode("receipt")}
-                className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-1 ${
+                className={`flex-1 py-2 px-2 rounded-lg text-[11px] font-medium transition-all flex flex-col items-center gap-1 ${
                   mode === "receipt"
-                    ? "bg-white text-purple-600"
-                    : "text-white/80 hover:text-white"
+                    ? "bg-white text-[var(--accent)] shadow-sm"
+                    : "text-[var(--ink-soft)] hover:text-[var(--ink)]"
                 }`}
               >
                 <Receipt size={16} />
@@ -635,10 +660,10 @@ export default function AddCustomItemModal({
               </button>
               <button
                 onClick={() => setMode("manual")}
-                className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-1 ${
+                className={`flex-1 py-2 px-2 rounded-lg text-[11px] font-medium transition-all flex flex-col items-center gap-1 ${
                   mode === "manual"
-                    ? "bg-white text-purple-600"
-                    : "text-white/80 hover:text-white"
+                    ? "bg-white text-[var(--accent)] shadow-sm"
+                    : "text-[var(--ink-soft)] hover:text-[var(--ink)]"
                 }`}
               >
                 <Edit3 size={16} />
@@ -647,7 +672,7 @@ export default function AddCustomItemModal({
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="px-5 pb-4">
             {/* Quick Suggestions (always visible at top unless in manual mode) */}
             {mode !== "manual" &&
               !showResults &&
@@ -925,67 +950,37 @@ export default function AddCustomItemModal({
 
             {/* ==================== MANUAL MODE ==================== */}
             {mode === "manual" && (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nombre del producto *
+                  <label className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold">
+                    Producto *
                   </label>
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Ej: Camarones, Quinoa..."
-                    className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500"
+                    placeholder="Ej: Aguacate hass"
+                    className="w-full mt-1 bg-stone-50 border border-[var(--border)] rounded-xl px-3 py-2.5 text-[14px] text-[var(--ink)] focus:outline-none focus:border-[var(--accent)] transition-colors"
                     autoFocus
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Categoría
+                  <label className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold">
+                    Cantidad
                   </label>
-                  <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
-                    {categories.map((cat) => (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => setSelectedCategory(cat.id)}
-                        className={`flex items-center gap-2 p-2.5 rounded-xl border-2 transition-all text-left ${
-                          selectedCategory === cat.id
-                            ? "border-purple-500 bg-purple-50"
-                            : "border-gray-200 hover:border-gray-300"
-                        }`}
-                      >
-                        <span className="text-lg">{cat.icon}</span>
-                        <span className="text-sm font-medium">
-                          {cat.name_es}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Cantidad
-                    </label>
+                  <div className="flex gap-2 mt-1">
                     <input
                       type="text"
                       value={quantity}
                       onChange={(e) => setQuantity(e.target.value)}
-                      placeholder="Ej: 1, 500"
-                      className="w-full px-4 py-3 border rounded-xl"
+                      placeholder="2"
+                      className="flex-1 bg-stone-50 border border-[var(--border)] rounded-xl px-3 py-2.5 text-[14px] text-[var(--ink)] focus:outline-none focus:border-[var(--accent)] transition-colors"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Unidad
-                    </label>
                     <select
                       value={unit}
                       onChange={(e) => setUnit(e.target.value)}
-                      className="w-full px-4 py-3 border rounded-xl bg-white"
+                      className="bg-stone-50 border border-[var(--border)] rounded-xl px-3 py-2.5 text-[14px] text-[var(--ink)] focus:outline-none focus:border-[var(--accent)]"
                     >
                       {commonUnits.map((u) => (
                         <option key={u} value={u}>
@@ -993,6 +988,29 @@ export default function AddCustomItemModal({
                         </option>
                       ))}
                     </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold">
+                    Categoría
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {categories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setSelectedCategory(cat.id)}
+                        className={`px-2.5 py-1.5 rounded-full text-[11.5px] font-medium flex items-center gap-1 transition-colors ${
+                          selectedCategory === cat.id
+                            ? "bg-[var(--ink)] text-white"
+                            : "bg-stone-100 text-stone-500 hover:bg-stone-200"
+                        }`}
+                      >
+                        <span>{cat.icon}</span>
+                        <span>{cat.name_es}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -1159,52 +1177,8 @@ export default function AddCustomItemModal({
               </div>
             )}
           </div>
-
-          {/* Footer */}
-          <div className="p-4 border-t flex gap-3">
-            <button
-              onClick={onClose}
-              className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200"
-            >
-              Cancelar
-            </button>
-
-            {mode === "manual" ? (
-              <button
-                onClick={handleSaveManual}
-                disabled={saving || !name.trim()}
-                className="flex-1 py-3 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {saving ? (
-                  <Spinner size="md" />
-                ) : (
-                  <>
-                    <Plus size={18} />
-                    Agregar
-                  </>
-                )}
-              </button>
-            ) : showResults ? (
-              <button
-                onClick={handleSaveItems}
-                disabled={saving || selectedCount === 0}
-                className="flex-1 py-3 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {saving ? (
-                  <Spinner size="md" />
-                ) : (
-                  <>
-                    <Plus size={18} />
-                    Agregar {selectedCount > 0 ? `(${selectedCount})` : ""}
-                  </>
-                )}
-              </button>
-            ) : (
-              <div className="flex-1" /> // Placeholder when no action needed
-            )}
-          </div>
         </div>
-      </div>
+      </BottomSheet>
     </FocusTrap>
   );
 }

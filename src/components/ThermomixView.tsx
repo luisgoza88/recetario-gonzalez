@@ -13,9 +13,10 @@ import {
   Zap,
   Thermometer,
   Timer,
-  ChefHat,
+  Soup,
   Maximize2,
   Minimize2,
+  Sparkles,
 } from "lucide-react";
 import type { ThermomixRecipe, ThermomixStep } from "@/types";
 
@@ -153,6 +154,30 @@ function formatSeconds(s: number): string {
 }
 
 // =====================================================
+// Spec chip (vel / temp / min) — Thermomix style
+// =====================================================
+function SpecChip({
+  icon,
+  children,
+  accent = false,
+}: {
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+  accent?: boolean;
+}) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider tabular-nums ${
+        accent ? "bg-slate-900 text-white" : "bg-stone-100 text-stone-700"
+      }`}
+    >
+      {icon}
+      {children}
+    </span>
+  );
+}
+
+// =====================================================
 // ThermomixView Props
 // =====================================================
 interface ThermomixViewProps {
@@ -216,63 +241,73 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
     const accessory = ACCESSORY_INFO[step.accessory] || ACCESSORY_INFO.ninguno;
 
     return (
-      <div className="fixed inset-0 bg-gray-900 z-[300] flex flex-col text-white select-none">
+      <div className="fixed inset-0 z-[300] flex flex-col select-none bg-slate-950 text-white">
         {/* Top bar */}
-        <div className="flex justify-between items-center p-4 bg-black/30">
+        <div className="flex items-center justify-between bg-gradient-to-br from-slate-900 to-slate-800 px-5 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
           <button
             onClick={() => setCookingMode(false)}
-            className="flex items-center gap-2 text-white/80 hover:text-white"
+            className="flex items-center gap-2 text-white/70 transition-colors hover:text-white"
           >
-            <Minimize2 size={20} />
-            <span className="text-sm">Salir</span>
+            <Minimize2 size={18} />
+            <span className="text-[13px] font-medium">Salir</span>
           </button>
           <div className="text-center">
-            <span className="text-white/60 text-sm">Paso</span>
-            <span className="ml-1 font-bold text-lg">{currentStep + 1}</span>
-            <span className="text-white/60 text-sm"> / {totalSteps}</span>
+            <span className="text-[11px] uppercase tracking-wider text-white/50">
+              Paso
+            </span>
+            <span className="ml-1 text-lg font-bold tabular-nums">
+              {currentStep + 1}
+            </span>
+            <span className="text-[13px] text-white/50 tabular-nums">
+              {" "}
+              / {totalSteps}
+            </span>
           </div>
-          <button onClick={onClose} className="text-white/60 hover:text-white">
-            <X size={20} />
+          <button
+            onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/70 backdrop-blur transition-colors hover:bg-white/20 hover:text-white"
+          >
+            <X size={16} />
           </button>
         </div>
 
         {/* Progress bar */}
         <div className="h-1 bg-white/10">
           <div
-            className="h-full bg-gradient-to-r from-emerald-400 to-teal-400 transition-all duration-500"
+            className="h-full bg-white transition-all duration-500"
             style={{ width: `${((currentStep + 1) / totalSteps) * 100}%` }}
           />
         </div>
 
         {/* Main content */}
-        <div className="flex-1 flex flex-col items-center justify-center p-6 space-y-6">
+        <div className="flex flex-1 flex-col items-center justify-center space-y-6 p-6">
           {/* Accessory badge */}
           <div
-            className={`px-4 py-2 rounded-full text-lg font-medium ${accessory.color}`}
+            className={`rounded-full px-4 py-2 text-base font-medium ${accessory.color}`}
           >
             {accessory.emoji} {accessory.name}
           </div>
 
           {/* Description */}
-          <h2 className="text-2xl font-bold text-center leading-relaxed max-w-md">
+          <h2 className="max-w-md text-center text-2xl font-bold leading-relaxed tracking-tight">
             {step.description}
           </h2>
 
           {/* Settings row */}
-          <div className="flex gap-6 text-lg">
-            <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl">
-              <Zap size={20} className="text-yellow-400" />
-              <span>
-                Vel: <strong>{step.speed}</strong>
+          <div className="flex flex-wrap items-center justify-center gap-3 text-base">
+            <div className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2">
+              <Zap size={18} className="text-yellow-400" />
+              <span className="tabular-nums">
+                Vel <strong>{step.speed}</strong>
               </span>
             </div>
-            <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl">
-              <Thermometer size={20} className="text-red-400" />
-              <span>{step.temperature}</span>
+            <div className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2">
+              <Thermometer size={18} className="text-red-400" />
+              <span className="tabular-nums">{step.temperature}</span>
             </div>
-            <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl">
-              <Clock size={20} className="text-blue-400" />
-              <span>{step.time}</span>
+            <div className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2">
+              <Clock size={18} className="text-sky-400" />
+              <span className="tabular-nums">{step.time}</span>
             </div>
           </div>
 
@@ -280,9 +315,9 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
           {timerSeconds > 0 && (
             <div className="flex flex-col items-center gap-3">
               <div
-                className={`text-6xl font-mono font-bold tabular-nums ${
+                className={`font-mono text-6xl font-bold tabular-nums ${
                   timer?.remaining === 0
-                    ? "text-red-400 animate-pulse"
+                    ? "animate-pulse text-red-400"
                     : "text-white"
                 }`}
               >
@@ -293,34 +328,34 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
               <div className="flex gap-3">
                 <button
                   onClick={() => startTimer(step.stepNumber, timerSeconds)}
-                  className={`px-6 py-3 rounded-xl font-semibold text-lg transition-colors ${
+                  className={`rounded-xl px-6 py-3 text-base font-semibold transition-colors ${
                     timer?.running
                       ? "bg-red-500 hover:bg-red-600"
-                      : "bg-emerald-500 hover:bg-emerald-600"
+                      : "bg-white text-slate-900 hover:bg-white/90"
                   }`}
                 >
                   {timer?.running ? (
                     <span className="flex items-center gap-2">
-                      <Pause size={20} /> Pausar
+                      <Pause size={18} /> Pausar
                     </span>
                   ) : (
                     <span className="flex items-center gap-2">
-                      <Play size={20} /> {timer ? "Continuar" : "Iniciar"}
+                      <Play size={18} /> {timer ? "Continuar" : "Iniciar"}
                     </span>
                   )}
                 </button>
                 {timer && (
                   <button
                     onClick={() => resetTimer(step.stepNumber)}
-                    className="px-4 py-3 bg-white/10 hover:bg-white/20 rounded-xl"
+                    className="rounded-xl bg-white/10 px-4 py-3 hover:bg-white/20"
                   >
-                    <RotateCcw size={20} />
+                    <RotateCcw size={18} />
                   </button>
                 )}
               </div>
               {timer?.remaining === 0 && (
-                <div className="flex items-center gap-2 text-red-400 animate-bounce">
-                  <Volume2 size={24} />
+                <div className="flex animate-bounce items-center gap-2 text-red-400">
+                  <Volume2 size={22} />
                   <span className="text-xl font-bold">¡Tiempo!</span>
                 </div>
               )}
@@ -329,20 +364,20 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
 
           {/* Tip */}
           {step.tip && (
-            <div className="bg-amber-500/20 border border-amber-500/30 px-5 py-3 rounded-xl max-w-md text-center">
+            <div className="max-w-md rounded-xl border border-amber-500/30 bg-amber-500/15 px-5 py-3 text-center">
               <span className="text-amber-300">💡 {step.tip}</span>
             </div>
           )}
         </div>
 
         {/* Navigation */}
-        <div className="flex gap-4 p-6 bg-black/30">
+        <div className="flex gap-3 bg-slate-900/60 p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
           <button
             onClick={goPrev}
             disabled={currentStep === 0}
-            className="flex-1 py-4 bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-white/10 rounded-xl font-semibold flex items-center justify-center gap-2 text-lg transition-colors"
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white/10 py-4 text-base font-semibold transition-colors hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-white/10"
           >
-            <ChevronLeft size={24} /> Anterior
+            <ChevronLeft size={22} /> Anterior
           </button>
           <button
             onClick={
@@ -350,17 +385,17 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
                 ? () => setCookingMode(false)
                 : goNext
             }
-            className={`flex-1 py-4 rounded-xl font-semibold flex items-center justify-center gap-2 text-lg transition-colors ${
+            className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-4 text-base font-semibold transition-colors ${
               currentStep === totalSteps - 1
                 ? "bg-emerald-500 hover:bg-emerald-600"
-                : "bg-teal-500 hover:bg-teal-600"
+                : "bg-white text-slate-900 hover:bg-white/90"
             }`}
           >
             {currentStep === totalSteps - 1 ? (
               <>✅ Finalizar</>
             ) : (
               <>
-                Siguiente <ChevronRight size={24} />
+                Siguiente <ChevronRight size={22} />
               </>
             )}
           </button>
@@ -370,71 +405,81 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
   }
 
   // =====================================================
-  // List view (default)
+  // List view (default) — full-screen sheet, Thermomix style
   // =====================================================
   return (
-    <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-0 sm:p-4">
       <div
-        className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col"
+        className="flex h-full w-full flex-col overflow-hidden bg-stone-50 sm:h-auto sm:max-h-[92vh] sm:max-w-md sm:rounded-3xl sm:shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="bg-gradient-to-r from-teal-600 to-emerald-600 text-white p-4">
-          <div className="flex justify-between items-start">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <ChefHat size={20} />
-                <span className="text-sm font-medium bg-white/20 px-2 py-0.5 rounded-full">
-                  TM6 Adaptado
-                </span>
-              </div>
-              <h3 className="font-bold text-lg">{recipe.name}</h3>
-            </div>
+        {/* Header — dark slate Thermomix */}
+        <div className="bg-gradient-to-br from-slate-900 to-slate-700 px-5 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] text-white">
+          <div className="mb-3 flex items-center justify-between">
             <button
               onClick={onClose}
-              className="text-white/80 hover:text-white p-1"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur transition-colors hover:bg-white/25"
             >
-              <X size={24} />
+              <X size={16} />
             </button>
+            <span className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider backdrop-blur">
+              Modo Thermomix · TM6
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-white/15 backdrop-blur">
+              <Soup size={24} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[12px] text-white/70">Receta adaptada</p>
+              <h1 className="truncate text-[18px] font-semibold tracking-tight">
+                {recipe.name}
+              </h1>
+            </div>
           </div>
 
           {/* Time comparison */}
-          <div className="mt-3 flex items-center gap-3 bg-white/10 rounded-xl p-3">
-            <div className="text-center flex-1">
-              <div className="text-white/60 text-xs">Manual</div>
-              <div className="font-bold text-lg">
+          <div className="mt-4 flex items-center gap-3 rounded-2xl bg-white/10 p-3 backdrop-blur">
+            <div className="flex-1 text-center">
+              <div className="text-[11px] uppercase tracking-wider text-white/50">
+                Manual
+              </div>
+              <div className="text-lg font-bold tabular-nums">
                 {recipe.manualTimeMinutes} min
               </div>
             </div>
-            <div className="text-2xl">→</div>
-            <div className="text-center flex-1">
-              <div className="text-white/60 text-xs">Thermomix</div>
-              <div className="font-bold text-lg text-emerald-200">
+            <ChevronRight size={20} className="text-white/40" />
+            <div className="flex-1 text-center">
+              <div className="text-[11px] uppercase tracking-wider text-white/50">
+                Thermomix
+              </div>
+              <div className="text-lg font-bold tabular-nums text-emerald-300">
                 {recipe.totalTimeMinutes} min
               </div>
             </div>
-            <div className="bg-emerald-400 text-emerald-900 px-3 py-1 rounded-lg text-sm font-bold">
+            <span className="rounded-lg bg-emerald-400 px-3 py-1 text-sm font-bold text-emerald-950 tabular-nums">
               {recipe.timeSaved}
-            </div>
+            </span>
           </div>
         </div>
 
         {/* Accessories & Difficulty */}
-        <div className="px-4 py-3 border-b bg-gray-50 flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2 border-b border-stone-200 bg-white px-5 py-3">
           {recipe.accessories.map((acc, i) => {
             const key = acc.toLowerCase() as keyof typeof ACCESSORY_INFO;
             const info = ACCESSORY_INFO[key] || ACCESSORY_INFO.ninguno;
             return (
               <span
                 key={i}
-                className={`text-xs px-2 py-1 rounded-full font-medium ${info.color}`}
+                className={`rounded-full px-2 py-1 text-xs font-medium ${info.color}`}
               >
                 {info.emoji} {acc}
               </span>
             );
           })}
           <span
-            className={`text-xs px-2 py-1 rounded-full font-medium ml-auto ${
+            className={`ml-auto rounded-full px-2 py-1 text-xs font-medium ${
               recipe.difficulty === "fácil"
                 ? "bg-green-100 text-green-700"
                 : recipe.difficulty === "media"
@@ -452,24 +497,29 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
         </div>
 
         {/* Cooking Mode Button */}
-        <div className="px-4 py-3 border-b">
+        <div className="border-b border-stone-200 bg-white px-5 py-3">
           <button
             onClick={() => {
               setCookingMode(true);
               setCurrentStep(0);
             }}
-            className="w-full bg-gradient-to-r from-teal-500 to-emerald-500 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:from-teal-600 hover:to-emerald-600 transition-all shadow-md"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-slate-800"
           >
             <Maximize2 size={18} />
-            ▶️ Modo Cocina (paso a paso)
+            Modo Cocina · paso a paso
           </button>
         </div>
 
         {/* Steps list */}
         <div
-          className="overflow-y-auto flex-1 p-4 space-y-3"
+          className="flex-1 space-y-3 overflow-y-auto px-5 py-4"
           ref={stepsContainerRef}
         >
+          {/* Section label */}
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">
+            Paso a paso · TM6
+          </p>
+
           {steps.map((step, i) => {
             const timerSeconds = parseTimeToSeconds(step.time);
             const timer = timers.get(step.stepNumber);
@@ -482,109 +532,125 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
                 key={i}
                 data-step={i}
                 onClick={() => setCurrentStep(i)}
-                className={`p-3 rounded-xl border-2 transition-all cursor-pointer ${
+                className={`cursor-pointer rounded-2xl border bg-white p-4 transition-all ${
                   isActive
-                    ? "border-teal-400 bg-teal-50 shadow-md"
-                    : "border-gray-200 bg-white hover:border-gray-300"
+                    ? "border-slate-900 shadow-md ring-1 ring-slate-900"
+                    : "border-stone-200 hover:border-stone-300"
                 }`}
               >
-                {/* Step header */}
-                <div className="flex items-start gap-3">
+                {/* Step header: number + spec chips */}
+                <div className="mb-2 flex items-center gap-2">
                   <div
-                    className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                    className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold tabular-nums ${
                       isActive
-                        ? "bg-teal-600 text-white"
-                        : "bg-gray-200 text-gray-600"
+                        ? "bg-slate-900 text-white"
+                        : "bg-stone-200 text-stone-600"
                     }`}
                   >
                     {step.stepNumber}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm leading-relaxed">
-                      {step.description}
-                    </p>
-
-                    {/* Settings chips */}
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${accessory.color}`}
-                      >
-                        {accessory.emoji} {accessory.name}
-                      </span>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">
-                        ⚡ Vel: {step.speed}
-                      </span>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-600">
-                        🌡️ {step.temperature}
-                      </span>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                        ⏱️ {step.time}
-                      </span>
-                    </div>
-
-                    {/* Timer button */}
-                    {timerSeconds > 0 && (
-                      <div className="flex items-center gap-2 mt-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            startTimer(step.stepNumber, timerSeconds);
-                          }}
-                          className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                            timer?.running
-                              ? "bg-red-100 text-red-700 hover:bg-red-200"
-                              : "bg-teal-100 text-teal-700 hover:bg-teal-200"
-                          }`}
-                        >
-                          {timer?.running ? (
-                            <Pause size={12} />
-                          ) : (
-                            <Play size={12} />
-                          )}
-                          <Timer size={12} />
-                          {timer
-                            ? formatSeconds(timer.remaining)
-                            : formatSeconds(timerSeconds)}
-                        </button>
-                        {timer && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              resetTimer(step.stepNumber);
-                            }}
-                            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
-                          >
-                            <RotateCcw size={12} />
-                          </button>
-                        )}
-                        {timer?.remaining === 0 && (
-                          <span className="text-red-500 text-xs font-bold animate-pulse flex items-center gap-1">
-                            <Volume2 size={12} /> ¡Listo!
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Tip */}
-                    {step.tip && (
-                      <div className="mt-2 text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded-lg">
-                        💡 {step.tip}
-                      </div>
-                    )}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <SpecChip icon={<Clock size={10} />}>{step.time}</SpecChip>
+                    <SpecChip icon={<Thermometer size={10} />}>
+                      {step.temperature}
+                    </SpecChip>
+                    <SpecChip icon={<Zap size={10} />}>
+                      Vel {step.speed}
+                    </SpecChip>
                   </div>
                 </div>
+
+                {/* Description */}
+                <p className="pl-8 text-[13px] leading-relaxed text-stone-800">
+                  {step.description}
+                </p>
+
+                {/* Accessory chip */}
+                <div className="mt-2 pl-8">
+                  <span
+                    className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${accessory.color}`}
+                  >
+                    {accessory.emoji} {accessory.name}
+                  </span>
+                </div>
+
+                {/* Timer button */}
+                {timerSeconds > 0 && (
+                  <div className="mt-2 flex items-center gap-2 pl-8">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startTimer(step.stepNumber, timerSeconds);
+                      }}
+                      className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium tabular-nums transition-colors ${
+                        timer?.running
+                          ? "bg-red-100 text-red-700 hover:bg-red-200"
+                          : "bg-slate-900 text-white hover:bg-slate-800"
+                      }`}
+                    >
+                      {timer?.running ? (
+                        <Pause size={12} />
+                      ) : (
+                        <Play size={12} />
+                      )}
+                      <Timer size={12} />
+                      {timer
+                        ? formatSeconds(timer.remaining)
+                        : formatSeconds(timerSeconds)}
+                    </button>
+                    {timer && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          resetTimer(step.stepNumber);
+                        }}
+                        className="rounded-lg p-1.5 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600"
+                      >
+                        <RotateCcw size={12} />
+                      </button>
+                    )}
+                    {timer?.remaining === 0 && (
+                      <span className="flex animate-pulse items-center gap-1 text-xs font-bold text-red-500">
+                        <Volume2 size={12} /> ¡Listo!
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Tip */}
+                {step.tip && (
+                  <div className="ml-8 mt-2 rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-700">
+                    💡 {step.tip}
+                  </div>
+                )}
               </div>
             );
           })}
+
+          {/* AI adaptation note */}
+          <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+            <Sparkles
+              size={14}
+              className="mt-0.5 flex-shrink-0 text-amber-700"
+            />
+            <p className="text-[12.5px] leading-snug text-amber-900">
+              Receta adaptada al Thermomix desde la versión tradicional. Tiempo
+              total estimado:{" "}
+              <strong className="tabular-nums">
+                {recipe.totalTimeMinutes} min
+              </strong>
+              .
+            </p>
+          </div>
         </div>
 
         {/* Tips footer */}
         {recipe.tips && recipe.tips.length > 0 && (
-          <div className="p-4 border-t bg-amber-50">
-            <h4 className="text-sm font-semibold text-amber-800 mb-1">
+          <div className="border-t border-amber-200 bg-amber-50 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <h4 className="mb-1 text-sm font-semibold text-amber-800">
               💡 Tips Thermomix
             </h4>
-            <ul className="text-xs text-amber-700 space-y-1">
+            <ul className="space-y-1 text-xs text-amber-700">
               {recipe.tips.map((tip, i) => (
                 <li key={i}>• {tip}</li>
               ))}
