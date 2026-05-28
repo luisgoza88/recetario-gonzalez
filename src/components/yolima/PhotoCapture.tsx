@@ -78,23 +78,15 @@ export default function PhotoCapture({
   };
 
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm border-2 border-gray-200">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <span className="text-3xl">📸</span>
-        <h3 className="text-xl font-bold text-gray-700 uppercase">
-          Fotos del Plato
-        </h3>
-      </div>
-
+    <div className="bg-white rounded-2xl p-4 border border-[var(--border)] shadow-sm">
       {/* Existing photos */}
       {existingPhotos.length > 0 && (
-        <div className="flex flex-wrap gap-3 mb-4">
+        <div className="flex flex-wrap gap-2 mb-3">
           {existingPhotos.map((url, i) => (
             <button
               key={i}
               onClick={() => setPreviewPhoto(url)}
-              className="w-20 h-20 rounded-xl overflow-hidden border-2 border-gray-200 hover:border-blue-400 transition-colors"
+              className="w-16 h-16 rounded-xl overflow-hidden border border-[var(--border)] hover:border-[var(--accent)] transition-colors"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -111,22 +103,24 @@ export default function PhotoCapture({
       <button
         onClick={handleCapture}
         disabled={uploading}
-        className={`w-full min-h-[56px] rounded-xl text-lg font-semibold transition-all
-                    flex items-center justify-center gap-3 ${
+        className={`w-full rounded-xl py-3 text-[13px] font-medium transition-colors
+                    flex items-center justify-center gap-2 ${
                       uploading
-                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                        : "bg-orange-100 text-orange-700 hover:bg-orange-200 active:bg-orange-300 border-2 border-orange-300"
+                        ? "bg-stone-100 text-stone-400 cursor-not-allowed"
+                        : "bg-white border border-[var(--border)] text-[var(--ink)] active:bg-stone-50"
                     }`}
       >
         {uploading ? (
           <>
-            <Spinner size="md" />
+            <Spinner size="sm" />
             Subiendo foto...
           </>
         ) : (
           <>
-            <Camera size={24} />
-            Tomar Foto del Plato
+            <Camera size={15} />
+            {existingPhotos.length > 0
+              ? "Agregar otra foto"
+              : "Tomar foto del plato"}
           </>
         )}
       </button>

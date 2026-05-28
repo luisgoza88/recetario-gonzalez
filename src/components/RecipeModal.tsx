@@ -4,17 +4,22 @@ import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import {
   X,
-  Users,
   Timer,
   Play,
   Pause,
   RotateCcw,
   Volume2,
   Lightbulb,
-  ImageIcon,
   ChefHat,
+  Flame,
+  Beef,
+  Users,
+  CheckCircle2,
+  Soup,
+  Heart,
 } from "lucide-react";
 import Spinner from "@/components/ui/Spinner";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Recipe, Ingredient, ThermomixRecipe } from "@/types";
 import { MoodChip } from "@/components/ui/MoodChip";
 import NutritionDisplay, {
@@ -26,8 +31,6 @@ import SmartSubstitutionPanel from "./SmartSubstitutionPanel";
 import { FavoriteButton } from "@/components/recipe/FavoriteButton";
 import { ShareRecipeButton } from "@/components/share/ShareRecipeButton";
 import ThermomixView from "./ThermomixView";
-import { useEscapeKey } from "@/hooks/useEscapeKey";
-import FocusTrap from "@/components/ui/FocusTrap";
 import { CookingMode } from "@/components/CookingMode";
 // findThermomixRecipe is loaded lazily inside the handler to avoid 40KB in initial bundle
 
@@ -63,8 +66,7 @@ export default function RecipeModal({
     useState<ThermomixRecipe | null>(null);
   const [isAdaptingThermomix, setIsAdaptingThermomix] = useState(false);
   const [thermomixError, setThermomixError] = useState<string | null>(null);
-
-  useEscapeKey(onClose);
+  const [showNutrition, setShowNutrition] = useState(false);
 
   // Thermomix adaptation handler
   const handleThermomixAdapt = useCallback(async () => {
@@ -272,246 +274,346 @@ export default function RecipeModal({
     }
   };
 
-  return (
-    <FocusTrap active={true}>
-      <div
-        className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="recipe-modal-title"
-        onClick={onClose}
-      >
-        <div
-          className="bg-white rounded-2xl max-w-md w-full max-h-[85vh] overflow-hidden flex flex-col"
-          onClick={(e) => e.stopPropagation()}
+  // ─── Metadata por tipo de comida (eyebrow + tinte del hero) ───
+  const typeMeta = {
+    breakfast: { color: "text-amber-700", tint: "from-amber-100 to-orange-50" },
+    lunch: { color: "text-green-700", tint: "from-green-100 to-lime-50" },
+    dinner: { color: "text-indigo-700", tint: "from-indigo-100 to-violet-50" },
+  }[recipe.type] ?? {
+    color: "text-stone-700",
+    tint: "from-stone-100 to-stone-50",
+  };
+
+  const totalTime =
+    recipe.total_time ?? (recipe.prep_time ?? 0) + (recipe.cook_time ?? 0);
+
+  // ─── Footer: acción primaria "Cocinar con esto" ───
+  const footer = (
+    <div className="space-y-2">
+      <div className="grid grid-cols-3 gap-2">
+        {/* Thermomix */}
+        {recipe.thermomixCompatible !== false && (
+          <button
+            onClick={handleThermomixAdapt}
+            disabled={isAdaptingThermomix}
+            className="bg-stone-100 text-[var(--ink)] py-2.5 rounded-xl text-[12px] font-medium flex items-center justify-center gap-1.5 hover:bg-stone-200 transition-colors disabled:opacity-60 disabled:cursor-wait"
+          >
+            {isAdaptingThermomix ? <Spinner size="sm" /> : <Soup size={13} />}{" "}
+            Thermomix
+          </button>
+        )}
+
+        {/* Nutrición */}
+        {recipe.nutrition && (
+          <button
+            onClick={() => setShowNutrition((v) => !v)}
+            className={`py-2.5 rounded-xl text-[12px] font-medium flex items-center justify-center gap-1.5 transition-colors ${
+              showNutrition
+                ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+                : "bg-stone-100 text-[var(--ink)] hover:bg-stone-200"
+            }`}
+          >
+            <Heart size={13} /> Nutrición
+          </button>
+        )}
+
+        {/* Compartir (sustituye a "Calificar" — flujo existente del modal) */}
+        {recipe.id && (
+          <div className="bg-stone-100 rounded-xl flex items-center justify-center">
+            <ShareRecipeButton recipeId={recipe.id} recipeName={recipe.name} />
+          </div>
+        )}
+      </div>
+
+      {/* Cocinar con esto */}
+      {recipe.steps && recipe.steps.length > 0 && (
+        <button
+          onClick={() => setShowCookingMode(true)}
+          className="w-full bg-[var(--accent)] text-white py-3 rounded-xl text-[14px] font-semibold flex items-center justify-center gap-2 hover:brightness-110 transition-all"
         >
-          {/* Header */}
-          <div className="p-4 border-b dark:border-gray-800 flex justify-between items-center sticky top-0 bg-white dark:bg-gray-900 z-10">
-            <h3
-              id="recipe-modal-title"
-              className="font-semibold text-lg pr-2 dark:text-white flex-1 truncate"
-            >
-              {recipe.name}
-            </h3>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {recipe.id && <FavoriteButton recipeId={recipe.id} size={20} />}
-              {recipe.id && (
-                <ShareRecipeButton
-                  recipeId={recipe.id}
-                  recipeName={recipe.name}
+          <ChefHat size={16} /> Cocinar con esto
+        </button>
+      )}
+
+      {thermomixError && (
+        <p className="text-red-500 text-xs text-center">{thermomixError}</p>
+      )}
+    </div>
+  );
+
+  return (
+    <>
+      <BottomSheet
+        open={true}
+        onClose={onClose}
+        showCloseButton={false}
+        maxHeight="92vh"
+        footer={footer}
+      >
+        {/* Wrapper que cancela el padding del BottomSheet para el hero a sangre */}
+        <div className="-mx-5 -my-4">
+          {/* ─── Hero ─────────────────────────────────────── */}
+          <div className="relative h-48 overflow-hidden flex items-end">
+            {recipe.image_url ? (
+              <Image
+                src={recipe.image_url}
+                alt={recipe.name}
+                fill
+                className="object-cover"
+                loading="lazy"
+                sizes="(max-width: 448px) 100vw, 448px"
+              />
+            ) : (
+              <div
+                className={`absolute inset-0 bg-gradient-to-br ${typeMeta.tint}`}
+              >
+                <div
+                  className="absolute inset-0 opacity-[0.08]"
+                  style={{
+                    backgroundImage:
+                      "repeating-linear-gradient(45deg, #000 0, #000 1px, transparent 1px, transparent 8px)",
+                  }}
                 />
+              </div>
+            )}
+
+            {/* Eyebrow categoría tipo de comida */}
+            <span
+              className={`absolute top-3 left-3 inline-flex items-center gap-1 bg-white/90 backdrop-blur px-2 py-1 rounded-full text-[10px] uppercase tracking-wider font-semibold ${typeMeta.color}`}
+            >
+              {getTypeLabel(recipe.type)}
+            </span>
+
+            {/* Acciones del hero: favorito + cerrar */}
+            <div className="absolute top-3 right-3 flex items-center gap-1.5">
+              {recipe.id && (
+                <span className="w-8 h-8 rounded-full bg-white/90 backdrop-blur flex items-center justify-center">
+                  <FavoriteButton recipeId={recipe.id} size={16} />
+                </span>
               )}
               <button
                 onClick={onClose}
                 aria-label="Cerrar"
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 p-2 ml-1"
+                className="w-8 h-8 rounded-full bg-white/90 backdrop-blur flex items-center justify-center text-[var(--ink)] hover:bg-white transition-colors"
               >
-                <X size={24} />
+                <X size={16} />
               </button>
             </div>
+
+            {/* Timer activo */}
+            {activeTimers.some((t) => t.isRunning) && (
+              <span className="absolute bottom-3 right-3 text-[10px] px-2 py-1 rounded-full bg-red-500 text-white animate-pulse flex items-center gap-1 font-medium">
+                <Timer size={12} />
+                Timer activo
+              </span>
+            )}
           </div>
 
-          {/* Content - Scrollable area including image */}
-          <div className="overflow-y-auto flex-1">
-            {/* Recipe Image */}
-            {recipe.image_url ? (
-              <div className="relative w-full h-64 bg-gray-100">
-                <Image
-                  src={recipe.image_url}
-                  alt={recipe.name}
-                  fill
-                  className="object-cover"
-                  loading="lazy"
-                  sizes="(max-width: 448px) 100vw, 448px"
+          {/* ─── Contenido ──────────────────────────────────── */}
+          <div className="px-5 py-4">
+            {/* Título */}
+            <h2
+              id="recipe-modal-title"
+              className="text-[22px] font-semibold tracking-tight text-[var(--ink)] leading-tight"
+            >
+              {recipe.name}
+            </h2>
+
+            {/* Eyebrow categoría + dificultad + tags */}
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              {recipe.category && (
+                <>
+                  <span className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)] font-medium">
+                    {recipe.category}
+                  </span>
+                  {recipe.difficulty && (
+                    <span className="text-stone-300">·</span>
+                  )}
+                </>
+              )}
+              {recipe.difficulty && (
+                <DifficultyDisplay difficulty={recipe.difficulty} />
+              )}
+            </div>
+
+            {/* Dietary tags */}
+            {recipe.dietary_tags && recipe.dietary_tags.length > 0 && (
+              <div className="mt-2">
+                <DietaryTags tags={recipe.dietary_tags} />
+              </div>
+            )}
+
+            {/* Mood chips */}
+            {recipe.moods && recipe.moods.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {recipe.moods.map((mood) => (
+                  <MoodChip key={mood} mood={mood} size="sm" />
+                ))}
+              </div>
+            )}
+
+            {/* Region badge */}
+            {recipe.region && (
+              <div className="mt-2">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
+                  🇨🇴 {recipe.region}
+                </span>
+              </div>
+            )}
+
+            {/* Descripción */}
+            {recipe.description && (
+              <p className="mt-3 text-[13px] text-[var(--ink-soft)] italic leading-relaxed">
+                {recipe.description}
+              </p>
+            )}
+
+            {/* ─── Stats grid (tiempo / kcal / proteína / porciones) ─── */}
+            <div className="grid grid-cols-4 gap-2 mt-4">
+              <div className="bg-white rounded-xl border border-[var(--border)] p-2.5 text-center">
+                <Timer size={14} className="text-stone-500 mx-auto" />
+                <p className="text-[14px] font-semibold text-[var(--ink)] mt-1 tabular-nums">
+                  {totalTime}
+                </p>
+                <p className="text-[9px] uppercase tracking-wider text-stone-400">
+                  min
+                </p>
+              </div>
+              <div className="bg-white rounded-xl border border-[var(--border)] p-2.5 text-center">
+                <Flame size={14} className="text-orange-500 mx-auto" />
+                <p className="text-[14px] font-semibold text-[var(--ink)] mt-1 tabular-nums">
+                  {recipe.nutrition?.calories ?? 0}
+                </p>
+                <p className="text-[9px] uppercase tracking-wider text-stone-400">
+                  kcal
+                </p>
+              </div>
+              <div className="bg-white rounded-xl border border-[var(--border)] p-2.5 text-center">
+                <Beef size={14} className="text-red-500 mx-auto" />
+                <p className="text-[14px] font-semibold text-[var(--ink)] mt-1 tabular-nums">
+                  {recipe.nutrition?.protein ?? 0}
+                </p>
+                <p className="text-[9px] uppercase tracking-wider text-stone-400">
+                  g prot
+                </p>
+              </div>
+              <div className="bg-white rounded-xl border border-[var(--border)] p-2.5 text-center">
+                <Users size={14} className="text-stone-500 mx-auto" />
+                <p className="text-[14px] font-semibold text-[var(--ink)] mt-1 tabular-nums">
+                  5
+                </p>
+                <p className="text-[9px] uppercase tracking-wider text-stone-400">
+                  porc
+                </p>
+              </div>
+            </div>
+
+            {/* Prep time detallado */}
+            {(recipe.prep_time || recipe.cook_time || recipe.total_time) && (
+              <div className="mt-4">
+                <PrepTimeDisplay
+                  prepTime={recipe.prep_time}
+                  cookTime={recipe.cook_time}
+                  totalTime={recipe.total_time}
                 />
               </div>
-            ) : (
-              <div className="w-full h-40 bg-gradient-to-br from-orange-100 to-amber-50 flex items-center justify-center">
-                <div className="text-center text-gray-400">
-                  <ImageIcon className="w-10 h-10 mx-auto mb-1 opacity-50" />
-                  <span className="text-sm">Sin foto</span>
+            )}
+
+            {/* ─── Porciones por miembro ─────────────────────── */}
+            {recipe.portions && (
+              <div className="mt-4 bg-white rounded-2xl border border-[var(--border)] p-4">
+                <p className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-2">
+                  Porciones por miembro {scale !== 1 && `(×${scale})`}
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold text-[13px] flex-shrink-0">
+                      L
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[12px] text-stone-500">Luis</p>
+                      <p className="text-[12.5px] font-medium text-[var(--ink)]">
+                        {recipe.portions.luis}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center font-semibold text-[13px] flex-shrink-0">
+                      M
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[12px] text-stone-500">Mariana</p>
+                      <p className="text-[12.5px] font-medium text-[var(--ink)]">
+                        {recipe.portions.mariana}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Content padding wrapper */}
-            <div className="p-5">
-              {/* Type Badge + Difficulty */}
-              <div className="mb-4 flex items-center gap-2 flex-wrap">
-                <span
-                  className={`
-              text-sm px-3 py-1 rounded-full
-              ${recipe.type === "breakfast" ? "bg-orange-100 text-orange-700" : ""}
-              ${recipe.type === "lunch" ? "bg-green-100 text-green-700" : ""}
-              ${recipe.type === "dinner" ? "bg-blue-100 text-blue-700" : ""}
-            `}
-                >
-                  {getTypeLabel(recipe.type)}
+            {/* Total a preparar */}
+            {recipe.total && (
+              <div className="mt-3 p-3 bg-blue-50 rounded-xl text-[13px] text-blue-700">
+                <strong>Total a preparar:</strong> {scaleQuantity(recipe.total)}
+              </div>
+            )}
+
+            {/* ─── Ajustar porciones (escala) ────────────────── */}
+            <div className="mt-4 bg-white rounded-2xl border border-[var(--border)] p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold flex items-center gap-1.5">
+                  <Users size={13} />
+                  Ajustar porciones
                 </span>
-
-                {recipe.difficulty && (
-                  <DifficultyDisplay difficulty={recipe.difficulty} />
-                )}
-
-                {activeTimers.some((t) => t.isRunning) && (
-                  <span className="text-sm px-3 py-1 rounded-full bg-red-100 text-red-700 animate-pulse flex items-center gap-1">
-                    <Timer size={14} />
-                    Timer activo
-                  </span>
-                )}
+                <span className="text-[12px] text-[var(--accent)] font-medium tabular-nums">
+                  {scale === 1 ? "Original" : `×${scale}`}
+                </span>
               </div>
-
-              {/* Mood chips */}
-              {recipe.moods && recipe.moods.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-3">
-                  {recipe.moods.map((mood) => (
-                    <MoodChip key={mood} mood={mood} size="sm" />
-                  ))}
-                </div>
-              )}
-
-              {/* Region badge */}
-              {recipe.region && (
-                <div className="mb-3">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
-                    🇨🇴 {recipe.region}
-                  </span>
-                </div>
-              )}
-
-              {/* Description */}
-              {recipe.description && (
-                <p className="mb-4 text-sm text-gray-600 italic">
-                  {recipe.description}
-                </p>
-              )}
-
-              {/* Prep Time Display */}
-              {(recipe.prep_time || recipe.cook_time || recipe.total_time) && (
-                <div className="mb-4">
-                  <PrepTimeDisplay
-                    prepTime={recipe.prep_time}
-                    cookTime={recipe.cook_time}
-                    totalTime={recipe.total_time}
-                  />
-                </div>
-              )}
-
-              {/* Dietary Tags */}
-              {recipe.dietary_tags && recipe.dietary_tags.length > 0 && (
-                <div className="mb-4">
-                  <DietaryTags tags={recipe.dietary_tags} />
-                </div>
-              )}
-
-              {/* Cooking Mode Button */}
-              {recipe.steps && recipe.steps.length > 0 && (
-                <div className="mb-4">
+              <div className="flex gap-2">
+                {[0.5, 1, 1.5, 2, 3].map((s) => (
                   <button
-                    onClick={() => setShowCookingMode(true)}
-                    className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 px-4 rounded-xl font-semibold flex items-center justify-center gap-2 hover:from-purple-700 hover:to-indigo-700 transition-all shadow-md"
+                    key={s}
+                    onClick={() => setScale(s)}
+                    className={`flex-1 py-2 rounded-lg text-[13px] font-medium transition-colors tabular-nums ${
+                      scale === s
+                        ? "bg-[var(--accent)] text-white"
+                        : "bg-stone-100 text-[var(--ink)] hover:bg-stone-200"
+                    }`}
                   >
-                    Empezar a cocinar
+                    {s === 1 ? "1x" : s < 1 ? "½" : `${s}x`}
                   </button>
-                </div>
-              )}
+                ))}
+              </div>
+            </div>
 
-              {/* Thermomix Adapt Button */}
-              <div className="mb-4">
-                <button
-                  onClick={handleThermomixAdapt}
-                  disabled={isAdaptingThermomix}
-                  className="w-full bg-gradient-to-r from-teal-500 to-emerald-500 text-white py-3 px-4 rounded-xl font-semibold flex items-center justify-center gap-2 hover:from-teal-600 hover:to-emerald-600 transition-all shadow-md disabled:opacity-60 disabled:cursor-wait"
-                >
-                  {isAdaptingThermomix ? (
-                    <>
-                      <Spinner size="md" /> Adaptando a Thermomix...
-                    </>
-                  ) : (
-                    <>
-                      <ChefHat size={18} /> 🤖 Ver en Thermomix TM6
-                    </>
+            {/* Smart Substitutions Panel */}
+            {missingIngredients.length > 0 && (
+              <div className="mt-4">
+                <SmartSubstitutionPanel
+                  missingIngredients={missingIngredients}
+                  dietaryTags={recipe.dietary_tags}
+                  onSubstitutionSelect={handleSubstitutionSelect}
+                />
+              </div>
+            )}
+
+            {/* ─── Ingredientes ──────────────────────────────── */}
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-2 px-1">
+                <p className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold flex items-center gap-2">
+                  Ingredientes
+                  {scale !== 1 && (
+                    <span className="text-[10px] normal-case tracking-normal text-[var(--accent)] bg-[var(--accent-soft)] px-2 py-0.5 rounded-full">
+                      Escalado ×{scale}
+                    </span>
                   )}
-                </button>
-                {thermomixError && (
-                  <p className="text-red-500 text-xs mt-1 text-center">
-                    {thermomixError}
-                  </p>
-                )}
+                </p>
+                <span className="text-[11px] text-stone-400 tabular-nums">
+                  {ingredients.length} items
+                </span>
               </div>
-
-              {/* Scale Control */}
-              <div className="mb-4 p-3 bg-purple-50 rounded-xl">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-purple-700 flex items-center gap-2">
-                    <Users size={16} />
-                    Ajustar porciones
-                  </span>
-                  <span className="text-sm text-purple-600">
-                    {scale === 1 ? "Original" : `×${scale}`}
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  {[0.5, 1, 1.5, 2, 3].map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setScale(s)}
-                      className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        scale === s
-                          ? "bg-purple-600 text-white"
-                          : "bg-white text-purple-600 hover:bg-purple-100"
-                      }`}
-                    >
-                      {s === 1 ? "1x" : s < 1 ? "½" : `${s}x`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Smart Substitutions Panel */}
-              {missingIngredients.length > 0 && (
-                <div className="mb-4">
-                  <SmartSubstitutionPanel
-                    missingIngredients={missingIngredients}
-                    dietaryTags={recipe.dietary_tags}
-                    onSubstitutionSelect={handleSubstitutionSelect}
-                  />
-                </div>
-              )}
-
-              {/* Portions */}
-              {recipe.portions && (
-                <div className="mb-4 p-3 bg-gray-50 rounded-lg text-sm">
-                  <div className="font-semibold mb-1">
-                    Porciones {scale !== 1 && `(×${scale})`}:
-                  </div>
-                  <div>
-                    <strong>Porción grande:</strong> {recipe.portions.luis}
-                  </div>
-                  <div>
-                    <strong>Porción pequeña:</strong> {recipe.portions.mariana}
-                  </div>
-                </div>
-              )}
-
-              {/* Total */}
-              {recipe.total && (
-                <div className="mb-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
-                  <strong>Total a preparar:</strong>{" "}
-                  {scaleQuantity(recipe.total)}
-                </div>
-              )}
-
-              {/* Ingredients */}
-              <h4 className="font-semibold mb-2 flex items-center gap-2">
-                Ingredientes
-                {scale !== 1 && (
-                  <span className="text-xs text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
-                    Escalado ×{scale}
-                  </span>
-                )}
-              </h4>
-              <div className="space-y-2 mb-4">
+              <div className="bg-white rounded-2xl border border-[var(--border)] divide-y divide-[var(--border)] overflow-hidden">
                 {ingredients.map((ing, i) => {
                   const isMissing = missingIngredients.some(
                     (m) =>
@@ -520,29 +622,36 @@ export default function RecipeModal({
                   );
 
                   return (
-                    <div
-                      key={i}
-                      className={`p-3 rounded-lg border ${isMissing ? "bg-orange-50 border-orange-200" : "bg-gray-50 border-gray-200"}`}
-                    >
-                      <div className="font-medium text-sm mb-1">
-                        {ing.name}
+                    <div key={i} className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <CheckCircle2
+                          size={16}
+                          className={`flex-shrink-0 ${
+                            isMissing ? "text-orange-400" : "text-green-500"
+                          }`}
+                        />
+                        <span className="text-[13.5px] text-[var(--ink)] font-medium flex-1">
+                          {ing.name}
+                        </span>
                         {isMissing && (
-                          <span className="ml-1 text-orange-500">⚠</span>
+                          <span className="text-[10px] uppercase tracking-wider text-orange-500 font-medium">
+                            Falta
+                          </span>
                         )}
                       </div>
-                      <div className="grid grid-cols-3 gap-2 text-xs text-gray-600">
+                      <div className="grid grid-cols-3 gap-2 text-[11px] text-stone-500 mt-1.5 pl-7">
                         {hasTotal && (
-                          <div>
-                            <span className="text-gray-400">Total:</span>{" "}
+                          <div className="tabular-nums">
+                            <span className="text-stone-400">Total:</span>{" "}
                             {scaleQuantity(ing.total || "")}
                           </div>
                         )}
-                        <div>
-                          <span className="text-gray-400">Grande:</span>{" "}
+                        <div className="tabular-nums">
+                          <span className="text-stone-400">Grande:</span>{" "}
                           {scaleQuantity(ing.luis)}
                         </div>
-                        <div>
-                          <span className="text-gray-400">Pequeña:</span>{" "}
+                        <div className="tabular-nums">
+                          <span className="text-stone-400">Pequeña:</span>{" "}
                           {scaleQuantity(ing.mariana)}
                         </div>
                       </div>
@@ -550,31 +659,37 @@ export default function RecipeModal({
                   );
                 })}
               </div>
+            </div>
 
-              {/* Steps with Timers */}
-              <h4 className="font-semibold mb-2">Preparación</h4>
-              <ol className="space-y-3 text-sm">
+            {/* ─── Preparación (pasos numerados con timers) ──── */}
+            <div className="mt-4">
+              <p className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-2 px-1">
+                Preparación
+              </p>
+              <div className="bg-white rounded-2xl border border-[var(--border)] p-4 space-y-3">
                 {recipe.steps.map((step, i) => {
                   const timeSeconds = extractTime(step);
                   const timer = activeTimers.find((t) => t.stepIndex === i);
 
                   return (
-                    <li key={i} className="flex gap-3">
-                      <span className="flex-shrink-0 w-6 h-6 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-xs font-bold">
+                    <div key={i} className="flex gap-3">
+                      <div className="w-6 h-6 rounded-full bg-[var(--accent)] text-white flex items-center justify-center font-semibold text-[11px] flex-shrink-0 tabular-nums">
                         {i + 1}
-                      </span>
+                      </div>
                       <div className="flex-1">
-                        <p className="leading-relaxed">{step}</p>
+                        <p className="text-[13.5px] text-[var(--ink)] leading-relaxed pt-0.5">
+                          {step}
+                        </p>
 
                         {/* Timer UI */}
                         {timeSeconds && (
                           <div className="mt-2 flex items-center gap-2">
                             <button
                               onClick={() => startTimer(i, timeSeconds)}
-                              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors tabular-nums ${
                                 timer?.isRunning
                                   ? "bg-red-100 text-red-700"
-                                  : "bg-green-100 text-green-700 hover:bg-green-200"
+                                  : "bg-[var(--accent-soft)] text-[var(--accent)] hover:brightness-95"
                               }`}
                             >
                               {timer?.isRunning ? (
@@ -590,14 +705,14 @@ export default function RecipeModal({
                             {timer && (
                               <button
                                 onClick={() => resetTimer(i)}
-                                className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+                                className="p-1.5 text-stone-500 hover:text-[var(--ink)] hover:bg-stone-100 rounded-lg"
                               >
                                 <RotateCcw size={12} />
                               </button>
                             )}
 
                             {timer?.remainingSeconds === 0 && (
-                              <span className="flex items-center gap-1 text-red-600 text-xs animate-pulse">
+                              <span className="flex items-center gap-1 text-red-600 text-[12px] animate-pulse">
                                 <Volume2 size={12} />
                                 ¡Tiempo!
                               </span>
@@ -605,47 +720,49 @@ export default function RecipeModal({
                           </div>
                         )}
                       </div>
-                    </li>
+                    </div>
                   );
                 })}
-              </ol>
+              </div>
+            </div>
 
-              {/* Tips */}
-              {recipe.tips && (
-                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                  <div className="flex items-start gap-2">
-                    <Lightbulb
-                      size={16}
-                      className="text-amber-600 flex-shrink-0 mt-0.5"
-                    />
-                    <div>
-                      <h5 className="text-sm font-medium text-amber-700 mb-1">
-                        Tips
-                      </h5>
-                      <p className="text-sm text-amber-800">{recipe.tips}</p>
-                    </div>
+            {/* Tips */}
+            {recipe.tips && (
+              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-2xl">
+                <div className="flex items-start gap-2">
+                  <Lightbulb
+                    size={16}
+                    className="text-amber-600 flex-shrink-0 mt-0.5"
+                  />
+                  <div>
+                    <h5 className="text-[12px] uppercase tracking-wider font-semibold text-amber-700 mb-1">
+                      Tips
+                    </h5>
+                    <p className="text-[13px] text-amber-800 leading-relaxed">
+                      {recipe.tips}
+                    </p>
                   </div>
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Nutrition Info */}
-              {recipe.nutrition && (
-                <div className="mt-4">
-                  <NutritionDisplay nutrition={recipe.nutrition} />
-                </div>
-              )}
-            </div>
+            {/* Nutrición (toggle desde footer) */}
+            {recipe.nutrition && showNutrition && (
+              <div className="mt-4">
+                <NutritionDisplay nutrition={recipe.nutrition} />
+              </div>
+            )}
           </div>
         </div>
+      </BottomSheet>
 
-        {/* Thermomix View Modal */}
-        {showThermomix && thermomixRecipe && (
-          <ThermomixView
-            recipe={thermomixRecipe}
-            onClose={() => setShowThermomix(false)}
-          />
-        )}
-      </div>
+      {/* Thermomix View Modal */}
+      {showThermomix && thermomixRecipe && (
+        <ThermomixView
+          recipe={thermomixRecipe}
+          onClose={() => setShowThermomix(false)}
+        />
+      )}
 
       {/* Cooking Mode — full-screen overlay */}
       {showCookingMode && (
@@ -654,6 +771,6 @@ export default function RecipeModal({
           onClose={() => setShowCookingMode(false)}
         />
       )}
-    </FocusTrap>
+    </>
   );
 }

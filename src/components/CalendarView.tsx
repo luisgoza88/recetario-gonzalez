@@ -16,6 +16,12 @@ import {
   Archive,
   ArrowLeftRight,
   ShoppingCart,
+  Coffee,
+  UtensilsCrossed,
+  Moon,
+  Timer,
+  Flame,
+  AlertCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import {
@@ -1016,193 +1022,130 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
     const lunch = getRecipeById(menu.lunch_id);
     const dinner = menu.dinner_id ? getRecipeById(menu.dinner_id) : null;
 
+    const dayLabel = `${dayName} ${selectedDate.getDate()} ${MONTHS[selectedDate.getMonth()]} · Semana ${weekNum} · Día ${(cycleDay % 6) + 1}`;
+
     return (
-      <div className="mt-4">
-        <div className="bg-orange-500 text-white p-4 rounded-t-xl flex justify-between items-center">
-          <h3 className="font-semibold">
-            {dayName} {selectedDate.getDate()} {MONTHS[selectedDate.getMonth()]}
-          </h3>
-          <span className="bg-white/20 px-3 py-1 rounded-full text-sm">
-            Semana {weekNum} • Día {(cycleDay % 6) + 1}
-          </span>
+      <div className="px-1 py-4 space-y-3">
+        {/* Eyebrow + Cambiar */}
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold">
+            {dayLabel}
+          </p>
+          <button
+            onClick={() =>
+              openSwapModal("breakfast", breakfast, "static", {
+                dayNumber: cycleDay,
+              })
+            }
+            className="text-[11px] text-[var(--accent)] font-semibold flex items-center gap-1 uppercase tracking-wider"
+          >
+            <RefreshCw size={11} /> Cambiar
+          </button>
         </div>
 
-        {menu.reminder && (
-          <div className="bg-orange-50 border-l-4 border-orange-500 p-4">
-            <div className="flex items-center gap-2 text-orange-700 text-sm font-medium">
-              <Star size={16} /> RECORDATORIO
-            </div>
-            <p className="text-orange-800 font-semibold mt-1">
-              {menu.reminder}
-            </p>
-          </div>
-        )}
-
         {breakfast && (
-          <MealCard
-            type="breakfast"
-            label="🍳 DESAYUNO"
+          <DayMealCard
+            meal="breakfast"
             recipe={breakfast}
-            expanded={expandedRecipe === breakfast.id}
-            onToggle={() =>
-              setExpandedRecipe(
-                expandedRecipe === breakfast.id ? null : breakfast.id,
-              )
-            }
-            onView={() => setSelectedRecipe(breakfast)}
-            onFeedback={() =>
-              setFeedbackRecipe({ recipe: breakfast, mealType: "breakfast" })
-            }
-            onSuggestions={() =>
-              setSuggestionsRecipe({ recipe: breakfast, mealType: "breakfast" })
-            }
+            time="7:30 am"
+            onOpen={() => setSelectedRecipe(breakfast)}
             onSwap={() =>
               openSwapModal("breakfast", breakfast, "static", {
                 dayNumber: cycleDay,
               })
             }
-            mealKey={`${dateKey}-breakfast`}
-            activeMoodKey={moodPopover?.mealKey ?? null}
-            onMoodToggle={(key) =>
-              setMoodPopover((prev) =>
-                prev?.mealKey === key ? null : { mealKey: key },
-              )
-            }
-            onMoodChange={(mood) =>
-              setMoodPopover((prev) =>
-                prev ? { ...prev, selectedMood: mood } : null,
-              )
-            }
-            currentMood={
-              moodPopover?.mealKey === `${dateKey}-breakfast`
-                ? moodPopover.selectedMood
-                : undefined
+            onFeedback={() =>
+              setFeedbackRecipe({ recipe: breakfast, mealType: "breakfast" })
             }
           />
         )}
 
         {lunch && (
-          <MealCard
-            type="lunch"
-            label="🍗 ALMUERZO (5 porciones)"
+          <DayMealCard
+            meal="lunch"
             recipe={lunch}
-            expanded={expandedRecipe === lunch.id}
-            onToggle={() =>
-              setExpandedRecipe(expandedRecipe === lunch.id ? null : lunch.id)
-            }
-            onView={() => setSelectedRecipe(lunch)}
-            onFeedback={() =>
-              setFeedbackRecipe({ recipe: lunch, mealType: "lunch" })
-            }
-            onSuggestions={() =>
-              setSuggestionsRecipe({ recipe: lunch, mealType: "lunch" })
-            }
+            time="1:00 pm"
+            onOpen={() => setSelectedRecipe(lunch)}
             onSwap={() =>
               openSwapModal("lunch", lunch, "static", {
                 dayNumber: cycleDay,
               })
             }
-            mealKey={`${dateKey}-lunch`}
-            activeMoodKey={moodPopover?.mealKey ?? null}
-            onMoodToggle={(key) =>
-              setMoodPopover((prev) =>
-                prev?.mealKey === key ? null : { mealKey: key },
-              )
-            }
-            onMoodChange={(mood) =>
-              setMoodPopover((prev) =>
-                prev ? { ...prev, selectedMood: mood } : null,
-              )
-            }
-            currentMood={
-              moodPopover?.mealKey === `${dateKey}-lunch`
-                ? moodPopover.selectedMood
-                : undefined
+            onFeedback={() =>
+              setFeedbackRecipe({ recipe: lunch, mealType: "lunch" })
             }
           />
         )}
 
         {dinner ? (
-          <MealCard
-            type="dinner"
-            label="🐟 CENA (2 porciones)"
+          <DayMealCard
+            meal="dinner"
             recipe={dinner}
-            expanded={expandedRecipe === dinner.id}
-            onToggle={() =>
-              setExpandedRecipe(expandedRecipe === dinner.id ? null : dinner.id)
-            }
-            onView={() => setSelectedRecipe(dinner)}
-            onFeedback={() =>
-              setFeedbackRecipe({ recipe: dinner, mealType: "dinner" })
-            }
-            onSuggestions={() =>
-              setSuggestionsRecipe({ recipe: dinner, mealType: "dinner" })
-            }
+            time="7:30 pm"
+            onOpen={() => setSelectedRecipe(dinner)}
             onSwap={() =>
               openSwapModal("dinner", dinner, "static", {
                 dayNumber: cycleDay,
               })
             }
-            mealKey={`${dateKey}-dinner`}
-            activeMoodKey={moodPopover?.mealKey ?? null}
-            onMoodToggle={(key) =>
-              setMoodPopover((prev) =>
-                prev?.mealKey === key ? null : { mealKey: key },
-              )
+            onFeedback={() =>
+              setFeedbackRecipe({ recipe: dinner, mealType: "dinner" })
             }
-            onMoodChange={(mood) =>
-              setMoodPopover((prev) =>
-                prev ? { ...prev, selectedMood: mood } : null,
-              )
-            }
-            currentMood={
-              moodPopover?.mealKey === `${dateKey}-dinner`
-                ? moodPopover.selectedMood
-                : undefined
-            }
-            isLast
           />
         ) : (
-          <div className="bg-white border-l-4 border-gray-400 p-4 rounded-b-xl">
-            <div className="flex justify-between items-start">
-              <div>
-                <div className="text-gray-500 text-sm">🌙 CENA</div>
-                <p className="text-gray-400">No hay cena - Salen a comer</p>
-              </div>
-              <button
-                onClick={() =>
-                  setSuggestionsRecipe({
-                    recipe: {
-                      id: "generate-dinner",
-                      name: "Generar cena",
-                      type: "dinner",
-                      ingredients: [],
-                      steps: [],
-                    },
-                    mealType: "dinner",
-                  })
-                }
-                className="bg-purple-100 text-purple-700 p-2 rounded-lg hover:bg-purple-200 flex items-center gap-2"
-                title="Generar receta de cena con IA"
-              >
-                <Sparkles size={18} />
-                <span className="text-sm font-medium">Generar</span>
-              </button>
-            </div>
-            <p className="text-xs text-gray-400 mt-2">
-              ¿Cambio de planes? Genera una receta de cena con IA
+          <div className="bg-white rounded-2xl border border-dashed border-stone-300 p-5 text-center">
+            <Moon size={20} className="text-stone-400 mx-auto mb-2" />
+            <p className="text-[14px] font-medium text-stone-600">
+              Sin cena programada
             </p>
+            <p className="text-[12px] text-stone-400 mt-0.5">
+              Salen a comer fuera
+            </p>
+            <button
+              onClick={() =>
+                setSuggestionsRecipe({
+                  recipe: {
+                    id: "generate-dinner",
+                    name: "Generar cena",
+                    type: "dinner",
+                    ingredients: [],
+                    steps: [],
+                  },
+                  mealType: "dinner",
+                })
+              }
+              className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg text-[12px] font-medium hover:bg-purple-100"
+            >
+              <Sparkles size={12} /> Sugerir una cena
+            </button>
+          </div>
+        )}
+
+        {menu.reminder && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
+            <AlertCircle
+              size={14}
+              className="text-amber-600 mt-0.5 flex-shrink-0"
+            />
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-amber-700 font-semibold mb-0.5">
+                Recordatorio
+              </p>
+              <p className="text-[12.5px] text-amber-900 leading-snug">
+                {menu.reminder}
+              </p>
+            </div>
           </div>
         )}
 
         <button
           onClick={toggleDayComplete}
           className={`
-            w-full p-4 rounded-xl font-semibold mt-4 flex items-center justify-center gap-2 transition-colors
+            w-full p-4 rounded-2xl font-semibold mt-1 flex items-center justify-center gap-2 transition-colors
             ${
               isCompleted
-                ? "bg-green-50 text-green-700 border-2 border-green-200"
-                : "bg-orange-500 text-white hover:bg-orange-600"
+                ? "bg-[var(--accent-soft)] text-[var(--accent)] border-2 border-green-200"
+                : "bg-[var(--accent)] text-white hover:opacity-90"
             }
           `}
         >
@@ -1247,48 +1190,32 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
   // =====================================================
   return (
     <div className="p-4 max-w-lg mx-auto">
-      {/* Month Navigation */}
-      <div className="flex justify-between items-center p-4 bg-white rounded-xl shadow-sm mb-4">
+      {/* Header rediseñado */}
+      <div className="flex items-end justify-between mb-4">
+        <div>
+          <h1 className="text-[22px] leading-tight font-semibold tracking-tight text-[var(--ink)]">
+            Calendario
+          </h1>
+          <p className="text-[13px] text-[var(--ink-soft)] mt-0.5">
+            Ciclo de 12 días · Familia González
+          </p>
+        </div>
         <button
-          onClick={() => changeMonth(-1)}
-          className="bg-green-50 text-green-700 p-2 rounded-lg hover:bg-green-100"
+          onClick={generateWeeklyMenu}
+          disabled={isGenerating || !selectedDate}
+          className="text-[var(--accent)] text-[13px] font-medium flex items-center gap-1 disabled:opacity-50"
         >
-          <ChevronLeft size={24} />
-        </button>
-        <h2 className="font-semibold text-lg">
-          {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
-        </h2>
-        <button
-          onClick={() => changeMonth(1)}
-          className="bg-green-50 text-green-700 p-2 rounded-lg hover:bg-green-100"
-        >
-          <ChevronRight size={24} />
+          {isGenerating ? (
+            <>
+              <Spinner size="sm" /> Generando…
+            </>
+          ) : (
+            <>
+              <Sparkles size={14} /> Generar
+            </>
+          )}
         </button>
       </div>
-
-      {/* Generate Weekly Menu Button */}
-      <button
-        onClick={generateWeeklyMenu}
-        disabled={isGenerating || !selectedDate}
-        className={`
-          w-full p-4 rounded-xl font-semibold mb-4 flex items-center justify-center gap-2 transition-all
-          ${
-            isGenerating
-              ? "bg-indigo-100 text-indigo-400 cursor-wait"
-              : "bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700 shadow-md hover:shadow-lg"
-          }
-        `}
-      >
-        {isGenerating ? (
-          <>
-            <Spinner size="md" /> Generando menú semanal con IA...
-          </>
-        ) : (
-          <>
-            <RefreshCw size={20} /> 🔄 Generar Menú Semanal con IA
-          </>
-        )}
-      </button>
 
       {/* Generate error */}
       {generateError && (
@@ -1408,6 +1335,98 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
         </div>
       </div>
 
+      {/* Strip semanal (rediseño): L M X J V S con dots de comidas planeadas */}
+      <div className="bg-white rounded-2xl border border-[var(--border)] px-4 py-4 mb-3">
+        <div className="flex items-center justify-between mb-2.5">
+          <p className="text-[12px] text-[var(--ink-soft)] font-medium tabular-nums">
+            {(() => {
+              const end = new Date(weekStart);
+              end.setDate(end.getDate() + 5);
+              return `${weekStart.getDate()}–${end.getDate()} ${MONTHS[end.getMonth()].slice(0, 3)}`;
+            })()}
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => {
+                const d = new Date(weekStart);
+                d.setDate(d.getDate() - 7);
+                setWeekStart(d);
+              }}
+              className="p-1 rounded hover:bg-stone-100"
+              aria-label="Semana anterior"
+            >
+              <ChevronLeft size={14} className="text-stone-500" />
+            </button>
+            <button
+              onClick={() => {
+                const d = new Date(weekStart);
+                d.setDate(d.getDate() + 7);
+                setWeekStart(d);
+              }}
+              className="p-1 rounded hover:bg-stone-100"
+              aria-label="Semana siguiente"
+            >
+              <ChevronRight size={14} className="text-stone-500" />
+            </button>
+          </div>
+        </div>
+        <div className="grid grid-cols-6 gap-1.5">
+          {["L", "M", "X", "J", "V", "S"].map((dayShort, i) => {
+            const date = new Date(weekStart);
+            date.setDate(date.getDate() + i);
+            const isSel =
+              !!selectedDate &&
+              date.toDateString() === selectedDate.toDateString();
+            const genInfo = getGeneratedMenuForDate(date);
+            const staticMenu = getMenuForDate(date);
+            const hasBreakfast = !!(
+              genInfo?.dayData.breakfast || staticMenu?.breakfast_id
+            );
+            const hasLunch = !!(genInfo?.dayData.lunch || staticMenu?.lunch_id);
+            const hasDinner = !!(
+              genInfo?.dayData.dinner || staticMenu?.dinner_id
+            );
+            return (
+              <button
+                key={i}
+                onClick={() => selectDate(date)}
+                className={`py-2 rounded-lg flex flex-col items-center transition-all ${
+                  isSel
+                    ? "bg-[var(--accent)] text-white"
+                    : "bg-stone-50 hover:bg-stone-100 text-[var(--ink)]"
+                }`}
+              >
+                <span
+                  className={`text-[10px] uppercase ${isSel ? "text-white/80" : "text-[var(--ink-soft)]"}`}
+                >
+                  {dayShort}
+                </span>
+                <span className="text-[16px] font-semibold tracking-tight mt-0.5 tabular-nums">
+                  {date.getDate()}
+                </span>
+                <div className="flex gap-0.5 mt-1">
+                  {hasBreakfast && (
+                    <span
+                      className={`w-1 h-1 rounded-full ${isSel ? "bg-white" : "bg-amber-400"}`}
+                    />
+                  )}
+                  {hasLunch && (
+                    <span
+                      className={`w-1 h-1 rounded-full ${isSel ? "bg-white" : "bg-green-400"}`}
+                    />
+                  )}
+                  {hasDinner && (
+                    <span
+                      className={`w-1 h-1 rounded-full ${isSel ? "bg-white" : "bg-indigo-400"}`}
+                    />
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {viewMode === "week" ? (
         <WeeklyCardsView
           weekStart={weekStart}
@@ -1440,6 +1459,27 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
         />
       ) : (
         <>
+          {/* Month Navigation (vista clasica mensual) */}
+          <div className="flex justify-between items-center px-4 py-3 bg-white rounded-2xl border border-[var(--border)] mb-3">
+            <button
+              onClick={() => changeMonth(-1)}
+              className="p-1.5 rounded-lg hover:bg-stone-100"
+              aria-label="Mes anterior"
+            >
+              <ChevronLeft size={20} className="text-stone-500" />
+            </button>
+            <h2 className="font-semibold text-[15px] text-[var(--ink)]">
+              {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
+            </h2>
+            <button
+              onClick={() => changeMonth(1)}
+              className="p-1.5 rounded-lg hover:bg-stone-100"
+              aria-label="Mes siguiente"
+            >
+              <ChevronRight size={20} className="text-stone-500" />
+            </button>
+          </div>
+
           {/* Calendar Grid (vista clasica mensual) */}
           <div className="bg-white rounded-xl p-4 shadow-sm">
             <div className="grid grid-cols-7 text-center text-xs text-gray-500 font-semibold mb-2">
@@ -1546,6 +1586,127 @@ function generatedMealToRecipe(
     tips: meal.tips,
     source: "ai_generated",
   };
+}
+
+// =====================================================
+// Day Meal Card (rediseño visual — desayuno/almuerzo/cena)
+// =====================================================
+interface DayMealCardProps {
+  meal: "breakfast" | "lunch" | "dinner";
+  recipe: Recipe;
+  time: string;
+  onOpen: () => void;
+  onSwap: () => void;
+  onFeedback: () => void;
+}
+
+function DayMealCard({
+  meal,
+  recipe,
+  time,
+  onOpen,
+  onSwap,
+  onFeedback,
+}: DayMealCardProps) {
+  const meta = {
+    breakfast: {
+      color: "amber",
+      label: "Desayuno",
+      Icon: Coffee,
+      tint: "from-amber-100 to-orange-50",
+    },
+    lunch: {
+      color: "green",
+      label: "Almuerzo",
+      Icon: UtensilsCrossed,
+      tint: "from-green-100 to-lime-50",
+    },
+    dinner: {
+      color: "indigo",
+      label: "Cena",
+      Icon: Moon,
+      tint: "from-indigo-100 to-violet-50",
+    },
+  }[meal];
+
+  const totalTime = (recipe.prep_time ?? 0) + (recipe.cook_time ?? 0);
+
+  return (
+    <div className="bg-white rounded-2xl border border-[var(--border)] overflow-hidden">
+      <button
+        onClick={onOpen}
+        className="w-full active:scale-[0.99] transition-transform text-left"
+      >
+        <div
+          className={`h-28 w-full bg-gradient-to-br ${meta.tint} relative overflow-hidden flex items-end p-3`}
+        >
+          {recipe.image_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={recipe.image_url}
+              alt={recipe.name}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          ) : (
+            <span className="absolute top-3 left-3 text-[10px] font-mono uppercase tracking-[0.15em] text-stone-500/70">
+              {recipe.name}
+            </span>
+          )}
+        </div>
+        <div className="p-3.5">
+          <div className="flex items-center gap-2 mb-1">
+            <meta.Icon size={12} className={`text-${meta.color}-700`} />
+            <span
+              className={`text-[10px] uppercase tracking-wider text-${meta.color}-700 font-semibold`}
+            >
+              {meta.label}
+            </span>
+            <span className="text-[10px] text-stone-400">·&nbsp; {time}</span>
+          </div>
+          <p className="text-[15px] font-semibold text-[var(--ink)] leading-tight">
+            {recipe.name}
+          </p>
+          <div className="flex items-center gap-3 mt-2">
+            <span className="text-[11px] text-[var(--ink-soft)] flex items-center gap-1 tabular-nums">
+              <Timer size={11} />
+              {totalTime} min
+            </span>
+            <span className="text-[11px] text-[var(--ink-soft)] flex items-center gap-1 tabular-nums">
+              <Flame size={11} />
+              {recipe.nutrition?.calories ?? 0} kcal
+            </span>
+            {recipe.nutrition?.protein != null && (
+              <span className="text-[11px] text-[var(--ink-soft)] tabular-nums">
+                {recipe.nutrition.protein}g prot
+              </span>
+            )}
+            {recipe.difficulty && (
+              <span className="ml-auto text-[10px] uppercase tracking-wider text-stone-400 font-medium">
+                {recipe.difficulty}
+              </span>
+            )}
+          </div>
+        </div>
+      </button>
+      {/* Acciones rápidas (preservan swap/feedback existentes) */}
+      <div className="flex items-center gap-2 px-3.5 pb-3.5">
+        <button
+          onClick={onSwap}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-stone-50 hover:bg-stone-100 text-[12px] font-medium text-[var(--ink)]"
+          title="Cambiar receta"
+        >
+          <ArrowLeftRight size={13} /> Cambiar
+        </button>
+        <button
+          onClick={onFeedback}
+          className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-[12px] font-medium text-amber-700"
+          title="Dar feedback"
+        >
+          <MessageSquare size={13} />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // =====================================================

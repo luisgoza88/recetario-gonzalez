@@ -4,39 +4,40 @@ interface DayProgressProps {
   /** 0 to 100 */
   percent: number;
   label?: string;
+  /** Optional "X de Y" counter shown top-right */
+  completed?: number;
+  total?: number;
 }
 
-export default function DayProgress({ percent, label }: DayProgressProps) {
+export default function DayProgress({
+  percent,
+  label,
+  completed,
+  total,
+}: DayProgressProps) {
   const clampedPercent = Math.min(100, Math.max(0, Math.round(percent)));
-
-  const getColor = () => {
-    if (clampedPercent >= 100) return "bg-green-500";
-    if (clampedPercent >= 60) return "bg-blue-500";
-    if (clampedPercent >= 30) return "bg-yellow-500";
-    return "bg-gray-400";
-  };
-
-  const getEmoji = () => {
-    if (clampedPercent >= 100) return "🎉";
-    if (clampedPercent >= 75) return "💪";
-    if (clampedPercent >= 50) return "👍";
-    if (clampedPercent >= 25) return "🏃‍♀️";
-    return "☀️";
-  };
+  const showCounter =
+    typeof completed === "number" && typeof total === "number";
 
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm border">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-lg font-bold text-gray-800">
-          {getEmoji()} {label || "Progreso del Día"}
+    <div className="bg-white rounded-2xl p-4 border border-[var(--border)] shadow-sm">
+      <div className="flex items-center justify-between mb-2.5">
+        <span className="text-[15px] font-semibold text-[var(--ink)]">
+          {label || "Hoy"}
         </span>
-        <span className="text-2xl font-bold text-gray-700">
-          {clampedPercent}%
-        </span>
+        {showCounter ? (
+          <span className="text-[12px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold tabular-nums">
+            {completed} de {total}
+          </span>
+        ) : (
+          <span className="text-[15px] font-semibold text-[var(--ink)] tabular-nums">
+            {clampedPercent}%
+          </span>
+        )}
       </div>
-      <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+      <div className="h-3 bg-stone-100 rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all duration-700 ease-out ${getColor()}`}
+          className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-green-500 transition-all duration-700 ease-out"
           style={{ width: `${clampedPercent}%` }}
           role="progressbar"
           aria-valuenow={clampedPercent}
@@ -46,8 +47,8 @@ export default function DayProgress({ percent, label }: DayProgressProps) {
         />
       </div>
       {clampedPercent >= 100 && (
-        <p className="text-center text-green-600 font-semibold mt-3 text-lg">
-          ¡Todo completado! 🎊
+        <p className="text-center text-[var(--accent)] font-semibold mt-3 text-[14px]">
+          ¡Todo completado!
         </p>
       )}
     </div>

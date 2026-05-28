@@ -22,6 +22,10 @@ import {
   ShoppingBasket,
   LayoutList,
   Map,
+  ScanLine,
+  ChevronDown,
+  Tag,
+  Receipt,
 } from "lucide-react";
 import Spinner from "@/components/ui/Spinner";
 import { supabase } from "@/lib/supabase/client";
@@ -87,6 +91,12 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  // Filtro de chips (rediseño visual): Todo | Pendientes | Bajo stock | Por temporada
+  const [chipFilter, setChipFilter] = useState<
+    "Todo" | "Pendientes" | "Bajo stock" | "Por temporada"
+  >("Todo");
+  // Estado de categorías colapsables (rediseño visual)
+  const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({});
   const [showAddModal, setShowAddModal] = useState(false);
   const [showScanModal, setShowScanModal] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
@@ -556,59 +566,167 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
     [filteredItems],
   );
 
+  // ── Rediseño visual: items según chip seleccionado, agrupados por categoría ──
+  const isLowStock = (i: MarketItem) => {
+    const current = i.currentNumber || 0;
+    const required = parseQuantity(i.quantity);
+    return current < required * 0.2;
+  };
+
+  const chipFilteredItems = useMemo(() => {
+    switch (chipFilter) {
+      case "Pendientes":
+        return filteredItems.filter((i) => !i.checked);
+      case "Bajo stock":
+        return filteredItems.filter(isLowStock);
+      case "Por temporada":
+        return filteredItems.filter(
+          (i) => isInSeason(i.name, currentMonth) !== null,
+        );
+      default:
+        return filteredItems;
+    }
+  }, [filteredItems, chipFilter, currentMonth]);
+
+  const visualCategories = useMemo(() => {
+    const groups = chipFilteredItems.reduce(
+      (acc, item) => {
+        const key = item.category || "Otros";
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(item);
+        return acc;
+      },
+      {} as Record<string, MarketItem[]>,
+    );
+    return Object.entries(groups).map(([name, catItems]) => ({
+      name,
+      icon: getCategoryEmoji(catItems[0]),
+      items: catItems,
+      checked: catItems.filter((i) => i.checked).length,
+    }));
+  }, [chipFilteredItems, categoryData]);
+
+  const toggleCategory = (name: string) =>
+    setExpandedCats((prev) => ({
+      ...prev,
+      [name]: prev[name] === undefined ? false : !prev[name],
+    }));
+  // Por defecto, primeras 3 categorías abiertas
+  const isCatOpen = (name: string, index: number) =>
+    expandedCats[name] === undefined ? index < 3 : expandedCats[name];
+
+  const totalEstimate = "$782.450";
+
   return (
-    <div className="p-4 max-w-lg mx-auto">
-      {/* Mode Toggle */}
-      <div className="flex gap-2 mb-4">
+    <div className="max-w-lg mx-auto">
+      {/* Header — título + acciones scan/add */}
+      <div className="px-5 pt-4 pb-3 flex items-end justify-between">
+        <div>
+          <h1 className="text-[22px] leading-tight font-semibold tracking-tight text-[var(--ink)]">
+            Mercado
+          </h1>
+          <p className="text-[13px] text-[var(--ink-soft)] mt-0.5">
+            Ciclo del 19 enero al 2 febrero
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowScanModal(true)}
+            aria-label="Escanear despensa"
+            className="w-9 h-9 rounded-full bg-stone-100 flex items-center justify-center active:scale-95 transition-transform"
+          >
+            <ScanLine size={16} className="text-stone-600" />
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            aria-label="Agregar producto"
+            className="w-9 h-9 rounded-full bg-[var(--accent)] text-white flex items-center justify-center active:scale-95 transition-transform"
+          >
+            <Plus size={16} />
+          </button>
+        </div>
+      </div>
+
+      {/* Mode Toggle (Compras / Despensa / Precios) */}
+      <div className="px-5 flex gap-2 mb-3">
         <button
           onClick={() => setViewMode("shopping")}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-medium transition-colors ${
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-full text-[12.5px] font-medium transition-colors ${
             viewMode === "shopping"
-              ? "bg-orange-500 text-white"
-              : "bg-white text-gray-600 hover:bg-gray-50"
+              ? "bg-[var(--ink)] text-white"
+              : "bg-stone-100 text-[var(--ink-soft)]"
           }`}
         >
-          <ShoppingCart size={18} />
+          <ShoppingCart size={14} />
           Compras
           {customItemsCount > 0 && (
-            <span className="bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full">
+            <span className="bg-purple-500 text-white text-[10px] px-1.5 py-0.5 rounded-full tabular-nums">
               +{customItemsCount}
             </span>
           )}
         </button>
         <button
           onClick={() => setViewMode("pantry")}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-medium transition-colors ${
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-full text-[12.5px] font-medium transition-colors ${
             viewMode === "pantry"
-              ? "bg-orange-600 text-white"
-              : "bg-white text-gray-600 hover:bg-gray-50"
+              ? "bg-[var(--ink)] text-white"
+              : "bg-stone-100 text-[var(--ink-soft)]"
           }`}
         >
-          <Home size={18} />
+          <Home size={14} />
           Despensa
           {lowStockCount > 0 && (
-            <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+            <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full tabular-nums">
               {lowStockCount}
             </span>
           )}
         </button>
         <button
           onClick={() => setViewMode("prices")}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-medium transition-colors ${
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-full text-[12.5px] font-medium transition-colors ${
             viewMode === "prices"
-              ? "bg-blue-600 text-white"
-              : "bg-white text-gray-600 hover:bg-gray-50"
+              ? "bg-[var(--ink)] text-white"
+              : "bg-stone-100 text-[var(--ink-soft)]"
           }`}
         >
-          <TrendingDown size={18} />
+          <TrendingDown size={14} />
           Precios
         </button>
       </div>
 
+      {/* Progress strip — solo en modo compras */}
+      {viewMode === "shopping" && (
+        <div className="px-5 pb-3">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[12.5px] font-medium text-[var(--ink)]">
+              Progreso del mercado
+            </span>
+            <span className="text-[12.5px] text-[var(--ink-soft)] tabular-nums">
+              {checkedCount}/{totalCount} items
+            </span>
+          </div>
+          <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-[var(--accent)] transition-all duration-300"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-[11px] text-[var(--ink-soft)] flex items-center gap-1">
+              <Receipt size={11} /> {totalEstimate} estimado
+            </span>
+            <span className="text-[11px] text-stone-400">·</span>
+            <span className="text-[11px] text-[var(--ink-soft)]">
+              15 días · 5 porciones
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Offline Indicator */}
       {(!isOnline || pendingCount > 0) && (
         <div
-          className={`mb-4 p-3 rounded-xl flex items-center gap-3 ${
+          className={`mx-5 mb-4 p-3 rounded-xl flex items-center gap-3 ${
             !isOnline
               ? "bg-orange-50 border border-orange-200"
               : "bg-blue-50 border border-blue-200"
@@ -637,32 +755,53 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
         </div>
       )}
 
-      {/* Search */}
-      <div className="relative mb-4">
-        <Search
-          size={18}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-        />
-        <input
-          type="text"
-          placeholder="Buscar producto... (ej: champiñones)"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 bg-white rounded-xl border border-gray-200 focus:ring-2 focus:ring-green-500 focus:border-green-500"
-        />
-        {searchQuery && (
-          <button
-            onClick={() => setSearchQuery("")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-          >
-            <X size={18} />
-          </button>
+      {/* Search + chips */}
+      <div className="px-5 pb-3">
+        <div className="relative">
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+          />
+          <input
+            type="text"
+            placeholder="Buscar producto…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-stone-50 border border-[var(--border)] rounded-lg pl-9 pr-9 py-2.5 text-[13px] text-[var(--ink)] placeholder:text-stone-400 focus:outline-none focus:bg-white focus:border-stone-300"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-[var(--ink)]"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+        {viewMode === "shopping" && (
+          <div className="flex gap-1.5 mt-2 overflow-x-auto scrollbar-hide">
+            {(
+              ["Todo", "Pendientes", "Bajo stock", "Por temporada"] as const
+            ).map((chip) => (
+              <button
+                key={chip}
+                onClick={() => setChipFilter(chip)}
+                className={`px-3 py-1.5 rounded-full text-[11.5px] font-medium whitespace-nowrap transition-colors ${
+                  chipFilter === chip
+                    ? "bg-[var(--ink)] text-white"
+                    : "bg-stone-100 text-[var(--ink-soft)]"
+                }`}
+              >
+                {chip}
+              </button>
+            ))}
+          </div>
         )}
       </div>
 
       {/* Search Results Info */}
       {searchQuery && (
-        <div className="mb-4 text-sm text-gray-500">
+        <div className="px-5 mb-4 text-sm text-gray-500">
           {filteredItems.length === 0 ? (
             <span className="text-red-500">No se encontró "{searchQuery}"</span>
           ) : (
@@ -675,396 +814,508 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
         </div>
       )}
 
-      {viewMode === "shopping" ? (
-        <>
-          {/* Budget Widget */}
-          <div className="mb-4">
-            <BudgetWidget compact />
-          </div>
+      <div className="px-5 pb-32">
+        {viewMode === "shopping" ? (
+          <>
+            {/* Categorías colapsables (rediseño visual) */}
+            <div className="py-1 space-y-3">
+              {visualCategories.map((cat, index) => {
+                const isOpen = isCatOpen(cat.name, index);
+                return (
+                  <section
+                    key={cat.name}
+                    className="bg-white rounded-2xl border border-[var(--border)] overflow-hidden"
+                  >
+                    <button
+                      onClick={() => toggleCategory(cat.name)}
+                      className="w-full px-4 py-3 flex items-center gap-3 text-left"
+                    >
+                      <span className="text-[18px]">{cat.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-[14px] text-[var(--ink)] truncate">
+                          {cat.name}
+                        </p>
+                        <p className="text-[11px] text-[var(--ink-soft)] tabular-nums">
+                          {cat.checked} de {cat.items.length} en carrito
+                        </p>
+                      </div>
+                      <ChevronDown
+                        size={16}
+                        className={`text-stone-400 transition-transform ${
+                          isOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+                    {isOpen && (
+                      <div className="border-t border-[var(--border)] divide-y divide-[var(--border)]">
+                        {cat.items.map((item) => (
+                          <div key={item.id} className="flex items-center">
+                            <button
+                              onClick={() => !loading && toggleItem(item)}
+                              disabled={loading === item.id}
+                              className="px-4 py-2.5 flex items-center gap-3 text-left active:bg-stone-50 flex-1 min-w-0 disabled:opacity-60"
+                            >
+                              <span
+                                className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${
+                                  item.checked
+                                    ? "bg-[var(--accent)] border-[var(--accent)]"
+                                    : "border-stone-300"
+                                }`}
+                              >
+                                {item.checked && (
+                                  <Check
+                                    size={12}
+                                    className="text-white"
+                                    strokeWidth={3}
+                                  />
+                                )}
+                              </span>
+                              <span
+                                className={`flex-1 text-[13.5px] truncate ${
+                                  item.checked
+                                    ? "text-stone-400 line-through"
+                                    : "text-[var(--ink)]"
+                                }`}
+                              >
+                                {item.name}
+                              </span>
+                              <span
+                                className={`text-[12px] tabular-nums ${
+                                  item.checked
+                                    ? "text-stone-400"
+                                    : "text-[var(--ink-soft)]"
+                                }`}
+                              >
+                                {item.quantity}
+                              </span>
+                            </button>
+                            <button
+                              onClick={() =>
+                                setPriceLogItem({
+                                  id: item.id,
+                                  name: item.name,
+                                })
+                              }
+                              className="pr-3 pl-1.5 py-2.5 text-stone-300 active:text-[var(--accent)]"
+                              aria-label="Comparar precios"
+                            >
+                              <Tag size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
+              {visualCategories.length === 0 && (
+                <div className="text-center text-[13px] text-[var(--ink-soft)] py-10">
+                  No hay productos para este filtro.
+                </div>
+              )}
+            </div>
 
-          {/* Sprint 6 (Whole Foods pattern): items que probablemente
+            {/* ── Funcionalidad preservada (widgets/secciones existentes) ── */}
+            <div className="pt-4 space-y-4">
+              {/* Budget Widget */}
+              <div className="mb-4">
+                <BudgetWidget compact />
+              </div>
+
+              {/* Sprint 6 (Whole Foods pattern): items que probablemente
               se acabaron pronto basado en purchase_patterns historicos.
               Se renderiza solo si hay items due (RecurringItemsCard
               retorna null si lista vacia). */}
-          {dueItems.length > 0 && (
-            <div className="mb-4">
-              <RecurringItemsCard
-                items={dueItems}
-                onAddItem={(item) => {
-                  toast.info(
-                    `Agregar "${item.itemName}" — usa el boton + arriba`,
-                  );
-                }}
-                onAddAll={(items) => {
-                  toast.info(
-                    `${items.length} items recurrentes — usa el modal de agregar`,
-                  );
-                }}
-              />
-            </div>
-          )}
-
-          {/* Smart Shopping Section (AI Weekly List) */}
-          <SmartShoppingSection onRefreshMarket={onUpdate} />
-
-          {/* Shopping Info Banner */}
-          <div className="bg-green-50 border border-green-200 text-green-700 p-3 rounded-xl mb-4 text-sm flex items-center gap-2">
-            <ShoppingCart size={16} />
-            <span>
-              Marca lo que compraste. Se agregará automáticamente a tu despensa.
-            </span>
-          </div>
-
-          {/* Shopping Progress Header */}
-          <div className="flex items-center gap-4 p-4 bg-white rounded-xl shadow-sm mb-4">
-            <span className="font-semibold text-green-700 whitespace-nowrap">
-              {checkedCount}/{totalCount}
-            </span>
-            <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-green-700 transition-all duration-300"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-            <button
-              onClick={generateSmartList}
-              disabled={smartListLoading}
-              className="bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-blue-100 disabled:opacity-50"
-            >
-              {smartListLoading ? (
-                <Spinner size="sm" />
-              ) : (
-                <ListChecks size={16} />
-              )}
-              Generar
-            </button>
-            <button
-              onClick={() => setConfirmAction({ type: "reset-market" })}
-              className="bg-red-50 text-red-700 px-3 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-red-100"
-            >
-              <RotateCcw size={16} />
-              Reiniciar
-            </button>
-          </div>
-
-          {/* De temporada este mes */}
-          {(seasonalData.peak.length > 0 ||
-            seasonalData.inSeason.length > 0) && (
-            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 mb-4">
-              <h3 className="font-semibold text-amber-800 text-sm mb-2 flex items-center gap-2">
-                <span aria-hidden="true">&#x1F33E;</span>
-                De temporada en {seasonalData.monthName}
-              </h3>
-              {seasonalData.peak.length > 0 && (
-                <div className="mb-2">
-                  <span className="text-[10px] font-semibold text-amber-700 uppercase tracking-wide">
-                    Temporada alta
-                  </span>
-                  <div className="flex flex-wrap gap-1.5 mt-1">
-                    {seasonalData.peak.map((item) => (
-                      <span
-                        key={item.name}
-                        className="bg-amber-100 text-amber-800 text-xs px-2 py-1 rounded-full border border-amber-200 flex items-center gap-1"
-                      >
-                        <span aria-hidden="true">&#x1F525;</span>
-                        {item.name}
-                      </span>
-                    ))}
-                  </div>
+              {dueItems.length > 0 && (
+                <div className="mb-4">
+                  <RecurringItemsCard
+                    items={dueItems}
+                    onAddItem={(item) => {
+                      toast.info(
+                        `Agregar "${item.itemName}" — usa el boton + arriba`,
+                      );
+                    }}
+                    onAddAll={(items) => {
+                      toast.info(
+                        `${items.length} items recurrentes — usa el modal de agregar`,
+                      );
+                    }}
+                  />
                 </div>
               )}
-              {seasonalData.inSeason.length > 0 && (
-                <div>
-                  <span className="text-[10px] font-semibold text-green-700 uppercase tracking-wide">
-                    Disponible
-                  </span>
-                  <div className="flex flex-wrap gap-1.5 mt-1">
-                    {seasonalData.inSeason.map((item) => (
-                      <span
-                        key={item.name}
-                        className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full border border-green-200 flex items-center gap-1"
-                      >
-                        <span aria-hidden="true">&#x1F33F;</span>
-                        {item.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
 
-          {/* Comparador automatico de precios */}
-          <PriceComparisonCard items={items} minItems={5} />
+              {/* Smart Shopping Section (AI Weekly List) */}
+              <SmartShoppingSection onRefreshMarket={onUpdate} />
 
-          {/* Acciones rapidas: compartir lista + cocinar con inventario */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-            <ShareShoppingListButton
-              items={items
-                .filter((i) => !i.checked)
-                .map((i) => ({
-                  name: i.name,
-                  quantity: i.quantity || undefined,
-                  category: i.category || undefined,
-                  price: undefined,
-                  checked: false,
-                }))}
-              weekLabel={new Date().toLocaleDateString("es-CO", {
-                day: "numeric",
-                month: "long",
-              })}
-            />
-            <CookWithThisButton
-              ingredients={items
-                .filter((i) => (i.currentNumber || 0) > 0)
-                .slice(0, 15)
-                .map((i) => i.name)}
-            />
-          </div>
-
-          {/* Layout toggle: Categoria vs Pasillo */}
-          <div className="flex items-center gap-2 mb-3">
-            <button
-              onClick={() => handleListLayoutChange("category")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                listLayout === "category"
-                  ? "bg-orange-500 text-white"
-                  : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
-              }`}
-            >
-              <LayoutList size={14} />
-              Categoria
-            </button>
-            <button
-              onClick={() => handleListLayoutChange("aisle")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                listLayout === "aisle"
-                  ? "bg-orange-500 text-white"
-                  : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
-              }`}
-            >
-              <Map size={14} />
-              Pasillo del super
-            </button>
-          </div>
-
-          {/* Boton "Estoy comprando" */}
-          <button
-            onClick={() => setShowSupermarketMode(true)}
-            className="w-full flex items-center justify-center gap-2 py-3 mb-4 bg-gradient-to-r from-orange-500 to-emerald-600 text-white font-semibold rounded-xl shadow-sm hover:shadow-md active:scale-[0.98] transition-all"
-          >
-            <ShoppingBasket size={20} />
-            Estoy comprando
-          </button>
-
-          {/* Shopping List - Aisle mode */}
-          {listLayout === "aisle"
-            ? aisleGroups.map(({ aisle, items: aisleItems }) => (
-                <div key={aisle} className="mb-4">
-                  <div className="bg-orange-500 text-white px-4 py-3 rounded-t-lg font-semibold flex items-center gap-2">
-                    <span>{getCategoryEmoji(aisleItems[0])}</span>
-                    {aisle}
-                  </div>
-                  <div className="bg-white rounded-b-lg shadow-sm overflow-hidden">
-                    {aisleItems.map((item) => (
-                      <ShoppingItemRow
-                        key={item.id}
-                        item={item}
-                        loading={loading}
-                        onToggle={toggleItem}
-                        onDelete={(i) =>
-                          setConfirmAction({ type: "delete-item", item: i })
-                        }
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))
-            : null}
-
-          {/* Shopping List - Category mode */}
-          {listLayout === "category"
-            ? Object.entries(categories).map(([category, categoryItems]) => (
-                <div key={category} className="mb-4">
-                  <div className="bg-orange-500 text-white px-4 py-3 rounded-t-lg font-semibold flex items-center gap-2">
-                    <span>{getCategoryEmoji(categoryItems[0])}</span>
-                    {category}
-                  </div>
-                  <div className="bg-white rounded-b-lg shadow-sm overflow-hidden">
-                    {categoryItems.map((item) => (
-                      <ShoppingItemRow
-                        key={item.id}
-                        item={item}
-                        loading={loading}
-                        onToggle={toggleItem}
-                        onDelete={(i) =>
-                          setConfirmAction({ type: "delete-item", item: i })
-                        }
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))
-            : null}
-        </>
-      ) : viewMode === "pantry" ? (
-        <>
-          {/* Pantry View */}
-          <div className="bg-orange-50 border border-orange-200 text-orange-700 p-3 rounded-xl mb-4 text-sm">
-            <div className="flex items-center gap-2 mb-1">
-              <Home size={16} />
-              <span className="font-medium">Tu despensa actual</span>
-            </div>
-            <span className="text-xs text-orange-600">
-              Usa los botones +/- para ajustar lo que tienes en casa
-            </span>
-          </div>
-
-          {Object.entries(categories).map(([category, categoryItems]) => (
-            <div key={category} className="mb-4">
-              <div className="bg-orange-600 text-white px-4 py-3 rounded-t-lg font-semibold flex items-center gap-2">
-                <span>{getCategoryEmoji(categoryItems[0])}</span>
-                {category}
+              {/* Shopping Info Banner */}
+              <div className="bg-green-50 border border-green-200 text-green-700 p-3 rounded-xl mb-4 text-sm flex items-center gap-2">
+                <ShoppingCart size={16} />
+                <span>
+                  Marca lo que compraste. Se agregará automáticamente a tu
+                  despensa.
+                </span>
               </div>
-              <div className="bg-white rounded-b-lg shadow-sm overflow-hidden">
-                {categoryItems.map((item) => {
-                  const currentNum = item.currentNumber || 0;
-                  const requiredNum = parseQuantity(item.quantity);
-                  const percentage =
-                    requiredNum > 0 ? (currentNum / requiredNum) * 100 : 0;
-                  const isLow = percentage < 20;
-                  const isEmpty = currentNum === 0;
 
-                  return (
-                    <div
-                      key={item.id}
-                      className={`
+              {/* Shopping Progress Header */}
+              <div className="flex items-center gap-4 p-4 bg-white rounded-xl shadow-sm mb-4">
+                <span className="font-semibold text-green-700 whitespace-nowrap">
+                  {checkedCount}/{totalCount}
+                </span>
+                <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-green-700 transition-all duration-300"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+                <button
+                  onClick={generateSmartList}
+                  disabled={smartListLoading}
+                  className="bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-blue-100 disabled:opacity-50"
+                >
+                  {smartListLoading ? (
+                    <Spinner size="sm" />
+                  ) : (
+                    <ListChecks size={16} />
+                  )}
+                  Generar
+                </button>
+                <button
+                  onClick={() => setConfirmAction({ type: "reset-market" })}
+                  className="bg-red-50 text-red-700 px-3 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-red-100"
+                >
+                  <RotateCcw size={16} />
+                  Reiniciar
+                </button>
+              </div>
+
+              {/* De temporada este mes */}
+              {(seasonalData.peak.length > 0 ||
+                seasonalData.inSeason.length > 0) && (
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 mb-4">
+                  <h3 className="font-semibold text-amber-800 text-sm mb-2 flex items-center gap-2">
+                    <span aria-hidden="true">&#x1F33E;</span>
+                    De temporada en {seasonalData.monthName}
+                  </h3>
+                  {seasonalData.peak.length > 0 && (
+                    <div className="mb-2">
+                      <span className="text-[10px] font-semibold text-amber-700 uppercase tracking-wide">
+                        Temporada alta
+                      </span>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {seasonalData.peak.map((item) => (
+                          <span
+                            key={item.name}
+                            className="bg-amber-100 text-amber-800 text-xs px-2 py-1 rounded-full border border-amber-200 flex items-center gap-1"
+                          >
+                            <span aria-hidden="true">&#x1F525;</span>
+                            {item.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {seasonalData.inSeason.length > 0 && (
+                    <div>
+                      <span className="text-[10px] font-semibold text-green-700 uppercase tracking-wide">
+                        Disponible
+                      </span>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {seasonalData.inSeason.map((item) => (
+                          <span
+                            key={item.name}
+                            className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full border border-green-200 flex items-center gap-1"
+                          >
+                            <span aria-hidden="true">&#x1F33F;</span>
+                            {item.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Comparador automatico de precios */}
+              <PriceComparisonCard items={items} minItems={5} />
+
+              {/* Acciones rapidas: compartir lista + cocinar con inventario */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                <ShareShoppingListButton
+                  items={items
+                    .filter((i) => !i.checked)
+                    .map((i) => ({
+                      name: i.name,
+                      quantity: i.quantity || undefined,
+                      category: i.category || undefined,
+                      price: undefined,
+                      checked: false,
+                    }))}
+                  weekLabel={new Date().toLocaleDateString("es-CO", {
+                    day: "numeric",
+                    month: "long",
+                  })}
+                />
+                <CookWithThisButton
+                  ingredients={items
+                    .filter((i) => (i.currentNumber || 0) > 0)
+                    .slice(0, 15)
+                    .map((i) => i.name)}
+                />
+              </div>
+
+              {/* Layout toggle: Categoria vs Pasillo */}
+              <div className="flex items-center gap-2 mb-3">
+                <button
+                  onClick={() => handleListLayoutChange("category")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    listLayout === "category"
+                      ? "bg-orange-500 text-white"
+                      : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  <LayoutList size={14} />
+                  Categoria
+                </button>
+                <button
+                  onClick={() => handleListLayoutChange("aisle")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    listLayout === "aisle"
+                      ? "bg-orange-500 text-white"
+                      : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  <Map size={14} />
+                  Pasillo del super
+                </button>
+              </div>
+
+              {/* Boton "Estoy comprando" */}
+              <button
+                onClick={() => setShowSupermarketMode(true)}
+                className="w-full flex items-center justify-center gap-2 py-3 mb-4 bg-gradient-to-r from-orange-500 to-emerald-600 text-white font-semibold rounded-xl shadow-sm hover:shadow-md active:scale-[0.98] transition-all"
+              >
+                <ShoppingBasket size={20} />
+                Estoy comprando
+              </button>
+
+              {/* Shopping List - Aisle mode */}
+              {listLayout === "aisle"
+                ? aisleGroups.map(({ aisle, items: aisleItems }) => (
+                    <div key={aisle} className="mb-4">
+                      <div className="bg-orange-500 text-white px-4 py-3 rounded-t-lg font-semibold flex items-center gap-2">
+                        <span>{getCategoryEmoji(aisleItems[0])}</span>
+                        {aisle}
+                      </div>
+                      <div className="bg-white rounded-b-lg shadow-sm overflow-hidden">
+                        {aisleItems.map((item) => (
+                          <ShoppingItemRow
+                            key={item.id}
+                            item={item}
+                            loading={loading}
+                            onToggle={toggleItem}
+                            onDelete={(i) =>
+                              setConfirmAction({ type: "delete-item", item: i })
+                            }
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                : null}
+
+              {/* Shopping List - Category mode */}
+              {listLayout === "category"
+                ? Object.entries(categories).map(
+                    ([category, categoryItems]) => (
+                      <div key={category} className="mb-4">
+                        <div className="bg-orange-500 text-white px-4 py-3 rounded-t-lg font-semibold flex items-center gap-2">
+                          <span>{getCategoryEmoji(categoryItems[0])}</span>
+                          {category}
+                        </div>
+                        <div className="bg-white rounded-b-lg shadow-sm overflow-hidden">
+                          {categoryItems.map((item) => (
+                            <ShoppingItemRow
+                              key={item.id}
+                              item={item}
+                              loading={loading}
+                              onToggle={toggleItem}
+                              onDelete={(i) =>
+                                setConfirmAction({
+                                  type: "delete-item",
+                                  item: i,
+                                })
+                              }
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ),
+                  )
+                : null}
+            </div>
+          </>
+        ) : viewMode === "pantry" ? (
+          <>
+            {/* Pantry View */}
+            <div className="bg-orange-50 border border-orange-200 text-orange-700 p-3 rounded-xl mb-4 text-sm">
+              <div className="flex items-center gap-2 mb-1">
+                <Home size={16} />
+                <span className="font-medium">Tu despensa actual</span>
+              </div>
+              <span className="text-xs text-orange-600">
+                Usa los botones +/- para ajustar lo que tienes en casa
+              </span>
+            </div>
+
+            {Object.entries(categories).map(([category, categoryItems]) => (
+              <div key={category} className="mb-4">
+                <div className="bg-orange-600 text-white px-4 py-3 rounded-t-lg font-semibold flex items-center gap-2">
+                  <span>{getCategoryEmoji(categoryItems[0])}</span>
+                  {category}
+                </div>
+                <div className="bg-white rounded-b-lg shadow-sm overflow-hidden">
+                  {categoryItems.map((item) => {
+                    const currentNum = item.currentNumber || 0;
+                    const requiredNum = parseQuantity(item.quantity);
+                    const percentage =
+                      requiredNum > 0 ? (currentNum / requiredNum) * 100 : 0;
+                    const isLow = percentage < 20;
+                    const isEmpty = currentNum === 0;
+
+                    return (
+                      <div
+                        key={item.id}
+                        className={`
                         p-4 border-b last:border-b-0 transition-colors
                         ${isEmpty ? "bg-red-50" : isLow ? "bg-orange-50" : ""}
                       `}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          {(isEmpty || isLow) && (
-                            <AlertTriangle
-                              size={16}
-                              className={
-                                isEmpty ? "text-red-500" : "text-orange-500"
-                              }
-                            />
-                          )}
-                          <span className="font-medium">{item.name}</span>
-                          {item.is_custom && (
-                            <span className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                              <Sparkles size={10} />
-                              nuevo
-                            </span>
-                          )}
-                          <SeasonalBadge itemName={item.name} compact />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-400">
-                            Necesitas: {item.quantity}
-                          </span>
-                          {item.is_custom && (
-                            <button
-                              onClick={() =>
-                                setConfirmAction({ type: "delete-item", item })
-                              }
-                              disabled={loading === item.id}
-                              className="p-1 text-gray-400 hover:text-red-500 disabled:opacity-30"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Progress bar */}
-                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
-                        <div
-                          className={`h-full transition-all duration-300 ${
-                            isEmpty
-                              ? "bg-red-500"
-                              : isLow
-                                ? "bg-orange-500"
-                                : "bg-green-500"
-                          }`}
-                          style={{ width: `${Math.min(100, percentage)}%` }}
-                        />
-                      </div>
-
-                      {/* Quantity controls */}
-                      <div className="flex items-center justify-between">
-                        {editingItem === item.id ? (
-                          <div className="flex items-center gap-2 flex-1">
-                            <input
-                              type="text"
-                              value={editValue}
-                              onChange={(e) => setEditValue(e.target.value)}
-                              className="flex-1 px-3 py-2 border rounded-lg text-sm"
-                              placeholder="Ej: 2.5 kg"
-                              autoFocus
-                            />
-                            <button
-                              onClick={() => saveEdit(item)}
-                              className="p-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200"
-                            >
-                              <Check size={18} />
-                            </button>
-                            <button
-                              onClick={cancelEdit}
-                              className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200"
-                            >
-                              <X size={18} />
-                            </button>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => adjustQuantity(item, -1)}
-                                disabled={
-                                  loading === item.id || currentNum <= 0
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            {(isEmpty || isLow) && (
+                              <AlertTriangle
+                                size={16}
+                                className={
+                                  isEmpty ? "text-red-500" : "text-orange-500"
                                 }
-                                className="w-10 h-10 flex items-center justify-center bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50"
-                              >
-                                <Minus size={18} />
-                              </button>
+                              />
+                            )}
+                            <span className="font-medium">{item.name}</span>
+                            {item.is_custom && (
+                              <span className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                                <Sparkles size={10} />
+                                nuevo
+                              </span>
+                            )}
+                            <SeasonalBadge itemName={item.name} compact />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-400">
+                              Necesitas: {item.quantity}
+                            </span>
+                            {item.is_custom && (
                               <button
-                                onClick={() => startEdit(item)}
-                                className="px-4 py-2 bg-gray-100 rounded-lg font-semibold min-w-[100px] text-center hover:bg-gray-200"
-                              >
-                                {item.currentQuantity || "0"}
-                              </button>
-                              <button
-                                onClick={() => adjustQuantity(item, 1)}
+                                onClick={() =>
+                                  setConfirmAction({
+                                    type: "delete-item",
+                                    item,
+                                  })
+                                }
                                 disabled={loading === item.id}
-                                className="w-10 h-10 flex items-center justify-center bg-green-100 text-green-700 rounded-lg hover:bg-green-200 disabled:opacity-50"
+                                className="p-1 text-gray-400 hover:text-red-500 disabled:opacity-30"
                               >
-                                <Plus size={18} />
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Progress bar */}
+                        <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
+                          <div
+                            className={`h-full transition-all duration-300 ${
+                              isEmpty
+                                ? "bg-red-500"
+                                : isLow
+                                  ? "bg-orange-500"
+                                  : "bg-green-500"
+                            }`}
+                            style={{ width: `${Math.min(100, percentage)}%` }}
+                          />
+                        </div>
+
+                        {/* Quantity controls */}
+                        <div className="flex items-center justify-between">
+                          {editingItem === item.id ? (
+                            <div className="flex items-center gap-2 flex-1">
+                              <input
+                                type="text"
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                className="flex-1 px-3 py-2 border rounded-lg text-sm"
+                                placeholder="Ej: 2.5 kg"
+                                autoFocus
+                              />
+                              <button
+                                onClick={() => saveEdit(item)}
+                                className="p-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200"
+                              >
+                                <Check size={18} />
+                              </button>
+                              <button
+                                onClick={cancelEdit}
+                                className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200"
+                              >
+                                <X size={18} />
                               </button>
                             </div>
-                            <button
-                              onClick={() => startEdit(item)}
-                              className="p-2 text-gray-400 hover:text-gray-600"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                          </>
-                        )}
+                          ) : (
+                            <>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => adjustQuantity(item, -1)}
+                                  disabled={
+                                    loading === item.id || currentNum <= 0
+                                  }
+                                  className="w-10 h-10 flex items-center justify-center bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50"
+                                >
+                                  <Minus size={18} />
+                                </button>
+                                <button
+                                  onClick={() => startEdit(item)}
+                                  className="px-4 py-2 bg-gray-100 rounded-lg font-semibold min-w-[100px] text-center hover:bg-gray-200"
+                                >
+                                  {item.currentQuantity || "0"}
+                                </button>
+                                <button
+                                  onClick={() => adjustQuantity(item, 1)}
+                                  disabled={loading === item.id}
+                                  className="w-10 h-10 flex items-center justify-center bg-green-100 text-green-700 rounded-lg hover:bg-green-200 disabled:opacity-50"
+                                >
+                                  <Plus size={18} />
+                                </button>
+                              </div>
+                              <button
+                                onClick={() => startEdit(item)}
+                                className="p-2 text-gray-400 hover:text-gray-600"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
-        </>
-      ) : (
-        /* Price Comparison View */
-        <PriceComparisonView />
-      )}
+            ))}
+          </>
+        ) : (
+          /* Price Comparison View */
+          <PriceComparisonView />
+        )}
+      </div>
 
       {/* Modo supermercado pantalla completa */}
       {showSupermarketMode && (

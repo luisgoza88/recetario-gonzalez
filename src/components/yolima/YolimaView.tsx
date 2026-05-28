@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { LogOut } from "lucide-react";
+import { LogOut, CheckCircle2, Lightbulb } from "lucide-react";
 import Spinner from "@/components/ui/Spinner";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -398,142 +398,178 @@ export default function YolimaView() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[var(--accent-soft)] to-[var(--bg)]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-orange-500 mx-auto mb-4" />
-          <p className="text-xl text-gray-600">Cargando tu día...</p>
+          <Spinner size="xl" color="green" className="mx-auto mb-4" />
+          <p className="text-[15px] text-[var(--ink-soft)]">
+            Cargando tu día...
+          </p>
         </div>
       </div>
     );
   }
+
+  const userInitial = userName.charAt(0).toUpperCase();
 
   // =====================================================
   // Render
   // =====================================================
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-orange-50">
+    <div className="min-h-screen bg-gradient-to-b from-[var(--accent-soft)] to-[var(--bg)]">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b sticky top-0 z-40">
-        <div className="max-w-lg mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">
-                👋 {greeting}, {userName}!
-              </h1>
-              <p className="text-lg text-gray-500 capitalize mt-1">
-                {dayName}, {dateFormatted}
+      <div className="bg-white border-b border-[var(--border)] sticky top-0 z-40">
+        <div className="max-w-lg mx-auto px-5 pt-5 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-[18px] flex-shrink-0">
+              {userInitial}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[18px] font-semibold tracking-tight text-[var(--ink)]">
+                {greeting}, {userName}!
+              </p>
+              <p className="text-[12.5px] text-[var(--ink-soft)] capitalize">
+                {dayName} · {dateFormatted}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              {saving && <Spinner size="md" color="gray" />}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {saving ? (
+                <Spinner size="sm" color="gray" />
+              ) : (
+                <span className="bg-green-100 text-green-700 text-[11px] px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-green-500" />{" "}
+                  Presente
+                </span>
+              )}
               <button
                 onClick={signOut}
-                className="p-3 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors"
+                className="p-2 rounded-xl text-[var(--ink-soft)] hover:bg-stone-100 transition-colors"
                 title="Cerrar Sesión"
               >
-                <LogOut size={22} className="text-gray-500" />
+                <LogOut size={18} />
               </button>
             </div>
+          </div>
+
+          {/* Day Progress */}
+          <div className="mt-4">
+            <DayProgress
+              percent={progressPercent}
+              completed={completedItems}
+              total={totalItems}
+            />
           </div>
         </div>
       </div>
 
       {/* Main content - single scrollable view */}
-      <div className="max-w-lg mx-auto px-4 py-6 space-y-5 pb-32">
-        {/* Day Progress */}
-        <DayProgress percent={progressPercent} />
-
+      <div className="max-w-lg mx-auto px-5 py-4 space-y-5 pb-32">
         {/* Meals */}
-        <MealCard
-          emoji="🍳"
-          label="Desayuno"
-          meal={recipeToMealCard(todayMenu?.breakfast)}
-          isCompleted={completion.meals.breakfast}
-          onToggleComplete={() => toggleMeal("breakfast")}
-          onViewRecipe={() => handleViewRecipe(todayMenu?.breakfast)}
-          onStartThermomix={() => handleStartThermomix(todayMenu?.breakfast)}
-        />
+        <section>
+          <p className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-2 px-1">
+            Comidas que preparar
+          </p>
+          <div className="space-y-2">
+            <MealCard
+              kind="breakfast"
+              label="Desayuno"
+              meal={recipeToMealCard(todayMenu?.breakfast)}
+              isCompleted={completion.meals.breakfast}
+              onToggleComplete={() => toggleMeal("breakfast")}
+              onViewRecipe={() => handleViewRecipe(todayMenu?.breakfast)}
+              onStartThermomix={() =>
+                handleStartThermomix(todayMenu?.breakfast)
+              }
+            />
 
-        <MealCard
-          emoji="🥘"
-          label="Almuerzo"
-          meal={recipeToMealCard(todayMenu?.lunch)}
-          isCompleted={completion.meals.lunch}
-          onToggleComplete={() => toggleMeal("lunch")}
-          onViewRecipe={() => handleViewRecipe(todayMenu?.lunch)}
-          onStartThermomix={() => handleStartThermomix(todayMenu?.lunch)}
-        />
+            <MealCard
+              kind="lunch"
+              label="Almuerzo"
+              meal={recipeToMealCard(todayMenu?.lunch)}
+              isCompleted={completion.meals.lunch}
+              onToggleComplete={() => toggleMeal("lunch")}
+              onViewRecipe={() => handleViewRecipe(todayMenu?.lunch)}
+              onStartThermomix={() => handleStartThermomix(todayMenu?.lunch)}
+            />
 
-        <MealCard
-          emoji="🌙"
-          label="Cena"
-          meal={recipeToMealCard(todayMenu?.dinner)}
-          isCompleted={completion.meals.dinner}
-          onToggleComplete={() => toggleMeal("dinner")}
-          onViewRecipe={() => handleViewRecipe(todayMenu?.dinner)}
-          onStartThermomix={() => handleStartThermomix(todayMenu?.dinner)}
-        />
+            <MealCard
+              kind="dinner"
+              label="Cena"
+              meal={recipeToMealCard(todayMenu?.dinner)}
+              isCompleted={completion.meals.dinner}
+              onToggleComplete={() => toggleMeal("dinner")}
+              onViewRecipe={() => handleViewRecipe(todayMenu?.dinner)}
+              onStartThermomix={() => handleStartThermomix(todayMenu?.dinner)}
+            />
+          </div>
+        </section>
 
         {/* Preparations */}
         {preparations.length > 0 && (
           <TaskChecklist
-            emoji="📋"
-            title="Preparaciones Base"
+            title="Preparaciones base"
             items={preparations}
             completedItems={completion.preparations}
             onToggle={togglePreparation}
+            variant="square"
           />
         )}
 
         {/* Reminder note from the menu */}
         {todayMenu?.reminder && (
-          <div className="bg-yellow-50 border-2 border-yellow-200 rounded-2xl p-5">
-            <div className="flex items-center gap-3 mb-2">
-              <span className="text-3xl">💡</span>
-              <h3 className="text-xl font-bold text-yellow-700 uppercase">
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-2.5">
+            <Lightbulb
+              size={16}
+              className="text-amber-700 mt-0.5 flex-shrink-0"
+            />
+            <div>
+              <p className="text-[11px] uppercase tracking-wider font-semibold text-amber-800 mb-0.5">
                 Recordatorio
-              </h3>
+              </p>
+              <p className="text-[13px] text-amber-900 leading-snug">
+                {todayMenu.reminder}
+              </p>
             </div>
-            <p className="text-lg text-yellow-800 ml-12">
-              {todayMenu.reminder}
-            </p>
           </div>
         )}
 
         {/* Cleaning Tasks */}
         <TaskChecklist
-          emoji="🧹"
-          title="Tareas de Limpieza"
+          title="Tareas de limpieza"
           items={cleaningTasks}
           completedItems={completion.tasks}
           onToggle={toggleTask}
         />
 
         {/* Photo Capture */}
-        <PhotoCapture
-          date={todayStr}
-          householdId={householdId || null}
-          existingPhotos={completion.photos}
-          onPhotoAdded={handlePhotoAdded}
-        />
+        <section>
+          <p className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-2 px-1">
+            Fotos del plato
+          </p>
+          <PhotoCapture
+            date={todayStr}
+            householdId={householdId || null}
+            existingPhotos={completion.photos}
+            onPhotoAdded={handlePhotoAdded}
+          />
+        </section>
 
         {/* Day Completed Button */}
         {!dayCompleted ? (
           <button
             onClick={handleDayCompleted}
-            className="w-full min-h-[64px] bg-green-600 text-white rounded-2xl text-xl font-bold
-                       hover:bg-green-700 active:bg-green-800 transition-colors shadow-lg
-                       flex items-center justify-center gap-3"
+            className="w-full py-3.5 bg-[var(--accent)] text-white rounded-xl text-[14px] font-semibold
+                       active:opacity-90 transition-opacity flex items-center justify-center gap-2"
           >
-            ✅ Día Completado
+            <CheckCircle2 size={16} /> Terminé mi día
           </button>
         ) : (
-          <div className="bg-green-100 border-2 border-green-300 rounded-2xl p-6 text-center">
-            <p className="text-2xl font-bold text-green-700">
-              🎉 ¡Día Completado!
-            </p>
-            <p className="text-lg text-green-600 mt-2">
+          <div className="bg-[var(--accent-soft)] border border-green-300 rounded-2xl p-5 text-center">
+            <div className="flex items-center justify-center gap-2 text-[var(--accent)] mb-1">
+              <CheckCircle2 size={20} />
+              <p className="text-[16px] font-semibold">¡Día completado!</p>
+            </div>
+            <p className="text-[13px] text-[var(--ink-soft)]">
               Buen trabajo, {userName}. Descansa bien.
             </p>
           </div>

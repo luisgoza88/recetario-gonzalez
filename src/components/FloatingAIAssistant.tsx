@@ -6,6 +6,7 @@ import {
   Bot,
   User,
   Sparkles,
+  Wand2,
   Loader2,
   Calendar,
   ShoppingCart,
@@ -19,8 +20,6 @@ import {
   VolumeX,
   Camera,
   Image as ImageIcon,
-  Minimize2,
-  Maximize2,
   AlertCircle,
 } from "lucide-react";
 import { useAIChat } from "@/lib/hooks/useAIChat";
@@ -120,7 +119,6 @@ export default function FloatingAIAssistant({
   activeSection = "hoy",
 }: FloatingAIAssistantProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
   const [input, setInput] = useState("");
   const [showProposalModal, setShowProposalModal] = useState(false);
 
@@ -267,79 +265,60 @@ export default function FloatingAIAssistant({
     );
   }
 
-  // Chat panel (open state)
+  // Chat overlay (open state) — full-screen "Asistente Recetario"
   return (
-    <div
-      className={`fixed z-[100] bg-white rounded-2xl shadow-2xl border overflow-hidden flex flex-col transition-all duration-300 ${
-        isExpanded
-          ? "inset-4 sm:inset-8"
-          : "bottom-24 right-4 w-[calc(100%-2rem)] max-w-sm h-[70vh] max-h-[500px]"
-      }`}
-    >
+    <div className="fixed inset-0 z-[400] bg-[var(--bg)] flex flex-col animate-slide-up">
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-3 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-            <Bot size={18} />
+      <div className="bg-gradient-to-br from-purple-600 to-violet-700 text-white px-5 pt-12 pb-4 flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center backdrop-blur">
+              <Sparkles size={16} />
+            </div>
+            <div>
+              <p className="text-[15px] font-semibold">Asistente Recetario</p>
+              <p className="text-[11px] text-white/70">
+                Gemini 2.5 · Conoce tu cocina
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-medium text-sm">Asistente IA</h3>
-            <p className="text-xs text-purple-200">
-              {activeSection === "recetario"
-                ? "Recetas y menú"
-                : activeSection === "hogar"
-                  ? "Tareas del hogar"
-                  : "Tu ayudante"}
-            </p>
+          <div className="flex items-center gap-1.5">
+            {alertsHook.alertCount > 0 && (
+              <button
+                onClick={alertsHook.toggleAlerts}
+                className="relative w-9 h-9 rounded-full bg-white/20 flex items-center justify-center backdrop-blur transition-colors hover:bg-white/30"
+              >
+                <AlertCircle size={16} />
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center">
+                  {alertsHook.alertCount}
+                </span>
+              </button>
+            )}
+            {chat.messages.length > 0 && (
+              <button
+                onClick={chat.clearChat}
+                title="Nueva conversación"
+                className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center backdrop-blur transition-colors hover:bg-white/30"
+              >
+                <RefreshCw size={15} />
+              </button>
+            )}
+            <button
+              onClick={() => setIsOpen(false)}
+              className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center backdrop-blur transition-colors hover:bg-white/30"
+            >
+              <X size={16} />
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-1">
-          {alertsHook.alertCount > 0 && (
-            <button
-              onClick={alertsHook.toggleAlerts}
-              className="relative p-1.5 hover:bg-white/20 rounded-lg transition-colors"
-            >
-              <AlertCircle size={18} />
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center">
-                {alertsHook.alertCount}
-              </span>
-            </button>
-          )}
-          {chat.messages.length > 0 && (
-            <button
-              onClick={chat.clearChat}
-              className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
-              title="Nueva conversación"
-            >
-              <RefreshCw size={16} />
-            </button>
-          )}
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
-          >
-            {isExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-          </button>
-          <button
-            onClick={() => setIsOpen(false)}
-            className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
-          >
-            <X size={16} />
-          </button>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="flex-shrink-0 bg-gray-50 border-b p-2">
-        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
+        <div className="flex gap-1.5 mt-3 overflow-x-auto scrollbar-hide">
           {quickActions.map((action) => (
             <button
               key={action.id}
               onClick={() => chat.sendMessage(action.prompt)}
               disabled={chat.isLoading}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border rounded-full text-xs font-medium whitespace-nowrap hover:bg-purple-50 hover:border-purple-300 hover:text-purple-700 transition-colors disabled:opacity-50"
+              className="bg-white/15 backdrop-blur px-2.5 py-1 rounded-full text-[10.5px] font-medium whitespace-nowrap transition-colors hover:bg-white/25 disabled:opacity-50 flex items-center gap-1"
             >
-              {action.icon}
               {action.label}
             </button>
           ))}
@@ -347,22 +326,42 @@ export default function FloatingAIAssistant({
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto min-h-0 p-3">
+      <div className="flex-1 overflow-y-auto min-h-0 px-5 py-4">
         {chat.isLoadingHistory ? (
           <div className="flex items-center justify-center h-full">
-            <Loader2 size={20} className="animate-spin text-purple-500" />
+            <Loader2 size={20} className="animate-spin text-purple-600" />
           </div>
         ) : chat.showWelcome && chat.messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center px-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center mb-3">
-              <Sparkles size={24} className="text-white" />
+          <div className="space-y-3">
+            {/* Welcome bubble (IA side) */}
+            <div className="flex justify-start">
+              <div className="max-w-[80%] px-3.5 py-2.5 rounded-2xl text-[13.5px] leading-relaxed bg-white border border-[var(--border)] text-[var(--ink)]">
+                ¿En qué puedo ayudarte? Pregúntame sobre recetas, menú, tareas o
+                compras.
+              </div>
             </div>
-            <h4 className="font-medium text-gray-800 mb-1">
-              ¿En qué puedo ayudarte?
-            </h4>
-            <p className="text-xs text-gray-500">
-              Pregúntame sobre recetas, menú, tareas o compras
-            </p>
+            {/* Suggestions */}
+            <div className="pt-2">
+              <p className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-2 px-1">
+                Sugerencias
+              </p>
+              <div className="space-y-1.5">
+                {quickActions.map((action) => (
+                  <button
+                    key={action.id}
+                    onClick={() => chat.sendMessage(action.prompt)}
+                    disabled={chat.isLoading}
+                    className="w-full text-left bg-white border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-[13px] text-[var(--ink)] active:bg-stone-50 hover:bg-stone-50 transition-colors flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <Wand2
+                      size={13}
+                      className="text-purple-600 flex-shrink-0"
+                    />
+                    {action.prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
           <ChatMessageList
@@ -380,7 +379,7 @@ export default function FloatingAIAssistant({
 
       {/* Voice Listening Indicator */}
       {voice.isListening && (
-        <div className="px-3 py-1.5 bg-purple-50 border-t flex items-center gap-2">
+        <div className="px-5 py-1.5 bg-purple-50 border-t border-[var(--border)] flex items-center gap-2 flex-shrink-0">
           <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
           <span className="text-xs text-purple-700 flex-1">
             {voice.interimTranscript || "Escuchando..."}
@@ -396,7 +395,7 @@ export default function FloatingAIAssistant({
 
       {/* Image Preview */}
       {selectedImage && (
-        <div className="px-3 py-2 bg-gray-50 border-t">
+        <div className="px-5 py-2 bg-stone-50 border-t border-[var(--border)] flex-shrink-0">
           <div className="relative inline-block">
             <img
               src={selectedImage}
@@ -432,7 +431,7 @@ export default function FloatingAIAssistant({
 
       {/* Image Options Popup */}
       {showImageOptions && (
-        <div className="absolute bottom-20 left-3 bg-white rounded-xl shadow-xl border p-1 z-50">
+        <div className="absolute bottom-20 left-3 bg-white rounded-xl shadow-xl border border-[var(--border)] p-1 z-[410]">
           <button
             onClick={openCamera}
             className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 rounded-lg w-full"
@@ -451,97 +450,89 @@ export default function FloatingAIAssistant({
       )}
 
       {/* Input Area */}
-      <div className="p-2 bg-white border-t flex-shrink-0">
-        <div className="flex gap-1.5 items-center">
+      <div className="border-t border-[var(--border)] bg-white px-3 py-2.5 flex items-center gap-2 flex-shrink-0">
+        <button
+          onClick={toggleImageOptions}
+          disabled={chat.isLoading || voice.isListening}
+          className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
+            selectedImage
+              ? "bg-purple-100 text-purple-600"
+              : "bg-stone-100 text-stone-600 hover:bg-purple-50 hover:text-purple-600"
+          }`}
+        >
+          <Camera size={16} />
+        </button>
+
+        {voice.ttsSupported && (
           <button
-            onClick={toggleImageOptions}
-            disabled={chat.isLoading || voice.isListening}
-            className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
-              selectedImage
+            onClick={voice.toggleTTS}
+            className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
+              voice.ttsEnabled
                 ? "bg-purple-100 text-purple-600"
-                : "bg-gray-100 text-gray-500 hover:bg-purple-50 hover:text-purple-600"
+                : "bg-stone-100 text-stone-400"
             }`}
           >
-            <Camera size={16} />
+            {voice.ttsEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
           </button>
+        )}
 
-          {voice.ttsSupported && (
-            <button
-              onClick={voice.toggleTTS}
-              className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
-                voice.ttsEnabled
-                  ? "bg-purple-100 text-purple-600"
-                  : "bg-gray-100 text-gray-400"
-              }`}
-            >
-              {voice.ttsEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
-            </button>
-          )}
-
-          <input
-            ref={inputRef}
-            type="text"
-            value={voice.isListening ? voice.interimTranscript : input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              selectedImage
-                ? "Describe..."
-                : voice.isListening
-                  ? "Escuchando..."
-                  : "Escribe..."
-            }
-            disabled={chat.isLoading || voice.isListening}
-            className="flex-1 px-3 py-2 bg-gray-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
-          />
-
-          {voice.voiceSupported && (
-            <button
-              onClick={voice.toggleListening}
-              disabled={chat.isLoading}
-              className={`
-                w-9 h-9 rounded-full flex items-center justify-center transition-all
-                ${
-                  voice.isListening
-                    ? "bg-red-500 text-white animate-pulse"
-                    : "bg-gray-100 text-gray-600 hover:bg-purple-100 hover:text-purple-600"
-                }
-              `}
-            >
-              {voice.isListening ? <MicOff size={16} /> : <Mic size={16} />}
-            </button>
-          )}
-
+        {voice.voiceSupported && (
           <button
-            onClick={() => handleSend()}
-            disabled={
-              (!input.trim() && !selectedImage) ||
-              chat.isLoading ||
+            onClick={voice.toggleListening}
+            disabled={chat.isLoading}
+            className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
               voice.isListening
-            }
-            className={`
-              w-9 h-9 rounded-full flex items-center justify-center transition-all
-              ${
-                (input.trim() || selectedImage) &&
-                !chat.isLoading &&
-                !voice.isListening
-                  ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg"
-                  : "bg-gray-200 text-gray-400"
-              }
-            `}
+                ? "bg-red-500 text-white animate-pulse"
+                : "bg-stone-100 text-stone-600 hover:bg-purple-100 hover:text-purple-600"
+            }`}
           >
-            {chat.isLoading ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Send size={16} />
-            )}
+            {voice.isListening ? <MicOff size={16} /> : <Mic size={16} />}
           </button>
-        </div>
+        )}
+
+        <input
+          ref={inputRef}
+          type="text"
+          value={voice.isListening ? voice.interimTranscript : input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={
+            selectedImage
+              ? "Describe la imagen…"
+              : voice.isListening
+                ? "Escuchando…"
+                : "Pídele algo a tu Recetario…"
+          }
+          disabled={chat.isLoading || voice.isListening}
+          className="flex-1 bg-stone-100 rounded-full px-4 py-2 text-[13.5px] focus:outline-none focus:bg-stone-50 placeholder:text-stone-400 disabled:opacity-50"
+        />
+
+        <button
+          onClick={() => handleSend()}
+          disabled={
+            (!input.trim() && !selectedImage) ||
+            chat.isLoading ||
+            voice.isListening
+          }
+          className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
+            (input.trim() || selectedImage) &&
+            !chat.isLoading &&
+            !voice.isListening
+              ? "bg-gradient-to-br from-purple-600 to-violet-700 text-white shadow-md"
+              : "bg-stone-200 text-stone-400"
+          }`}
+        >
+          {chat.isLoading ? (
+            <Loader2 size={15} className="animate-spin" />
+          ) : (
+            <Send size={15} />
+          )}
+        </button>
       </div>
 
       {/* Proposal Modal */}
       {showProposalModal && proposal.activeProposal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50">
+        <div className="fixed inset-0 z-[420] flex items-center justify-center p-4 bg-black/50">
           <div className="w-full max-w-md max-h-[80vh] overflow-y-auto">
             <ProposalCard
               proposalId={proposal.activeProposal.id}
