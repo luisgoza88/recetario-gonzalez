@@ -15,6 +15,23 @@ const InputSchema = z.object({
   householdId: z.string().uuid().optional(),
 });
 
+// Schema del OUTPUT del modelo (fallback Gemini). Validamos la respuesta antes
+// de reenviarla al cliente: el LLM puede devolver `recipes` ausente o no array,
+// o recetas con campos faltantes. Tipamos solo lo esencial; `.passthrough()`
+// conserva campos extra y cada receta acepta forma flexible (time como string,
+// missing_ingredients opcional).
+const CookWithThisRecipeSchema = z
+  .object({
+    name: z.string().min(1),
+  })
+  .passthrough();
+
+const CookWithThisOutputSchema = z
+  .object({
+    recipes: z.array(CookWithThisRecipeSchema).optional(),
+  })
+  .passthrough();
+
 interface RecipeRow {
   id: string;
   name: string;
@@ -128,10 +145,24 @@ Responde SOLO en JSON con este formato exacto:
     });
 
     const text = cleanJsonResponse(result.text || "{}");
-    const json = JSON.parse(text);
+    const raw = JSON.parse(text);
+
+    // Validar forma y tipos del output del modelo antes de reenviar al cliente
+    const parsed = CookWithThisOutputSchema.safeParse(raw);
+    if (!parsed.success) {
+      logger.error("AI cook-with-this failed schema validation", {
+        issues: parsed.error.issues
+          .slice(0, 5)
+          .map((i) => `${i.path.join(".")}: ${i.message}`),
+      });
+      return NextResponse.json(
+        { error: "La IA devolvió recetas con formato inválido" },
+        { status: 502 },
+      );
+    }
 
     return NextResponse.json(
-      { source: "ai", ...json },
+      { source: "ai", ...parsed.data },
       { headers: rateLimit.headers },
     );
   } catch (err) {

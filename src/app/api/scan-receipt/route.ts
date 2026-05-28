@@ -75,6 +75,32 @@ export interface ScannedProduct {
   brand?: string;
 }
 
+// Schema del OUTPUT del modelo. Validamos la respuesta de Gemini antes de
+// mapearla/persistirla: el LLM puede devolver tipos inesperados (ej. items
+// no array, name ausente, quantity como string). Tipamos solo lo que el codigo
+// consume downstream; `.passthrough()` conserva campos extra (store, total,
+// error). Los items pueden venir vacios y los campos numericos venir como
+// string, asi que somos generosos para no rechazar respuestas validas.
+const ScanReceiptItemSchema = z
+  .object({
+    name: z.string().min(1),
+    quantity: z.union([z.number(), z.string()]).optional(),
+    unit: z.string().optional(),
+    price: z.union([z.number(), z.string()]).optional(),
+    category: z.string().optional(),
+    brand: z.string().optional(),
+  })
+  .passthrough();
+
+const ScanReceiptOutputSchema = z
+  .object({
+    items: z.array(ScanReceiptItemSchema).optional(),
+    store: z.unknown().optional(),
+    total: z.unknown().optional(),
+    error: z.string().optional(),
+  })
+  .passthrough();
+
 export async function POST(request: NextRequest) {
   const auth = requireAuth(request);
   if (auth instanceof NextResponse) return auth;
@@ -164,36 +190,53 @@ Si no puedes leer claramente el recibo, devuelve: {"items": [], "error": "No se 
 
     // Clean and parse response
     const jsonContent = cleanJsonResponse(content);
-    const parsed = JSON.parse(jsonContent);
+    const raw = JSON.parse(jsonContent);
+
+    // Validar forma y tipos del output del modelo antes de mapear/persistir
+    const parsedResult = ScanReceiptOutputSchema.safeParse(raw);
+    if (!parsedResult.success) {
+      logger.error("AI receipt scan failed schema validation", {
+        issues: parsedResult.error.issues
+          .slice(0, 5)
+          .map((i) => `${i.path.join(".")}: ${i.message}`),
+      });
+      return NextResponse.json(
+        { error: "La IA devolvió un recibo con formato inválido", items: [] },
+        { status: 502 },
+      );
+    }
+    const parsed = parsedResult.data;
 
     if (parsed.error) {
       return NextResponse.json({ items: [], error: parsed.error });
     }
 
-    // Map categories to our format
-    const items: ScannedProduct[] = (parsed.items || []).map(
-      (item: {
-        name: string;
-        quantity?: number;
-        unit?: string;
-        price?: number;
-        category?: string;
-        brand?: string;
-      }) => {
-        const categoryKey = (item.category || "otros").toLowerCase();
-        const categoryInfo =
-          CATEGORIES_MAP[categoryKey] || CATEGORIES_MAP["otros"];
+    // Coercionar quantity/price (pueden venir como string desde el LLM)
+    const toNumber = (value: unknown): number | undefined => {
+      if (typeof value === "number")
+        return Number.isFinite(value) ? value : undefined;
+      if (typeof value === "string") {
+        const n = Number(value.replace(/[^\d.,-]/g, "").replace(",", "."));
+        return Number.isFinite(n) ? n : undefined;
+      }
+      return undefined;
+    };
 
-        return {
-          name: item.name,
-          quantity: item.quantity || 1,
-          unit: item.unit || "unid",
-          price: item.price,
-          category: categoryInfo,
-          brand: item.brand,
-        };
-      },
-    );
+    // Map categories to our format
+    const items: ScannedProduct[] = (parsed.items || []).map((item) => {
+      const categoryKey = (item.category || "otros").toLowerCase();
+      const categoryInfo =
+        CATEGORIES_MAP[categoryKey] || CATEGORIES_MAP["otros"];
+
+      return {
+        name: item.name,
+        quantity: toNumber(item.quantity) ?? 1,
+        unit: item.unit || "unid",
+        price: toNumber(item.price),
+        category: categoryInfo,
+        brand: item.brand,
+      };
+    });
 
     return NextResponse.json({
       items,

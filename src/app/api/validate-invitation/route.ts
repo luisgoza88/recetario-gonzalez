@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (data.current_uses >= data.max_uses) {
+    if ((data.current_uses ?? 0) >= (data.max_uses ?? Infinity)) {
       return NextResponse.json(
         { isValid: false, error: "Este código de invitación ya fue utilizado" },
         { headers: rateLimit.headers },

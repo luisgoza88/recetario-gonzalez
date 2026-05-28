@@ -83,8 +83,7 @@ export async function completeTask(taskName: string, _employeeName?: string) {
 
   // Filter by name match (task name is in the template)
   const matched = scheduledTasks?.find((t) => {
-    const template = t.task_template as unknown as { name: string } | null;
-    const templateName = template?.name || "";
+    const templateName = t.task_template?.name || "";
     return templateName.toLowerCase().includes(taskName.toLowerCase());
   });
 
@@ -92,9 +91,7 @@ export async function completeTask(taskName: string, _employeeName?: string) {
     return { success: false, message: `No se encontró la tarea "${taskName}"` };
   }
 
-  const templateName =
-    (matched.task_template as unknown as { name: string } | null)?.name ||
-    taskName;
+  const templateName = matched.task_template?.name || taskName;
 
   await supabase
     .from("scheduled_tasks")

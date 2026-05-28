@@ -17,7 +17,7 @@ export async function getRecipesToAvoid(
 
     let query = supabase
       .from("meal_feedback")
-      .select("recipe_id, recipe_name")
+      .select("recipe_id")
       .lte("star_rating", 2)
       .not("star_rating", "is", null)
       .gte("created_at", thirtyDaysAgo.toISOString());
@@ -30,10 +30,8 @@ export async function getRecipesToAvoid(
 
     if (error || !data) return [];
 
-    // Return unique recipe IDs; fall back to recipe_name when id is null
-    const ids = data
-      .map((d) => d.recipe_id || d.recipe_name)
-      .filter(Boolean) as string[];
+    // recipe_id es NOT NULL en meal_feedback; devolver IDs únicos.
+    const ids = data.map((d) => d.recipe_id).filter(Boolean);
 
     return [...new Set(ids)];
   } catch {

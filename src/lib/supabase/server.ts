@@ -1,6 +1,7 @@
 import { createServerClient as createSupabaseServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import type { Database } from "@/types/database.types";
 
 /**
  * Creates a Supabase client that inherits the authenticated user's session
@@ -10,7 +11,7 @@ import { cookies } from "next/headers";
  */
 export async function createAuthenticatedClient() {
   const cookieStore = await cookies();
-  return createSupabaseServerClient(
+  return createSupabaseServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -41,12 +42,16 @@ export function createServiceRoleClient() {
   if (!serviceKey) {
     throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured");
   }
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
+  return createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    serviceKey,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
     },
-  });
+  );
 }
 
 /**

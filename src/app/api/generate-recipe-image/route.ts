@@ -484,10 +484,8 @@ export async function PUT(request: NextRequest) {
     for (const recipe of recipes) {
       try {
         const ingredientNames = Array.isArray(recipe.ingredients)
-          ? recipe.ingredients
-              .map((ing: { name?: string } | string) =>
-                typeof ing === "string" ? ing : ing.name || "",
-              )
+          ? (recipe.ingredients as Array<{ name?: string } | string>)
+              .map((ing) => (typeof ing === "string" ? ing : ing?.name || ""))
               .filter(Boolean)
           : [];
 

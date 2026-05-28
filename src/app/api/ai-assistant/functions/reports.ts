@@ -101,7 +101,7 @@ export async function getLowInventoryAlerts(threshold: number = 2) {
     if (!grouped[cat]) grouped[cat] = [];
     grouped[cat].push({
       name: item.market_item?.name || "Item",
-      quantity: item.current_number,
+      quantity: item.current_number ?? 0,
     });
   });
 
@@ -196,10 +196,11 @@ export async function calculatePortions(recipeName: string, portions: number) {
     return { error: `No se encontró la receta "${recipeName}"` };
   }
 
-  const originalPortions = recipe.portions || 5;
+  const originalPortions =
+    (typeof recipe.portions === "number" ? recipe.portions : null) || 5;
   const multiplier = portions / originalPortions;
   const ingredients = Array.isArray(recipe.ingredients)
-    ? recipe.ingredients
+    ? (recipe.ingredients as Array<{ name?: string; amount?: string } | string>)
     : [];
 
   const adjustedIngredients = ingredients.map(
@@ -397,7 +398,7 @@ export async function smartShoppingList(daysAhead: number = 7): Promise<{
       (item.market_item as { name?: string })?.name?.toLowerCase() || "";
     const category =
       (item.market_item as { category?: string })?.category || "Otros";
-    availableMap.set(name, { quantity: item.current_number, category });
+    availableMap.set(name, { quantity: item.current_number ?? 0, category });
   });
 
   const byCategory: Record<

@@ -2,8 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Mock Supabase client used by menu-tasks-integration.ts
-// The module calls createClient() at the top level, so we mock the entire
-// @supabase/supabase-js module before importing anything from the source.
+// The module imports the `supabase` singleton from "@/lib/supabase/client"
+// (built with createBrowserClient from @supabase/ssr), so we must mock THAT
+// module — not @supabase/supabase-js — for the chain mocks to be intercepted.
 //
 // vi.hoisted() ensures the mock fns are available when vi.mock is hoisted.
 // ---------------------------------------------------------------------------
@@ -56,8 +57,8 @@ const {
   };
 });
 
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: vi.fn(() => ({ from: mockFrom })),
+vi.mock("@/lib/supabase/client", () => ({
+  supabase: { from: mockFrom },
 }));
 
 // ---------------------------------------------------------------------------

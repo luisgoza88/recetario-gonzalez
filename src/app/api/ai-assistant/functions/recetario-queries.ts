@@ -368,11 +368,12 @@ export async function getRecipeDetails(recipeName: string) {
     prep_time: recipe.prep_time,
     portions: recipe.portions || 5,
     description: recipe.description || "",
-    ingredients: ingredients.map(
-      (ing: { name?: string; amount?: string } | string) =>
-        typeof ing === "string"
-          ? ing
-          : `${ing.amount || ""} ${ing.name || ing}`.trim(),
+    ingredients: (
+      ingredients as Array<{ name?: string; amount?: string } | string>
+    ).map((ing) =>
+      typeof ing === "string"
+        ? ing
+        : `${ing.amount || ""} ${ing.name || ing}`.trim(),
     ),
     steps: steps.length > 0 ? steps : ["No hay pasos detallados disponibles"],
     tips: recipe.tips || null,
@@ -399,14 +400,16 @@ export async function getMissingIngredients(recipeName: string) {
   const availableItems =
     inventory?.map((i) => i.market_item?.name?.toLowerCase()) || [];
   const recipeIngredients = Array.isArray(recipe.ingredients)
-    ? recipe.ingredients
+    ? (recipe.ingredients as Array<{ name?: string } | string | null>)
     : [];
 
   const missing: string[] = [];
   const available: string[] = [];
 
   for (const ing of recipeIngredients) {
-    const ingName = typeof ing === "string" ? ing : ing.name || "";
+    if (ing === null || ing === undefined) continue;
+    const ingName =
+      typeof ing === "string" ? ing : (ing as { name?: string }).name || "";
     const normalized = ingName.toLowerCase();
     const found = availableItems.some(
       (item) => item?.includes(normalized) || normalized.includes(item || ""),
@@ -562,7 +565,7 @@ export async function suggestRecipe(_preferences?: string) {
 
   for (const recipe of recipes) {
     const ingredients = Array.isArray(recipe.ingredients)
-      ? recipe.ingredients
+      ? (recipe.ingredients as Array<{ name?: string } | string>)
       : [];
     const { matchCount, matchPercent } = countIngredientMatches(
       ingredients,

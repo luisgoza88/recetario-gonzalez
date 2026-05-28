@@ -29,10 +29,13 @@ export async function addToShoppingList(itemName: string, quantity?: string) {
   const { data: newItem } = await supabase
     .from("market_items")
     .insert({
+      id: crypto.randomUUID(),
       name: itemName,
       category: "Otros",
+      quantity: quantity || "unidad",
       unit: quantity || "unidad",
       is_custom: true,
+      order_index: 999,
     })
     .select()
     .single();
@@ -358,12 +361,12 @@ export async function resetInventoryToDefault(confirm: boolean) {
 
     const { data: defaultValues } = await supabase
       .from("market_items")
-      .select("id, default_quantity");
+      .select("id");
 
     for (const item of defaultValues || []) {
       await supabase.from("inventory").upsert({
         item_id: item.id,
-        current_number: item.default_quantity || 0,
+        current_number: 0,
       });
     }
 
@@ -412,9 +415,10 @@ export async function createRecipe(
     const { data: newRecipe, error } = await supabase
       .from("recipes")
       .insert({
+        id: crypto.randomUUID(),
         name,
         type,
-        ingredients,
+        ingredients: ingredients as unknown as never,
         steps,
         prep_time: prepTime,
         cook_time: cookTime,
