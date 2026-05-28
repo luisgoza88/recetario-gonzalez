@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  Brain,
   Shield,
   Clock,
   CheckCircle,
@@ -24,7 +23,8 @@ import {
   RotateCcw,
   ThumbsUp,
   ThumbsDown,
-  ArrowLeft,
+  Sparkles,
+  X,
 } from "lucide-react";
 import Spinner from "@/components/ui/Spinner";
 import { supabase } from "@/lib/supabase/client";
@@ -415,13 +415,14 @@ export default function AICommandCenter({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="fixed inset-0 z-[400] bg-[var(--bg)] flex items-center justify-center">
         <div className="text-center">
-          <Brain
-            size={48}
-            className="text-purple-500 mx-auto mb-4 animate-pulse"
-          />
-          <p className="text-gray-500">Cargando Centro de Comando IA...</p>
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-600 to-violet-700 flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <Sparkles size={28} className="text-white" />
+          </div>
+          <p className="text-[var(--ink-soft)] text-sm">
+            Cargando Centro de Comando IA...
+          </p>
         </div>
       </div>
     );
@@ -430,34 +431,40 @@ export default function AICommandCenter({
   // No household ID - show setup message
   if (!householdId) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-4 pb-6">
-          <div className="flex items-center gap-3">
+      <div className="fixed inset-0 z-[400] bg-[var(--bg)] flex flex-col animate-slide-up">
+        {/* Header morado */}
+        <div className="bg-gradient-to-br from-purple-600 to-violet-700 text-white px-5 pt-12 pb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center backdrop-blur">
+                <Sparkles size={16} />
+              </div>
+              <div>
+                <p className="text-[15px] font-semibold">
+                  Centro de Comando IA
+                </p>
+                <p className="text-[11px] text-white/70">Asistente Recetario</p>
+              </div>
+            </div>
             {onClose && (
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center"
               >
-                <ArrowLeft size={24} />
+                <X size={16} />
               </button>
             )}
-            <div className="flex-1">
-              <h1 className="text-xl font-bold flex items-center gap-2">
-                <Brain size={24} />
-                Centro de Comando IA
-              </h1>
-            </div>
           </div>
         </div>
-        <div className="p-4 flex items-center justify-center min-h-[60vh]">
+        <div className="flex-1 p-4 flex items-center justify-center">
           <div className="text-center">
-            <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Brain size={40} className="text-purple-500" />
+            <div className="w-20 h-20 bg-gradient-to-br from-purple-600 to-violet-700 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Sparkles size={36} className="text-white" />
             </div>
-            <h2 className="text-xl font-bold text-gray-800 mb-2">
+            <h2 className="text-xl font-bold text-[var(--ink)] mb-2">
               Configura tu hogar
             </h2>
-            <p className="text-gray-500 max-w-xs mx-auto">
+            <p className="text-[var(--ink-soft)] max-w-xs mx-auto">
               Para usar el Centro de Comando IA necesitas tener un hogar
               configurado primero.
             </p>
@@ -468,55 +475,60 @@ export default function AICommandCenter({
   }
 
   return (
-    <div className="h-dvh bg-gray-50 overflow-hidden flex flex-col">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-4 pb-6">
-        <div className="flex items-center gap-3 mb-4">
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-            >
-              <ArrowLeft size={24} />
-            </button>
-          )}
-          <div className="flex-1">
-            <h1 className="text-xl font-bold flex items-center gap-2">
-              <Brain size={24} />
-              Centro de Comando IA
-            </h1>
-            <p className="text-purple-200 text-sm">
-              Monitorea y controla tu asistente
-            </p>
+    <div className="fixed inset-0 z-[400] bg-[var(--bg)] overflow-hidden flex flex-col animate-slide-up">
+      {/* Header morado full-screen */}
+      <div className="bg-gradient-to-br from-purple-600 to-violet-700 text-white px-5 pt-12 pb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center backdrop-blur">
+              <Sparkles size={16} />
+            </div>
+            <div>
+              <p className="text-[15px] font-semibold">Centro de Comando IA</p>
+              <p className="text-[11px] text-white/70">
+                Monitorea y controla tu asistente
+              </p>
+            </div>
           </div>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-          >
-            <RefreshCw size={20} className={refreshing ? "animate-spin" : ""} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center backdrop-blur"
+            >
+              <RefreshCw
+                size={16}
+                className={refreshing ? "animate-spin" : ""}
+              />
+            </button>
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center backdrop-blur"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-3 gap-2">
-          <div className="bg-white/10 rounded-lg p-3 text-center">
-            <p className="text-2xl font-bold">{trustStats?.trust_level || 1}</p>
-            <p className="text-xs text-purple-200">Nivel Trust</p>
-          </div>
-          <div className="bg-white/10 rounded-lg p-3 text-center">
-            <p className="text-2xl font-bold">{pendingProposals.length}</p>
-            <p className="text-xs text-purple-200">Pendientes</p>
-          </div>
-          <div className="bg-white/10 rounded-lg p-3 text-center">
-            <p className="text-2xl font-bold">{todayStats.total}</p>
-            <p className="text-xs text-purple-200">Acciones Hoy</p>
-          </div>
+        {/* Context chips */}
+        <div className="flex gap-1.5 mt-3 overflow-x-auto scrollbar-hide">
+          <span className="bg-white/15 backdrop-blur px-2.5 py-1 rounded-full text-[10.5px] font-medium whitespace-nowrap">
+            Nivel Trust: {trustStats?.trust_level || 1}
+          </span>
+          <span className="bg-white/15 backdrop-blur px-2.5 py-1 rounded-full text-[10.5px] font-medium whitespace-nowrap">
+            {pendingProposals.length} pendiente
+            {pendingProposals.length !== 1 ? "s" : ""}
+          </span>
+          <span className="bg-white/15 backdrop-blur px-2.5 py-1 rounded-full text-[10.5px] font-medium whitespace-nowrap">
+            {todayStats.total} acción{todayStats.total !== 1 ? "es" : ""} hoy
+          </span>
         </div>
       </div>
 
       {/* Tabs - Chat eliminado (usar FloatingAIAssistant para chat) */}
-      <div className="bg-white border-b sticky top-0 z-10">
+      <div className="bg-white border-b border-[var(--border)] sticky top-0 z-10">
         <div className="flex">
           {[
             {
@@ -561,7 +573,7 @@ export default function AICommandCenter({
           {activeTab === "dashboard" && (
             <div className="space-y-4">
               {/* Trust Level Card */}
-              <div className="bg-gradient-to-r from-purple-500 to-indigo-500 rounded-xl p-4 text-white">
+              <div className="bg-gradient-to-br from-purple-600 to-violet-700 rounded-xl p-4 text-white">
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <p className="text-purple-200 text-sm">
