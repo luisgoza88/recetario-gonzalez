@@ -4,6 +4,7 @@ import {
   Geist_Mono,
   Fraunces,
   Plus_Jakarta_Sans,
+  JetBrains_Mono,
 } from "next/font/google";
 import "./globals.css";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
@@ -35,6 +36,14 @@ const plusJakarta = Plus_Jakarta_Sans({
   display: "swap",
 });
 
+// Monospace del nuevo design system (etiquetas técnicas, fechas, números)
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-mono",
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "Recetario Familia González",
   description: "Plan de 15 días - Menú rotativo familiar",
@@ -59,7 +68,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} ${plusJakarta.variable} antialiased warm-mode min-h-screen`}
+        className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} ${plusJakarta.variable} ${jetbrainsMono.variable} antialiased warm-mode min-h-screen`}
         style={{
           fontFamily: "var(--font-jakarta), var(--font-geist-sans)",
           background: "var(--bg)",
