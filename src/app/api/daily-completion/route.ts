@@ -3,6 +3,7 @@ import {
   createAuthenticatedClient,
   createServiceRoleClient,
 } from "@/lib/supabase/server";
+import { requireHouseholdMembership, forbiddenResponse } from "@/lib/api/auth";
 
 // ============================================
 // GET - Retrieve daily completion for a date
@@ -34,16 +35,27 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    if (!householdId) {
+      return NextResponse.json(
+        { error: "household_id parameter required" },
+        { status: 400 },
+      );
+    }
+
+    // Authorize: the user must belong to the requested household. The service
+    // role client below bypasses RLS, so this gate prevents cross-tenant reads.
+    const isMember = await requireHouseholdMembership(householdId);
+    if (!isMember) {
+      return forbiddenResponse("No perteneces a este hogar");
+    }
+
     const supabase = createServiceRoleClient();
 
     let query = supabase
       .from("daily_completions")
       .select("*")
-      .eq("completion_date", date);
-
-    if (householdId) {
-      query = query.eq("household_id", householdId);
-    }
+      .eq("completion_date", date)
+      .eq("household_id", householdId);
 
     if (employeeId) {
       query = query.eq("employee_id", employeeId);
@@ -100,6 +112,20 @@ export async function POST(request: NextRequest) {
 
     if (!date) {
       return NextResponse.json({ error: "date is required" }, { status: 400 });
+    }
+
+    if (!household_id) {
+      return NextResponse.json(
+        { error: "household_id is required" },
+        { status: 400 },
+      );
+    }
+
+    // Authorize: prevent writing completions into a household the user does
+    // not belong to (the service role client below bypasses RLS).
+    const isMember = await requireHouseholdMembership(household_id);
+    if (!isMember) {
+      return forbiddenResponse("No perteneces a este hogar");
     }
 
     const supabase = createServiceRoleClient();

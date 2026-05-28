@@ -25,6 +25,9 @@ describe("RATE_LIMIT_CONFIG", () => {
       "ai-chat",
       "ai-assistant",
       "validate-invitation",
+      "suggest-substitution",
+      "cook-with-this",
+      "external-recipe-search",
     ];
     expect(Object.keys(RATE_LIMIT_CONFIG)).toEqual(expectedActions);
   });

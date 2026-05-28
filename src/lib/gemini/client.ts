@@ -21,19 +21,22 @@ export function getGeminiClient(): GoogleGenAI {
   return geminiClient;
 }
 
-// Modelos disponibles
+// Modelos disponibles.
+// IDs configurables por env var para evitar el "drift" de modelos y la
+// dependencia de identificadores experimentales (`-exp`) que Google retira
+// sin aviso. Los defaults apuntan a modelos GA estables (familia 2.5).
 export const GEMINI_MODELS = {
   // Para texto rápido y económico
-  FLASH: "gemini-2.0-flash",
+  FLASH: process.env.GEMINI_MODEL_FLASH ?? "gemini-2.5-flash",
 
   // Para texto con generación de imágenes (Nano Banana)
-  FLASH_IMAGE: "gemini-2.0-flash-exp",
+  FLASH_IMAGE: process.env.GEMINI_MODEL_FLASH_IMAGE ?? "gemini-2.5-flash-image",
 
   // Para tareas de alta calidad
-  PRO: "gemini-2.0-pro",
+  PRO: process.env.GEMINI_MODEL_PRO ?? "gemini-2.5-pro",
 
   // Para generación de imágenes profesionales (Imagen 3)
-  IMAGE_GEN: "imagen-3.0-generate-002",
+  IMAGE_GEN: process.env.GEMINI_MODEL_IMAGE_GEN ?? "imagen-3.0-generate-002",
 } as const;
 
 // Configuraciones comunes
@@ -63,23 +66,34 @@ export const GEMINI_CONFIG = {
   },
 } as const;
 
-// Helper para limpiar respuestas JSON de Gemini
+// Helper para limpiar respuestas JSON de Gemini.
+// Soporta tanto objetos ({...}) como arrays ([...]) en el nivel superior:
+// recorta hasta el primer delimitador de apertura y su cierre correspondiente.
 export function cleanJsonResponse(content: string): string {
   let cleaned = content;
 
   // Remover bloques de código markdown
   cleaned = cleaned.replace(/```json\s*/gi, "");
   cleaned = cleaned.replace(/```\s*/g, "");
+  cleaned = cleaned.trim();
 
-  // Encontrar el primer { y el último }
+  // Determinar si el JSON top-level es un objeto o un array según el primer
+  // delimitador que aparezca, y recortar al par de apertura/cierre correcto.
   const firstBrace = cleaned.indexOf("{");
-  if (firstBrace > 0) {
-    cleaned = cleaned.slice(firstBrace);
+  const firstBracket = cleaned.indexOf("[");
+
+  const startsWithArray =
+    firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace);
+
+  const open = startsWithArray ? firstBracket : firstBrace;
+  if (open > 0) {
+    cleaned = cleaned.slice(open);
   }
 
-  const lastBrace = cleaned.lastIndexOf("}");
-  if (lastBrace !== -1 && lastBrace < cleaned.length - 1) {
-    cleaned = cleaned.slice(0, lastBrace + 1);
+  const closeChar = startsWithArray ? "]" : "}";
+  const lastClose = cleaned.lastIndexOf(closeChar);
+  if (lastClose !== -1 && lastClose < cleaned.length - 1) {
+    cleaned = cleaned.slice(0, lastClose + 1);
   }
 
   // Limpiar caracteres de control y comas finales

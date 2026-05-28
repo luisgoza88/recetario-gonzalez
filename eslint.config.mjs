@@ -12,6 +12,13 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Nested git worktrees traen su propio .next/ y copia de src/ que el
+    // glob ".next/**" no cubre, inflando el lint con miles de falsos positivos.
+    ".claude/**",
+    // Artefactos generados que no deben lintearse.
+    "coverage/**",
+    "public/sw.js",
+    "public/sw.js.map",
   ]),
   {
     rules: {

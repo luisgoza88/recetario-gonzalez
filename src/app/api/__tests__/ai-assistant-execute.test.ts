@@ -5,9 +5,18 @@ import { NextRequest } from "next/server";
 // Mocks
 // ---------------------------------------------------------------------------
 
-// Mock requireAuth from @/lib/api/auth
+// Mock auth helpers from @/lib/api/auth
 vi.mock("@/lib/api/auth", () => ({
   requireAuth: vi.fn(),
+  // Defaults to "is a member"; individual tests override for the 403 path.
+  requireHouseholdMembership: vi.fn().mockResolvedValue(true),
+  forbiddenResponse: vi.fn(
+    (message = "Insufficient permissions") =>
+      new Response(JSON.stringify({ error: message, code: "FORBIDDEN" }), {
+        status: 403,
+        headers: { "content-type": "application/json" },
+      }),
+  ),
 }));
 
 // Mock AI service modules
@@ -41,7 +50,7 @@ vi.mock("@/lib/utils/sql-escape", () => ({
 }));
 
 import { POST, GET } from "../ai-assistant/execute/route";
-import { requireAuth } from "@/lib/api/auth";
+import { requireAuth, requireHouseholdMembership } from "@/lib/api/auth";
 import {
   approveProposal,
   rejectProposal,
@@ -194,6 +203,7 @@ describe("POST /api/ai-assistant/execute", () => {
       {
         action: "reject",
         proposalId: "prop-123",
+        householdId: "h1",
         reason: "Not needed",
       },
     );
@@ -222,6 +232,7 @@ describe("POST /api/ai-assistant/execute", () => {
       {
         action: "invalid_action",
         proposalId: "123",
+        householdId: "h1",
       },
     );
     const response = await POST(request);
@@ -229,6 +240,29 @@ describe("POST /api/ai-assistant/execute", () => {
     expect(response.status).toBe(400);
     const body = await response.json();
     expect(body.error).toContain("Acción no reconocida");
+  });
+
+  // -----------------------------------------------------------------------
+  // 6b. CROSS-TENANT: non-member is rejected with 403
+  // -----------------------------------------------------------------------
+  it("returns 403 when the user does not belong to the household", async () => {
+    vi.mocked(requireAuth).mockReturnValue({ userId: "user-from-h1" });
+    vi.mocked(requireHouseholdMembership).mockResolvedValueOnce(false);
+
+    const request = buildMockRequest(
+      "http://localhost/api/ai-assistant/execute",
+      "POST",
+      {
+        action: "approve",
+        proposalId: "prop-from-h2",
+        householdId: "h2",
+      },
+    );
+    const response = await POST(request);
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.code).toBe("FORBIDDEN");
   });
 
   // -----------------------------------------------------------------------

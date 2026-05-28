@@ -21,7 +21,11 @@ import {
   TransactionOptions,
 } from "@/lib/ai/proposal-executor";
 
-import { requireAuth } from "@/lib/api/auth";
+import {
+  requireAuth,
+  requireHouseholdMembership,
+  forbiddenResponse,
+} from "@/lib/api/auth";
 import { createAuthenticatedClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 import { escapeIlike } from "@/lib/utils/sql-escape";
@@ -427,6 +431,22 @@ export async function POST(request: NextRequest) {
 
     if (!action) {
       return NextResponse.json({ error: "Action required" }, { status: 400 });
+    }
+
+    if (!householdId) {
+      return NextResponse.json(
+        { error: "householdId required" },
+        { status: 400 },
+      );
+    }
+
+    // Authorize: the user must belong to the household this proposal targets.
+    // decide_ai_proposal is SECURITY DEFINER (bypasses RLS), so without this
+    // gate any authenticated user could approve/execute/rollback another
+    // household's proposals by passing its proposalId.
+    const isMember = await requireHouseholdMembership(householdId);
+    if (!isMember) {
+      return forbiddenResponse("No perteneces a este hogar");
     }
 
     const functionExecutor = await createFunctionExecutor(householdId);

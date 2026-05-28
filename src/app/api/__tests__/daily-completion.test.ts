@@ -35,7 +35,7 @@ function buildMockRequest(
   return request;
 }
 
-function createMockAuthClient(shouldPass = true) {
+function createMockAuthClient(shouldPass = true, isMember = true) {
   return {
     auth: {
       getUser: vi
@@ -46,6 +46,18 @@ function createMockAuthClient(shouldPass = true) {
             : { data: { user: null }, error: new Error("Unauthorized") },
         ),
     },
+    // Chain used by requireHouseholdMembership() to verify the user belongs
+    // to the requested household before the service-role client runs.
+    from: vi.fn().mockReturnThis(),
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    maybeSingle: vi
+      .fn()
+      .mockResolvedValue(
+        isMember
+          ? { data: { id: "membership-1" }, error: null }
+          : { data: null, error: null },
+      ),
   };
 }
 
@@ -176,13 +188,53 @@ describe("GET /api/daily-completion", () => {
     );
 
     const request = buildMockRequest(
-      "http://localhost/api/daily-completion?date=2026-05-08&employee_id=e2",
+      "http://localhost/api/daily-completion?date=2026-05-08&household_id=h1&employee_id=e2",
       "GET",
     );
     const response = await GET(request);
 
     expect(response.status).toBe(200);
     expect(mockServiceClient.eq).toHaveBeenCalledWith("employee_id", "e2");
+  });
+
+  // -----------------------------------------------------------------------
+  // 5. CROSS-TENANT: non-member is rejected with 403
+  // -----------------------------------------------------------------------
+  it("returns 403 when the user does not belong to the household", async () => {
+    const mockAuthClient = createMockAuthClient(true, false); // not a member
+    vi.mocked(createAuthenticatedClient).mockResolvedValue(
+      mockAuthClient as never,
+    );
+
+    const request = buildMockRequest(
+      "http://localhost/api/daily-completion?date=2026-05-08&household_id=other-household",
+      "GET",
+    );
+    const response = await GET(request);
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.code).toBe("FORBIDDEN");
+  });
+
+  // -----------------------------------------------------------------------
+  // 6. MISSING HOUSEHOLD_ID PARAM
+  // -----------------------------------------------------------------------
+  it("returns 400 when household_id parameter is missing", async () => {
+    const mockAuthClient = createMockAuthClient(true);
+    vi.mocked(createAuthenticatedClient).mockResolvedValue(
+      mockAuthClient as never,
+    );
+
+    const request = buildMockRequest(
+      "http://localhost/api/daily-completion?date=2026-05-08",
+      "GET",
+    );
+    const response = await GET(request);
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("household_id parameter required");
   });
 });
 
