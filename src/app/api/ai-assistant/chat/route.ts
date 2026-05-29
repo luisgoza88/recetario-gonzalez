@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  getGeminiClient,
-  GEMINI_MODELS,
-  base64ToGeminiFormat,
-} from "@/lib/gemini/client";
-import {
-  FunctionDeclaration,
-  Type,
-  FunctionCallingConfigMode,
-} from "@google/genai";
+import { FunctionDeclaration, Type } from "@google/genai";
+import { selectTools, type ChatMessageInput } from "@/lib/ai/chat";
+import { generateText } from "@/lib/ai/generate";
 import { withRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 import { createAuthenticatedClient } from "@/lib/supabase/server";
@@ -612,40 +605,27 @@ export async function POST(request: NextRequest) {
       moodPatterns: formatMoodPatternsForPrompt(moodPatterns),
     });
 
-    const gemini = getGeminiClient();
     const lastUserMessage = messages[messages.length - 1]?.content || "";
 
-    // Convertir mensajes al formato Gemini
-    const geminiMessages = messages.map((msg: MessageWithImage) => {
-      const parts: Array<
-        { text: string } | { inlineData: { data: string; mimeType: string } }
-      > = [];
-      if (msg.content) parts.push({ text: msg.content });
-      if (msg.image) parts.push(base64ToGeminiFormat(msg.image));
-      return {
-        role: msg.role === "assistant" ? ("model" as const) : ("user" as const),
-        parts,
-      };
-    });
+    // Mensajes normalizados para el adaptador agnóstico de proveedor
+    const chatMessages: ChatMessageInput[] = messages.map(
+      (msg: MessageWithImage) => ({
+        role: msg.role === "assistant" ? "assistant" : "user",
+        content: msg.content || "",
+        image: msg.image,
+      }),
+    );
 
-    // Llamar a Gemini con funciones de consulta
-    const response = await gemini.models.generateContent({
-      model: GEMINI_MODELS.FLASH,
-      contents: geminiMessages,
-      config: {
-        temperature: 0.7,
-        maxOutputTokens: 1000,
-        systemInstruction: dynamicSystemPrompt,
-        tools: [{ functionDeclarations: queryFunctions }],
-        toolConfig: {
-          functionCallingConfig: { mode: FunctionCallingConfigMode.AUTO },
-        },
-      },
+    // Selección de herramientas (DeepSeek con fallback Gemini)
+    const selection = await selectTools({
+      system: dynamicSystemPrompt,
+      messages: chatMessages,
+      tools: queryFunctions,
+      temperature: 0.7,
+      maxTokens: 1000,
     });
-
-    const candidate = response.candidates?.[0];
-    const parts = candidate?.content?.parts || [];
-    const functionCalls = parts.filter((part) => part.functionCall);
+    const assistantText = selection.text;
+    const functionCalls = selection.toolCalls;
 
     // Si no hay llamadas a funciones, verificar si debería haber una
     if (functionCalls.length === 0) {
@@ -655,29 +635,15 @@ export async function POST(request: NextRequest) {
         logger.info(`[AI Chat Simple] Forcing function: ${detected.name}`);
         const result = await executeQueryFunction(detected.name, detected.args);
 
-        // Generar respuesta basada en el resultado
-        const followUp = await gemini.models.generateContent({
-          model: GEMINI_MODELS.FLASH,
-          contents: [
-            {
-              role: "user",
-              parts: [
-                {
-                  text: `Usuario preguntó: "${lastUserMessage}"\n\nResultado de ${detected.name}:\n${JSON.stringify(result, null, 2)}\n\nResponde de forma útil y amigable.`,
-                },
-              ],
-            },
-          ],
-          config: {
-            temperature: 0.7,
-            maxOutputTokens: 1000,
-            systemInstruction: dynamicSystemPrompt,
-          },
-        });
-
+        // Generar respuesta basada en el resultado (DeepSeek/Gemini)
         const content =
-          followUp.candidates?.[0]?.content?.parts?.[0]?.text ||
-          "No pude obtener la información.";
+          (await generateText({
+            system: dynamicSystemPrompt,
+            prompt: `Usuario preguntó: "${lastUserMessage}"\n\nResultado de ${detected.name}:\n${JSON.stringify(result, null, 2)}\n\nResponde de forma útil y amigable.`,
+            json: false,
+            temperature: 0.7,
+            maxTokens: 1000,
+          })) || "No pude obtener la información.";
 
         if (stream) {
           return new Response(
@@ -696,7 +662,7 @@ export async function POST(request: NextRequest) {
 
       // Respuesta directa sin función
       const textResponse =
-        parts.find((part) => part.text)?.text ||
+        assistantText ||
         "Hola, ¿en qué puedo ayudarte con el menú, recetas o tareas del hogar?";
 
       if (stream) {
@@ -714,38 +680,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ content: textResponse, role: "assistant" });
     }
 
-    // Ejecutar funciones llamadas
-    const functionResponses = [];
-    for (const part of functionCalls) {
-      const fc = part.functionCall!;
-      const result = await executeQueryFunction(
-        fc.name!,
-        (fc.args as Record<string, unknown>) || {},
+    // Ejecutar funciones de consulta llamadas (solo lectura)
+    const results: string[] = [];
+    for (const fc of functionCalls) {
+      const result = await executeQueryFunction(fc.name, fc.args || {});
+      results.push(
+        `${fc.name}:\n${JSON.stringify(result, null, 2).slice(0, 4000)}`,
       );
-      functionResponses.push({
-        functionResponse: { name: fc.name, response: result },
-      });
     }
 
-    // Obtener respuesta final
-    const finalResponse = await gemini.models.generateContent({
-      model: GEMINI_MODELS.FLASH,
-      contents: [
-        ...geminiMessages,
-        { role: "model" as const, parts: parts },
-        { role: "user" as const, parts: functionResponses },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ] as any,
-      config: {
-        temperature: 0.7,
-        maxOutputTokens: 1000,
-        systemInstruction: dynamicSystemPrompt,
-      },
-    });
-
+    // Síntesis de la respuesta final (DeepSeek con fallback Gemini)
     const finalContent =
-      finalResponse.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "No pude procesar tu solicitud.";
+      (await generateText({
+        system: dynamicSystemPrompt,
+        prompt: `El usuario dijo: "${lastUserMessage}"\n\nResultados de las consultas:\n${results.join("\n\n")}\n\nResponde de forma útil, amigable y breve basándote en estos resultados. No inventes datos que no estén en ellos.`,
+        json: false,
+        temperature: 0.7,
+        maxTokens: 1000,
+      })) || "No pude procesar tu solicitud.";
 
     if (stream) {
       return new Response(

@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
-  getGeminiClient,
-  GEMINI_MODELS,
   GEMINI_CONFIG,
-  base64ToGeminiFormat,
   prepareUserInput,
   wrapUserInput,
 } from "@/lib/gemini/client";
@@ -14,7 +11,6 @@ import {
   forbiddenResponse,
 } from "@/lib/api/auth";
 import { createAuthenticatedClient } from "@/lib/supabase/server";
-import { FunctionCallingConfigMode } from "@google/genai";
 import {
   getFunctionRiskLevel,
   AI_RISK_LEVELS,
@@ -72,8 +68,40 @@ const ALWAYS_REQUIRE_APPROVAL = new Set<string>([
   "bulk_update_inventory",
 ]);
 
+/**
+ * Construye el prompt de síntesis a partir de los resultados de las funciones
+ * ejecutadas. Reemplaza el formato multi-turno functionResponse de Gemini por
+ * texto plano, válido para cualquier proveedor (DeepSeek/Gemini).
+ */
+function buildSynthesisPrompt(
+  userMessage: string,
+  functionResponses: Array<{
+    functionResponse: { name: string; response: unknown };
+  }>,
+): string {
+  const results = functionResponses
+    .map(
+      (fr) =>
+        `Función ${fr.functionResponse.name}:\n${JSON.stringify(
+          fr.functionResponse.response,
+          null,
+          2,
+        ).slice(0, 4000)}`,
+    )
+    .join("\n\n");
+  return `El usuario dijo: "${userMessage}"
+
+Resultados de las acciones/consultas ejecutadas:
+${results}
+
+Responde al usuario de forma útil, amigable y breve, confirmando lo que se hizo o respondiendo su consulta basándote en estos resultados. No inventes datos que no estén en los resultados.`;
+}
+
 // Import function declarations and orchestrator
 import { functionDeclarations } from "./functions";
+// Tool-calling agnóstico de proveedor (DeepSeek con fallback Gemini) + texto
+import { selectTools, type ChatMessageInput } from "@/lib/ai/chat";
+import { generateText } from "@/lib/ai/generate";
 import {
   executeFunction,
   executeFunctionWithLogging,
@@ -179,8 +207,6 @@ export async function POST(request: NextRequest) {
       sessionId,
     };
 
-    const gemini = getGeminiClient();
-
     // Fetch cooking profile for household-aware prompts
     const cookingProfile = await getCookingProfile(householdId);
     const familyName = getFamilyDisplayName(cookingProfile);
@@ -232,87 +258,56 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Convert messages to Gemini format (with image support).
-    // User-authored text is sanitized and wrapped in <user_input> delimiters so
-    // the model treats it as data, not instructions (prompt-injection defense).
-    // This route executes household mutations via function calling, so this is
-    // the most security-sensitive entry point for untrusted text.
-    const geminiMessages = messages.map((msg: MessageWithImage) => {
-      const parts: Array<
-        { text: string } | { inlineData: { data: string; mimeType: string } }
-      > = [];
-
-      if (msg.content) {
+    // Mensajes normalizados para el adaptador agnóstico de proveedor.
+    // El texto del usuario se sanitiza y envuelve en <user_input> (defensa
+    // anti prompt-injection) — este route ejecuta mutaciones del hogar vía
+    // function-calling, así que es el punto más sensible para texto no confiable.
+    const chatMessages: ChatMessageInput[] = messages.map(
+      (msg: MessageWithImage) => {
         if (msg.role === "assistant") {
-          parts.push({ text: msg.content });
-        } else {
-          const { sanitized, possibleInjection } = prepareUserInput(
-            msg.content,
-            { maxLength: 10000 },
-          );
-          if (possibleInjection) {
-            logger.warn("[ai-assistant] Possible prompt injection detected", {
-              sessionId,
-            });
-          }
-          parts.push({ text: wrapUserInput(sanitized) });
+          return { role: "assistant", content: msg.content || "" };
         }
-      }
+        const { sanitized, possibleInjection } = prepareUserInput(
+          msg.content || "",
+          { maxLength: 10000 },
+        );
+        if (possibleInjection) {
+          logger.warn("[ai-assistant] Possible prompt injection detected", {
+            sessionId,
+          });
+        }
+        return {
+          role: "user",
+          content: wrapUserInput(sanitized),
+          image: msg.image,
+        };
+      },
+    );
 
-      if (msg.image) {
-        const imageData = base64ToGeminiFormat(msg.image);
-        parts.push(imageData);
-      }
-
-      return {
-        role: msg.role === "assistant" ? ("model" as const) : ("user" as const),
-        parts,
-      };
-    });
-
-    // First Gemini call with function declarations
-    let response;
+    // Primera llamada: selección de herramientas (DeepSeek con fallback Gemini)
+    let selection;
     try {
-      logger.info("Calling Gemini API", { model: GEMINI_MODELS.FLASH });
-      response = await gemini.models.generateContent({
-        model: GEMINI_MODELS.FLASH,
-        contents: geminiMessages,
-        config: {
-          temperature: GEMINI_CONFIG.assistant.temperature,
-          maxOutputTokens: GEMINI_CONFIG.assistant.maxOutputTokens,
-          systemInstruction: enhancedSystemPrompt,
-          tools: [
-            {
-              functionDeclarations,
-            },
-          ],
-          toolConfig: {
-            functionCallingConfig: {
-              mode: FunctionCallingConfigMode.AUTO,
-            },
-          },
-        },
+      selection = await selectTools({
+        system: enhancedSystemPrompt,
+        messages: chatMessages,
+        tools: functionDeclarations,
       });
-      logger.info("Gemini API response received");
-    } catch (geminiError) {
-      logger.error("Gemini API error", {
-        error:
-          geminiError instanceof Error
-            ? geminiError.message
-            : String(geminiError),
+      logger.info("AI tool-selection recibida", {
+        provider: selection.provider,
+        toolCalls: selection.toolCalls.length,
       });
+    } catch (aiError) {
       const errorMsg =
-        geminiError instanceof Error
-          ? geminiError.message
-          : String(geminiError);
-      throw new Error(`Gemini API error: ${errorMsg}`);
+        aiError instanceof Error ? aiError.message : String(aiError);
+      logger.error("AI tool-selection error", { error: errorMsg });
+      throw new Error(`AI provider error: ${errorMsg}`);
     }
 
-    const candidate = response.candidates?.[0];
-    const parts = candidate?.content?.parts || [];
+    // Texto de la respuesta del modelo (cuando no llama funciones)
+    const assistantText = selection.text;
 
-    // Check for function calls in response
-    const functionCalls = parts.filter((part) => part.functionCall);
+    // Tool calls normalizados ({name,args}) que decidió el modelo
+    const functionCalls = selection.toolCalls;
 
     const lastUserMessage = messages[messages.length - 1]?.content || "";
     logger.info("User message", { message: lastUserMessage.substring(0, 100) });
@@ -363,19 +358,14 @@ ${JSON.stringify(forcedResult, null, 2)}
 
 Basándote en estos datos, responde al usuario de forma útil y amigable.`;
 
-      const followUpResponse = await gemini.models.generateContent({
-        model: GEMINI_MODELS.FLASH,
-        contents: [{ role: "user", parts: [{ text: contextMessage }] }],
-        config: {
-          temperature: GEMINI_CONFIG.assistant.temperature,
-          maxOutputTokens: GEMINI_CONFIG.assistant.maxOutputTokens,
-          systemInstruction: enhancedSystemPrompt,
-        },
-      });
-
       const forcedContent =
-        followUpResponse.candidates?.[0]?.content?.parts?.[0]?.text ||
-        "Hubo un problema al procesar tu solicitud.";
+        (await generateText({
+          system: enhancedSystemPrompt,
+          prompt: contextMessage,
+          json: false,
+          temperature: GEMINI_CONFIG.assistant.temperature,
+          maxTokens: GEMINI_CONFIG.assistant.maxOutputTokens,
+        })) || "Hubo un problema al procesar tu solicitud.";
 
       if (stream) {
         const streamData = createToolStreamEvent({
@@ -406,20 +396,14 @@ Basándote en estos datos, responde al usuario de forma útil y amigable.`;
     }
 
     if (functionCalls.length === 0) {
-      const textResponse = parts.find((part) => part.text)?.text || "";
       logger.info("No functions called, text response", {
-        response: textResponse.substring(0, 200),
+        response: assistantText.substring(0, 200),
       });
     }
 
     if (functionCalls.length > 0) {
-      const parsedCalls = functionCalls
-        .map((part) => part.functionCall!)
-        .filter((fc) => fc.name)
-        .map((fc) => ({
-          name: fc.name!,
-          args: (fc.args as Record<string, unknown>) || {},
-        }));
+      // Ya vienen normalizados como {name,args} desde selectTools
+      const parsedCalls = functionCalls;
 
       // Check for write operations
       const writeOperations = parsedCalls.filter(
@@ -600,36 +584,29 @@ Basándote en estos datos, responde al usuario de forma útil y amigable.`;
                 });
               }
 
-              // Stream AI response based on function results
-              const streamResponse = await gemini.models.generateContentStream({
-                model: GEMINI_MODELS.FLASH,
-                contents: [
-                  ...geminiMessages,
-                  { role: "model" as const, parts: parts },
-                  { role: "user" as const, parts: functionResponses },
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                ] as any,
-                config: {
-                  temperature: GEMINI_CONFIG.assistant.temperature,
-                  maxOutputTokens: GEMINI_CONFIG.assistant.maxOutputTokens,
-                  systemInstruction: enhancedSystemPrompt,
-                },
+              // Síntesis de la respuesta a partir de los resultados (agnóstico
+              // de proveedor: DeepSeek con fallback Gemini, vía generateText).
+              const synthesisText = await generateText({
+                system: enhancedSystemPrompt,
+                prompt: buildSynthesisPrompt(
+                  lastUserMessage,
+                  functionResponses,
+                ),
+                json: false,
+                temperature: GEMINI_CONFIG.assistant.temperature,
+                maxTokens: GEMINI_CONFIG.assistant.maxOutputTokens,
               });
 
-              for await (const chunk of streamResponse) {
-                const text =
-                  chunk.candidates?.[0]?.content?.parts?.[0]?.text || "";
-                if (text) {
-                  controller.enqueue(
-                    new TextEncoder().encode(
-                      createToolStreamEvent({
-                        type: "content",
-                        content: text,
-                        done: false,
-                      }),
-                    ),
-                  );
-                }
+              if (synthesisText) {
+                controller.enqueue(
+                  new TextEncoder().encode(
+                    createToolStreamEvent({
+                      type: "content",
+                      content: synthesisText,
+                      done: false,
+                    }),
+                  ),
+                );
               }
 
               const undoableActions = executionMetadata.filter(
@@ -713,23 +690,13 @@ Basándote en estos datos, responde al usuario de forma útil y amigable.`;
         executionMetadata.push({ functionName: fc.name, auditLogId, canUndo });
       }
 
-      const finalResponse = await gemini.models.generateContent({
-        model: GEMINI_MODELS.FLASH,
-        contents: [
-          ...geminiMessages,
-          { role: "model" as const, parts: parts },
-          { role: "user" as const, parts: functionResponses },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ] as any,
-        config: {
-          temperature: GEMINI_CONFIG.assistant.temperature,
-          maxOutputTokens: GEMINI_CONFIG.assistant.maxOutputTokens,
-          systemInstruction: enhancedSystemPrompt,
-        },
+      let finalContent = await generateText({
+        system: enhancedSystemPrompt,
+        prompt: buildSynthesisPrompt(lastUserMessage, functionResponses),
+        json: false,
+        temperature: GEMINI_CONFIG.assistant.temperature,
+        maxTokens: GEMINI_CONFIG.assistant.maxOutputTokens,
       });
-
-      let finalContent =
-        finalResponse.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
       if (!finalContent || isInvalidResponse(finalContent)) {
         const lastUserMsg = messages[messages.length - 1]?.content || "";
@@ -759,7 +726,7 @@ Basándote en estos datos, responde al usuario de forma útil y amigable.`;
 
     // No function calls — streaming text response
     if (stream) {
-      const textContent = parts.find((part) => part.text)?.text || "";
+      const textContent = assistantText;
       const chunks = textContent.split(/(\s+)/).filter(Boolean);
 
       const readableStream = new ReadableStream({
@@ -816,7 +783,7 @@ Basándote en estos datos, responde al usuario de forma útil y amigable.`;
     }
 
     // Non-streaming text response
-    let textContent = parts.find((part) => part.text)?.text || "";
+    let textContent = assistantText;
 
     if (!textContent || isInvalidResponse(textContent)) {
       const lastUserMsg = messages[messages.length - 1]?.content || "";
