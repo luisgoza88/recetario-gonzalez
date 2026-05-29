@@ -61,11 +61,16 @@ export async function generateText(opts: GenerateTextOptions): Promise<string> {
             { role: "user" as const, content: prompt },
           ]
         : [{ role: "user" as const, content: prompt }];
+      // FLASH por defecto: las rutas de generación tienen límite de 30s en
+      // Vercel y PRO (reasoning) tarda ~60s y trunca el JSON. Override con
+      // DEEPSEEK_MODEL_TEXT si se quiere otro. Subimos el piso de tokens para
+      // dejar espacio al reasoning y evitar JSON truncado.
+      const model = process.env.DEEPSEEK_MODEL_TEXT ?? DEEPSEEK_MODELS.FLASH;
       return await deepseekChatWithRetry({
-        model: DEEPSEEK_MODELS.PRO,
+        model,
         messages,
         temperature,
-        maxTokens,
+        maxTokens: Math.max(maxTokens, 4000),
         json,
       });
     } catch (err) {
