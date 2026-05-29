@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  getGeminiClient,
-  GEMINI_MODELS,
-  cleanJsonResponse,
-  geminiWithRetry,
-  sanitizeUserInput,
-} from "@/lib/gemini/client";
+import { cleanJsonResponse, sanitizeUserInput } from "@/lib/gemini/client";
+import { generateText } from "@/lib/ai/generate";
 import { withRateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/api/auth";
 import { createServiceRoleClient } from "@/lib/supabase/server";
@@ -394,21 +389,13 @@ export async function POST(request: NextRequest) {
       avoidSection,
     });
 
-    // Call Gemini
-    const gemini = getGeminiClient();
-    const response = await geminiWithRetry(() =>
-      gemini.models.generateContent({
-        model: GEMINI_MODELS.FLASH,
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        config: {
-          temperature: 0.8,
-          maxOutputTokens: 8000,
-          responseMimeType: "application/json",
-        },
-      }),
-    );
-
-    const content = response.candidates?.[0]?.content?.parts?.[0]?.text;
+    // Call AI text provider (DeepSeek con fallback Gemini)
+    const content = await generateText({
+      prompt,
+      temperature: 0.8,
+      maxTokens: 8000,
+      json: true,
+    });
     if (!content) {
       return NextResponse.json(
         { error: "No response from AI" },

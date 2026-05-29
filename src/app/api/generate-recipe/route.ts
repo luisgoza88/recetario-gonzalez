@@ -8,6 +8,7 @@ import {
   geminiWithRetry,
   sanitizeUserInput,
 } from "@/lib/gemini/client";
+import { generateText } from "@/lib/ai/generate";
 import { withRateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/api/auth";
 import { createServiceRoleClient } from "@/lib/supabase/server";
@@ -454,25 +455,14 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura exacta:
   "moods": ["moods aplicables a esta receta, ej: nutritivo, saludable"]
 }`;
 
-    // Llamar a Gemini con retry automático
-    const response = await geminiWithRetry(() =>
-      gemini.models.generateContent({
-        model: GEMINI_MODELS.FLASH,
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: prompt }],
-          },
-        ],
-        config: {
-          temperature: GEMINI_CONFIG.recipe.temperature,
-          maxOutputTokens: GEMINI_CONFIG.recipe.maxOutputTokens,
-          responseMimeType: "application/json",
-        },
-      }),
-    );
-
-    const content = response.candidates?.[0]?.content?.parts?.[0]?.text;
+    // Generar el TEXTO de la receta con el proveedor configurado
+    // (DeepSeek con fallback a Gemini). La imagen sigue en Gemini abajo.
+    const content = await generateText({
+      prompt,
+      temperature: GEMINI_CONFIG.recipe.temperature,
+      maxTokens: GEMINI_CONFIG.recipe.maxOutputTokens,
+      json: true,
+    });
 
     if (!content) {
       return NextResponse.json(
