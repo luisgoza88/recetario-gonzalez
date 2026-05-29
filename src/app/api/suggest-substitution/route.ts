@@ -2,12 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuth } from "@/lib/api/auth";
 import { withRateLimit } from "@/lib/rate-limit";
-import {
-  getGeminiClient,
-  GEMINI_MODELS,
-  cleanJsonResponse,
-  sanitizeUserInput,
-} from "@/lib/gemini/client";
+import { cleanJsonResponse, sanitizeUserInput } from "@/lib/gemini/client";
+import { generateText } from "@/lib/ai/generate";
 import { logger } from "@/lib/logger";
 
 const InputSchema = z.object({
@@ -45,7 +41,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const client = getGeminiClient();
     const safeIngredient = sanitizeUserInput(body.ingredient, 100);
     const safeRecipeName = body.recipeName
       ? sanitizeUserInput(body.recipeName, 200)
@@ -72,18 +67,19 @@ Responde SOLO en JSON con este formato exacto:
 
 Contexto: cocina colombiana/latinoamericana, ingredientes comunes en Colombia.`;
 
-    const result = await client.models.generateContent({
-      model: GEMINI_MODELS.FLASH,
-      contents: prompt,
-      config: { temperature: 0.7, responseMimeType: "application/json" },
+    const content = await generateText({
+      prompt,
+      temperature: 0.7,
+      maxTokens: 2500,
+      json: true,
     });
 
-    const text = cleanJsonResponse(result.text || "{}");
+    const text = cleanJsonResponse(content || "{}");
     const json = JSON.parse(text);
 
     return NextResponse.json(json, { headers: rateLimit.headers });
   } catch (err) {
-    logger.error("[suggest-substitution] Error calling Gemini", {
+    logger.error("[suggest-substitution] Error generating substitutions", {
       error: err instanceof Error ? err.message : String(err),
     });
     return NextResponse.json(

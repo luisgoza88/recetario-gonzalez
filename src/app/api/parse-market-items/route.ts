@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  getGeminiClient,
-  GEMINI_MODELS,
-  GEMINI_CONFIG,
-  cleanJsonResponse,
-} from "@/lib/gemini/client";
+import { GEMINI_CONFIG, cleanJsonResponse } from "@/lib/gemini/client";
+import { generateText } from "@/lib/ai/generate";
 import { requireAuth } from "@/lib/api/auth";
 import { logger } from "@/lib/logger";
 import {
@@ -410,24 +406,13 @@ Responde SOLO con JSON válido en este formato:
 
 Separa múltiples productos si los hay (pueden estar separados por comas, "y", o saltos de línea).`;
 
-    const gemini = getGeminiClient();
-
-    const response = await gemini.models.generateContent({
-      model: GEMINI_MODELS.FLASH,
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: systemPrompt }, { text: userPrompt }],
-        },
-      ],
-      config: {
-        temperature: GEMINI_CONFIG.parsing.temperature,
-        maxOutputTokens: GEMINI_CONFIG.parsing.maxOutputTokens,
-        responseMimeType: "application/json",
-      },
+    const content = await generateText({
+      system: systemPrompt,
+      prompt: userPrompt,
+      temperature: GEMINI_CONFIG.parsing.temperature,
+      maxTokens: GEMINI_CONFIG.parsing.maxOutputTokens,
+      json: true,
     });
-
-    const content = response.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!content) {
       return NextResponse.json(

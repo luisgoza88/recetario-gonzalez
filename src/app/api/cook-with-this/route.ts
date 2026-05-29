@@ -3,11 +3,8 @@ import { z } from "zod";
 import { requireAuth } from "@/lib/api/auth";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { withRateLimit } from "@/lib/rate-limit";
-import {
-  getGeminiClient,
-  GEMINI_MODELS,
-  cleanJsonResponse,
-} from "@/lib/gemini/client";
+import { cleanJsonResponse } from "@/lib/gemini/client";
+import { generateText } from "@/lib/ai/generate";
 import { logger } from "@/lib/logger";
 
 const InputSchema = z.object({
@@ -118,8 +115,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fallback: Gemini sugiere recetas con esos ingredientes
-    const client = getGeminiClient();
+    // Fallback: la IA sugiere recetas con esos ingredientes
     const ingredientList = body.ingredients.join(", ");
 
     const prompt = `Tengo estos ingredientes disponibles: ${ingredientList}.
@@ -138,13 +134,13 @@ Responde SOLO en JSON con este formato exacto:
   ]
 }`;
 
-    const result = await client.models.generateContent({
-      model: GEMINI_MODELS.FLASH,
-      contents: prompt,
-      config: { temperature: 0.8, responseMimeType: "application/json" },
+    const content = await generateText({
+      prompt,
+      temperature: 0.8,
+      json: true,
     });
 
-    const text = cleanJsonResponse(result.text || "{}");
+    const text = cleanJsonResponse(content || "{}");
     const raw = JSON.parse(text);
 
     // Validar forma y tipos del output del modelo antes de reenviar al cliente
