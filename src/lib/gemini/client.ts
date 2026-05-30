@@ -24,15 +24,21 @@ export function getGeminiClient(): GoogleGenAI {
 // Modelos disponibles.
 // IDs configurables por env var para evitar el "drift" de modelos y la
 // dependencia de identificadores experimentales (`-exp`) que Google retira
-// sin aviso. Los defaults apuntan a modelos GA estables (familia 2.5).
+// sin aviso. Los defaults apuntan a modelos GA estables (familia 3.5 donde
+// está disponible, con fallback a 2.5 para lo que aún no migró).
 export const GEMINI_MODELS = {
-  // Para texto rápido y económico
-  FLASH: process.env.GEMINI_MODEL_FLASH ?? "gemini-2.5-flash",
+  // Para texto rápido y económico — Gemini 3.5 Flash (May 2026)
+  FLASH: process.env.GEMINI_MODEL_FLASH ?? "gemini-3.5-flash",
 
-  // Para texto con generación de imágenes (Nano Banana)
+  // Para texto con generación de imágenes (Nano Banana).
+  // ⚠️  Gemini 3.5 Flash NO soporta image generation, por lo que este
+  //     modelo se mantiene en la última versión 2.5 que sí lo soporta.
+  //     Cuando Google lance un Flash con image gen en 3.x, migrar.
   FLASH_IMAGE: process.env.GEMINI_MODEL_FLASH_IMAGE ?? "gemini-2.5-flash-image",
 
-  // Para tareas de alta calidad
+  // Para tareas de alta calidad.
+  // ⚠️  Gemini 3.5 Pro aún no está disponible (anunciado para junio 2026
+  //     en Google I/O). Se mantiene 2.5 Pro hasta entonces.
   PRO: process.env.GEMINI_MODEL_PRO ?? "gemini-2.5-pro",
 
   // Para generación de imágenes profesionales (Imagen 3)

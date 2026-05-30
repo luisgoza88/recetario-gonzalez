@@ -88,7 +88,7 @@ La aplicación combina **dos módulos principales**:
 | ------------------------- | ------------------------------------ |
 | `gemini-2.0-flash`        | Generación rápida (recetas, parsing) |
 | `gemini-2.0-flash-exp`    | Con soporte de imágenes              |
-| `gemini-2.5-flash`        | Chat y asistente                     |
+| `gemini-3.5-flash`        | Chat y asistente (desde May 2026)    |
 | `imagen-3.0-generate-002` | Generación de imágenes de platos     |
 
 ---

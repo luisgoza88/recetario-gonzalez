@@ -11,7 +11,7 @@ Aplicación de recetario familiar con plan de 15 días y menú rotativo para la 
 ## Stack
 
 - **Frontend**: Next.js 16 + TypeScript + Tailwind CSS v4
-- **Backend**: Supabase (PostgreSQL) + Google Gemini API (Gemini 2.5 Flash + Imagen 3)
+- **Backend**: Supabase (PostgreSQL) + Google Gemini API (Gemini 3.5 Flash + Imagen 3)
 - **PWA**: Serwist (Service Worker para offline)
 - **Deploy**: Vercel (auto-deploy desde main)
 - **UI**: Lucide React (iconos)
