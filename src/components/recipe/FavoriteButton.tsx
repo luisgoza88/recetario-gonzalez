@@ -13,8 +13,12 @@ export function FavoriteButton({
   size = 24,
   className = "",
 }: FavoriteButtonProps) {
-  const { isFavorite, toggleFavorite, isLoading } = useFavorites();
+  const { isFavorite, toggleFavorite, canFavorite, isLoading } = useFavorites();
   const fav = isFavorite(recipeId);
+
+  // Ocultar el botón para recetas que no se pueden favoritar (sin sesión o del
+  // paquete estático): antes mostraba un corazón que fallaba en silencio.
+  if (!canFavorite(recipeId)) return null;
 
   return (
     <button

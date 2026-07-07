@@ -44,11 +44,10 @@ function createFileWithArrayBuffer(
   name: string,
   type: string,
 ) {
-  const file = new File([bytes], name, { type });
-  const buffer = bytes.buffer.slice(
-    bytes.byteOffset,
-    bytes.byteOffset + bytes.byteLength,
-  );
+  // Convert to ArrayBuffer to ensure compatibility with File constructor
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  const file = new File([buffer], name, { type });
   file.arrayBuffer = () => Promise.resolve(buffer);
   return file;
 }

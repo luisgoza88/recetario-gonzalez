@@ -26,7 +26,9 @@ export default function ForgotPasswordPage() {
     setIsSubmitting(false);
 
     if (result.error) {
-      setError(result.error);
+      setError(
+        "No se pudo enviar el enlace. Verifica el email e intenta de nuevo.",
+      );
       return;
     }
 
@@ -41,7 +43,7 @@ export default function ForgotPasswordPage() {
             <ChefHat className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-gray-800">
-            Recuperar contrasena
+            Recuperar contraseña
           </h1>
           <p className="text-gray-600 mt-1">
             Te enviaremos un enlace para restablecerla
@@ -59,13 +61,13 @@ export default function ForgotPasswordPage() {
               </h2>
               <p className="text-gray-600 mb-6">
                 Revisa tu bandeja de entrada y abre el enlace para cambiar tu
-                contrasena.
+                contraseña.
               </p>
               <Link
                 href="/auth/login"
                 className="inline-block px-5 py-2.5 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition-all"
               >
-                Volver a iniciar sesion
+                Volver a iniciar sesión
               </Link>
             </div>
           ) : (
@@ -99,19 +101,19 @@ export default function ForgotPasswordPage() {
                 disabled={isSubmitting}
                 className="w-full py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 focus:ring-4 focus:ring-green-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSubmitting ? "Enviando..." : "Enviar enlace de recuperacion"}
+                {isSubmitting ? "Enviando..." : "Enviar enlace de recuperación"}
               </button>
             </form>
           )}
 
           {!success && (
             <p className="mt-6 text-center text-gray-600">
-              Recordaste tu contrasena?{" "}
+              ¿Recordaste tu contraseña?{" "}
               <Link
                 href="/auth/login"
                 className="text-green-600 font-semibold hover:text-green-700"
               >
-                Inicia sesion
+                Inicia sesión
               </Link>
             </p>
           )}

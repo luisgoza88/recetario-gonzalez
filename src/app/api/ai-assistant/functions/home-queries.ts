@@ -19,7 +19,7 @@ export async function getTodayTasks() {
       .order("created_at");
 
     // Fetch employee names separately to avoid ambiguity
-    let employeeNames: Record<string, string> = {};
+    const employeeNames: Record<string, string> = {};
     if (tasks && tasks.length > 0) {
       const empIds = [
         ...new Set(tasks.map((t) => t.employee_id).filter(Boolean)),

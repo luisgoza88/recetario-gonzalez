@@ -36,14 +36,19 @@ function getSystemTheme(): ResolvedTheme {
     : "light";
 }
 
-function applyTheme(resolved: ResolvedTheme) {
+function applyTheme(_resolved: ResolvedTheme) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  if (resolved === "dark") {
-    root.classList.add("dark");
-  } else {
-    root.classList.remove("dark");
-  }
+  // FIX modo oscuro: la app aún NO tiene un tema oscuro real. Los tokens
+  // (--bg/--ink/--border/--accent) sólo definen valores claros y ~116
+  // utilidades `dark:*` conviven con superficies claras hardcodeadas
+  // (bg-white, stone-50), lo que producía una UI mitad clara / mitad oscura
+  // en teléfonos en modo oscuro, sin forma de forzar claro.
+  // Por eso resolvemos SIEMPRE a tema claro: nunca añadimos la clase `.dark`.
+  // El resto de la API del context (theme/setTheme/resolvedTheme) queda intacta.
+  // Reversible: para reactivar un tema oscuro real, restaurar el toggle
+  //   _resolved === "dark" ? root.classList.add("dark") : root.classList.remove("dark");
+  root.classList.remove("dark");
 }
 
 // ============================================================

@@ -1042,11 +1042,7 @@ export interface AIGuardrails {
 // =====================================================
 
 export type ThermomixAccessory =
-  | "cuchilla"
-  | "mariposa"
-  | "cestillo"
-  | "varoma"
-  | "ninguno";
+  "cuchilla" | "mariposa" | "cestillo" | "varoma" | "ninguno";
 
 export type ThermomixDifficulty = "fácil" | "media" | "avanzada";
 

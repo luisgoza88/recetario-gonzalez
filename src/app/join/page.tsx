@@ -36,7 +36,7 @@ function JoinPageContent() {
   const handleValidate = useCallback(
     async (codeToValidate: string) => {
       if (codeToValidate.length !== 8) {
-        setError("El codigo debe tener 8 caracteres");
+        setError("El código debe tener 8 caracteres");
         return;
       }
 
@@ -55,7 +55,7 @@ function JoinPageContent() {
       setValidation(result);
 
       if (!result.isValid) {
-        setError(result.error || "Codigo invalido");
+        setError(result.error || "Código inválido");
       }
 
       setIsValidating(false);
@@ -138,7 +138,7 @@ function JoinPageContent() {
               <Check className="w-8 h-8 text-green-600" />
             </div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              Bienvenido!
+              ¡Bienvenido!
             </h2>
             <p className="text-gray-600 mb-4">
               Te has unido exitosamente a{" "}
@@ -162,7 +162,7 @@ function JoinPageContent() {
           <h1 className="text-2xl font-bold text-gray-800">
             Unirse a un Hogar
           </h1>
-          <p className="text-gray-600 mt-1">Ingresa tu codigo de invitacion</p>
+          <p className="text-gray-600 mt-1">Ingresa tu código de invitación</p>
         </div>
 
         {/* Card */}
@@ -170,7 +170,7 @@ function JoinPageContent() {
           {/* Code input */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Codigo de invitacion
+              Código de invitación
             </label>
             <div className="relative">
               <input
@@ -185,7 +185,7 @@ function JoinPageContent() {
               />
             </div>
             <p className="text-xs text-gray-500 mt-2 text-center">
-              8 caracteres alfanumericos
+              8 caracteres alfanuméricos
             </p>
           </div>
 
@@ -220,7 +220,7 @@ function JoinPageContent() {
               </p>
               {validation.invitation.suggested_name && (
                 <p className="text-sm text-gray-500 mt-2">
-                  Seras registrado como:{" "}
+                  Serás registrado como:{" "}
                   <strong>{validation.invitation.suggested_name}</strong>
                 </p>
               )}
@@ -241,7 +241,7 @@ function JoinPageContent() {
                 </>
               ) : (
                 <>
-                  Validar codigo
+                  Validar código
                   <ArrowRight className="w-5 h-5" />
                 </>
               )}
@@ -255,7 +255,7 @@ function JoinPageContent() {
               {isJoining ? (
                 <>
                   <Spinner size="md" color="white" />
-                  Uniendose...
+                  Uniéndose...
                 </>
               ) : (
                 <>
@@ -269,7 +269,7 @@ function JoinPageContent() {
           {/* Auth status message */}
           {validation?.isValid && !auth?.isAuthenticated && (
             <p className="text-sm text-gray-500 text-center mt-4">
-              Necesitaras iniciar sesion o crear una cuenta para continuar
+              Necesitarás iniciar sesión o crear una cuenta para continuar
             </p>
           )}
 

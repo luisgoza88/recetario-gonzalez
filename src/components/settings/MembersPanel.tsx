@@ -59,11 +59,9 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newInvitation, setNewInvitation] = useState<{
     role: UserRole;
-    email: string;
     suggestedName: string;
   }>({
     role: "familia",
-    email: "",
     suggestedName: "",
   });
   const [isCreating, setIsCreating] = useState(false);
@@ -122,7 +120,6 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
     const result = await createInvitation({
       householdId,
       role: newInvitation.role,
-      email: newInvitation.email || undefined,
       suggestedName: newInvitation.suggestedName || undefined,
     });
 
@@ -181,7 +178,7 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
   const closeCreateModal = () => {
     setShowCreateModal(false);
     setCreatedInvitation(null);
-    setNewInvitation({ role: "familia", email: "", suggestedName: "" });
+    setNewInvitation({ role: "familia", suggestedName: "" });
   };
 
   const getRoleIcon = (role: UserRole) => {
@@ -512,28 +509,6 @@ export default function MembersPanel({ householdId }: MembersPanelProps) {
                         </label>
                       ))}
                     </div>
-                  </div>
-
-                  {/* Email opcional */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email especifico (opcional)
-                    </label>
-                    <input
-                      type="email"
-                      value={newInvitation.email}
-                      onChange={(e) =>
-                        setNewInvitation((prev) => ({
-                          ...prev,
-                          email: e.target.value,
-                        }))
-                      }
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      placeholder="solo@este-email.com"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Si se especifica, solo este email podra usar el codigo
-                    </p>
                   </div>
 
                   {/* Nombre sugerido */}

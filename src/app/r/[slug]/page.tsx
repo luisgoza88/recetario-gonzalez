@@ -1,9 +1,7 @@
 import { notFound } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
+import { createServiceRoleClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 import type { Ingredient } from "@/types";
-
-// TODO: Agregar /r/ a PUBLIC_PATHS para que las paginas publicas de recetas funcionen
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -21,24 +19,33 @@ interface RecipeRow {
   steps: string[];
 }
 
+const RECIPE_PUBLIC_COLUMNS =
+  "id, name, description, image_url, prep_time, cook_time, region, ingredients, steps";
+
 async function getRecipe(slug: string): Promise<RecipeRow | null> {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
+  // Página pública: se usa service-role en el servidor (nunca llega al cliente)
+  // para que el share funcione sin exponer la tabla al rol anónimo.
+  const supabase = createServiceRoleClient();
 
-  // El slug puede ser id (UUID) o nombre normalizado con guiones
-  const nameFromSlug = slug.replace(/-/g, " ");
-
-  const { data } = await supabase
+  // 1) Búsqueda exacta por id (parametrizada, sin riesgo de inyección de filtro).
+  const byId = await supabase
     .from("recipes")
-    .select(
-      "id, name, description, image_url, prep_time, cook_time, region, ingredients, steps",
-    )
-    .or(`id.eq.${slug},name.ilike.%${nameFromSlug}%`)
+    .select(RECIPE_PUBLIC_COLUMNS)
+    .eq("id", slug)
     .maybeSingle();
+  if (byId.data) return byId.data as unknown as RecipeRow;
 
-  return data ?? null;
+  // 2) Fallback por nombre normalizado. Se escapan los comodines de LIKE y se
+  //    limita a 1 fila para no romper con múltiples coincidencias.
+  const nameFromSlug = slug.replace(/-/g, " ");
+  const escaped = nameFromSlug.replace(/[%_]/g, "\\$&");
+  const byName = await supabase
+    .from("recipes")
+    .select(RECIPE_PUBLIC_COLUMNS)
+    .ilike("name", `%${escaped}%`)
+    .limit(1);
+
+  return (byName.data?.[0] as unknown as RecipeRow | undefined) ?? null;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

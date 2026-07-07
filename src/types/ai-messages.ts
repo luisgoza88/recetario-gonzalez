@@ -5,12 +5,7 @@
 
 // Base message types
 export type RichMessageType =
-  | "text"
-  | "card"
-  | "list"
-  | "recipe_card"
-  | "inventory_alert"
-  | "task_summary";
+  "text" | "card" | "list" | "recipe_card" | "inventory_alert" | "task_summary";
 
 // Action that can be triggered from a button
 export interface MessageAction {

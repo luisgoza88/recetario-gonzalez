@@ -8,7 +8,7 @@ import {
 import type { AIProposal, AIProposedAction, AIRiskLevel } from "@/types";
 
 // Mock Supabase client
-const mockDb = {
+const mockDb: any = {
   from: vi.fn(() => mockDb),
   select: vi.fn(() => mockDb),
   insert: vi.fn(() => mockDb),
@@ -46,6 +46,7 @@ function createMockProposal(
   actions: AIProposedAction[] = [],
 ): AIProposal {
   return {
+    id: "id-123",
     proposal_id: "proposal-123",
     household_id: "household-123",
     user_id: "user-123",
@@ -57,6 +58,7 @@ function createMockProposal(
     tables_affected: ["test_table"],
     records_affected: actions.length,
     created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
     expires_at: new Date(Date.now() + 3600000).toISOString(),
   };
 }

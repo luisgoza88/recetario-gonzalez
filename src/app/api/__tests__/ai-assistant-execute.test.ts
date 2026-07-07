@@ -168,7 +168,15 @@ describe("POST /api/ai-assistant/execute", () => {
     vi.mocked(approveProposal).mockResolvedValue(true);
     vi.mocked(executeProposal).mockResolvedValue({
       success: true,
-      executed_actions: [{ function_name: "swap_menu_recipe", status: "done" }],
+      proposal_id: "proposal-123",
+      executed_actions: [
+        {
+          action_id: "action-123",
+          function_name: "swap_menu_recipe",
+          success: true,
+          audit_log_id: "audit-123",
+        },
+      ],
       can_rollback: true,
     });
 

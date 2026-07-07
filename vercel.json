@@ -8,6 +8,12 @@
     "src/app/api/ai-assistant/chat/route.ts": { "maxDuration": 30 },
     "src/app/api/ai-assistant/execute/route.ts": { "maxDuration": 30 },
     "src/app/api/scan-pantry/route.ts": { "maxDuration": 30 },
-    "src/app/api/generate-recipe/route.ts": { "maxDuration": 30 }
+    "src/app/api/scan-receipt/route.ts": { "maxDuration": 30 },
+    "src/app/api/generate-recipe/route.ts": { "maxDuration": 30 },
+    "src/app/api/generate-recipe-from-image/route.ts": { "maxDuration": 30 },
+    "src/app/api/generate-weekly-menu/route.ts": { "maxDuration": 30 },
+    "src/app/api/analyze-room/route.ts": { "maxDuration": 30 },
+    "src/app/api/cook-with-this/route.ts": { "maxDuration": 30 },
+    "src/app/api/adapt-recipe-thermomix/route.ts": { "maxDuration": 30 }
   }
 }

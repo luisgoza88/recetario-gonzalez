@@ -27,6 +27,7 @@ import {
   ProactiveSuggestionType,
   ProactiveSuggestionPriority,
 } from "@/hooks/useProactiveSuggestions";
+import { useToast } from "@/components/ui/Toast";
 
 interface SuggestionsPanelProps {
   onUpdate?: () => void;
@@ -117,6 +118,7 @@ export default function SuggestionsPanel({
   onUpdate,
   onNavigate,
 }: SuggestionsPanelProps) {
+  const toast = useToast();
   // Sugerencias reactivas (basadas en feedback)
   const [reactiveSuggestions, setReactiveSuggestions] = useState<
     AdjustmentSuggestion[]
@@ -198,6 +200,7 @@ export default function SuggestionsPanel({
       onUpdate?.();
     } catch (error) {
       console.error("Error applying suggestion:", error);
+      toast.error("No se pudo aplicar la sugerencia. Intenta de nuevo.");
     } finally {
       setApplying(null);
     }
@@ -277,12 +280,22 @@ export default function SuggestionsPanel({
   };
 
   const dismissReactiveSuggestion = async (suggestionId: string) => {
-    await supabase
-      .from("adjustment_suggestions")
-      .update({ status: "dismissed" })
-      .eq("id", suggestionId);
-
+    // Optimista: quitar la sugerencia de inmediato, guardando el estado previo
+    const previous = reactiveSuggestions;
     setReactiveSuggestions((prev) => prev.filter((s) => s.id !== suggestionId));
+
+    try {
+      const { error } = await supabase
+        .from("adjustment_suggestions")
+        .update({ status: "dismissed" })
+        .eq("id", suggestionId);
+      if (error) throw error;
+    } catch (error) {
+      console.error("Error dismissing suggestion:", error);
+      toast.error("No se pudo descartar la sugerencia. Intenta de nuevo.");
+      // Rollback: volver a mostrar la sugerencia
+      setReactiveSuggestions(previous);
+    }
   };
 
   const handleProactiveAction = (suggestion: ProactiveSuggestion) => {
@@ -291,8 +304,7 @@ export default function SuggestionsPanel({
     switch (suggestion.action.type) {
       case "navigate":
         const payload = suggestion.action.payload as
-          | { tab: string; mode?: string }
-          | undefined;
+          { tab: string; mode?: string } | undefined;
         if (payload?.tab && onNavigate) {
           onNavigate(payload.tab, payload.mode);
         }
@@ -356,9 +368,7 @@ export default function SuggestionsPanel({
               Asistente analizó tu cocina
             </p>
             <p className="text-[11.5px] text-purple-700">
-              {isLoading
-                ? "Analizando…"
-                : "Actualizado · hace unos momentos"}
+              {isLoading ? "Analizando…" : "Actualizado · hace unos momentos"}
             </p>
           </div>
         </div>

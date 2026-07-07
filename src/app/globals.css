@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+/* FIX modo oscuro: en Tailwind v4 el variant `dark:` responde por defecto al
+   media query `prefers-color-scheme`. Como aún NO existe un tema oscuro real
+   (los tokens de arriba sólo tienen valores claros), eso activaba por sí solas
+   las ~116 utilidades `dark:*` de los componentes cuando el teléfono estaba en
+   modo oscuro y producía una UI mitad clara / mitad oscura. Reasignamos `dark:`
+   a la clase `.dark` (que ThemeContext ya nunca aplica: ver applyTheme), de modo
+   que todas las utilidades `dark:*` quedan inactivas y la UI resuelve SIEMPRE a
+   claro. No introduce estilos oscuros nuevos, sólo neutraliza el modo oscuro
+   parcial. Reversible: eliminar esta línea para volver al `dark:` por media query. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   :root {
     /* Sistema nuevo (úsalos vía bg-[var(--accent)], text-[var(--ink)], etc.) */

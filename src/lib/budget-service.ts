@@ -144,6 +144,7 @@ export async function createBudget(
  */
 export async function recordPurchase(
   purchase: Omit<Purchase, "id" | "purchased_at">,
+  householdId?: string | null,
 ): Promise<Purchase | null> {
   const budget = await getCurrentBudget();
 
@@ -171,6 +172,27 @@ export async function recordPurchase(
         updated_at: new Date().toISOString(),
       })
       .eq("id", budget.id);
+  }
+
+  // Alimentar el patrón de recurrencia (best-effort: no rompe el registro).
+  // El RPC exige household_id e item_id no nulos; si falta alguno, se omite.
+  if (householdId && purchase.item_id) {
+    try {
+      const { error: patternError } = await supabase.rpc(
+        "upsert_purchase_pattern",
+        {
+          p_household_id: householdId,
+          p_item_id: purchase.item_id,
+          p_item_name: purchase.item_name,
+          p_purchase_date: new Date().toISOString().split("T")[0],
+        },
+      );
+      if (patternError) {
+        console.error("Error updating purchase pattern:", patternError);
+      }
+    } catch (patternErr) {
+      console.error("Error updating purchase pattern:", patternErr);
+    }
   }
 
   return data as Purchase;

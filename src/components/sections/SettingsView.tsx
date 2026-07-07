@@ -15,16 +15,20 @@ import {
   Sparkles,
   Crown,
   User,
+  Users,
   LogOut,
   ChevronRight,
+  ChevronLeft,
   Mail,
 } from "lucide-react";
 import AICommandCenter from "@/components/ai/AICommandCenter";
 import DietaryPreferencesPanel from "@/components/settings/DietaryPreferencesPanel";
 import CookingProfilePanel from "@/components/settings/CookingProfilePanel";
+import MembersPanel from "@/components/settings/MembersPanel";
 import MonthlyReportView from "@/components/reports/MonthlyReportView";
 import { KidsMode } from "@/components/kids/KidsMode";
 import { useSubscription } from "@/lib/hooks/useSubscription";
+import { useNotifications } from "@/hooks/useNotifications";
 import { AdminOnly } from "@/components/auth/RoleGate";
 import {
   useHouseholdId,
@@ -33,10 +37,10 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function SettingsView() {
-  const [notifications, setNotifications] = useState(true);
   const [showAICommandCenter, setShowAICommandCenter] = useState(false);
   const [showDietaryPreferences, setShowDietaryPreferences] = useState(false);
   const [showCookingProfile, setShowCookingProfile] = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
   const [showMonthlyReport, setShowMonthlyReport] = useState(false);
   const [showKidsMode, setShowKidsMode] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -45,6 +49,30 @@ export default function SettingsView() {
   const household = useCurrentHousehold();
   const { user, signOut } = useAuth();
   const router = useRouter();
+
+  // Notificaciones push reales (antes el toggle era decorativo: useState(true)).
+  // `supported` es false si el navegador no lo soporta O si falta la VAPID key
+  // (NEXT_PUBLIC_VAPID_PUBLIC_KEY); en ese caso el toggle se muestra deshabilitado
+  // y honesto en vez de fingir "Activadas".
+  const notif = useNotifications();
+  const notifSubText = !notif.supported
+    ? "No disponible en este dispositivo"
+    : notif.permission === "denied"
+      ? "Bloqueadas en el navegador"
+      : notif.subscribed
+        ? "Activadas"
+        : "Desactivadas";
+
+  const handleToggleNotifications = async () => {
+    if (!notif.supported || notif.loading) return;
+    if (notif.subscribed) {
+      await notif.unsubscribe();
+    } else {
+      const granted =
+        notif.permission === "granted" || (await notif.requestPermission());
+      if (granted) await notif.subscribe(householdId ?? undefined);
+    }
+  };
 
   /**
    * Cierra sesión limpiando TODO: cookies, localStorage,
@@ -158,9 +186,36 @@ export default function SettingsView() {
     );
   }
 
+  // Show Members & invitations panel (MembersPanel no trae onBack propio)
+  if (showMembers && householdId) {
+    return (
+      <div className="min-h-screen bg-[var(--bg)] pb-32">
+        <div className="bg-white px-5 pt-4 pb-3 border-b border-[var(--border)] flex items-center gap-3">
+          <button
+            onClick={() => setShowMembers(false)}
+            aria-label="Volver a Ajustes"
+            className="p-1 -ml-1 text-[var(--ink)] active:opacity-60"
+          >
+            <ChevronLeft size={22} />
+          </button>
+          <div>
+            <h1 className="text-[22px] leading-tight font-semibold tracking-tight text-[var(--ink)]">
+              Miembros del hogar
+            </h1>
+            <p className="text-[13px] text-[var(--ink-soft)]">
+              Invita y gestiona quién accede
+            </p>
+          </div>
+        </div>
+        <div className="px-5 py-4 max-w-lg mx-auto">
+          <MembersPanel householdId={householdId} />
+        </div>
+      </div>
+    );
+  }
+
   const householdName = household?.name || "Mi Hogar";
-  const userName =
-    user?.full_name || user?.email?.split("@")[0] || "Usuario";
+  const userName = user?.full_name || user?.email?.split("@")[0] || "Usuario";
   const userEmail = user?.email || "Sin sesión";
 
   return (
@@ -186,9 +241,7 @@ export default function SettingsView() {
               <p className="text-[15px] font-semibold text-[var(--ink)] truncate">
                 {householdName}
               </p>
-              <p className="text-[12px] text-[var(--ink-soft)]">
-                Hogar activo
-              </p>
+              <p className="text-[12px] text-[var(--ink-soft)]">Hogar activo</p>
             </div>
           </div>
         </section>
@@ -231,20 +284,26 @@ export default function SettingsView() {
             Icon={Bell}
             color="text-orange-600"
             label="Notificaciones"
-            sub={notifications ? "Activadas" : "Desactivadas"}
+            sub={notifSubText}
             rightContent={
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setNotifications(!notifications);
+                  handleToggleNotifications();
                 }}
-                className={`w-12 h-7 rounded-full transition-colors flex-shrink-0 ${
-                  notifications ? "bg-[var(--accent)]" : "bg-stone-300"
+                disabled={!notif.supported || notif.loading}
+                aria-label={
+                  notif.subscribed
+                    ? "Desactivar notificaciones"
+                    : "Activar notificaciones"
+                }
+                className={`w-12 h-7 rounded-full transition-colors flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
+                  notif.subscribed ? "bg-[var(--accent)]" : "bg-stone-300"
                 }`}
               >
                 <div
                   className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
-                    notifications ? "translate-x-6" : "translate-x-1"
+                    notif.subscribed ? "translate-x-6" : "translate-x-1"
                   }`}
                 />
               </button>
@@ -265,6 +324,20 @@ export default function SettingsView() {
             last
           />
         </Group>
+
+        {/* Hogar — solo admin (crear invitaciones es acción de admin) */}
+        <AdminOnly>
+          <Group title="Hogar">
+            <Row
+              Icon={Users}
+              color="text-teal-600"
+              label="Miembros e invitaciones"
+              sub="Invita familia o empleados y gestiona el acceso"
+              onClick={() => setShowMembers(true)}
+              last
+            />
+          </Group>
+        </AdminOnly>
 
         {/* Tecnología */}
         <Group title="Tecnología">

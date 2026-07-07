@@ -89,6 +89,17 @@ export default function Home() {
   const auth = useOptionalAuth();
   const isEmployee = auth?.isEmployee?.() ?? false;
 
+  // Gate de sesión: la app (`/`) es solo para usuarios autenticados. Sin esto,
+  // un visitante sin sesión renderizaba el shell y consultaba datos del hogar
+  // como rol anónimo (fuga). Al resolver la sesión sin usuario → a login.
+  const authLoading = auth?.isLoading ?? true;
+  const isAuthenticated = auth?.isAuthenticated ?? false;
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      window.location.href = "/auth/login";
+    }
+  }, [authLoading, isAuthenticated]);
+
   // Estado global con Zustand (navegación y UI)
   const {
     activeSection,
@@ -108,7 +119,7 @@ export default function Home() {
 
   // ─── Proactive alerts ────────────────────────────────────────────────────────
   const { alerts: proactiveAlerts, dismissForHours } = useProactiveAlerts({
-    autoGenerateOnMount: !isEmployee,
+    autoGenerateOnMount: !isEmployee && isAuthenticated,
     refreshIntervalMs: 30 * 60 * 1000,
   });
 
@@ -191,6 +202,21 @@ export default function Home() {
   const handleUpdate = () => {
     refreshAppData();
   };
+
+  // Mientras se resuelve la sesión, o si no hay sesión (se está redirigiendo a
+  // login), no renderizar el shell de la app.
+  if (authLoading || !isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Spinner size="xl" className="mx-auto mb-4" />
+          <p className="text-gray-600">
+            {authLoading ? "Cargando…" : "Redirigiendo…"}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

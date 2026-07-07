@@ -178,8 +178,7 @@ export function formatForSpeech(text: string): string {
 export class VoiceManager {
   private recognition: SpeechRecognition | null = null;
   private onResultCallback:
-    | ((transcript: string, isFinal: boolean) => void)
-    | null = null;
+    ((transcript: string, isFinal: boolean) => void) | null = null;
   private onErrorCallback: ((error: string) => void) | null = null;
   private onEndCallback: (() => void) | null = null;
   private isActive = false;

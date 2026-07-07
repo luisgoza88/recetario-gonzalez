@@ -42,7 +42,9 @@ function spaceName(space: Space): string {
 }
 
 function spaceIcon(space: Space): string {
-  return space.space_type?.icon || (space.category === "exterior" ? "🌳" : "🏠");
+  return (
+    space.space_type?.icon || (space.category === "exterior" ? "🌳" : "🏠")
+  );
 }
 
 function avatarColor(zone: HomeEmployee["zone"]): string {
@@ -441,8 +443,7 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
           {upcomingTasks.length > 0 ? (
             <div className="bg-white rounded-2xl border border-[var(--border)] divide-y divide-[var(--border)] overflow-hidden">
               {upcomingTasks.map((task) => {
-                const name =
-                  task.task_template?.name || task.notes || "Tarea";
+                const name = task.task_template?.name || task.notes || "Tarea";
                 const space = task.space
                   ? spaceName(task.space)
                   : "Sin espacio";
@@ -479,9 +480,7 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
                       </p>
                     </div>
                     <button
-                      onClick={() =>
-                        openModal({ type: "inspection", task })
-                      }
+                      onClick={() => openModal({ type: "inspection", task })}
                       aria-label="Más opciones"
                       className="shrink-0"
                     >
@@ -694,10 +693,18 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
       {/* ── TAB: ESPACIOS ────────────────────────────────────────── */}
       {tab === "espacios" && (
         <div className="px-5 py-4 space-y-4">
-          {([
-            { label: "Interior", list: interiorSpaces, category: "interior" as const },
-            { label: "Exterior", list: exteriorSpaces, category: "exterior" as const },
-          ]).map((group) => (
+          {[
+            {
+              label: "Interior",
+              list: interiorSpaces,
+              category: "interior" as const,
+            },
+            {
+              label: "Exterior",
+              list: exteriorSpaces,
+              category: "exterior" as const,
+            },
+          ].map((group) => (
             <div key={group.category}>
               <div className="flex items-center justify-between mb-2 px-1">
                 <p className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold">
@@ -705,7 +712,10 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
                 </p>
                 <button
                   onClick={() =>
-                    openModal({ type: "spaces", initialCategory: group.category })
+                    openModal({
+                      type: "spaces",
+                      initialCategory: group.category,
+                    })
                   }
                   className="text-blue-700 text-[12px] font-medium"
                 >
@@ -744,7 +754,10 @@ export default function HomeView({ initialHouseholdId }: HomeViewProps) {
               ) : (
                 <button
                   onClick={() =>
-                    openModal({ type: "spaces", initialCategory: group.category })
+                    openModal({
+                      type: "spaces",
+                      initialCategory: group.category,
+                    })
                   }
                   className="w-full bg-white rounded-2xl border border-[var(--border)] border-dashed p-4 text-center hover:bg-stone-50 transition-colors"
                 >

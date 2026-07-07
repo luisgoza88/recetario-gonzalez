@@ -35,8 +35,7 @@ export default function ProactiveAlerts({
   const resolveAction = (alert: Alert): (() => void) | undefined => {
     if (!alert.action) return undefined;
     const payload = alert.action.payload as
-      | { tab?: string; mode?: string }
-      | undefined;
+      { tab?: string; mode?: string } | undefined;
     if (payload?.tab === "suggestions") return onNavigateToSuggestions;
     if (payload?.tab === "market") return onNavigateToMarket;
     return undefined;

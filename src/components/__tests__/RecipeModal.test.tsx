@@ -70,12 +70,9 @@ describe("RecipeModal", () => {
       "Mezclar huevos con queso",
       "Combinar todo y servir",
     ],
-    servings: { luis: 3, mariana: 2 },
-    totalServings: 5,
-    mealType: "lunch",
-    imageUrl: null,
-    estimatedCost: 12000,
-    prepTime: 20,
+    portions: { luis: "200g", mariana: "150g" },
+    type: "lunch",
+    prep_time: 20,
   };
 
   const mockOnClose = vi.fn();
@@ -113,8 +110,9 @@ describe("RecipeModal", () => {
   it("should call onClose when clicking close button", () => {
     render(<RecipeModal recipe={mockRecipe} onClose={mockOnClose} />);
 
-    const closeButton = screen.getByRole("button", { name: /cerrar/i });
-    fireEvent.click(closeButton);
+    const closeButtons = screen.getAllByRole("button", { name: /cerrar/i });
+    // Click the first close button (modal close button, not image close)
+    fireEvent.click(closeButtons[0]);
 
     expect(mockOnClose).toHaveBeenCalledTimes(1);
   });

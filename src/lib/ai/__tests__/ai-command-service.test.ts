@@ -14,10 +14,10 @@ import {
   functionCallToProposedAction,
   AI_RISK_LEVELS,
 } from "../ai-command-service";
-import type { AIRiskLevel, HouseholdTrust } from "@/types";
+import type { AIRiskLevel, HouseholdAITrust } from "@/types";
 
 // Mock Supabase client
-const mockDb = {
+const mockDb: any = {
   from: vi.fn(() => mockDb),
   select: vi.fn(() => mockDb),
   insert: vi.fn(() => mockDb),

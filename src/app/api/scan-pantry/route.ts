@@ -452,12 +452,11 @@ export async function PUT(request: NextRequest) {
         const nextOrder = (maxOrder?.[0]?.order_index || 0) + 1;
 
         // Crear el nuevo item
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: createdItem, error: createError } = await (
-          getSupabase() as any
-        )
+        const supabase = getSupabase();
+        const { data: createdItem, error: createError } = await supabase
           .from("market_items")
           .insert({
+            id: crypto.randomUUID(),
             name: newItem.product.genericName,
             category: newItem.product.category,
             quantity: `${newItem.product.quantity} ${newItem.product.unit}`,

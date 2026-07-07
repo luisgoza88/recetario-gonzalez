@@ -31,11 +31,11 @@ export default function LoginPage() {
     if (result.error) {
       // Traducir errores comunes
       if (result.error.includes("Invalid login credentials")) {
-        setError("Email o contrasena incorrectos");
+        setError("Email o contraseña incorrectos");
       } else if (result.error.includes("Email not confirmed")) {
-        setError("Por favor confirma tu email antes de iniciar sesion");
+        setError("Por favor confirma tu email antes de iniciar sesión");
       } else {
-        setError(result.error);
+        setError("No se pudo iniciar sesión. Intenta de nuevo.");
       }
     } else {
       const redirectParam = searchParams.get("redirect");
@@ -65,7 +65,7 @@ export default function LoginPage() {
           {/* Tabs login / registro */}
           <div className="flex bg-stone-100 rounded-xl p-1 mb-5">
             <span className="flex-1 py-2 rounded-lg text-[13px] font-semibold text-center bg-white shadow-sm text-[var(--ink)]">
-              Iniciar sesion
+              Iniciar sesión
             </span>
             <Link
               href="/auth/register"
@@ -102,7 +102,7 @@ export default function LoginPage() {
             {/* Password */}
             <div className="mb-2">
               <label className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold">
-                Contrasena
+                Contraseña
               </label>
               <div className="relative">
                 <input
@@ -110,7 +110,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full mt-1 bg-stone-50 border border-[var(--border)] rounded-xl px-3 py-2.5 pr-11 text-[14px] focus:outline-none focus:border-[var(--accent)] transition-colors"
-                  placeholder="Tu contrasena"
+                  placeholder="Tu contraseña"
                   autoComplete="current-password"
                 />
                 <button
@@ -118,7 +118,7 @@ export default function LoginPage() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 mt-0.5 text-stone-400 hover:text-stone-600"
                   aria-label={
-                    showPassword ? "Ocultar contrasena" : "Mostrar contrasena"
+                    showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
                   }
                 >
                   {showPassword ? (
@@ -136,7 +136,7 @@ export default function LoginPage() {
                 href="/auth/forgot-password"
                 className="text-[12px] text-[var(--accent)] font-medium hover:underline"
               >
-                Olvidaste tu contrasena?
+                ¿Olvidaste tu contraseña?
               </Link>
             </div>
 
@@ -175,18 +175,18 @@ export default function LoginPage() {
             className="w-full bg-white border border-[var(--border)] py-2.5 rounded-xl text-[13px] font-medium flex items-center justify-center gap-2 hover:bg-stone-50 transition-colors"
           >
             <Ticket className="w-4 h-4 text-[var(--accent)]" />
-            Tengo un codigo de invitacion
+            Tengo un código de invitación
           </Link>
         </div>
 
         {/* Register link */}
         <p className="mt-6 text-center text-[13px] text-[var(--ink-soft)]">
-          No tienes cuenta?{" "}
+          ¿No tienes cuenta?{" "}
           <Link
             href="/auth/register"
             className="text-[var(--accent)] font-semibold hover:underline"
           >
-            Registrate
+            Regístrate
           </Link>
         </p>
       </div>

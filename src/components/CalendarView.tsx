@@ -359,6 +359,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
       }
     } catch (error) {
       console.error("Error approving menu:", error);
+      toast.error("No se pudo aprobar el menú. Intenta de nuevo.");
     }
   };
 
@@ -379,6 +380,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
       }
     } catch (error) {
       console.error("Error archiving menu:", error);
+      toast.error("No se pudo archivar el menú. Intenta de nuevo.");
     }
   };
 
@@ -585,17 +587,46 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
     const dateKey = selectedDate.toISOString().split("T")[0];
     const isCompleted = completedDays.has(dateKey);
     if (isCompleted) {
-      await supabase.from("completed_days").delete().eq("date", dateKey);
+      // Optimista: des-marcar el día de inmediato
       setCompletedDays((prev) => {
         const next = new Set(prev);
         next.delete(dateKey);
         return next;
       });
+      try {
+        const { error } = await supabase
+          .from("completed_days")
+          .delete()
+          .eq("date", dateKey);
+        if (error) throw error;
+      } catch (error) {
+        console.error("Error updating completed day:", error);
+        toast.error("No se pudo actualizar el día. Intenta de nuevo.");
+        // Rollback: volver a marcar el día como completado
+        setCompletedDays((prev) => new Set([...prev, dateKey]));
+      }
     } else {
-      await supabase
-        .from("completed_days")
-        .upsert({ date: dateKey, completed: true });
+      // Optimista: marcar el día como completado de inmediato
       setCompletedDays((prev) => new Set([...prev, dateKey]));
+
+      try {
+        const { error } = await supabase
+          .from("completed_days")
+          .upsert({ date: dateKey, completed: true });
+        if (error) throw error;
+      } catch (error) {
+        console.error("Error updating completed day:", error);
+        toast.error(
+          "No se pudo marcar el día como completado. Intenta de nuevo.",
+        );
+        // Rollback: des-marcar el día
+        setCompletedDays((prev) => {
+          const next = new Set(prev);
+          next.delete(dateKey);
+          return next;
+        });
+        return;
+      }
 
       // Auto-prompt feedback for the first meal of the day
       // unless the user already skipped feedback for this date

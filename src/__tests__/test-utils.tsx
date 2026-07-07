@@ -124,11 +124,6 @@ function createTestQueryClient() {
         gcTime: Infinity,
       },
     },
-    logger: {
-      log: () => {},
-      warn: () => {},
-      error: () => {},
-    },
   });
 }
 

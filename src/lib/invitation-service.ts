@@ -18,7 +18,6 @@ import { logger } from "@/lib/logger";
 export interface CreateInvitationParams {
   householdId: string;
   role: UserRole;
-  email?: string;
   suggestedName?: string;
   maxUses?: number;
   expiresInDays?: number;
@@ -51,10 +50,13 @@ export async function createInvitation(
   error?: string;
 }> {
   try {
+    // NOTA: el RPC create_invitation NO acepta p_email (su firma es
+    // p_household_id, p_role, p_suggested_name, p_max_uses, p_expires_in_days).
+    // Pasarlo hacía fallar el RPC (PGRST202). El código es de un solo uso por
+    // defecto; la restricción por email no está soportada por el backend.
     const { data, error } = await supabase.rpc("create_invitation", {
       p_household_id: params.householdId,
       p_role: params.role,
-      p_email: params.email || null,
       p_suggested_name: params.suggestedName || null,
       p_max_uses: params.maxUses || 1,
       p_expires_in_days: params.expiresInDays || 7,

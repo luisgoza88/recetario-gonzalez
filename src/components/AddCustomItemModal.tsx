@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { IngredientCategory } from "@/types";
+import { recordPurchase } from "@/lib/budget-service";
+import { useAuth } from "@/contexts/AuthContext";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import {
   recordProductUsage,
@@ -62,6 +64,7 @@ export default function AddCustomItemModal({
   onClose,
   onAdded,
 }: AddCustomItemModalProps) {
+  const { currentHousehold } = useAuth();
   const [mode, setMode] = useState<InputMode>("smart");
   const [categories, setCategories] = useState<IngredientCategory[]>([]);
 
@@ -489,6 +492,26 @@ export default function AddCustomItemModal({
           item.category.name,
           item.category.id,
         );
+
+        // Registrar la compra en el presupuesto (solo items con precio, ej.
+        // los escaneados de factura). No rompe el guardado si falla.
+        if (item.price != null) {
+          try {
+            await recordPurchase(
+              {
+                item_id: customId,
+                item_name: item.brand
+                  ? `${item.name} (${item.brand})`
+                  : item.name,
+                quantity: fullQuantity,
+                price: item.price,
+              },
+              currentHousehold?.id,
+            );
+          } catch (purchaseErr) {
+            console.error("Error registrando la compra:", purchaseErr);
+          }
+        }
       }
 
       onAdded();

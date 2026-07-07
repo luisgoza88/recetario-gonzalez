@@ -118,15 +118,26 @@ export default function FeedbackModal({
     try {
       const comments = buildComments();
 
+      // La tabla meal_feedback NO tiene columna recipe_name: incluirla hacía
+      // fallar el insert entero (por eso no se guardaba ningún feedback). Se
+      // omite. Además mapeamos los chips de porción a la columna estructurada
+      // portion_rating para que el motor de aprendizaje (feedback-learning)
+      // genere sugerencias en vez de quedarse siempre en 0.
+      const portionRating = selectedIssues.has("too_much")
+        ? "mucha"
+        : selectedIssues.has("too_little")
+          ? "poca"
+          : null;
+
       const feedbackData: Record<string, unknown> = {
         date,
         meal_type: mealType,
         recipe_id: recipe.id,
-        recipe_name: recipe.name,
         notes: comments,
         would_repeat: wouldRepeat,
       };
 
+      if (portionRating) feedbackData.portion_rating = portionRating;
       if (starRating > 0) feedbackData.star_rating = starRating;
       if (isAIGenerated) feedbackData.source = "generated";
 

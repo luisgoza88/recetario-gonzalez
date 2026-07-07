@@ -39,12 +39,12 @@ export default function RegisterPage() {
     }
 
     if (!isPasswordValid) {
-      setError("La contrasena no cumple con los requisitos");
+      setError("La contraseña no cumple con los requisitos");
       return;
     }
 
     if (!passwordsMatch) {
-      setError("Las contrasenas no coinciden");
+      setError("Las contraseñas no coinciden");
       return;
     }
 
@@ -53,9 +53,9 @@ export default function RegisterPage() {
     if (result.error) {
       // Traducir errores comunes
       if (result.error.includes("already registered")) {
-        setError("Este email ya esta registrado");
+        setError("Este email ya está registrado");
       } else {
-        setError(result.error);
+        setError("No se pudo crear la cuenta. Intenta de nuevo.");
       }
     } else {
       setSuccess(true);
@@ -71,17 +71,17 @@ export default function RegisterPage() {
               <Check className="w-8 h-8 text-[var(--accent)]" />
             </div>
             <h2 className="text-[22px] font-bold tracking-tight mb-2">
-              Registro exitoso!
+              ¡Registro exitoso!
             </h2>
             <p className="text-[14px] text-[var(--ink-soft)] mb-6">
-              Te hemos enviado un email de confirmacion. Por favor revisa tu
+              Te hemos enviado un email de confirmación. Por favor revisa tu
               bandeja de entrada y haz clic en el enlace para activar tu cuenta.
             </p>
             <Link
               href="/auth/login"
               className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-[var(--accent)] text-white text-[14px] font-semibold rounded-xl transition-all active:scale-[0.99] hover:opacity-95"
             >
-              Ir a Iniciar Sesion
+              Ir a Iniciar Sesión
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -113,7 +113,7 @@ export default function RegisterPage() {
               href="/auth/login"
               className="flex-1 py-2 rounded-lg text-[13px] font-semibold text-center text-stone-500 transition-all hover:text-[var(--ink)]"
             >
-              Iniciar sesion
+              Iniciar sesión
             </Link>
             <span className="flex-1 py-2 rounded-lg text-[13px] font-semibold text-center bg-white shadow-sm text-[var(--ink)]">
               Crear cuenta
@@ -162,7 +162,7 @@ export default function RegisterPage() {
             {/* Password */}
             <div className="mb-3">
               <label className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold">
-                Contrasena
+                Contraseña
               </label>
               <div className="relative">
                 <input
@@ -170,7 +170,7 @@ export default function RegisterPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full mt-1 bg-stone-50 border border-[var(--border)] rounded-xl px-3 py-2.5 pr-11 text-[14px] focus:outline-none focus:border-[var(--accent)] transition-colors"
-                  placeholder="Crea una contrasena segura"
+                  placeholder="Crea una contraseña segura"
                   autoComplete="new-password"
                 />
                 <button
@@ -178,7 +178,7 @@ export default function RegisterPage() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 mt-0.5 text-stone-400 hover:text-stone-600"
                   aria-label={
-                    showPassword ? "Ocultar contrasena" : "Mostrar contrasena"
+                    showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
                   }
                 >
                   {showPassword ? (
@@ -194,19 +194,19 @@ export default function RegisterPage() {
                 <div className="mt-2 space-y-1">
                   <PasswordCheck
                     passed={passwordChecks.length}
-                    text="Minimo 8 caracteres"
+                    text="Mínimo 8 caracteres"
                   />
                   <PasswordCheck
                     passed={passwordChecks.uppercase}
-                    text="Una mayuscula"
+                    text="Una mayúscula"
                   />
                   <PasswordCheck
                     passed={passwordChecks.lowercase}
-                    text="Una minuscula"
+                    text="Una minúscula"
                   />
                   <PasswordCheck
                     passed={passwordChecks.number}
-                    text="Un numero"
+                    text="Un número"
                   />
                 </div>
               )}
@@ -215,7 +215,7 @@ export default function RegisterPage() {
             {/* Confirm Password */}
             <div className="mb-2">
               <label className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold">
-                Confirmar contrasena
+                Confirmar contraseña
               </label>
               <input
                 type={showPassword ? "text" : "password"}
@@ -228,12 +228,12 @@ export default function RegisterPage() {
                       : "border-[var(--danger)] focus:border-[var(--danger)]"
                     : "border-[var(--border)] focus:border-[var(--accent)]"
                 }`}
-                placeholder="Repite tu contrasena"
+                placeholder="Repite tu contraseña"
                 autoComplete="new-password"
               />
               {confirmPassword.length > 0 && !passwordsMatch && (
                 <p className="mt-1 text-[12px] text-[var(--danger)]">
-                  Las contrasenas no coinciden
+                  Las contraseñas no coinciden
                 </p>
               )}
             </div>
@@ -261,12 +261,12 @@ export default function RegisterPage() {
 
         {/* Login link */}
         <p className="mt-6 text-center text-[13px] text-[var(--ink-soft)]">
-          Ya tienes cuenta?{" "}
+          ¿Ya tienes cuenta?{" "}
           <Link
             href="/auth/login"
             className="text-[var(--accent)] font-semibold hover:underline"
           >
-            Inicia sesion
+            Inicia sesión
           </Link>
         </p>
       </div>

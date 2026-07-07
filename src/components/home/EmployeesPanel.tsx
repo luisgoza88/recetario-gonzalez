@@ -402,9 +402,7 @@ export default function EmployeesPanel({
                         setEditingEmployee({
                           ...editingEmployee,
                           zone: option.value as
-                            | "interior"
-                            | "exterior"
-                            | "ambos",
+                            "interior" | "exterior" | "ambos",
                         })
                       }
                       className={`py-3 rounded-xl text-sm font-medium transition-colors ${

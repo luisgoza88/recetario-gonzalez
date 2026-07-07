@@ -599,8 +599,7 @@ export async function POST(request: NextRequest) {
       cookingStyle: cookingProfile.cooking_style,
       familySize: cookingProfile.family_size,
       conversationContext: conversationContext as
-        | ConversationContextPayload
-        | undefined,
+        ConversationContextPayload | undefined,
       learningInsights: learningInsights ?? undefined,
       moodPatterns: formatMoodPatternsForPrompt(moodPatterns),
     });

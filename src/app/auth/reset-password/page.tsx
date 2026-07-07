@@ -31,12 +31,12 @@ export default function ResetPasswordPage() {
     setError(null);
 
     if (!isPasswordValid) {
-      setError("La contrasena no cumple con los requisitos");
+      setError("La contraseña no cumple con los requisitos");
       return;
     }
 
     if (!passwordsMatch) {
-      setError("Las contrasenas no coinciden");
+      setError("Las contraseñas no coinciden");
       return;
     }
 
@@ -45,7 +45,7 @@ export default function ResetPasswordPage() {
     setIsSubmitting(false);
 
     if (result.error) {
-      setError(result.error);
+      setError("No se pudo actualizar la contraseña. Intenta de nuevo.");
       return;
     }
 
@@ -62,9 +62,9 @@ export default function ResetPasswordPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-green-600 rounded-full mb-4">
             <ChefHat className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">Nueva contrasena</h1>
+          <h1 className="text-2xl font-bold text-gray-800">Nueva contraseña</h1>
           <p className="text-gray-600 mt-1">
-            Actualiza tu contrasena de acceso
+            Actualiza tu contraseña de acceso
           </p>
         </div>
 
@@ -75,7 +75,7 @@ export default function ResetPasswordPage() {
                 <CheckCircle2 className="w-7 h-7 text-green-600" />
               </div>
               <h2 className="text-xl font-semibold text-gray-800 mb-2">
-                Contrasena actualizada
+                Contraseña actualizada
               </h2>
               <p className="text-gray-600">Redirigiendo...</p>
             </div>
@@ -85,7 +85,7 @@ export default function ResetPasswordPage() {
                 <div className="mb-4 flex items-center gap-2 p-3 bg-amber-50 text-amber-800 rounded-lg">
                   <AlertCircle className="w-5 h-5 flex-shrink-0" />
                   <span className="text-sm">
-                    Este enlace de recuperacion no es valido o ya expiro.
+                    Este enlace de recuperación no es válido o ya expiró.
                   </span>
                 </div>
               )}
@@ -100,7 +100,7 @@ export default function ResetPasswordPage() {
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Nueva contrasena
+                    Nueva contraseña
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -109,7 +109,7 @@ export default function ResetPasswordPage() {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                      placeholder="Nueva contrasena"
+                      placeholder="Nueva contraseña"
                       autoComplete="new-password"
                     />
                   </div>
@@ -117,7 +117,7 @@ export default function ResetPasswordPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Confirmar nueva contrasena
+                    Confirmar nueva contraseña
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -126,7 +126,7 @@ export default function ResetPasswordPage() {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                      placeholder="Repite tu nueva contrasena"
+                      placeholder="Repite tu nueva contraseña"
                       autoComplete="new-password"
                     />
                   </div>
@@ -139,7 +139,7 @@ export default function ResetPasswordPage() {
                 >
                   {isSubmitting
                     ? "Actualizando..."
-                    : "Guardar nueva contrasena"}
+                    : "Guardar nueva contraseña"}
                 </button>
               </form>
 
@@ -148,7 +148,7 @@ export default function ResetPasswordPage() {
                   href="/auth/login"
                   className="text-green-600 font-semibold hover:text-green-700"
                 >
-                  Volver a iniciar sesion
+                  Volver a iniciar sesión
                 </Link>
               </p>
             </>

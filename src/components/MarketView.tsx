@@ -122,9 +122,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
     if (typeof window !== "undefined") {
       return (
         (localStorage.getItem("market_list_layout") as
-          | "category"
-          | "aisle"
-          | null) ?? "aisle"
+          "category" | "aisle" | null) ?? "aisle"
       );
     }
     return "aisle";
@@ -334,6 +332,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
       onUpdate();
     } catch (error) {
       console.error("Error toggling item:", error);
+      toast.error("No se pudo actualizar el producto. Intenta de nuevo.");
     } finally {
       setLoading(null);
     }
@@ -403,6 +402,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
       onUpdate();
     } catch (error) {
       console.error("Error updating inventory:", error);
+      toast.error("No se pudo actualizar el inventario. Intenta de nuevo.");
     } finally {
       setLoading(null);
       setEditingItem(null);
@@ -464,6 +464,9 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
       onUpdate();
     } catch (error) {
       console.error("Error resetting market:", error);
+      toast.error(
+        "No se pudo reiniciar la lista de mercado. Intenta de nuevo.",
+      );
     }
   };
 
@@ -492,6 +495,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
       onUpdate();
     } catch (error) {
       console.error("Error deleting custom item:", error);
+      toast.error("No se pudo eliminar el producto. Intenta de nuevo.");
     } finally {
       setLoading(null);
     }

@@ -249,7 +249,7 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
     async (recipe: Recipe) => {
       try {
         // Only delete from DB if it's a DB recipe (not expanded)
-        if (recipe.id.match(/^(col|rap|thm|fit|int|mp|cl|reg)-/)) {
+        if (recipe.id.match(/^(col|rap|thm|tm6|fit|int|mp|cl|reg)-/)) {
           toast.error("Las recetas de la biblioteca no se pueden eliminar");
           return;
         }
@@ -286,7 +286,7 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
 
   // Check if recipe is from expanded library (not editable/deletable from DB)
   const isExpandedRecipe = (recipe: Recipe) => {
-    return recipe.id.match(/^(col|rap|thm|fit|int|mp|cl|reg)-/);
+    return recipe.id.match(/^(col|rap|thm|tm6|fit|int|mp|cl|reg)-/);
   };
 
   return (

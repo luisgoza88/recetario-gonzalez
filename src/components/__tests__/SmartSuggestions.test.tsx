@@ -45,16 +45,12 @@ describe("SmartSuggestions", () => {
       },
     ],
     steps: ["Cocinar pasta", "Preparar salsa"],
-    servings: { luis: 3, mariana: 2 },
-    totalServings: 5,
-    mealType: "lunch",
-    imageUrl: null,
-    estimatedCost: 15000,
-    prepTime: 25,
+    portions: { luis: "150ml", mariana: "100ml" },
+    type: "lunch",
+    prep_time: 25,
   };
 
   const mockOnClose = vi.fn();
-  const mockOnRecipeGenerated = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -75,8 +71,10 @@ describe("SmartSuggestions", () => {
     render(
       <SmartSuggestions
         recipe={mockRecipe}
+        allRecipes={[mockRecipe]}
+        mealType="lunch"
+        onSelectAlternative={vi.fn()}
         onClose={mockOnClose}
-        onRecipeGenerated={mockOnRecipeGenerated}
       />,
     );
 
@@ -94,8 +92,10 @@ describe("SmartSuggestions", () => {
     render(
       <SmartSuggestions
         recipe={mockRecipe}
+        allRecipes={[mockRecipe]}
+        mealType="lunch"
+        onSelectAlternative={vi.fn()}
         onClose={mockOnClose}
-        onRecipeGenerated={mockOnRecipeGenerated}
       />,
     );
 
@@ -116,8 +116,10 @@ describe("SmartSuggestions", () => {
     render(
       <SmartSuggestions
         recipe={mockRecipe}
+        allRecipes={[mockRecipe]}
+        mealType="lunch"
+        onSelectAlternative={vi.fn()}
         onClose={mockOnClose}
-        onRecipeGenerated={mockOnRecipeGenerated}
       />,
     );
 
@@ -155,8 +157,10 @@ describe("SmartSuggestions", () => {
     render(
       <SmartSuggestions
         recipe={mockRecipe}
+        allRecipes={[mockRecipe]}
+        mealType="lunch"
+        onSelectAlternative={vi.fn()}
         onClose={mockOnClose}
-        onRecipeGenerated={mockOnRecipeGenerated}
       />,
     );
 
@@ -195,8 +199,10 @@ describe("SmartSuggestions", () => {
     render(
       <SmartSuggestions
         recipe={mockRecipe}
+        allRecipes={[mockRecipe]}
+        mealType="lunch"
+        onSelectAlternative={vi.fn()}
         onClose={mockOnClose}
-        onRecipeGenerated={mockOnRecipeGenerated}
       />,
     );
 
@@ -223,7 +229,7 @@ describe("SmartSuggestions", () => {
         recipe: {
           id: "2",
           name: "Alternativa 1",
-          mealType: "lunch",
+          type: "lunch",
         },
         availability: {
           availabilityScore: 90,
@@ -234,8 +240,10 @@ describe("SmartSuggestions", () => {
     render(
       <SmartSuggestions
         recipe={mockRecipe}
+        allRecipes={[mockRecipe]}
+        mealType="lunch"
+        onSelectAlternative={vi.fn()}
         onClose={mockOnClose}
-        onRecipeGenerated={mockOnRecipeGenerated}
       />,
     );
 

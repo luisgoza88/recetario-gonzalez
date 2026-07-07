@@ -423,8 +423,7 @@ export function useSmartFABContext(
         onClick: () => {
           if (alert.action) {
             const payload = alert.action.payload as
-              | { tab?: string; section?: string }
-              | undefined;
+              { tab?: string; section?: string } | undefined;
             if (payload?.section) navigateTo(payload.section, payload.tab);
             else if (payload?.tab) navigateTo("recetario", payload.tab);
           }

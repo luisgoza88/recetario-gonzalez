@@ -112,8 +112,7 @@ async function loadInventory(): Promise<
     if (data) {
       for (const item of data) {
         const inv = item.inventory as
-          | { current_quantity: string; current_number: number }[]
-          | null;
+          { current_quantity: string; current_number: number }[] | null;
         if (inv && inv.length > 0 && inv[0].current_number > 0) {
           inventoryCache.set(item.name.toLowerCase(), {
             quantity: inv[0].current_quantity,
