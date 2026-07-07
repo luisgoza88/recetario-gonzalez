@@ -146,12 +146,14 @@ export type ColombianRegion =
   | "Llanos"
   | "Santander"
   | "Valle del Cauca"
-  | "Tolima-Huila";
+  | "Tolima-Huila"
+  | "Amazonía"
+  | "Insular";
 
 export interface Recipe {
   id: string;
   name: string;
-  type: "breakfast" | "lunch" | "dinner";
+  type: "breakfast" | "lunch" | "dinner" | "dessert" | "snack";
   portions?: {
     luis: string;
     mariana: string;

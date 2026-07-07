@@ -70,6 +70,33 @@ const REGION_FILTERS: Array<{
   { key: "Santander", label: "Santander", icon: "🐐" },
   { key: "Valle del Cauca", label: "Valle del Cauca", icon: "🌿" },
   { key: "Tolima-Huila", label: "Tolima-Huila", icon: "🌾" },
+  { key: "Amazonía", label: "Amazonía", icon: "🌳" },
+  { key: "Insular", label: "Insular", icon: "🏝️" },
+];
+
+// Cuisine filter options (shown when "Internacional" is selected).
+// Matches against recipe.tags (first tag = cuisine slug).
+const CUISINE_FILTERS: Array<{ key: string; label: string; icon: string }> = [
+  { key: "all", label: "Todas las cocinas", icon: "🌍" },
+  { key: "mexicana", label: "Mexicana", icon: "🇲🇽" },
+  { key: "peruana", label: "Peruana", icon: "🇵🇪" },
+  { key: "italiana", label: "Italiana", icon: "🇮🇹" },
+  { key: "espanola", label: "Española", icon: "🇪🇸" },
+  { key: "argentina", label: "Argentina", icon: "🇦🇷" },
+  { key: "venezolana", label: "Venezolana", icon: "🇻🇪" },
+  { key: "francesa", label: "Francesa", icon: "🇫🇷" },
+  { key: "india", label: "India", icon: "🇮🇳" },
+  { key: "china", label: "China", icon: "🇨🇳" },
+  { key: "japonesa", label: "Japonesa", icon: "🇯🇵" },
+  { key: "tailandesa", label: "Tailandesa", icon: "🇹🇭" },
+  { key: "coreana", label: "Coreana", icon: "🇰🇷" },
+  { key: "vietnamita", label: "Vietnamita", icon: "🇻🇳" },
+  { key: "griega", label: "Griega", icon: "🇬🇷" },
+  { key: "arabe", label: "Árabe", icon: "🥙" },
+  { key: "libanesa", label: "Libanesa", icon: "🇱🇧" },
+  { key: "americana", label: "Americana", icon: "🇺🇸" },
+  { key: "cubana", label: "Cubana", icon: "🇨🇺" },
+  { key: "moderna", label: "Moderna", icon: "🥗" },
 ];
 
 export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
@@ -116,8 +143,9 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
     };
   }, []);
   const [filter, setFilter] = useState<
-    "all" | "breakfast" | "lunch" | "dinner" | "thermomix"
+    "all" | "breakfast" | "lunch" | "dinner" | "dessert" | "snack" | "thermomix"
   >("all");
+  const [cuisineFilter, setCuisineFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<"all" | RecipeCategory>(
     "all",
   );
@@ -212,15 +240,28 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
         moodFilters.length === 0 ||
         (recipe.moods ?? []).some((m) => moodFilters.includes(m));
 
+      // Cuisine filter (only applies when internacional is selected)
+      const matchesCuisine =
+        cuisineFilter === "all" || (recipe.tags ?? []).includes(cuisineFilter);
+
       return (
         matchesSearch &&
         matchesFilter &&
         matchesCategory &&
         matchesRegion &&
-        matchesMood
+        matchesMood &&
+        matchesCuisine
       );
     });
-  }, [allRecipes, search, filter, categoryFilter, regionFilter, moodFilters]);
+  }, [
+    allRecipes,
+    search,
+    filter,
+    categoryFilter,
+    regionFilter,
+    moodFilters,
+    cuisineFilter,
+  ]);
 
   // Total de recetas TM6 disponibles (para el banner del filtro Thermomix)
   const thermomixCount = useMemo(
@@ -232,7 +273,14 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
 
   // Meal-type chips (incluye TM6 dark)
   const TYPE_CHIPS: Array<{
-    id: "all" | "breakfast" | "lunch" | "dinner" | "thermomix";
+    id:
+      | "all"
+      | "breakfast"
+      | "lunch"
+      | "dinner"
+      | "dessert"
+      | "snack"
+      | "thermomix";
     label: string;
     Icon: typeof BookOpen;
     dark?: boolean;
@@ -241,6 +289,8 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
     { id: "breakfast", label: "Desayunos", Icon: Coffee },
     { id: "lunch", label: "Almuerzos", Icon: UtensilsCrossed },
     { id: "dinner", label: "Cenas", Icon: Moon },
+    { id: "dessert", label: "Postres", Icon: Sparkles },
+    { id: "snack", label: "Snacks", Icon: Soup },
     { id: "thermomix", label: "TM6", Icon: Soup, dark: true },
   ];
 
@@ -317,6 +367,7 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
             onClick={() => {
               setCategoryFilter(cat.key);
               if (cat.key !== "colombiana") setRegionFilter("all");
+              if (cat.key !== "internacional") setCuisineFilter("all");
             }}
             className={`
               flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border
@@ -354,6 +405,34 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
             >
               <span>{reg.icon}</span>
               <span>{reg.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Cuisine Filter - Shown when "Internacional" category is selected */}
+      {categoryFilter === "internacional" && (
+        <div
+          className="flex gap-2 mb-3 overflow-x-auto pb-2 scrollbar-hide"
+          style={{ WebkitOverflowScrolling: "touch" }}
+          role="group"
+          aria-label="Filtrar por cocina del mundo"
+        >
+          {CUISINE_FILTERS.map((c) => (
+            <button
+              key={c.key}
+              onClick={() => setCuisineFilter(c.key)}
+              className={`
+                flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border
+                ${
+                  cuisineFilter === c.key
+                    ? "bg-sky-700 text-white border-sky-700"
+                    : "bg-white text-gray-600 hover:bg-gray-50 border-gray-200"
+                }
+              `}
+            >
+              <span>{c.icon}</span>
+              <span>{c.label}</span>
             </button>
           ))}
         </div>

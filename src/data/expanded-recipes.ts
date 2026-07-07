@@ -3073,6 +3073,24 @@ const cenaLigeraRecipes: ExpandedRecipe[] = [
 // EXPORTACIÓN - BIBLIOTECA COMPLETA
 // =====================================================
 
+// Recetas retiradas del pack por duplicar platos que ya existen en la BD
+// (ej. Ajiaco, Sancocho, Pad Thai, Tacos). La versión canónica vive en Supabase.
+const DUPLICATED_IN_DB = new Set([
+  "col-01", // Bandeja Paisa (Simplificada)
+  "col-02", // Ajiaco Bogotano
+  "col-03", // Sancocho de Gallina
+  "col-09", // Mote de Queso (queda reg-04)
+  "col-10", // Changua (Caldo Boyacense)
+  "col-11", // Arroz Atollado Valluno (queda reg-20)
+  "col-12", // Tamal Tolimense (queda reg-22)
+  "int-01", // Pad Thai Casero
+  "int-02", // Tacos Mexicanos de Carne
+  "int-06", // Pollo Teriyaki con Arroz
+  "int-07", // Ramen Casero Simplificado
+  "int-08", // Pizza Casera Rápida
+  "fit-05", // Salmón al Horno con Espárragos
+]);
+
 export const expandedRecipes: ExpandedRecipe[] = [
   ...colombianaRecipes,
   ...rapidasRecipes,
@@ -3081,7 +3099,7 @@ export const expandedRecipes: ExpandedRecipe[] = [
   ...internacionalRecipes,
   ...mealPrepRecipes,
   ...cenaLigeraRecipes,
-];
+].filter((r) => !DUPLICATED_IN_DB.has(r.id));
 
 // Helper: obtener recetas por categoría
 export function getRecipesByCategory(

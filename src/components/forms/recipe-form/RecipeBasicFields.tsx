@@ -5,7 +5,6 @@ import {
   ColombianRegion,
   RecipeDifficulty,
   DietaryTag,
-  MealType,
 } from "@/types";
 import { RecipeFormAction, RecipeFormState } from "@/hooks/useRecipeForm";
 
@@ -103,12 +102,16 @@ export function RecipeBasicFields({ state, dispatch }: RecipeBasicFieldsProps) {
         <label className="block text-sm font-medium mb-1">Tipo *</label>
         <select
           value={state.type}
-          onChange={(e) => set("type", e.target.value as MealType)}
+          onChange={(e) =>
+            set("type", e.target.value as RecipeFormState["type"])
+          }
           className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-700"
         >
           <option value="breakfast">Desayuno</option>
           <option value="lunch">Almuerzo</option>
           <option value="dinner">Cena</option>
+          <option value="dessert">Postre</option>
+          <option value="snack">Snack</option>
         </select>
       </div>
 

@@ -269,6 +269,10 @@ export default function RecipeModal({
         return "Almuerzo";
       case "dinner":
         return "Cena";
+      case "dessert":
+        return "Postre";
+      case "snack":
+        return "Snack";
       default:
         return type;
     }
@@ -279,6 +283,8 @@ export default function RecipeModal({
     breakfast: { color: "text-amber-700", tint: "from-amber-100 to-orange-50" },
     lunch: { color: "text-green-700", tint: "from-green-100 to-lime-50" },
     dinner: { color: "text-indigo-700", tint: "from-indigo-100 to-violet-50" },
+    dessert: { color: "text-pink-700", tint: "from-pink-100 to-rose-50" },
+    snack: { color: "text-yellow-700", tint: "from-yellow-100 to-amber-50" },
   }[recipe.type] ?? {
     color: "text-stone-700",
     tint: "from-stone-100 to-stone-50",

@@ -30,6 +30,8 @@ export default function RecipeCard({
       breakfast: "from-amber-100 to-orange-50",
       lunch: "from-green-100 to-lime-50",
       dinner: "from-indigo-100 to-violet-50",
+      dessert: "from-pink-100 to-rose-50",
+      snack: "from-yellow-100 to-amber-50",
     }[recipe.type] ?? "from-stone-100 to-stone-50";
 
   const emoji =
@@ -37,6 +39,8 @@ export default function RecipeCard({
       breakfast: "🥚",
       lunch: "🥗",
       dinner: "🍽️",
+      dessert: "🍰",
+      snack: "🥨",
     }[recipe.type] ?? "🍴";
 
   const totalTime = (recipe.prep_time ?? 0) + (recipe.cook_time ?? 0);

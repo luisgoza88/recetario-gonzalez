@@ -5,7 +5,6 @@ import { supabase } from "@/lib/supabase/client";
 import {
   Recipe,
   Ingredient,
-  MealType,
   RecipeCategory,
   ColombianRegion,
   RecipeDifficulty,
@@ -19,7 +18,7 @@ export interface RecipeFormState {
   // Basic fields
   name: string;
   description: string;
-  type: MealType;
+  type: Recipe["type"];
   category: RecipeCategory | "";
   region: ColombianRegion | "";
   difficulty: RecipeDifficulty | "";

@@ -55,6 +55,16 @@ export const REGION_CONFIG: Record<
     icon: "🌊",
     color: "bg-teal-100 text-teal-800",
   },
+  Amazonía: {
+    label: "Amazonía",
+    icon: "🌳",
+    color: "bg-lime-100 text-lime-800",
+  },
+  Insular: {
+    label: "Insular",
+    icon: "🏝️",
+    color: "bg-sky-100 text-sky-800",
+  },
   Llanos: {
     label: "Llanos",
     icon: "🐄",
@@ -1264,6 +1274,16 @@ const tolimaHuilaRecipes: RegionalRecipe[] = [
 // EXPORTACION - RECETAS REGIONALES COMPLETAS
 // =====================================================
 
+// Recetas retiradas del pack por duplicar platos que ya existen en la BD.
+// La versión canónica vive en Supabase.
+const DUPLICATED_IN_DB = new Set([
+  "reg-01", // Arroz con Coco
+  "reg-06", // Cazuela de Mariscos
+  "reg-09", // Arroz Atollado del Pacífico
+  "reg-11", // Mamona (Ternera a la Llanera)
+  "reg-15", // Mute Santandereano
+]);
+
 export const regionalRecipes: RegionalRecipe[] = [
   ...costaCoribeRecipes,
   ...pacificoRecipes,
@@ -1271,7 +1291,7 @@ export const regionalRecipes: RegionalRecipe[] = [
   ...santanderRecipes,
   ...valleRecipes,
   ...tolimaHuilaRecipes,
-];
+].filter((r) => !DUPLICATED_IN_DB.has(r.id));
 
 // Helper: obtener recetas por region
 export function getRecipesByRegion(region: ColombianRegion): RegionalRecipe[] {
