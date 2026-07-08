@@ -1,7 +1,7 @@
 ---
 name: analytics-monitoring
 description: "PostHog analytics: 40+ eventos en 10 categorias, useAnalytics hook, AnalyticsProvider, logger, ErrorBoundary. Sin Sentry aun."
-model: claude-haiku-4-5
+model: haiku
 tools:
   - Read
   - Write

@@ -1,7 +1,7 @@
 ---
 name: recetario-qa
 description: "QA: 15% coverage actual, ZERO tests de componentes, endpoints criticos sin tests. Build, lint, typecheck, vitest, coverage reports."
-model: claude-haiku-4-5
+model: haiku
 tools:
   - Read
   - Bash

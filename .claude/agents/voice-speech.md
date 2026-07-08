@@ -1,7 +1,7 @@
 ---
 name: voice-speech
-description: "Web Speech API: VoiceManager singleton, 7 comandos regex en espanol, TTS con voz es-CO, useSpeechRecognition hook."
-model: claude-haiku-4-5
+description: "Web Speech API: VoiceManager singleton, 7 comandos regex en espanol, TTS con voz es-ES/es-CO (discrepancia sin resolver), useSpeechRecognition hook."
+model: haiku
 tools:
   - Read
   - Write
@@ -40,7 +40,8 @@ Experto en funcionalidad de voz de recetario-app. Gestiona reconocimiento de voz
 
 ### Configuracion Speech
 
-- Idioma: `es-ES` (reconocimiento y TTS)
+- **Discrepancia de idioma sin resolver**: `src/lib/voice-commands.ts` fija `recognition.lang = "es-ES"` y `utterance.lang = "es-ES"` (STT y TTS), mientras que `src/hooks/useSpeechRecognition.ts` usa `es-CO` por defecto (`options.language ?? "es-CO"`). Dos rutas de voz distintas terminan con acentos/idiomas distintos segun cual se use.
+- **Recomendacion**: unificar a `es-CO` en ambos archivos — la app es para una familia colombiana, y `useSpeechRecognition.ts` ya lo tiene correcto; `voice-commands.ts` es el que hay que alinear.
 - `continuous = false` (no continuous listening)
 - `interimResults = true`
 - `maxAlternatives = 1`
@@ -56,7 +57,7 @@ Experto en funcionalidad de voz de recetario-app. Gestiona reconocimiento de voz
 
 ## Reglas
 
-1. Idioma SIEMPRE `es-ES` para STT y TTS
+1. Idioma objetivo: `es-CO` para STT y TTS (app colombiana) — `voice-commands.ts` aun usa `es-ES`, alinearlo al tocar el archivo
 2. Comandos con regex tolerante a variaciones
 3. `formatForSpeech()` antes de TTS (limpiar emojis/markdown)
 4. Manejar gracefully cuando Web Speech API no esta disponible

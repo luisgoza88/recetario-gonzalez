@@ -1,7 +1,7 @@
 ---
 name: vision-ai
 description: "5 endpoints de Vision AI (scan-receipt, scan-pantry multi-imagen, analyze-room, recipe-from-image, match-recipe-image) + generacion con Imagen 3."
-model: claude-sonnet-4-6
+model: sonnet
 tools:
   - Read
   - Write
@@ -33,9 +33,11 @@ Experto en endpoints de vision (analisis de imagenes) usando Gemini Flash y gene
 - `src/components/yolima/PhotoCapture.tsx` — Captura de fotos (Yolima)
 - `src/components/home/RoomScanner.tsx` — Scanner de habitaciones
 
-### Modelos de Vision
+### Modelos de Vision (verificar en `src/lib/gemini/client.ts` antes de asumir otros)
 
-- `gemini-2.0-flash` — Analisis de imagenes (rapido)
+- `gemini-3.5-flash` — Analisis de imagenes (rapido)
+- `gemini-2.5-flash-image` — Analisis/generacion combinada
+- `gemini-2.5-pro` — Alta calidad
 - `imagen-3.0-generate-002` — Generacion de imagenes
 
 ### Patrones Clave

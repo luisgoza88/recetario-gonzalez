@@ -1,7 +1,7 @@
 ---
 name: recetario-security
 description: "Seguridad: auditoria de RLS (anti-patrones recursion + auth.uid() IS NULL), service role key audit, fugas a anon, rate limiting, CSP headers. Pueden usar /user:audit-rls-leaks para chequeo rapido."
-model: claude-sonnet-4-6
+model: opus
 tools:
   - Read
   - Write
@@ -57,29 +57,32 @@ Ver skill `rls-security-patterns` para detalle completo de los patrones.
 
 ### VULNERABILIDADES HISTORICAS YA RESUELTAS
 
-| Bug                                                      | Tabla/Codigo                                          | Fix aplicado                                                                      |
-| -------------------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `infinite recursion in policy for household_memberships` | household_memberships, user_profiles, ai_action_queue | DROP policies recursivas viejas, dejar solo las que usan `is_household_member()`  |
-| Visitor anonimo veia "Mi Hogar"                          | households, users + initializeHouseholdContext()      | DROP policies con `auth.uid() IS NULL`, refactor cliente para esperar AuthContext |
-| `/api/daily-completion` sin auth                         | daily-completion route                                | Anadir middleware auth                                                            |
+| Bug                                                                     | Tabla/Codigo                                                    | Fix aplicado                                                                                                                                                                                                                                                                                                       |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `infinite recursion in policy for household_memberships`                | household_memberships, user_profiles, ai_action_queue           | DROP policies recursivas viejas, dejar solo las que usan `is_household_member()`                                                                                                                                                                                                                                   |
+| Visitor anonimo veia "Mi Hogar"                                         | households, users + initializeHouseholdContext()                | DROP policies con `auth.uid() IS NULL`, refactor cliente para esperar AuthContext                                                                                                                                                                                                                                  |
+| `/api/daily-completion` sin auth                                        | daily-completion route                                          | Auth agregada (`createAuthenticatedClient()` + `getUser()`) — resuelto, NO modificar sin auth                                                                                                                                                                                                                      |
+| Migracion posterior revirtio el aislamiento de `daily_completions`      | migracion `20260508000000` reintrodujo `auth.uid() IS NOT NULL` | Corregido en `20260528000000_fix_cross_tenant_leaks.sql` (vuelve a `is_household_member(household_id)`). **LECCION**: una migracion posterior puede revertir sin querer una policy de seguridad de una migracion anterior — al auditar, verificar las policies **vigentes en DB**, no solo el orden de migraciones |
+| `recipe_favorites` con policy sobre columna inexistente `status`        | `20260510020000_recipe_favorites.sql`                           | La policy referenciaba `household_memberships.status = 'active'`; la columna real es `is_active` → lanzaba error en runtime y nadie veia favoritos del hogar. Corregido en `20260528000000_fix_cross_tenant_leaks.sql`                                                                                             |
+| `decide_ai_proposal` (SECURITY DEFINER) sin validar hogar del aprobador | Funcion RPC de propuestas IA                                    | No verificaba que `p_decision_by` perteneciera al hogar de la propuesta → bypass cross-household (aprobar/ejecutar propuestas de otro hogar). Corregido en `20260528000000_fix_cross_tenant_leaks.sql`                                                                                                             |
+| Rol `anon` podia LEER las 59 tablas publicas                            | Incl. `ai_conversations`, `user_profiles`, `household_*`        | Hasta 2026-07-06 el anon key hacia SELECT sobre todo `public`. Revocado con `revoke select on all tables in schema public from anon` en `20260706001000_lockdown_anon_reads.sql` (complementa `20260706000000_lockdown_anon_writes.sql`)                                                                           |
+| `console.log('Auth state changed')` en produccion                       | `src/contexts/AuthContext.tsx`                                  | Removido — ya no expone eventos de auth en consola                                                                                                                                                                                                                                                                 |
 
 ### Areas de Auditoria
 
 1. **Auth en endpoints**: Verificar que TODOS los API routes tengan auth (excepto publicos)
-2. **Service role key**: Auditar los 6+ archivos que la usan
-3. **RLS policies**: Verificar cobertura en todas las tablas
+2. **Service role key**: Auditar los archivos que la usan
+3. **RLS policies**: Verificar cobertura en todas las tablas — auditar la policy **vigente**, no asumir por el nombre de la migracion mas reciente (ver leccion arriba)
 4. **Rate limiting**: Verificar en todos los endpoints
 5. **CSP headers**: `script-src unsafe-inline` necesario para Next.js
 6. **Input validation**: ILIKE sin validacion en `execute/route.ts`
-7. **console.log en produccion**: AuthContext.tsx exponiendo eventos de auth
+7. **Permisos de `anon`**: Confirmar que sigue sin SELECT/INSERT/UPDATE/DELETE en `public` tras `20260706000000`/`20260706001000`
 
 ### Archivos a Auditar
 
-- `src/middleware.ts` — Solo protege /api/, paginas no protegidas server-side
-- `src/app/api/daily-completion/route.ts` — **SIN AUTH, SERVICE ROLE**
+- `src/middleware.ts` — Protege `/api/*` (rutas publicas explicitas en `PUBLIC_API_PATHS`), paginas no protegidas server-side
 - `src/app/api/ai-assistant/execute/route.ts` — ILIKE sin validacion
 - `src/app/api/generate-recipe/route.ts` — Singleton Supabase con anon key
-- `src/contexts/AuthContext.tsx` — console.log('Auth state changed')
 - Todos los API routes en `src/app/api/`
 
 ### Rutas Publicas (legitimas)

@@ -1,7 +1,7 @@
 ---
 name: home-manager
 description: "Modulo hogar: 26+ componentes, espacios, empleados, tareas, scheduling inteligente, Modo Yolima, inspecciones, reportes. 8,000+ LOC."
-model: claude-sonnet-4-6
+model: sonnet
 tools:
   - Read
   - Write
@@ -27,7 +27,7 @@ Experto en el modulo de gestion del hogar: espacios, empleados domesticos, tarea
 - `src/components/home/ScheduleTemplateEditor.tsx` — Editor de templates
 - `src/components/home/ScheduleDashboard.tsx` — Dashboard de horarios
 - `src/components/home/EmployeesPanel.tsx` — Panel de empleados
-- `src/components/home/EmployeeDetailModal.tsx` — Detalle de empleado (846 LOC - monster)
+- `src/components/home/EmployeeDetailModal.tsx` — Detalle de empleado (1,002 LOC - monster, ver `component-architect.md`)
 - `src/components/home/EmployeeCheckIn.tsx` — Check-in de empleados
 - `src/components/home/SpacesPanel.tsx` — Panel de espacios
 - `src/components/home/SpaceFormView.tsx` — Formulario de espacios
@@ -57,13 +57,15 @@ Experto en el modulo de gestion del hogar: espacios, empleados domesticos, tarea
 - `src/lib/services/household-service.ts` — Service del hogar
 - `src/lib/config/spaceConfig.ts` — Configuracion de espacios
 - `src/lib/types/household.ts` — Tipos del hogar
-- `src/data/schedule-seed.ts` — Seed de 4 semanas (76KB)
 
 ### APIs
 
-- `src/app/api/seed-schedule/route.ts` — Seed de horarios
-- `src/app/api/daily-completion/route.ts` — Completar dia (SIN AUTH - CRITICO)
+- `src/app/api/daily-completion/route.ts` — Completar dia. **Historico**: estaba sin auth (P0), se agrego `createAuthenticatedClient()` + `getUser()` — ver `recetario-security.md` para el detalle del fix. Ya tiene auth, no modificar sin mantenerla
 - `src/app/api/analyze-room/route.ts` — Analisis IA de habitaciones
+
+### Resuelto
+
+`src/data/schedule-seed.ts` (seed de 4 semanas) fue eliminado junto con `src/app/api/seed-schedule/route.ts` — el seeding de horarios ya no depende de este archivo.
 
 ### Tablas DB
 
@@ -90,7 +92,7 @@ Experto en el modulo de gestion del hogar: espacios, empleados domesticos, tarea
 4. Rating de limpieza: 1-5 estrellas
 5. Frecuencias: diaria, semanal, quincenal, mensual, trimestral
 6. Modo Yolima es simplificado — minimo de UI, maximo de funcionalidad
-7. **CRITICO**: `/api/daily-completion` necesita auth — NO modificar sin agregar
+7. `/api/daily-completion` YA TIENE auth — no removerla al modificar el endpoint
 
 ## Checklist Pre-Commit
 

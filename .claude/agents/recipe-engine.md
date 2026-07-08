@@ -1,7 +1,7 @@
 ---
 name: recipe-engine
-description: "Motor de recetas, menu rotativo 12 dias, matching 4 pasos de ingredientes, sustituciones inteligentes, Thermomix, lista de compras. 5,000+ LOC."
-model: claude-sonnet-4-6
+description: "Motor de recetas (290 con foto, 119 Mundo), menu rotativo 12 dias, matching 4 pasos de ingredientes, sustituciones inteligentes, Thermomix, lista de compras. Absorbe a data-curator (proyecto). 5,000+ LOC."
+model: sonnet
 tools:
   - Read
   - Write
@@ -13,6 +13,8 @@ tools:
 
 # Recipe Engine Agent
 
+> Absorbe a `data-curator` (proyecto) — este agente cubre tanto el motor de recetas como la curaduria/consolidacion de datos estaticos del dominio de recetas.
+
 ## Rol
 
 Experto en el modulo de recetas, menu rotativo, matching de ingredientes, sustituciones, Thermomix y listas de compras de recetario-app.
@@ -23,17 +25,29 @@ Experto en el modulo de recetas, menu rotativo, matching de ingredientes, sustit
 
 - `src/data/recipes.ts` — 28 recetas simples
 - `src/data/expanded-recipes.ts` — 90KB con porciones Luis/Mariana
-- `src/data/recipe-library.ts` — 231KB biblioteca escalable (ATENCION: puede entrar al bundle)
+- `src/data/regional-colombian-recipes.ts` — 59KB, recetas regionales colombianas (reemplaza a `recipe-library.ts`, ver "Resuelto" abajo)
+- `src/data/colombian-seasons.ts` — 9KB, temporadas/estacionalidad de ingredientes colombianos
 - `src/data/menu.ts` — Ciclo 12 dias desde 2026-01-06 (excluyendo domingos)
-- `src/data/market.ts` — 82 items de mercado
 - `src/data/substitutions.ts` — 90+ sustituciones con tags dieteticos
+
+### Resuelto: consolidacion de datos de recetas y mercado
+
+`recipe-library.ts` (231KB) y `market.ts` (82 items) **fueron eliminados** — se migraron a Supabase (`recipes` y `market_items`/`store_prices`). Ya no hay bundle bloat por estos dos archivos ni doble fuente de verdad TS↔DB para ese contenido.
+
+### Catalogo Real (verificar contra DB antes de asumir cifras viejas)
+
+- 290 recetas con foto en catalogo, de las cuales 119 son de la categoria "Mundo"
+- `Recipe.type` (en `src/types/index.ts`) incluye los tipos nuevos `dessert` y `snack` ademas de `breakfast | lunch | dinner`
+
+### Mas Archivos Clave
+
 - `src/data/thermomix-recipes.ts` — Recetas Thermomix
 - `src/lib/inventory-check.ts` — Matching 4 pasos con cache (14,801 bytes)
 - `src/lib/smart-substitutions.ts` — Sustituciones con inventario + tags dieteticos
 - `src/lib/feedback-learning.ts` — Aprendizaje desde feedback
 - `src/lib/menu-tasks-integration.ts` — Integracion menu-tareas
-- `src/components/CalendarView.tsx` — Vista calendario/menu (1,025 LOC - monster)
-- `src/components/MarketView.tsx` — Vista mercado (936 LOC - monster)
+- `src/components/CalendarView.tsx` — Vista calendario/menu (2,071 LOC - monster, ver `component-architect.md`)
+- `src/components/MarketView.tsx` — Vista mercado (1,634 LOC - monster, ver `component-architect.md`)
 - `src/components/RecipesView.tsx` — Lista de recetas
 - `src/components/RecipeModal.tsx` — Detalles de receta
 - `src/components/ThermomixView.tsx` — Vista Thermomix
@@ -74,10 +88,17 @@ Experto en el modulo de recetas, menu rotativo, matching de ingredientes, sustit
 
 ### Problemas Conocidos
 
-- 3 representaciones redundantes de recetas (necesitan consolidacion)
-- `recipe-library.ts` (231KB) puede estar entrando al bundle del cliente
 - `CYCLE_START_DATE` hardcodeado, deberia ser configurable por hogar
 - Nombres personales hardcodeados (Luis, Mariana) en datos
+- `expanded-recipes.ts` sigue siendo una representacion separada de `recipes.ts` — evaluar si tambien debe migrar a DB
+
+### Curaduria de Datos (absorbido de data-curator)
+
+1. No crear nuevas fuentes de datos redundantes — antes de agregar un archivo `src/data/*.ts` nuevo, verificar si el dato ya vive en Supabase
+2. Datos > 50KB deben estar en DB, no en TS (ver precedente: recipe-library.ts y market.ts ya migrados)
+3. Nombres personales NUNCA hardcodeados — usar configuracion por hogar
+4. Archivos TS son para seed/fallback, no para runtime data
+5. Mantener consistencia entre datos TS (seeds) y tablas DB — si diverge, la DB es la fuente de verdad
 
 ## Reglas
 
@@ -87,12 +108,14 @@ Experto en el modulo de recetas, menu rotativo, matching de ingredientes, sustit
 4. Preparaciones caseras cuentan como disponibles si 70%+ ingredientes estan
 5. Ingredientes compuestos se separan por "+"
 6. Cache de aliases/preparaciones: 5 minutos
-7. No duplicar representaciones de recetas — consolidar
+7. No duplicar representaciones de recetas — consolidar hacia DB
+8. No hardcodear nombres personales ni crear nuevas fuentes de datos redundantes (ver Curaduria de Datos)
 
 ## Checklist Pre-Commit
 
 - [ ] Build exitoso
 - [ ] Matching de ingredientes funciona con aliases
 - [ ] Porciones correctas (Luis 3, Mariana 2)
-- [ ] Sin datos hardcodeados nuevos en archivos TS
+- [ ] Sin datos hardcodeados nuevos en archivos TS (ni nombres personales ni fuentes redundantes)
+- [ ] Datos nuevos > 50KB van a Supabase, no a un archivo TS
 - [ ] Tests de matching actualizados

@@ -1,7 +1,7 @@
 ---
 name: pwa-offline
-description: "PWA con Serwist: service worker, IndexedDB cache (6 stores), offline sync, push notifications, manifest. Estrategias de caching."
-model: claude-haiku-4-5
+description: "PWA con Serwist: service worker, IndexedDB cache (6 stores), offline sync, push notifications (VAPID + server-side), manifest. Estrategias de caching."
+model: haiku
 tools:
   - Read
   - Write
@@ -29,6 +29,14 @@ Experto en Progressive Web App y funcionalidad offline de recetario-app. Gestion
 - `src/app/manifest.ts` — Web App Manifest
 - `src/app/offline/page.tsx` — Pagina fallback offline
 - `next.config.ts` — Configuracion Serwist
+
+### Push Notifications (server-side)
+
+- `src/lib/push/vapid.ts` — Claves VAPID y config del push service
+- `src/app/api/push/send/route.ts` — Endpoint de envio (GET = health check con VAPID public key; POST se auto-autentica via `CRON_SECRET`, ruta publica en middleware)
+- `src/hooks/useNotifications.ts` — Hook cliente de suscripcion/permiso
+- `supabase/migrations/20260510000000_push_subscriptions.sql` — Tabla de suscripciones push
+- Dependencia: `web-push` (+ `@types/web-push`)
 
 ### Service Worker (Serwist)
 

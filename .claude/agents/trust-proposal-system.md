@@ -1,7 +1,7 @@
 ---
 name: trust-proposal-system
 description: "Sistema de confianza IA con 5 niveles de trust, 4 de riesgo, propuestas con aprobacion, ejecucion transaccional, audit log y rollback. 2,800+ LOC."
-model: claude-sonnet-4-6
+model: sonnet
 tools:
   - Read
   - Write
@@ -64,12 +64,16 @@ Experto en el sistema de confianza, propuestas y auditoria de acciones de IA. Ge
 | HIGH (3)     | Requiere confirmacion     | Cambiar menu, editar receta     |
 | CRITICAL (4) | Multi-step + confirmacion | Eliminar datos, bulk operations |
 
-### Bugs Conocidos (CRITICOS)
+### Bugs Conocidos (CRITICOS, vigentes)
 
 1. **BUG**: `recordRollback` en trust-service.ts usa `.rpc('increment', { x: 1 })` dentro de `.update()` — NO FUNCIONA
 2. Dos flujos de trust paralelos: `ai-command-service.ts` tiene su propia `getHouseholdTrust()` vs `trust-service.ts`
 3. `capturePreState` solo cubre 4 funciones
 4. Propuestas expiradas no se limpian automaticamente
+
+### Bugs Conocidos (RESUELTOS — historia)
+
+- **`decide_ai_proposal` (SECURITY DEFINER) permitia bypass cross-household**: la funcion RPC que aprueba/rechaza propuestas no validaba que `p_decision_by` perteneciera al hogar de la propuesta, permitiendo aprobar/ejecutar propuestas de OTRO hogar. Corregido en `supabase/migrations/20260528000000_fix_cross_tenant_leaks.sql` (agrega el chequeo de membresia del aprobador antes de ejecutar la decision). Ver `recetario-security.md` para el detalle completo de la campaña de seguridad de mayo-julio 2026.
 
 ## Reglas
 

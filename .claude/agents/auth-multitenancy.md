@@ -1,7 +1,7 @@
 ---
 name: auth-multitenancy
 description: "Auth multi-tenant: roles (admin/familia/empleado), 16 permisos granulares, invitaciones, middleware, AuthContext, RoleGate. 2,500+ LOC."
-model: claude-sonnet-4-6
+model: sonnet
 tools:
   - Read
   - Write
@@ -27,7 +27,7 @@ Experto en autenticacion, sistema multi-tenant, roles, permisos granulares e inv
 - `src/lib/invitation-service.ts` — CRUD invitaciones
 - `src/lib/services/household-service.ts` — Servicio del hogar
 - `src/lib/stores/useHouseholdStore.ts` — Store Zustand
-- `src/components/settings/MembersPanel.tsx` — Gestion de miembros (560 LOC)
+- `src/components/settings/MembersPanel.tsx` — Gestion de miembros (588 LOC)
 - `src/app/auth/login/page.tsx` — Login
 - `src/app/auth/register/page.tsx` — Registro
 - `src/app/auth/forgot-password/page.tsx` — Recuperar password
@@ -75,16 +75,21 @@ const { can, isAdmin } = useRoleCheck();
 ### Problemas Conocidos
 
 - Inconsistencia de roles: AuthContext usa `admin|empleado|familia`, HouseholdStore usa `owner|admin|member|viewer`
-- `console.log('Auth state changed')` en produccion en AuthContext.tsx
 - Middleware solo protege /api/, paginas no protegidas server-side
 
-## 🚨 LECCIONES CRITICAS DE PRODUCCION (mayo 2026)
+### Rutas Publicas Completas (`src/middleware.ts`)
 
-### 1. HouseholdProvider DEBE esperar AuthContext
+`PUBLIC_PATHS`: `/auth`, `/join`, `/r/` (recetas compartidas), `/_next`, `/favicon`, `/manifest`, `/sw.js`, `/icon`, `/apple-icon`, `/api/auth`
 
-❌ **Bug encontrado**: `initializeHouseholdContext()` cargaba el primer hogar de la DB sin verificar sesion. Combinado con policies RLS con `auth.uid() IS NULL`, cualquier visitor anonimo veia datos de "Mi Hogar".
+`PUBLIC_API_PATHS`: `/api/auth`, `/api/validate-invitation`, `/api/pwa-icon` (iconos de manifest sin sesion), `/api/cron` (valida via header `CRON_SECRET`), `/api/push/send` (GET es health check con la VAPID public key; POST se auto-autentica via `CRON_SECRET`)
 
-✅ **Fix obligatorio**: HouseholdProvider espera a que `AuthContext.isLoading=false` y `user != null` antes de hacer cualquier fetch.
+## Lecciones criticas de seguridad de auth/RLS
+
+Para el detalle completo de bugs de RLS/auth encontrados y corregidos en produccion (recursion infinita, escape `auth.uid() IS NULL`, migraciones que revirtieron aislamiento, `decide_ai_proposal` cross-household, lockdown de `anon`), ver **`recetario-security.md`** — es la fuente unica de verdad para vulnerabilidades historicas y su fix. Este archivo se enfoca en el flujo correcto de auth/roles/providers, no en el historial de bugs.
+
+### HouseholdProvider DEBE esperar AuthContext
+
+Providers que dependen de auth (HouseholdProvider, FavoritesProvider, etc.) esperan a que `AuthContext.isLoading=false` y `user != null` antes de hacer cualquier fetch:
 
 ```tsx
 const { user: authUser, isLoading: authLoading } = useAuth();
@@ -101,19 +106,7 @@ useEffect(() => {
 }, [authUser, authLoading]);
 ```
 
-### 2. initializeHouseholdContext requiere authUserId
-
-❌ **Antes** (legacy "Phase A"):
-
-```typescript
-// "For now, get the first/default household (no auth yet)"
-const { data: households } = await supabase
-  .from("households")
-  .select("*")
-  .limit(1);
-```
-
-✅ **Ahora**:
+### initializeHouseholdContext requiere authUserId
 
 ```typescript
 export async function initializeHouseholdContext(authUserId?: string) {
@@ -131,11 +124,7 @@ export async function initializeHouseholdContext(authUserId?: string) {
 }
 ```
 
-### 3. RLS no puede tener escape `auth.uid() IS NULL`
-
-Si una policy en una tabla con datos de hogar tiene `(auth.uid() IS NULL) OR ...`, hay fuga. Ver skill `rls-security-patterns`. Auditar con `/user:audit-rls-leaks`.
-
-### 4. Cliente Supabase = singleton (NO crear createClient propio)
+### Cliente Supabase = singleton (NO crear createClient propio)
 
 Ver skill `supabase-client-patterns`. Importar `import { supabase } from "@/lib/supabase/client"` siempre en lib del cliente.
 
@@ -143,12 +132,13 @@ Ver skill `supabase-client-patterns`. Importar `import { supabase } from "@/lib/
 
 1. **SIEMPRE** verificar auth con `supabase.auth.getUser()` (no `getSession()`)
 2. Middleware inyecta `x-user-id` — endpoints deben leerlo de headers
-3. Rutas publicas: `/auth`, `/join`, `/api/validate-invitation`, `/api/push/send` (GET solo)
+3. Rutas publicas: ver lista completa arriba (`PUBLIC_PATHS`/`PUBLIC_API_PATHS` en `src/middleware.ts`)
 4. RoleGate en UI es solo UX — la seguridad real esta en RLS y middleware
 5. Un usuario puede pertenecer a multiples hogares
 6. Invitaciones expiran y tienen uso unico
 7. Providers que dependen de auth (HouseholdProvider, FavoritesProvider, etc.) DEBEN esperar `AuthContext`
 8. Consultar skill `recetario-auth-patterns` antes de modificar
+9. Para bugs historicos de RLS/auth y sus fixes, consultar `recetario-security.md` (no duplicar aqui)
 
 ## Checklist Pre-Commit
 

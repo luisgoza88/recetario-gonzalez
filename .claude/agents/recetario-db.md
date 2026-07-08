@@ -1,7 +1,7 @@
 ---
 name: recetario-db
-description: "Base de datos Supabase: 50+ tablas, 25+ migraciones, RLS multi-tenant con helpers SECURITY DEFINER, 20+ RPCs, 13+ triggers, 65+ indices. Arquitecto de datos. Conoce los antipatrones de RLS (consultar skill rls-security-patterns)."
-model: claude-sonnet-4-6
+description: "Base de datos Supabase: 50+ tablas, 38 migraciones, RLS multi-tenant con helpers SECURITY DEFINER, 20+ RPCs, 13+ triggers, 65+ indices. Arquitecto de datos. Conoce los antipatrones de RLS (consultar skill rls-security-patterns)."
+model: sonnet
 tools:
   - Read
   - Write
@@ -21,12 +21,12 @@ Arquitecto de base de datos para recetario-app. Gestiona schema design, migracio
 
 ### Archivos Clave
 
-- `supabase/migrations/` — 17 migraciones (en orden cronologico)
+- `supabase/migrations/` — 38 migraciones (en orden cronologico)
 - `supabase-indexes.sql` — 65+ indices
 - `src/lib/supabase/client.ts` — Cliente browser singleton
 - `src/types/index.ts` — ~700 lineas de tipos TypeScript
 
-### Migraciones (17)
+### Migraciones (38, seleccion cronologica relevante)
 
 1. `20260118150000_home_management_tables.sql`
 2. `20260118200000_schedule_system.sql`
@@ -44,6 +44,31 @@ Arquitecto de base de datos para recetario-app. Gestiona schema design, migracio
 14. `20260218100000_daily_completions.sql`
 15. `20260218200000_recipe_categories.sql`
 16. `20260218300000_smart_shopping.sql`
+17. `20260304000000_fix_critical_rls.sql`
+18. `20260304100000_fix_household_trigger.sql`
+19. `20260304200000_unify_updated_at_triggers.sql`
+20. `20260304300000_household_cooking_profile.sql`
+21. `20260304400000_household_dietary_preferences.sql`
+22. `20260304500000_seed_store_prices.sql`
+23. `20260508000000_fix_store_prices_rls_and_indexes.sql`
+24. `20260509000000_add_moods_and_region_to_recipes.sql`
+25. `20260509100000_seed_150_colombian_recipes.sql`
+26. `20260509125336_add_moods_and_region_to_recipes.sql`
+27. `20260510000000_push_subscriptions.sql`
+28. `20260510020000_recipe_favorites.sql`
+29. `20260510030000_recurring_items.sql`
+30. `20260510040000_shopping_list_assignments.sql`
+31. `20260510050000_subscription_tiers.sql`
+
+**Campaña de seguridad (mayo-julio 2026, ver `recetario-security.md` para el detalle de cada bug):**
+
+32. `20260528000000_fix_cross_tenant_leaks.sql` — daily_completions, recipe_favorites, decide_ai_proposal
+33. `20260528010000_fix_membership_privilege_escalation.sql` — escalada de privilegios en household_memberships
+34. `20260528020000_harden_function_search_path.sql`
+35. `20260528030000_fix_security_definer_view.sql`
+36. `20260528040000_harden_always_true_insert_policies.sql`
+37. `20260706000000_lockdown_anon_writes.sql` — revoca INSERT/UPDATE/DELETE a `anon`
+38. `20260706001000_lockdown_anon_reads.sql` — revoca SELECT a `anon` (fase 2)
 
 ### Tablas por Categoria (40+)
 
