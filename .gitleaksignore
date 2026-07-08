@@ -1,0 +1,6 @@
+# Falsos positivos conocidos de gitleaks — línea base Recetario (2026-07-08).
+# Verificados seguros. El hook escanea solo lo staged. Formato: file:rule:line
+.claude/skills/web-push-notifications/SKILL.md:generic-api-key:45
+SETUP_PUSH_NOTIFICATIONS.md:generic-api-key:39
+SETUP_PUSH_NOTIFICATIONS.md:generic-api-key:40
+SETUP_PUSH_NOTIFICATIONS.md:generic-api-key:51

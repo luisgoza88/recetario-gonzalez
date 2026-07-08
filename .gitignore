@@ -46,3 +46,7 @@ yarn-error.log*
 next-env.d.ts
 .github/workflows/
 .lazyweb/
+
+# Artefactos locales
+graphify-out/
+context-packs/

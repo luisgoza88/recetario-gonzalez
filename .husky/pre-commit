@@ -1,0 +1,9 @@
+# Gitleaks: bloquea secretos en lo staged ANTES del historial. Guard command -v:
+# máquinas/CI sin gitleaks no rompen el commit. Falsos positivos → .gitleaksignore.
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks git --staged --pre-commit --redact --no-banner || {
+    echo "✖ gitleaks detectó un posible secreto en el commit." >&2
+    echo "  Si es falso positivo, agrega el fingerprint a .gitleaksignore." >&2
+    exit 1
+  }
+fi
