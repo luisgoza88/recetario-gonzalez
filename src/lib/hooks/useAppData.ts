@@ -24,7 +24,11 @@ async function fetchRecipes() {
     .order("name");
 
   if (error) throw error;
-  return data as Recipe[];
+  // La columna es thermomix_compatible (snake_case); el tipo Recipe usa camelCase
+  return (data ?? []).map((row) => ({
+    ...row,
+    thermomixCompatible: row.thermomix_compatible ?? false,
+  })) as Recipe[];
 }
 
 async function fetchMarketItems() {

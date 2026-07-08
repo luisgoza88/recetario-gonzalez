@@ -483,11 +483,20 @@ export async function POST(request: NextRequest) {
 // Prompt builder
 // =====================================================
 
-// Lazy-load expanded recipe names to avoid bloating the bundle at module level
+// Nombres de la biblioteca viva (tabla recipes) — incluye las recetas Mundo,
+// no solo el pack estático original
 async function getExpandedRecipeNames(): Promise<string[]> {
   try {
-    const { getRecipeNamesForPrompt } = await import("@/data/expanded-recipes");
-    return getRecipeNamesForPrompt();
+    const { data } = await getSupabase()
+      .from("recipes")
+      .select("name, category, thermomix_compatible")
+      .in("type", ["breakfast", "lunch", "dinner"])
+      .order("name");
+    if (!data) return [];
+    return data.map((r) => {
+      const badge = r.thermomix_compatible ? " [TM6]" : "";
+      return `${r.name}${r.category ? ` (${r.category})` : ""}${badge}`;
+    });
   } catch {
     return [];
   }

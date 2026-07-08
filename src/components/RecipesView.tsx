@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
+import Image from "next/image";
 import {
   Search,
   Plus,
@@ -271,6 +272,35 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
 
   const isThermomix = filter === "thermomix";
 
+  // "Descubre": cocina del día, rota con la fecha. Se calcula en cliente
+  // (useEffect) para no desincronizar el HTML del servidor con el hidratado.
+  const [dayIndex, setDayIndex] = useState<number | null>(null);
+  useEffect(() => {
+    setDayIndex(Math.floor(Date.now() / 86_400_000));
+  }, []);
+
+  const discovery = useMemo(() => {
+    if (dayIndex === null) return null;
+    const cuisines = CUISINE_FILTERS.filter((c) => c.key !== "all");
+    for (let i = 0; i < cuisines.length; i++) {
+      const cuisine = cuisines[(dayIndex + i) % cuisines.length];
+      const matches = allRecipes.filter((r) =>
+        (r.tags ?? []).includes(cuisine.key),
+      );
+      if (matches.length >= 3) return { cuisine, recipes: matches.slice(0, 8) };
+    }
+    return null;
+  }, [allRecipes, dayIndex]);
+
+  const showDiscovery =
+    discovery !== null &&
+    !search &&
+    filter === "all" &&
+    categoryFilter === "all" &&
+    regionFilter === "all" &&
+    cuisineFilter === "all" &&
+    moodFilters.length === 0;
+
   // Meal-type chips (incluye TM6 dark)
   const TYPE_CHIPS: Array<{
     id:
@@ -510,6 +540,54 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
             </p>
           </div>
           <Sparkles size={14} className="text-white/80" />
+        </div>
+      )}
+
+      {/* Descubre: cocina del día */}
+      {showDiscovery && discovery && (
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+              Descubre · Cocina {discovery.cuisine.label.toLowerCase()}{" "}
+              {discovery.cuisine.icon}
+            </p>
+            <button
+              onClick={() => {
+                setCategoryFilter("internacional");
+                setCuisineFilter(discovery.cuisine.key);
+              }}
+              className="text-[11px] font-semibold text-green-700"
+            >
+              Ver todas
+            </button>
+          </div>
+          <div
+            className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-hide"
+            style={{ WebkitOverflowScrolling: "touch" }}
+          >
+            {discovery.recipes.map((r) => (
+              <button
+                key={r.id}
+                onClick={() => setSelectedRecipe(r)}
+                className="w-32 shrink-0 text-left"
+              >
+                <div className="w-32 h-20 rounded-xl overflow-hidden relative bg-stone-100">
+                  {r.image_url && (
+                    <Image
+                      src={r.image_url}
+                      alt={r.name}
+                      fill
+                      sizes="128px"
+                      className="object-cover"
+                    />
+                  )}
+                </div>
+                <p className="text-[11.5px] font-medium leading-tight mt-1 line-clamp-2">
+                  {r.name}
+                </p>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

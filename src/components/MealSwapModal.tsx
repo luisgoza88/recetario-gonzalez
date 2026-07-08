@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
+import Image from "next/image";
 import {
   Search,
   Wand2,
@@ -11,12 +12,8 @@ import {
 } from "lucide-react";
 import Spinner from "@/components/ui/Spinner";
 import { BottomSheet } from "@/components/ui/BottomSheet";
-import { Recipe, MealType } from "@/types";
-import type {
-  ExpandedRecipe,
-  RecipeCategory as ExpandedCategory,
-} from "@/data/expanded-recipes";
-import { INITIAL_RECIPES } from "@/data/recipes";
+import { Recipe, MealType, RecipeCategory } from "@/types";
+import { useRecipes } from "@/lib/hooks/useAppData";
 import { useToast } from "@/components/ui/Toast";
 
 // =====================================================
@@ -48,25 +45,31 @@ const MEAL_TYPE_EMOJI: Record<MealType, string> = {
   dinner: "🍲",
 };
 
-const ALL_CATEGORIES: { value: ExpandedCategory | "all"; label: string }[] = [
+const ALL_CATEGORIES: {
+  value: RecipeCategory | "all";
+  label: string;
+  icon?: string;
+}[] = [
   { value: "all", label: "Todas" },
-  { value: "colombiana", label: "Colombiana" },
-  { value: "rapida", label: "Rapidas" },
-  { value: "fitness", label: "Fitness" },
-  { value: "internacional", label: "Internacional" },
-  { value: "thermomix", label: "Thermomix" },
-  { value: "meal-prep", label: "Meal Prep" },
-  { value: "cena-ligera", label: "Cena Ligera" },
+  { value: "colombiana", label: "Colombiana", icon: "🇨🇴" },
+  { value: "rapida", label: "Rapidas", icon: "⚡" },
+  { value: "fitness", label: "Fitness", icon: "💪" },
+  { value: "internacional", label: "Internacional", icon: "🌍" },
+  { value: "thermomix", label: "Thermomix", icon: "🤖" },
+  { value: "meal-prep", label: "Meal Prep", icon: "🥘" },
+  { value: "cena-ligera", label: "Cena Ligera", icon: "🌙" },
 ];
+
+const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
+  ALL_CATEGORIES.filter((c) => c.value !== "all").map((c) => [
+    c.value,
+    `${c.icon} ${c.label}`,
+  ]),
+);
 
 // =====================================================
 // Component
 // =====================================================
-
-type CategoryConfigMap = Record<
-  string,
-  { icon: string; color: string; label: string }
->;
 
 export default function MealSwapModal({
   isOpen,
@@ -78,57 +81,17 @@ export default function MealSwapModal({
   const toast = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<
-    ExpandedCategory | "all"
+    RecipeCategory | "all"
   >("all");
   const [isLoadingAI, setIsLoadingAI] = useState(false);
-  const [lazyExpandedRecipes, setLazyExpandedRecipes] = useState<
-    ExpandedRecipe[]
-  >([]);
-  const [categoryConfig, setCategoryConfig] = useState<CategoryConfigMap>({});
 
-  // Lazy load expanded-recipes (90KB) only when modal is open
-  useEffect(() => {
-    if (!isOpen) return;
-    let mounted = true;
-    import("@/data/expanded-recipes").then((mod) => {
-      if (!mounted) return;
-      setLazyExpandedRecipes(mod.expandedRecipes);
-      setCategoryConfig(mod.CATEGORY_CONFIG as CategoryConfigMap);
-    });
-    return () => {
-      mounted = false;
-    };
-  }, [isOpen]);
+  // Biblioteca viva: misma query cacheada que usa el resto de la app
+  const { data: dbRecipes, isLoading: isLoadingRecipes } = useRecipes();
 
-  // Combine initial recipes + expanded recipes, filtered by meal type
-  const allRecipes = useMemo(() => {
-    const initial: Recipe[] = INITIAL_RECIPES.filter(
-      (r) => r.type === mealType,
-    ).map((r) => ({ ...r }) as Recipe);
-
-    const expanded: Recipe[] = lazyExpandedRecipes
-      .filter((r) => r.type === mealType)
-      .map(
-        (r) =>
-          ({
-            ...r,
-            ingredients: r.ingredients,
-            steps: r.steps,
-          }) as Recipe,
-      );
-
-    // Merge, deduplicate by id
-    const seen = new Set<string>();
-    const merged: Recipe[] = [];
-    for (const r of [...initial, ...expanded]) {
-      if (!seen.has(r.id)) {
-        seen.add(r.id);
-        merged.push(r);
-      }
-    }
-
-    return merged;
-  }, [mealType, lazyExpandedRecipes]);
+  const allRecipes = useMemo(
+    () => (dbRecipes ?? []).filter((r) => r.type === mealType),
+    [dbRecipes, mealType],
+  );
 
   // Filter recipes based on search and category
   const filteredRecipes = useMemo(() => {
@@ -285,15 +248,18 @@ export default function MealSwapModal({
                   : "bg-stone-100 text-stone-500 hover:bg-stone-200"
               }`}
             >
-              {cat.value !== "all" &&
-                categoryConfig[cat.value as ExpandedCategory]?.icon + " "}
+              {cat.icon ? `${cat.icon} ` : ""}
               {cat.label}
             </button>
           ))}
         </div>
 
         {/* Recipe list */}
-        {filteredRecipes.length === 0 ? (
+        {isLoadingRecipes ? (
+          <div className="flex justify-center py-8">
+            <Spinner size="sm" />
+          </div>
+        ) : filteredRecipes.length === 0 ? (
           <div className="text-center py-8 text-[var(--ink-soft)]">
             <ChefHat size={40} className="mx-auto mb-2 opacity-50" />
             <p className="text-sm">
@@ -316,7 +282,6 @@ export default function MealSwapModal({
                   key={recipe.id}
                   recipe={recipe}
                   mealType={mealType}
-                  categoryConfig={categoryConfig}
                   onSelect={() => handleSelectRecipe(recipe)}
                 />
               ))}
@@ -335,16 +300,13 @@ export default function MealSwapModal({
 function RecipeSwapCard({
   recipe,
   mealType,
-  categoryConfig,
   onSelect,
 }: {
   recipe: Recipe;
   mealType: MealType;
-  categoryConfig: CategoryConfigMap;
   onSelect: () => void;
 }) {
-  const category = (recipe as Recipe & { category?: ExpandedCategory })
-    .category;
+  const category = recipe.category;
   const prepTime = recipe.prep_time;
   const cookTime = recipe.cook_time;
   const totalTime =
@@ -361,9 +323,19 @@ function RecipeSwapCard({
       onClick={onSelect}
       className="w-full bg-white rounded-xl border border-[var(--border)] p-3 text-left hover:border-[var(--accent)] active:bg-stone-50 transition-colors flex items-center gap-3"
     >
-      {/* Emoji thumbnail */}
-      <div className="w-14 h-14 shrink-0 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-2xl">
-        {MEAL_TYPE_EMOJI[mealType]}
+      {/* Foto (o emoji si no hay) */}
+      <div className="w-14 h-14 shrink-0 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-2xl relative overflow-hidden">
+        {recipe.image_url ? (
+          <Image
+            src={recipe.image_url}
+            alt={recipe.name}
+            fill
+            sizes="56px"
+            className="object-cover"
+          />
+        ) : (
+          MEAL_TYPE_EMOJI[mealType]
+        )}
       </div>
 
       <div className="flex-1 min-w-0">
@@ -379,9 +351,9 @@ function RecipeSwapCard({
               {totalTime}m
             </span>
           )}
-          {category && categoryConfig[category] && (
+          {category && CATEGORY_LABELS[category] && (
             <span className="text-[10.5px] text-[var(--ink-soft)]">
-              {categoryConfig[category].icon} {categoryConfig[category].label}
+              {CATEGORY_LABELS[category]}
             </span>
           )}
         </div>
