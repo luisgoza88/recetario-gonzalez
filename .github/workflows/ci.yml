@@ -58,13 +58,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # NO bloqueante: Recetario arrastra deuda de lint pre-existente
-      # (no-explicit-any) que nunca se detectó porque .github estaba en
-      # .gitignore (no había CI). Reporta sin romper el build; quitar el
-      # continue-on-error cuando se limpie la deuda.
+      # Gate real: la deuda de no-explicit-any se limpió (2026-07-08).
+      # Los 178 warnings restantes son no-unused-vars y no rompen el lint.
       - name: Run linter
         run: npm run lint
-        continue-on-error: true
 
       - name: Run build (includes type checking)
         run: npm run build

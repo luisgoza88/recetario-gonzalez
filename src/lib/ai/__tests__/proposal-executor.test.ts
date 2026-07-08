@@ -8,7 +8,7 @@ import {
 import type { AIProposal, AIProposedAction, AIRiskLevel } from "@/types";
 
 // Mock Supabase client
-const mockDb: any = {
+const mockDb: Record<string, ReturnType<typeof vi.fn>> = {
   from: vi.fn(() => mockDb),
   select: vi.fn(() => mockDb),
   insert: vi.fn(() => mockDb),

@@ -17,7 +17,9 @@ const ANON_KEY =
   process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!SUPABASE_URL || !ANON_KEY) {
-  console.log("verify-rls-invariants: sin SUPABASE_URL/SUPABASE_ANON_KEY — omitido (skip).");
+  console.log(
+    "verify-rls-invariants: sin SUPABASE_URL/SUPABASE_ANON_KEY — omitido (skip).",
+  );
   process.exit(0);
 }
 
@@ -59,13 +61,19 @@ const report = (ok, msg) => {
 
 for (const table of NO_READ) {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=id&limit=1`, { headers: HEADERS });
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${table}?select=id&limit=1`,
+      { headers: HEADERS },
+    );
     if (!res.ok) {
       report(true, `anon NO lee ${table} (HTTP ${res.status})`);
       continue;
     }
     const rows = await res.json().catch(() => null);
-    report(Array.isArray(rows) && rows.length === 0, `anon NO lee ${table} (${Array.isArray(rows) ? rows.length : "?"} filas)`);
+    report(
+      Array.isArray(rows) && rows.length === 0,
+      `anon NO lee ${table} (${Array.isArray(rows) ? rows.length : "?"} filas)`,
+    );
   } catch (e) {
     report(false, `anon lee ${table}: error de red ${e.message}`);
   }
@@ -96,5 +104,9 @@ for (const { table, body } of NO_WRITE) {
 }
 
 const total = NO_READ.length + NO_WRITE.length * 2;
-console.log(failures === 0 ? `\n✅ ${total} invariantes RLS OK` : `\n❌ ${failures} invariante(s) RLS VIOLADO(S) — posible fuga de PII del hogar`);
+console.log(
+  failures === 0
+    ? `\n✅ ${total} invariantes RLS OK`
+    : `\n❌ ${failures} invariante(s) RLS VIOLADO(S) — posible fuga de PII del hogar`,
+);
 process.exit(failures === 0 ? 0 : 1);

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
 import { render, screen, waitFor } from "@/__tests__/test-utils";
 import CalendarView from "../CalendarView";
 import { Recipe } from "@/types";
@@ -47,7 +47,7 @@ describe("CalendarView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Mock successful fetch response
-    (global.fetch as any).mockResolvedValue({
+    (global.fetch as Mock).mockResolvedValue({
       ok: true,
       json: async () => ({ data: [] }),
     });
@@ -114,7 +114,7 @@ describe("CalendarView", () => {
 
   it("should render shopping cart button when menu is generated", async () => {
     // Mock con menú generado
-    (global.fetch as any).mockResolvedValue({
+    (global.fetch as Mock).mockResolvedValue({
       ok: true,
       json: async () => ({
         data: [

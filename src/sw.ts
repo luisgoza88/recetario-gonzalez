@@ -89,7 +89,7 @@ self.addEventListener("notificationclick", (event: NotificationEvent) => {
       // Si ya hay una ventana abierta con la misma URL, enfocarla
       for (const client of clients) {
         if (client.url === url && "focus" in client) {
-          return (client as any).focus();
+          return (client as WindowClient).focus();
         }
       }
       // Si no, abrir una nueva ventana

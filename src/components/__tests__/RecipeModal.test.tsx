@@ -17,11 +17,11 @@ vi.mock("@/components/ui/FocusTrap", () => ({
 
 // Mock dynamic imports
 vi.mock("next/dynamic", () => ({
-  default: (loader: any) => {
-    const DynamicComponent = (props: any) => {
-      const Component = loader();
-      return <Component {...props} />;
-    };
+  default: (loader: () => React.ComponentType<Record<string, unknown>>) => {
+    const Component = loader();
+    const DynamicComponent = (props: Record<string, unknown>) => (
+      <Component {...props} />
+    );
     return DynamicComponent;
   },
 }));

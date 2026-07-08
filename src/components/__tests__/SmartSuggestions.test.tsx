@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@/__tests__/test-utils";
 import SmartSuggestions from "../SmartSuggestions";
 import { Recipe } from "@/types";
@@ -55,7 +55,7 @@ describe("SmartSuggestions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Mock successful API response
-    (global.fetch as any).mockResolvedValue({
+    (global.fetch as Mock).mockResolvedValue({
       ok: true,
       json: async () => ({
         recipe: {
@@ -138,7 +138,7 @@ describe("SmartSuggestions", () => {
 
   it.skip("should show loading state when generating recipe", async () => {
     // Mock delayed response
-    (global.fetch as any).mockImplementation(
+    (global.fetch as Mock).mockImplementation(
       () =>
         new Promise((resolve) =>
           setTimeout(
@@ -224,7 +224,7 @@ describe("SmartSuggestions", () => {
   it("should display alternative recipes if available", async () => {
     // Mock con alternativas
     const { findAlternativeRecipes } = await import("@/lib/inventory-check");
-    (findAlternativeRecipes as any).mockResolvedValue([
+    (findAlternativeRecipes as Mock).mockResolvedValue([
       {
         recipe: {
           id: "2",
