@@ -1,0 +1,39 @@
+name: Vigilancia
+
+on:
+  schedule:
+    - cron: "0 8 * * *"
+    - cron: "0 9 * * 1"
+  workflow_dispatch: {}
+
+jobs:
+  rls:
+    name: Invariantes RLS (sondas anon vs prod)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Invariantes RLS
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: node scripts/verify-rls-invariants.mjs
+
+  nightly-qa:
+    name: QA semanal (lint + build + test)
+    if: github.event.schedule == '0 9 * * 1' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm run test:run

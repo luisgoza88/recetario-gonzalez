@@ -1,0 +1,14 @@
+{
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "ignore": ["graphify-out/**", "context-packs/**", "supabase/functions/**"],
+  "ignoreBinaries": ["deno", "supabase", "gitleaks"],
+  "next": {
+    "entry": [
+      "next.config.{js,ts,mjs}",
+      "middleware.ts",
+      "src/middleware.ts",
+      "app/**/{page,layout,loading,error,not-found,route,template,default,sitemap,robots,manifest}.{ts,tsx}",
+      "src/app/**/{page,layout,loading,error,not-found,route,template,default,sitemap,robots,manifest}.{ts,tsx}"
+    ]
+  }
+}

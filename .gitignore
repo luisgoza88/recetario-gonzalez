@@ -44,5 +44,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-.github/workflows/
+# .github/workflows/  (des-ignorado para versionar CI)
 .lazyweb/
+
+# Artefactos locales
+graphify-out/
+context-packs/
+
+# CI debe versionarse
+!.github/
+!.github/workflows/
+!.github/workflows/*.yml

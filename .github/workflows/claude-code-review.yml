@@ -1,0 +1,36 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  claude-review:
+    if: github.event.pull_request.user.login != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Claude Code Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Revisa este PR de Recetario (gestor de hogar: hogares, empleados
+            domésticos, mercado, limpieza, menús; Next.js + Supabase). Comenta
+            SOLO hallazgos accionables, en español, priorizando:
+
+            1. FUGA DE DATOS: toda tabla nueva necesita RLS scoped por hogar/
+               usuario; el rol `anon` no debe leer PII (usuarios, empleados,
+               check-ins, compras, presupuestos). La app requiere login para todo.
+            2. SEGURIDAD: rutas API sin auth, secretos hardcodeados, CORS abierto.
+            3. CORRECCIÓN Y REGRESIONES.
+
+            Sé conciso. Si el PR se ve bien, dilo en una línea. Solo comentarios.
+          claude_args: "--max-turns 20"
