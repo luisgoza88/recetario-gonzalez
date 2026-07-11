@@ -1,10 +1,26 @@
 name: CI
 
+# DIETA DE COSTOS (2026-07-11, pedido del dueño): docs no gastan minutos;
+# push nuevo cancela runs viejos; el job Build (redundante en PRs — el job de
+# lint ya compila como typecheck) corre solo en push a main. Cualquier agente:
+# no relajar sin autorización del dueño — ver "Costos CI/CD" en CLAUDE.md.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".claude/**"
   pull_request:
     branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".claude/**"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   verify:
@@ -98,6 +114,8 @@ jobs:
 
   build:
     name: Build
+    # Solo en push a main: el job de lint ya compila (typecheck) en PRs.
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
 
     steps:
