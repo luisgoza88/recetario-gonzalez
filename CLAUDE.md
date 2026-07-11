@@ -421,3 +421,7 @@ function MyComponent() {
 - Recetas generadas por IA / semana
 - Escaneos de despensa / usuario
 - Tareas completadas / día
+
+## Costos CI/CD (REGLAS DURAS — pedido del dueño 2026-07-11)
+
+GitHub Actions cobra por minutos. Para CUALQUIER agente (Claude Code, Codex u otro): no crear workflows ni ampliar triggers sin autorización del dueño; no quitar `paths-ignore`/`concurrency` ni el `if` del job Build (en PRs el job de lint ya compila); verificar local antes de pushear; commits con pathspecs; no re-lanzar workflows en lote.
