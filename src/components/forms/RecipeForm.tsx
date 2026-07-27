@@ -6,6 +6,8 @@ import { CanEdit } from "@/components/auth/RoleGate";
 import { useToast } from "@/components/ui/Toast";
 import { useEscapeKey } from "@/hooks/useEscapeKey";
 import { useRecipeForm } from "@/hooks/useRecipeForm";
+import { portionLabel } from "@/lib/portions";
+import { usePortionsConfig } from "@/lib/stores/useHouseholdStore";
 import { RecipeBasicFields } from "./recipe-form/RecipeBasicFields";
 import { RecipeTimeFields } from "./recipe-form/RecipeTimeFields";
 import { RecipeIngredientsList } from "./recipe-form/RecipeIngredientsList";
@@ -39,6 +41,8 @@ export default function RecipeForm({
     handleGenerateNutrition,
     handleSubmit,
   } = useRecipeForm(recipe);
+
+  const portionsConfig = usePortionsConfig();
 
   return (
     <CanEdit
@@ -157,42 +161,26 @@ export default function RecipeForm({
                 Porciones resumidas
               </label>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">
-                    Porcion grande
-                  </label>
-                  <input
-                    type="text"
-                    value={state.portionsLuis}
-                    onChange={(e) =>
-                      dispatch({
-                        type: "set_field",
-                        field: "portionsLuis",
-                        value: e.target.value,
-                      })
-                    }
-                    className="w-full p-2 border rounded-lg text-sm"
-                    placeholder="Ej: 300g + 2 huevos"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">
-                    Porcion pequena
-                  </label>
-                  <input
-                    type="text"
-                    value={state.portionsMariana}
-                    onChange={(e) =>
-                      dispatch({
-                        type: "set_field",
-                        field: "portionsMariana",
-                        value: e.target.value,
-                      })
-                    }
-                    className="w-full p-2 border rounded-lg text-sm"
-                    placeholder="Ej: 180g + 1 huevo"
-                  />
-                </div>
+                {state.memberKeys.map((memberKey) => (
+                  <div key={memberKey}>
+                    <label className="block text-xs text-gray-500 mb-1">
+                      {portionLabel(memberKey, portionsConfig)}
+                    </label>
+                    <input
+                      type="text"
+                      value={state.portions[memberKey] ?? ""}
+                      onChange={(e) =>
+                        dispatch({
+                          type: "set_portion",
+                          memberKey,
+                          value: e.target.value,
+                        })
+                      }
+                      className="w-full p-2 border rounded-lg text-sm"
+                      placeholder="Ej: 300g + 2 huevos"
+                    />
+                  </div>
+                ))}
               </div>
             </div>
 

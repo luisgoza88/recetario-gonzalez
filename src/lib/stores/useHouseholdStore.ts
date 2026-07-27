@@ -98,3 +98,11 @@ export const useCurrentUser = () => useHouseholdStore((s) => s.user);
 export const useHouseholdId = () => useHouseholdStore((s) => s.household?.id);
 export const useHasFeature = (feature: keyof HouseholdFeatures) =>
   useHouseholdStore((s) => s.hasFeature(feature));
+
+/**
+ * Configuración de porciones por miembro del hogar (`{ "Luis": 3, ... }`).
+ * La usan los helpers de `@/lib/portions` para etiquetar y ordenar las
+ * cantidades de una receta sin asumir nombres fijos.
+ */
+export const usePortionsConfig = () =>
+  useHouseholdStore((s) => s.household?.cooking_profile?.portions_config);

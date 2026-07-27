@@ -12,7 +12,8 @@ import {
 } from "lucide-react";
 import Spinner from "@/components/ui/Spinner";
 import { BottomSheet } from "@/components/ui/BottomSheet";
-import { Recipe, MealType, RecipeCategory } from "@/types";
+import { Recipe, MealType, RecipeCategory, Ingredient } from "@/types";
+import { ingredientPortions } from "@/lib/portions";
 import { useRecipes } from "@/lib/hooks/useAppData";
 import { useToast } from "@/components/ui/Toast";
 
@@ -143,16 +144,10 @@ export default function MealSwapModal({
           name: data.recipe.name || "Receta IA",
           type: mealType,
           ingredients: (data.recipe.ingredients || []).map(
-            (ing: {
-              name: string;
-              total?: string;
-              luis: string;
-              mariana: string;
-            }) => ({
+            (ing: Ingredient) => ({
               name: ing.name,
               total: ing.total || "",
-              luis: ing.luis,
-              mariana: ing.mariana,
+              per_person: ingredientPortions(ing),
             }),
           ),
           steps: data.recipe.steps || [],

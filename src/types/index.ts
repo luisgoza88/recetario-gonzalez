@@ -71,8 +71,12 @@ export interface GeneratedMeal {
 export interface GeneratedIngredient {
   name: string;
   total: string;
-  luis: string;
-  mariana: string;
+  /** Cantidad por miembro. Leer con los helpers de `@/lib/portions`. */
+  per_person?: PersonPortions;
+  /** @deprecated Modelo legacy. Ver `Ingredient.luis`. */
+  luis?: string;
+  /** @deprecated Ver `luis`. */
+  mariana?: string;
   available?: boolean;
 }
 
@@ -150,14 +154,23 @@ export type ColombianRegion =
   | "Amazonía"
   | "Insular";
 
+/**
+ * Cantidad por miembro del hogar: `{ [claveDelMiembro]: cantidad }`.
+ *
+ * Sustituye al modelo hardcodeado `{ luis, mariana }`. Los datos existentes
+ * usan literalmente esas dos claves y siguen siendo válidos, porque
+ * `{ luis: "3", mariana: "2" }` ya satisface este tipo. Para leerlo y pintarlo
+ * usar los helpers de `@/lib/portions` — nunca acceder a `.luis`/`.mariana`
+ * directamente en código nuevo.
+ */
+export type PersonPortions = Record<string, string>;
+
 export interface Recipe {
   id: string;
   name: string;
   type: "breakfast" | "lunch" | "dinner" | "dessert" | "snack";
-  portions?: {
-    luis: string;
-    mariana: string;
-  };
+  /** Porción por miembro. Ver `PersonPortions` y `@/lib/portions`. */
+  portions?: PersonPortions;
   total?: string;
   ingredients: Ingredient[];
   steps: string[];
@@ -188,8 +201,17 @@ export interface Recipe {
 export interface Ingredient {
   name: string;
   total?: string;
-  luis: string;
-  mariana: string;
+  /** Cantidad por miembro del hogar. Leer con `ingredientPortions()`. */
+  per_person?: PersonPortions;
+  /**
+   * @deprecated Modelo legacy del hogar original (Familia González). Los
+   * catálogos estáticos y las recetas ya guardadas todavía traen estas claves.
+   * NO usar en código nuevo: leer con `resolveIngredientPortions()` de
+   * `@/lib/portions`, que resuelve ambos modelos.
+   */
+  luis?: string;
+  /** @deprecated Ver `luis`. */
+  mariana?: string;
 }
 
 export interface DayMenu {

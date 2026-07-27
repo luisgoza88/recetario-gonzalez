@@ -5,12 +5,22 @@ import { supabase } from "@/lib/supabase/client";
 import {
   Recipe,
   Ingredient,
+  PersonPortions,
   RecipeCategory,
   ColombianRegion,
   RecipeDifficulty,
   DietaryTag,
   NutritionInfo,
 } from "@/types";
+import { ingredientPortions, portionMemberKeys } from "@/lib/portions";
+import { usePortionsConfig } from "@/lib/stores/useHouseholdStore";
+
+/** Ingrediente en blanco con una casilla por cada miembro del hogar. */
+function emptyIngredientFor(memberKeys: string[]): Ingredient {
+  const per_person: PersonPortions = {};
+  for (const key of memberKeys) per_person[key] = "";
+  return { name: "", total: "", per_person };
+}
 
 // ---- State types ----
 
@@ -24,8 +34,10 @@ export interface RecipeFormState {
   difficulty: RecipeDifficulty | "";
   total: string;
   imageUrl: string | null;
-  portionsLuis: string;
-  portionsMariana: string;
+  /** Porción por miembro del hogar, indexada por su clave. */
+  portions: PersonPortions;
+  /** Claves de los miembros para los que el formulario pide cantidad. */
+  memberKeys: string[];
   ingredients: Ingredient[];
   steps: string[];
   errors: Record<string, string>;
@@ -74,6 +86,14 @@ export type RecipeFormAction =
       field: keyof Ingredient;
       value: string;
     }
+  | {
+      /** Actualiza la cantidad de UN miembro dentro de un ingrediente. */
+      type: "update_ingredient_portion";
+      index: number;
+      memberKey: string;
+      value: string;
+    }
+  | { type: "set_portion"; memberKey: string; value: string }
   | { type: "add_step" }
   | { type: "remove_step"; index: number }
   | { type: "update_step"; index: number; value: string }
@@ -111,8 +131,31 @@ function recipeFormReducer(
         ...state,
         ingredients: [
           ...state.ingredients,
-          { name: "", luis: "", mariana: "", total: "" },
+          emptyIngredientFor(state.memberKeys),
         ],
+      };
+
+    case "update_ingredient_portion": {
+      const updated = [...state.ingredients];
+      const current = updated[action.index];
+      updated[action.index] = {
+        ...current,
+        per_person: {
+          ...ingredientPortions(current),
+          [action.memberKey]: action.value,
+        },
+        // Se descartan las claves legacy: a partir de aquí el ingrediente
+        // vive en `per_person` y no en campos con nombre propio.
+        luis: undefined,
+        mariana: undefined,
+      };
+      return { ...state, ingredients: updated };
+    }
+
+    case "set_portion":
+      return {
+        ...state,
+        portions: { ...state.portions, [action.memberKey]: action.value },
       };
 
     case "remove_ingredient":
@@ -179,8 +222,7 @@ function recipeFormReducer(
         name: r.name ?? state.name,
         type: r.type ?? state.type,
         total: r.total ?? state.total,
-        portionsLuis: r.portionsLuis ?? state.portionsLuis,
-        portionsMariana: r.portionsMariana ?? state.portionsMariana,
+        portions: r.portions ?? state.portions,
         ingredients:
           r.ingredients && r.ingredients.length > 0
             ? r.ingredients
@@ -204,7 +246,10 @@ function recipeFormReducer(
 
 // ---- Initial state builder ----
 
-function buildInitialState(recipe?: Partial<Recipe> | null): RecipeFormState {
+function buildInitialState(
+  recipe?: Partial<Recipe> | null,
+  memberKeys: string[] = portionMemberKeys(),
+): RecipeFormState {
   return {
     name: recipe?.name ?? "",
     description: recipe?.description ?? "",
@@ -214,10 +259,10 @@ function buildInitialState(recipe?: Partial<Recipe> | null): RecipeFormState {
     difficulty: recipe?.difficulty ?? "",
     total: recipe?.total ?? "",
     imageUrl: recipe?.image_url ?? null,
-    portionsLuis: recipe?.portions?.luis ?? "",
-    portionsMariana: recipe?.portions?.mariana ?? "",
+    portions: recipe?.portions ?? {},
+    memberKeys,
     ingredients: (recipe?.ingredients as Ingredient[]) ?? [
-      { name: "", luis: "", mariana: "", total: "" },
+      emptyIngredientFor(memberKeys),
     ],
     steps: recipe?.steps ?? [""],
     errors: {},
@@ -264,9 +309,14 @@ export interface UseRecipeFormReturn {
 }
 
 export function useRecipeForm(recipe: Recipe | null): UseRecipeFormReturn {
+  // Miembros del hogar: el formulario pide una cantidad por cada uno, sin
+  // asumir que son dos ni cómo se llaman.
+  const portionsConfig = usePortionsConfig();
+  const memberKeys = portionMemberKeys(portionsConfig);
+
   const [state, dispatch] = useReducer(
     recipeFormReducer,
-    buildInitialState(recipe),
+    buildInitialState(recipe, memberKeys),
   );
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -335,20 +385,14 @@ export function useRecipeForm(recipe: Recipe | null): UseRecipeFormReturn {
       if (data.error) throw new Error(data.error);
 
       const generatedRecipe = data.recipe;
+      // La IA puede devolver el modelo nuevo (`per_person`) o el legacy
+      // (`luis`/`mariana`); `ingredientPortions` normaliza ambos.
       const mappedIngredients: Ingredient[] =
-        generatedRecipe.ingredients?.map(
-          (ing: {
-            name: string;
-            total?: string;
-            luis?: string;
-            mariana?: string;
-          }) => ({
-            name: ing.name,
-            total: ing.total || "",
-            luis: ing.luis || "",
-            mariana: ing.mariana || "",
-          }),
-        ) ?? [];
+        generatedRecipe.ingredients?.map((ing: Ingredient) => ({
+          name: ing.name,
+          total: ing.total || "",
+          per_person: ingredientPortions(ing),
+        })) ?? [];
 
       dispatch({
         type: "fill_from_ai",
@@ -356,8 +400,7 @@ export function useRecipeForm(recipe: Recipe | null): UseRecipeFormReturn {
           name: generatedRecipe.name,
           type: generatedRecipe.type,
           total: generatedRecipe.total || "",
-          portionsLuis: generatedRecipe.portions?.luis || "",
-          portionsMariana: generatedRecipe.portions?.mariana || "",
+          portions: generatedRecipe.portions ?? {},
           ingredients: mappedIngredients,
           steps: generatedRecipe.steps ?? [],
         },
@@ -459,10 +502,9 @@ export function useRecipeForm(recipe: Recipe | null): UseRecipeFormReturn {
           typeof state.totalTime === "number" ? state.totalTime : null,
         dietary_tags: state.dietaryTags.length > 0 ? state.dietaryTags : null,
         nutrition,
-        portions:
-          state.portionsLuis || state.portionsMariana
-            ? { luis: state.portionsLuis, mariana: state.portionsMariana }
-            : null,
+        portions: Object.values(state.portions).some((v) => v?.trim())
+          ? state.portions
+          : null,
         ingredients: state.ingredients.filter((i) => i.name.trim()),
         steps: state.steps.filter((s) => s.trim()),
         image_url: state.imageUrl,

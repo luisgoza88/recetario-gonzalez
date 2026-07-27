@@ -33,15 +33,12 @@ interface GeneratedRecipe {
   type: "breakfast" | "lunch" | "dinner";
   description: string;
   total: string;
-  portions: {
-    luis: string;
-    mariana: string;
-  };
+  /** Porción por miembro del hogar. Ver `@/lib/portions`. */
+  portions: Record<string, string>;
   ingredients: Array<{
     name: string;
     total: string;
-    luis: string;
-    mariana: string;
+    per_person?: Record<string, string>;
   }>;
   steps: string[];
   tips: string;
@@ -105,7 +102,8 @@ INSTRUCCIONES:
 IMPORTANTE para ingredientes:
 - Usa unidades apropiadas para la región (${cookingProfile.region || cookingProfile.country || "Colombia"})
 - Sé específico con las cantidades (no "un poco", sino "2 cucharadas")
-- Para el total, suma las cantidades de todas las porciones
+- Da la cantidad TOTAL para el hogar completo. No la repartas por persona: la
+  app hace el reparto según el perfil del hogar.
 
 Responde ÚNICAMENTE en formato JSON válido con esta estructura:
 {
@@ -113,16 +111,10 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura:
   "type": "lunch",
   "description": "Breve descripción del plato",
   "total": "Cantidad total a preparar (ej: 800g de pollo + 400ml de salsa)",
-  "portions": {
-    "luis": "Descripción de porción de Luis",
-    "mariana": "Descripción de porción de Mariana"
-  },
   "ingredients": [
     {
       "name": "Nombre del ingrediente",
-      "total": "Cantidad total",
-      "luis": "Porción Luis",
-      "mariana": "Porción Mariana"
+      "total": "Cantidad total para todo el hogar"
     }
   ],
   "steps": [

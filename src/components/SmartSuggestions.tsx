@@ -19,6 +19,7 @@ import {
   Coffee,
 } from "lucide-react";
 import { Recipe } from "@/types";
+import { ingredientPortions } from "@/lib/portions";
 import { supabase } from "@/lib/supabase/client";
 import {
   RecipeAvailability,
@@ -116,8 +117,10 @@ interface AIRecipe {
   ingredients: Array<{
     name: string;
     total: string;
-    luis: string;
-    mariana: string;
+    /** Cantidad por miembro. La IA puede devolver el modelo legacy. */
+    per_person?: Record<string, string>;
+    luis?: string;
+    mariana?: string;
     available: boolean;
   }>;
   steps: string[];
@@ -301,8 +304,7 @@ export default function SmartSuggestions({
       const ingredients = aiRecipe.ingredients.map((i) => ({
         name: i.name,
         total: i.total,
-        luis: i.luis,
-        mariana: i.mariana,
+        per_person: ingredientPortions(i),
       }));
 
       // Generar ID único para la receta

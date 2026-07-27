@@ -1,5 +1,6 @@
 import { supabase } from "./supabase/client";
 import { Recipe, Ingredient } from "@/types";
+import { representativeQuantity } from "./portions";
 import {
   compareQuantities,
   normalizeQuantity,
@@ -287,7 +288,7 @@ export async function checkRecipeIngredients(
   const availableIngredients: IngredientStatus[] = [];
 
   for (const ing of ingredients) {
-    const requiredQty = ing.total || ing.luis || "1";
+    const requiredQty = representativeQuantity(ing, "1");
     const requiredNum = extractNumber(requiredQty);
 
     // Separar ingredientes compuestos

@@ -40,8 +40,12 @@ export interface ProposalResponse {
 // Recipe types
 export interface RecipeIngredient {
   name: string;
-  luis: string;
-  mariana: string;
+  /** Cantidad por miembro del hogar. Ver `@/lib/portions`. */
+  per_person?: Record<string, string>;
+  /** @deprecated Modelo legacy con nombres propios. */
+  luis?: string;
+  /** @deprecated Ver `luis`. */
+  mariana?: string;
   total?: string;
   amount?: string;
 }

@@ -777,18 +777,15 @@ La función ejecutará automáticamente todos los pasos necesarios y reportará 
                 type: Type.STRING,
                 description: "Nombre del ingrediente",
               },
-              quantity_luis: {
+              total: {
                 type: Type.STRING,
-                description: "Cantidad para Luis (3 porciones)",
-              },
-              quantity_mariana: {
-                type: Type.STRING,
-                description: "Cantidad para Mariana (2 porciones)",
+                description:
+                  "Cantidad total a preparar para todo el hogar (ej. '500g')",
               },
             },
           },
           description:
-            "Lista de ingredientes con cantidades para Luis y Mariana",
+            "Lista de ingredientes con la cantidad total del hogar. El reparto por miembro lo calcula la app según el perfil del hogar.",
         },
         steps: {
           type: Type.ARRAY,
@@ -837,13 +834,10 @@ La función ejecutará automáticamente todos los pasos necesarios y reportará 
                 type: Type.STRING,
                 description: "Nombre del ingrediente",
               },
-              quantity_luis: {
+              total: {
                 type: Type.STRING,
-                description: "Cantidad para Luis",
-              },
-              quantity_mariana: {
-                type: Type.STRING,
-                description: "Cantidad para Mariana",
+                description:
+                  "Cantidad total a preparar para todo el hogar (ej. '500g')",
               },
             },
           },

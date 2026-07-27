@@ -20,7 +20,13 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
-import { AdjustmentSuggestion, Recipe, Ingredient } from "@/types";
+import {
+  AdjustmentSuggestion,
+  Recipe,
+  Ingredient,
+  PersonPortions,
+} from "@/types";
+import { ingredientPortions } from "@/lib/portions";
 import {
   useProactiveSuggestions,
   ProactiveSuggestion,
@@ -213,12 +219,18 @@ export default function SuggestionsPanel({
     const changePercent = suggestion.change_percent || 0;
     const multiplier = 1 + changePercent / 100;
 
+    // Escala la cantidad de CADA miembro del hogar, sea cual sea su nombre.
+    // Antes solo escalaba "luis" y "mariana": en un hogar con otros miembros,
+    // sus porciones se quedaban sin ajustar.
     const updatedIngredients = (recipe.ingredients as Ingredient[]).map(
       (ing) => {
+        const scaled: PersonPortions = {};
+        for (const [key, amount] of Object.entries(ingredientPortions(ing))) {
+          scaled[key] = adjustQuantityString(amount, multiplier);
+        }
         return {
-          ...ing,
-          luis: adjustQuantityString(ing.luis, multiplier),
-          mariana: adjustQuantityString(ing.mariana, multiplier),
+          name: ing.name,
+          per_person: scaled,
           total: ing.total
             ? adjustQuantityString(ing.total, multiplier)
             : undefined,

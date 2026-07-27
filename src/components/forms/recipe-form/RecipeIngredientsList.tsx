@@ -3,9 +3,11 @@
 import { Plus, Trash2 } from "lucide-react";
 import { Ingredient } from "@/types";
 import { RecipeFormAction, RecipeFormState } from "@/hooks/useRecipeForm";
+import { ingredientPortions, portionLabel } from "@/lib/portions";
+import { usePortionsConfig } from "@/lib/stores/useHouseholdStore";
 
 interface RecipeIngredientsListProps {
-  state: Pick<RecipeFormState, "ingredients" | "errors">;
+  state: Pick<RecipeFormState, "ingredients" | "errors" | "memberKeys">;
   dispatch: React.Dispatch<RecipeFormAction>;
 }
 
@@ -13,6 +15,8 @@ export function RecipeIngredientsList({
   state,
   dispatch,
 }: RecipeIngredientsListProps) {
+  const portionsConfig = usePortionsConfig();
+
   return (
     <div className="mb-4">
       <label className="block text-sm font-medium mb-2">Ingredientes *</label>
@@ -49,7 +53,7 @@ export function RecipeIngredientsList({
             </button>
           </div>
 
-          {/* Row 2: Total, Porcion grande, Porcion pequena */}
+          {/* Row 2: Total + una casilla por cada miembro del hogar */}
           <div className="grid grid-cols-3 gap-2">
             <div>
               <label className="block text-xs text-gray-500 mb-1">Total</label>
@@ -68,44 +72,32 @@ export function RecipeIngredientsList({
                 placeholder="500g"
               />
             </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">
-                P. grande
-              </label>
-              <input
-                type="text"
-                value={ing.luis}
-                onChange={(e) =>
-                  dispatch({
-                    type: "update_ingredient",
-                    index,
-                    field: "luis",
-                    value: e.target.value,
-                  })
-                }
-                className="w-full p-2 border rounded-lg text-sm bg-white"
-                placeholder="300g"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">
-                P. pequena
-              </label>
-              <input
-                type="text"
-                value={ing.mariana}
-                onChange={(e) =>
-                  dispatch({
-                    type: "update_ingredient",
-                    index,
-                    field: "mariana",
-                    value: e.target.value,
-                  })
-                }
-                className="w-full p-2 border rounded-lg text-sm bg-white"
-                placeholder="200g"
-              />
-            </div>
+            {state.memberKeys.map((memberKey) => {
+              const current = ingredientPortions(ing)[memberKey] ?? "";
+              const label = portionLabel(memberKey, portionsConfig);
+              return (
+                <div key={memberKey}>
+                  <label className="block text-xs text-gray-500 mb-1 truncate">
+                    {label}
+                  </label>
+                  <input
+                    type="text"
+                    value={current}
+                    onChange={(e) =>
+                      dispatch({
+                        type: "update_ingredient_portion",
+                        index,
+                        memberKey,
+                        value: e.target.value,
+                      })
+                    }
+                    className="w-full p-2 border rounded-lg text-sm bg-white"
+                    placeholder="300g"
+                    aria-label={`Cantidad para ${label} de ${ing.name || "el ingrediente"}`}
+                  />
+                </div>
+              );
+            })}
           </div>
         </div>
       ))}
