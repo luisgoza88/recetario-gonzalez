@@ -30,6 +30,11 @@ import ShareButton from "@/components/ShareButton";
 import { formatDayMenuForWhatsApp } from "@/lib/whatsapp-share";
 import Spinner from "@/components/ui/Spinner";
 import {
+  Skeleton,
+  SkeletonTodayHero,
+  SkeletonRecipeList,
+} from "@/components/ui/Skeleton";
+import {
   useTodayDashboard,
   useGreeting,
   EmployeeTaskSummary,
@@ -72,9 +77,16 @@ export default function TodayDashboard({
   const heroStats = useRecipeStats(heroMealForStats?.id, householdId);
 
   if (loading) {
+    // Skeleton en vez de spinner centrado: el usuario ve de una la forma de la
+    // pantalla que está por llegar, lo que se percibe bastante más rápido.
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--bg)]">
-        <Spinner size="xl" />
+      <div className="min-h-screen bg-[var(--bg)] px-4 pt-6 space-y-4">
+        <div className="space-y-2">
+          <Skeleton className="h-3 w-24 rounded" />
+          <Skeleton className="h-7 w-48" />
+        </div>
+        <SkeletonTodayHero />
+        <SkeletonRecipeList count={3} />
       </div>
     );
   }

@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
+import Image from "next/image";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 import type { Ingredient } from "@/types";
+import { representativeQuantity } from "@/lib/portions";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -77,12 +79,16 @@ export default async function PublicRecipePage({ params }: Props) {
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-gray-900 dark:to-gray-800 py-8 px-4">
       <article className="max-w-2xl mx-auto bg-white dark:bg-gray-900 rounded-3xl shadow-2xl overflow-hidden">
         {recipe.image_url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={recipe.image_url}
-            alt={recipe.name}
-            className="w-full h-64 object-cover"
-          />
+          <div className="relative w-full h-64">
+            <Image
+              src={recipe.image_url}
+              alt={recipe.name}
+              fill
+              priority
+              sizes="(max-width: 768px) 100vw, 672px"
+              className="object-cover"
+            />
+          </div>
         )}
 
         <div className="p-6">
@@ -114,7 +120,7 @@ export default async function PublicRecipePage({ params }: Props) {
                   {ing.name}
                 </span>
                 <span className="text-gray-500 dark:text-gray-400">
-                  {ing.total ?? ing.luis}
+                  {representativeQuantity(ing)}
                 </span>
               </li>
             ))}

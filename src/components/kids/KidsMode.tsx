@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Image from "next/image";
 import { X, Sparkles, ChefHat, Apple } from "lucide-react";
 import type { Recipe } from "@/types";
 
@@ -65,12 +66,15 @@ export function KidsMode({ todayRecipe, onClose }: KidsModeProps) {
               {todayRecipe.name}
             </h2>
             {todayRecipe.image_url && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={todayRecipe.image_url}
-                alt={todayRecipe.name}
-                className="w-full h-40 object-cover rounded-2xl mt-3"
-              />
+              <div className="relative w-full h-40 mt-3 rounded-2xl overflow-hidden">
+                <Image
+                  src={todayRecipe.image_url}
+                  alt={todayRecipe.name}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 600px"
+                  className="object-cover"
+                />
+              </div>
             )}
           </div>
         )}

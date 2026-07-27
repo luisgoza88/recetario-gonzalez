@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Image from "next/image";
 import { Sparkles, X, Loader2, Clock, ChefHat } from "lucide-react";
 
 interface DBRecipe {
@@ -151,9 +152,11 @@ export function CookWithThisButton({
                           className="flex items-start gap-3 p-3 border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors"
                         >
                           {recipe.image_url ? (
-                            <img
+                            <Image
                               src={recipe.image_url}
                               alt={recipe.name}
+                              width={56}
+                              height={56}
                               className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
                             />
                           ) : (

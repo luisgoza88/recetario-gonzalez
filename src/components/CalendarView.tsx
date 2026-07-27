@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import {
   ChevronLeft,
   ChevronRight,
@@ -24,6 +25,11 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
+import {
+  ingredientPortions,
+  resolveIngredientPortions,
+} from "@/lib/portions";
+import { usePortionsConfig } from "@/lib/stores/useHouseholdStore";
 import {
   Recipe,
   Ingredient,
@@ -509,8 +515,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
               ingredients: newRecipe.ingredients.map((ing) => ({
                 name: ing.name,
                 total: ing.total || "",
-                luis: ing.luis,
-                mariana: ing.mariana,
+                per_person: ingredientPortions(ing),
               })),
               steps: newRecipe.steps,
               tips: newRecipe.tips,
@@ -1609,8 +1614,7 @@ function generatedMealToRecipe(
     ingredients: (meal.ingredients || []).map((ing) => ({
       name: ing.name,
       total: ing.total,
-      luis: ing.luis,
-      mariana: ing.mariana,
+      per_person: ingredientPortions(ing),
     })),
     steps: meal.steps || [],
     description: meal.description,
@@ -1672,11 +1676,12 @@ function DayMealCard({
           className={`h-28 w-full bg-gradient-to-br ${meta.tint} relative overflow-hidden flex items-end p-3`}
         >
           {recipe.image_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={recipe.image_url}
               alt={recipe.name}
-              className="absolute inset-0 w-full h-full object-cover"
+              fill
+              sizes="(max-width: 768px) 100vw, 400px"
+              className="object-cover"
             />
           ) : (
             <span className="absolute top-3 left-3 text-[10px] font-mono uppercase tracking-[0.15em] text-stone-500/70">
@@ -1828,6 +1833,7 @@ function GeneratedMealCard({
 // Generated Meal Detail (ingredients + steps)
 // =====================================================
 function GeneratedMealDetail({ meal }: { meal: GeneratedMeal }) {
+  const portionsConfig = usePortionsConfig();
   return (
     <>
       {/* Preparations used */}
@@ -1860,12 +1866,12 @@ function GeneratedMealDetail({ meal }: { meal: GeneratedMeal }) {
               <div>
                 <span className="text-gray-400">Total:</span> {ing.total}
               </div>
-              <div>
-                <span className="text-gray-400">Luis:</span> {ing.luis}
-              </div>
-              <div>
-                <span className="text-gray-400">Mariana:</span> {ing.mariana}
-              </div>
+              {resolveIngredientPortions(ing, portionsConfig).map((portion) => (
+                <div key={portion.key}>
+                  <span className="text-gray-400">{portion.label}:</span>{" "}
+                  {portion.amount}
+                </div>
+              ))}
             </div>
           </div>
         ))}
@@ -2035,6 +2041,7 @@ function MealCard({
 }
 
 function RecipeDetail({ recipe }: { recipe: Recipe }) {
+  const portionsConfig = usePortionsConfig();
   const ingredients = recipe.ingredients as Ingredient[];
   const hasTotal = ingredients[0]?.total;
 
@@ -2051,12 +2058,12 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
                   {ing.total || ""}
                 </div>
               )}
-              <div>
-                <span className="text-gray-400">Grande:</span> {ing.luis}
-              </div>
-              <div>
-                <span className="text-gray-400">Pequeña:</span> {ing.mariana}
-              </div>
+              {resolveIngredientPortions(ing, portionsConfig).map((portion) => (
+                <div key={portion.key}>
+                  <span className="text-gray-400">{portion.label}:</span>{" "}
+                  {portion.amount}
+                </div>
+              ))}
             </div>
           </div>
         ))}

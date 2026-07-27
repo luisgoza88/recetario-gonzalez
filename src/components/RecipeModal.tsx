@@ -32,7 +32,26 @@ import { FavoriteButton } from "@/components/recipe/FavoriteButton";
 import { ShareRecipeButton } from "@/components/share/ShareRecipeButton";
 import ThermomixView from "./ThermomixView";
 import { CookingMode } from "@/components/CookingMode";
+import {
+  resolveIngredientPortions,
+  resolvePortions,
+  representativeQuantity,
+} from "@/lib/portions";
+import { usePortionsConfig } from "@/lib/stores/useHouseholdStore";
 // findThermomixRecipe is loaded lazily inside the handler to avoid 40KB in initial bundle
+
+/**
+ * Colores de avatar por posición, no por persona: el hogar puede tener
+ * cualquier número de miembros con cualquier nombre.
+ */
+const PORTION_AVATAR_COLORS = [
+  "bg-blue-100 text-blue-700",
+  "bg-rose-100 text-rose-700",
+  "bg-amber-100 text-amber-700",
+  "bg-emerald-100 text-emerald-700",
+  "bg-violet-100 text-violet-700",
+  "bg-cyan-100 text-cyan-700",
+];
 
 interface RecipeModalProps {
   recipe: Recipe;
@@ -68,6 +87,10 @@ export default function RecipeModal({
   const [thermomixError, setThermomixError] = useState<string | null>(null);
   const [showNutrition, setShowNutrition] = useState(false);
 
+  // Porciones por miembro del hogar (sin asumir nombres fijos).
+  const portionsConfig = usePortionsConfig();
+  const resolvedPortions = resolvePortions(recipe.portions, portionsConfig);
+
   // Thermomix adaptation handler
   const handleThermomixAdapt = useCallback(async () => {
     // Check cache first
@@ -95,7 +118,7 @@ export default function RecipeModal({
 
     try {
       const ingredientNames = (recipe.ingredients as Ingredient[]).map(
-        (i) => `${i.name}: ${i.total || i.luis}`,
+        (i) => `${i.name}: ${representativeQuantity(i)}`,
       );
 
       const response = await fetch("/api/adapt-recipe-thermomix", {
@@ -526,34 +549,29 @@ export default function RecipeModal({
             )}
 
             {/* ─── Porciones por miembro ─────────────────────── */}
-            {recipe.portions && (
+            {resolvedPortions.length > 0 && (
               <div className="mt-4 bg-white rounded-2xl border border-[var(--border)] p-4">
                 <p className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-2">
                   Porciones por miembro {scale !== 1 && `(×${scale})`}
                 </p>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold text-[13px] flex-shrink-0">
-                      L
+                  {resolvedPortions.map((portion, idx) => (
+                    <div key={portion.key} className="flex items-center gap-2.5">
+                      <div
+                        className={`w-9 h-9 rounded-full flex items-center justify-center font-semibold text-[13px] flex-shrink-0 ${PORTION_AVATAR_COLORS[idx % PORTION_AVATAR_COLORS.length]}`}
+                      >
+                        {portion.label.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[12px] text-stone-500">
+                          {portion.label}
+                        </p>
+                        <p className="text-[12.5px] font-medium text-[var(--ink)]">
+                          {scaleQuantity(portion.amount)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-[12px] text-stone-500">Luis</p>
-                      <p className="text-[12.5px] font-medium text-[var(--ink)]">
-                        {recipe.portions.luis}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center font-semibold text-[13px] flex-shrink-0">
-                      M
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[12px] text-stone-500">Mariana</p>
-                      <p className="text-[12.5px] font-medium text-[var(--ink)]">
-                        {recipe.portions.mariana}
-                      </p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -652,14 +670,16 @@ export default function RecipeModal({
                             {scaleQuantity(ing.total || "")}
                           </div>
                         )}
-                        <div className="tabular-nums">
-                          <span className="text-stone-400">Grande:</span>{" "}
-                          {scaleQuantity(ing.luis)}
-                        </div>
-                        <div className="tabular-nums">
-                          <span className="text-stone-400">Pequeña:</span>{" "}
-                          {scaleQuantity(ing.mariana)}
-                        </div>
+                        {resolveIngredientPortions(ing, portionsConfig).map(
+                          (portion) => (
+                            <div key={portion.key} className="tabular-nums">
+                              <span className="text-stone-400">
+                                {portion.label}:
+                              </span>{" "}
+                              {scaleQuantity(portion.amount)}
+                            </div>
+                          ),
+                        )}
                       </div>
                     </div>
                   );

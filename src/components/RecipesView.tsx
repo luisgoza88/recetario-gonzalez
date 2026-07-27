@@ -26,6 +26,8 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import dynamic from "next/dynamic";
 import { MOODS, Mood } from "@/lib/moods";
 import { MoodChip } from "@/components/ui/MoodChip";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const RecipeModal = dynamic(() => import("./RecipeModal"), {
   loading: () => null,
@@ -117,6 +119,10 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
     Record<string, { icon: string; color: string; label: string }>
   >({});
 
+  // El catálogo estático se carga en diferido. Sin este flag, la vista
+  // renderizaba una lista vacía y luego "aparecían" las recetas de golpe.
+  const [catalogLoading, setCatalogLoading] = useState(true);
+
   useEffect(() => {
     let mounted = true;
     Promise.all([
@@ -124,6 +130,7 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
       import("@/data/regional-colombian-recipes"),
     ]).then(([expandedMod, regionalMod]) => {
       if (!mounted) return;
+      setCatalogLoading(false);
       setExpandedRecipes(expandedMod.expandedRecipes);
       setCategoryConfig(
         expandedMod.CATEGORY_CONFIG as Record<
@@ -611,6 +618,24 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
         </button>
       </CanEdit>
 
+      {/* Skeleton mientras llega el catálogo diferido */}
+      {catalogLoading && filteredRecipes.length === 0 && (
+        <div className="grid grid-cols-2 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden"
+            >
+              <Skeleton className="w-full aspect-square rounded-none" />
+              <div className="p-2.5 space-y-2">
+                <Skeleton className="h-3 w-14 rounded-md" />
+                <Skeleton className="h-4 w-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Recipe Grid - 2 columnas de RecipeCard */}
       <div className="grid grid-cols-2 gap-3">
         {filteredRecipes.map((recipe) => {
@@ -655,20 +680,21 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
         })}
       </div>
 
-      {filteredRecipes.length === 0 && (
-        <div className="text-center py-16 px-4">
-          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-orange-50 dark:bg-orange-950/30 flex items-center justify-center">
-            <ImageIcon size={32} className="text-orange-400" />
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
-            {search ? "Sin resultados" : "Sin recetas aún"}
-          </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {search
-              ? `No encontramos nada para "${search}"`
-              : "Empezá agregando tu primera receta"}
-          </p>
-        </div>
+      {filteredRecipes.length === 0 && !catalogLoading && (
+        <EmptyState
+          icon={<ImageIcon size={32} />}
+          title={search ? "Sin resultados" : "Sin recetas aún"}
+          description={
+            search
+              ? `No encontramos nada para "${search}". Probá con otro término o quitá los filtros.`
+              : "Agregá tu primera receta, o pedile una al asistente."
+          }
+          action={
+            search
+              ? { label: "Limpiar búsqueda", onClick: () => setSearch("") }
+              : { label: "Agregar receta", onClick: () => setShowForm(true) }
+          }
+        />
       )}
 
       {/* Recipe Modal */}
