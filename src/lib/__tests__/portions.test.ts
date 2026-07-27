@@ -8,6 +8,8 @@ import {
   emptyIngredient,
   representativeQuantity,
   sumPortions,
+  defaultPortionMemberName,
+  resizePortionMembers,
 } from "../portions";
 import type { Ingredient } from "@/types";
 
@@ -127,6 +129,40 @@ describe("emptyIngredient", () => {
       total: "",
       per_person: { Ana: "", Beto: "", Caro: "" },
     });
+  });
+});
+
+describe("borradores de miembros", () => {
+  it("mantiene el fallback legacy y genera miembros adicionales", () => {
+    expect(defaultPortionMemberName(0)).toBe("Luis");
+    expect(defaultPortionMemberName(1)).toBe("Mariana");
+    expect(defaultPortionMemberName(2)).toBe("Miembro 3");
+  });
+
+  it("amplía el hogar sin perder la configuración existente", () => {
+    expect(
+      resizePortionMembers([{ name: "Ana", portions: 2 }], 3),
+    ).toEqual([
+      { name: "Ana", portions: 2 },
+      { name: "Mariana", portions: 1 },
+      { name: "Miembro 3", portions: 1 },
+    ]);
+  });
+
+  it("reduce miembros únicamente desde el final", () => {
+    expect(
+      resizePortionMembers(
+        [
+          { name: "Ana", portions: 2 },
+          { name: "Beto", portions: 1 },
+          { name: "Caro", portions: 0.5 },
+        ],
+        2,
+      ),
+    ).toEqual([
+      { name: "Ana", portions: 2 },
+      { name: "Beto", portions: 1 },
+    ]);
   });
 });
 

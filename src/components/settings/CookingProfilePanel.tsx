@@ -5,6 +5,11 @@ import { ArrowLeft, Save, MapPin, ChefHat } from "lucide-react";
 import Spinner from "@/components/ui/Spinner";
 import { supabase } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  resizePortionMembers,
+  type PortionMemberDraft,
+} from "@/lib/portions";
 import type { CookingProfile } from "@/types";
 
 // =====================================================
@@ -45,6 +50,7 @@ export default function CookingProfilePanel({
   onBack,
 }: CookingProfilePanelProps) {
   const toast = useToast();
+  const { refreshMemberships } = useAuth();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -58,7 +64,9 @@ export default function CookingProfilePanel({
     DEFAULT_VALUES.cooking_style,
   );
   const [familyName, setFamilyName] = useState(DEFAULT_VALUES.family_name);
-  const [familySize, setFamilySize] = useState(DEFAULT_VALUES.family_size);
+  const [portionMembers, setPortionMembers] = useState<PortionMemberDraft[]>(
+    () => resizePortionMembers([], DEFAULT_VALUES.family_size),
+  );
 
   // =====================================================
   // Load data
@@ -85,7 +93,23 @@ export default function CookingProfilePanel({
       setCountry(profile.country || DEFAULT_VALUES.country);
       setCookingStyle(profile.cooking_style || DEFAULT_VALUES.cooking_style);
       setFamilyName(profile.family_name || "");
-      setFamilySize(profile.family_size ?? DEFAULT_VALUES.family_size);
+      const configuredMembers = Object.entries(
+        profile.portions_config ?? {},
+      ).map(([name, portions]) => ({
+        name,
+        portions:
+          typeof portions === "number" && portions > 0 ? portions : 1,
+      }));
+      const nextFamilySize = Math.max(
+        1,
+        profile.family_size ??
+          (configuredMembers.length > 0
+            ? configuredMembers.length
+            : DEFAULT_VALUES.family_size),
+      );
+      setPortionMembers(
+        resizePortionMembers(configuredMembers, nextFamilySize),
+      );
     } catch {
       toast.error("Error de conexión");
     } finally {
@@ -102,6 +126,27 @@ export default function CookingProfilePanel({
   // =====================================================
 
   const handleSave = async () => {
+    const normalizedNames = portionMembers.map((member) => member.name.trim());
+    if (normalizedNames.some((name) => !name)) {
+      toast.error("Escribe el nombre de cada miembro");
+      return;
+    }
+
+    const uniqueNames = new Set(
+      normalizedNames.map((name) => name.toLocaleLowerCase("es")),
+    );
+    if (uniqueNames.size !== normalizedNames.length) {
+      toast.error("Cada miembro debe tener un nombre diferente");
+      return;
+    }
+
+    const portionsConfig = Object.fromEntries(
+      portionMembers.map((member, index) => [
+        normalizedNames[index],
+        Math.max(0.5, member.portions),
+      ]),
+    );
+
     setIsSaving(true);
     try {
       const newProfile: CookingProfile = {
@@ -110,7 +155,8 @@ export default function CookingProfilePanel({
         country: country.trim() || DEFAULT_VALUES.country,
         cooking_style: cookingStyle.trim() || DEFAULT_VALUES.cooking_style,
         family_name: familyName.trim() || undefined,
-        family_size: familySize,
+        family_size: portionMembers.length,
+        portions_config: portionsConfig,
       };
 
       const { error } = await supabase
@@ -126,6 +172,7 @@ export default function CookingProfilePanel({
         return;
       }
 
+      await refreshMemberships();
       toast.success("Perfil de cocina actualizado");
       setHasChanges(false);
     } catch {
@@ -137,6 +184,13 @@ export default function CookingProfilePanel({
 
   // Track changes
   const markChanged = () => setHasChanges(true);
+  const changeFamilySize = (nextSize: number) => {
+    const safeSize = Math.min(20, Math.max(1, nextSize));
+    setPortionMembers((members) =>
+      resizePortionMembers(members, safeSize),
+    );
+    markChanged();
+  };
 
   // =====================================================
   // Render
@@ -227,27 +281,90 @@ export default function CookingProfilePanel({
             </p>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => {
-                  setFamilySize(Math.max(1, familySize - 1));
-                  markChanged();
-                }}
+                onClick={() => changeFamilySize(portionMembers.length - 1)}
+                aria-label="Quitar miembro"
                 className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 text-lg font-bold"
               >
                 -
               </button>
               <span className="text-xl font-bold text-green-600 w-8 text-center">
-                {familySize}
+                {portionMembers.length}
               </span>
               <button
-                onClick={() => {
-                  setFamilySize(Math.min(20, familySize + 1));
-                  markChanged();
-                }}
+                onClick={() => changeFamilySize(portionMembers.length + 1)}
+                aria-label="Agregar miembro"
                 className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 text-lg font-bold"
               >
                 +
               </button>
             </div>
+          </div>
+
+          <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
+            <div>
+              <p className="text-sm font-medium text-gray-700">
+                Nombres y porciones habituales
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Se crea una cantidad independiente para cada persona en las
+                recetas.
+              </p>
+            </div>
+
+            {portionMembers.map((member, index) => (
+              <div
+                key={index}
+                className="grid grid-cols-[1fr_7rem] gap-3 items-end"
+              >
+                <label className="text-xs text-gray-500">
+                  Miembro {index + 1}
+                  <input
+                    type="text"
+                    value={member.name}
+                    onChange={(event) => {
+                      const name = event.target.value;
+                      setPortionMembers((members) =>
+                        members.map((current, memberIndex) =>
+                          memberIndex === index
+                            ? { ...current, name }
+                            : current,
+                        ),
+                      );
+                      markChanged();
+                    }}
+                    className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+                  />
+                </label>
+
+                <label className="text-xs text-gray-500">
+                  Porciones
+                  <input
+                    type="number"
+                    min="0.5"
+                    max="10"
+                    step="0.5"
+                    value={member.portions}
+                    onChange={(event) => {
+                      const portions = Number(event.target.value);
+                      setPortionMembers((members) =>
+                        members.map((current, memberIndex) =>
+                          memberIndex === index
+                            ? {
+                                ...current,
+                                portions: Number.isFinite(portions)
+                                  ? portions
+                                  : 1,
+                              }
+                            : current,
+                        ),
+                      );
+                      markChanged();
+                    }}
+                    className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+                  />
+                </label>
+              </div>
+            ))}
           </div>
         </div>
       </div>

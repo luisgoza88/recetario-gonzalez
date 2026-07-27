@@ -27,6 +27,34 @@ export interface ResolvedPortion {
   amount: string;
 }
 
+/** Borrador editable de un miembro y su consumo habitual. */
+export interface PortionMemberDraft {
+  name: string;
+  portions: number;
+}
+
+/** Nombre inicial usado al ampliar un hogar que aún no configuró miembros. */
+export function defaultPortionMemberName(index: number): string {
+  if (index === 0) return "Luis";
+  if (index === 1) return "Mariana";
+  return `Miembro ${index + 1}`;
+}
+
+/**
+ * Ajusta una lista editable al tamaño del hogar conservando los miembros
+ * existentes y agregando borradores estables al final.
+ */
+export function resizePortionMembers(
+  members: PortionMemberDraft[],
+  size: number,
+): PortionMemberDraft[] {
+  return Array.from({ length: size }, (_, index) =>
+    members[index]
+      ? { ...members[index] }
+      : { name: defaultPortionMemberName(index), portions: 1 },
+  );
+}
+
 /**
  * Claves legacy del hogar original. Se usan SOLO para que las recetas viejas
  * muestren un nombre bonito en vez de "luis" en minúscula. No se usan para
