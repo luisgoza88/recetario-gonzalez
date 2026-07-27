@@ -6,6 +6,24 @@ import { generateText } from "@/lib/ai/generate";
 import { withRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 import { createAuthenticatedClient } from "@/lib/supabase/server";
+import {
+  requireHouseholdMembership,
+  forbiddenResponse,
+} from "@/lib/api/auth";
+// Reconexión de escrituras: el catálogo completo de tools y el orchestrator
+// que ya sabía despacharlas, ejecutarlas con audit log y proponerlas.
+import { functionDeclarations } from "../functions";
+import {
+  executeFunctionWithLogging,
+  createFunctionProposal,
+} from "../orchestrator";
+import {
+  isWriteFunction,
+  partitionCalls,
+  needsHumanApproval,
+} from "../write-gate";
+import { generateSessionId } from "@/lib/ai/ai-command-service";
+import { getToolDescription } from "@/lib/ai-assistant/constants";
 import { getCookingProfile, getFamilyDisplayName } from "@/lib/cooking-profile";
 import {
   getHouseholdMoodPatterns,
@@ -61,13 +79,24 @@ const ChatRequestSchema = z.object({
 });
 
 /**
- * ENDPOINT SIMPLIFICADO PARA CONSULTAS
+ * ENDPOINT ÚNICO DEL ASISTENTE
  *
- * Este endpoint maneja SOLO consultas de lectura (get_*, search_*, suggest_*, list_*).
- * NO tiene sistema de trust, proposals ni audit logs.
- * Es más rápido y directo para preguntas simples como "¿qué hay de comer?".
+ * Maneja consultas Y acciones. Es el único endpoint de chat: `/api/ai-assistant`
+ * (la ruta raíz) quedó obsoleta y fue eliminada — durante meses estuvo huérfana
+ * y por eso el bot no podía ejecutar nada.
  *
- * Para acciones de escritura (crear, actualizar, eliminar), usar /api/ai-assistant
+ * Flujo:
+ *   1. Auth + rate limit + verificación de membresía del hogar.
+ *   2. `selectTools()` con consultas + escrituras (estas últimas solo si hay
+ *      un householdId verificado).
+ *   3. Las escrituras pasan por `write-gate.ts`: riesgo alto o destructivo →
+ *      propuesta con aprobación humana; riesgo bajo → ejecución con audit log
+ *      y undo.
+ *   4. Síntesis final del texto con el proveedor de turno.
+ *
+ * Al agregar una tool nueva: declararla en `functions/declarations.ts` y, si
+ * modifica datos, registrarla en `WRITE_FUNCTIONS` de `write-gate.ts` con su
+ * risk level. Las consultas se declaran en `queryFunctions` de este archivo.
  */
 
 // Note: MessageWithImage is imported from @/lib/ai-assistant modules
@@ -271,6 +300,23 @@ const queryFunctions: FunctionDeclaration[] = [
 ];
 
 // ============================================
+// FUNCIONES DE ESCRITURA
+// ============================================
+
+/**
+ * Tools que modifican datos, tomadas del catálogo canónico
+ * (`functions/declarations.ts`) y filtradas por la lista explícita de
+ * `write-gate.ts`. No se redeclaran aquí a mano: así el schema de una mutación
+ * vive en UN solo lugar y no se desincroniza.
+ *
+ * Solo se ofrecen cuando hay `householdId` verificado — sin hogar no hay a
+ * quién auditar ni a quién pedirle aprobación.
+ */
+const writeFunctions: FunctionDeclaration[] = functionDeclarations.filter((d) =>
+  d.name ? isWriteFunction(d.name) : false,
+);
+
+// ============================================
 // EJECUTAR FUNCIÓN DE CONSULTA
 // ============================================
 
@@ -417,26 +463,59 @@ function buildChatSystemPrompt(opts?: {
     moodPatternsSection = `\n\n${opts.moodPatterns}`;
   }
 
-  return `Eres el asistente de ${familyName}${locationSuffix}. Ayudas con consultas sobre recetas, menú, inventario y tareas.
+  const now = new Date();
+  const monthName = now.toLocaleDateString("es-CO", { month: "long" });
+  const weekday = now.toLocaleDateString("es-CO", { weekday: "long" });
 
-## REGLA: SIEMPRE USA LAS FUNCIONES
+  return `Eres el asistente de cocina y hogar de ${familyName}${locationSuffix}. Hoy es ${weekday}, ${now.toLocaleDateString("es-CO")} (${monthName}).
+
+## REGLA 1: NUNCA INVENTES — USA LAS FUNCIONES
+Si la respuesta depende de datos del hogar, llama la función. No adivines.
 - "¿Qué hay de comer?" → get_today_menu()
-- "¿Cómo hago X receta?" → get_recipe_details(recipe_name)
-- "¿Qué tengo en la despensa?" → get_inventory()
+- "¿Cómo hago X?" → get_recipe_details(recipe_name)
+- "¿Qué tengo?" → get_inventory()
 - "Lista de compras" → get_shopping_list()
 - "Tareas de hoy" → get_today_tasks()
+- "¿Qué me falta para X?" → get_missing_ingredients(recipe_name)
+
+## REGLA 2: PUEDES ACTUAR, NO SOLO RESPONDER
+Tienes funciones que MODIFICAN datos: agregar a la lista de compras, cambiar
+una comida del menú, actualizar inventario, completar tareas, crear recetas,
+programar tareas. Úsalas cuando el usuario lo pida.
+
+Las acciones delicadas (eliminar algo, operaciones masivas) generan una
+propuesta que el usuario aprueba antes de ejecutarse — eso es automático, tú
+solo llama la función. Nunca digas que no puedes hacer cambios.
+
+## REGLA 3: SÉ PROACTIVO CON LO QUE LA APP SABE HACER
+Cuando venga al caso, ofrece estas capacidades — el usuario a menudo no sabe
+que existen:
+- **Escanear la despensa** con la cámara para actualizar el inventario de golpe
+- **Escanear la factura** del mercado para registrar precios y stock
+- **Generar el menú de la semana** completo según lo que hay y la temporada
+- **Adaptar cualquier receta a Thermomix**
+- **Sustituir un ingrediente** que falta por otro que sí hay
+- **Ver qué está en cosecha** este mes en Colombia (sale más barato y mejor)
+- **Ajustar porciones** de una receta al número de comensales
+
+## CONTEXTO COLOMBIANO
+Cocinas para un hogar en Colombia. Usa nombres locales de ingredientes
+(cebolla cabezona, cebolla larga, cilantro, panela, plátano maduro/verde,
+guascas, ají dulce, color/achiote, arracacha, yuca, costeño, campesino).
+Mide en gramos, libras y tazas. Precios en pesos colombianos.
+Estamos en ${monthName}: si mencionas frutas o verduras, prioriza lo de cosecha.
+Considera pisos térmicos: no es lo mismo cocinar en Medellín que en la costa.
 
 ## DATOS DEL HOGAR
 - Hogar: ${familyName}
-- Porciones totales: 5 por receta
-- Viernes/Sábado: Sin cena${opts?.cookingStyle ? `\n- Estilo: ${opts.cookingStyle}` : ""}${opts?.familySize ? `\n- Miembros: ${opts.familySize}` : ""}
+- Comensales: ${opts?.familySize ?? "no especificado"}
+- Viernes y sábado: sin cena (salen a comer)${opts?.cookingStyle ? `\n- Estilo de cocina: ${opts.cookingStyle}` : ""}
 
 ## FORMATO
-- Sé amigable y conciso
-- Usa 1-2 emojis por respuesta
-- Respuestas claras y organizadas${snapshotSection}${recentMessagesSection}${preferencesSection}${insightsSection}${moodPatternsSection}
-
-NOTA: Este chat es solo para CONSULTAS. Para acciones (crear, modificar, eliminar), indica al usuario que use el chat principal.`;
+- Amigable y concreto. Nada de párrafos largos.
+- 1-2 emojis por respuesta, no más.
+- Si listas ingredientes o pasos, usa viñetas.
+- Cuando ejecutes una acción, confirma en una línea qué hiciste.${snapshotSection}${recentMessagesSection}${preferencesSection}${insightsSection}${moodPatternsSection}`;
 }
 
 // ============================================
@@ -581,6 +660,20 @@ export async function POST(request: NextRequest) {
       conversationContext,
     } = validatedBody;
 
+    // ─── Gate cross-tenant ────────────────────────────────────────────────────
+    // `householdId` llega del BODY, y tanto getCookingProfile como
+    // getHouseholdMoodPatterns usan createServiceRoleClient (bypass de RLS).
+    // Sin este chequeo, un usuario autenticado del hogar A podía pasar el UUID
+    // del hogar B y recibir su perfil (nombre de familia, ciudad, estilo,
+    // tamaño) y 90 días de patrones de ánimo inyectados en el system prompt —
+    // y luego pedirle al bot que se los repitiera.
+    if (householdId) {
+      const isMember = await requireHouseholdMembership(householdId);
+      if (!isMember) {
+        return forbiddenResponse("No perteneces a este hogar");
+      }
+    }
+
     // Fetch cooking profile, learning insights, and mood patterns in parallel
     // getLearningInsights is imported dynamically to avoid top-level env access at build time
     const [cookingProfile, learningInsights, moodPatterns] = await Promise.all([
@@ -615,11 +708,17 @@ export async function POST(request: NextRequest) {
       }),
     );
 
+    // Herramientas disponibles: consultas siempre; escrituras solo con un
+    // hogar ya verificado arriba (si no, no hay contexto de auditoría válido).
+    const availableTools = householdId
+      ? [...queryFunctions, ...writeFunctions]
+      : queryFunctions;
+
     // Selección de herramientas (DeepSeek con fallback Gemini)
     const selection = await selectTools({
       system: dynamicSystemPrompt,
       messages: chatMessages,
-      tools: queryFunctions,
+      tools: availableTools,
       temperature: 0.7,
       maxTokens: 1000,
     });
@@ -679,38 +778,221 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ content: textResponse, role: "assistant" });
     }
 
-    // Ejecutar funciones de consulta llamadas (solo lectura)
-    const results: string[] = [];
-    for (const fc of functionCalls) {
-      const result = await executeQueryFunction(fc.name, fc.args || {});
-      results.push(
-        `${fc.name}:\n${JSON.stringify(result, null, 2).slice(0, 4000)}`,
-      );
+    // ─── Separar lecturas de escrituras ──────────────────────────────────────
+    const { reads, writes } = partitionCalls(functionCalls);
+
+    // ─── Compuerta de escritura ──────────────────────────────────────────────
+    // Si el modelo pidió modificar algo, decide si se ejecuta con auditoría o
+    // si hay que pedirle permiso al humano. La propuesta se devuelve como JSON
+    // (no SSE) a propósito: el cliente ya distingue por content-type y su rama
+    // JSON sabe manejar `data.proposal` → `onProposal()`.
+    const sessionId = generateSessionId();
+    if (writes.length > 0 && householdId) {
+      const needsApproval = await needsHumanApproval(writes, householdId);
+
+      if (needsApproval) {
+        const proposal = await createFunctionProposal(
+          writes.map((w) => ({ name: w.name, args: w.args || {} })),
+          { householdId, userId: user.id, sessionId },
+        );
+
+        logger.info("[AI Chat] Propuesta creada", {
+          proposalId: proposal.proposalId,
+          actions: proposal.actions.length,
+          riskLevel: proposal.riskLevel,
+        });
+
+        return NextResponse.json({
+          type: "proposal",
+          content: `He preparado un plan que requiere tu aprobación:\n\n**${proposal.summary}**\n\nIncluye ${proposal.actions.length} acción(es) que modificarán datos. ¿Quieres que lo ejecute?`,
+          role: "assistant",
+          proposal,
+          sessionId,
+        });
+      }
     }
 
-    // Síntesis de la respuesta final (DeepSeek con fallback Gemini)
+    // ─── Ejecutar ────────────────────────────────────────────────────────────
+    // Lecturas: directas. Escrituras de riesgo bajo (ya pasaron la compuerta):
+    // con audit log y undo vía executeFunctionWithLogging.
+    //
+    // `onEvent` permite que el modo streaming emita tool_start/tool_result a
+    // medida que cada función corre. El cliente ya sabe pintarlos
+    // (useAIChat.ts, casos "tool_start"/"tool_result"); hasta ahora el servidor
+    // nunca los mandaba y el indicador de herramientas jamás se encendía.
+    type ToolEvent = Record<string, unknown>;
+    const executionMetadata: Array<{
+      functionName: string;
+      auditLogId?: string;
+      canUndo: boolean;
+    }> = [];
+
+    const runCalls = async (
+      onEvent?: (event: ToolEvent) => void,
+    ): Promise<string[]> => {
+      const results: string[] = [];
+
+      for (const fc of [...reads, ...writes]) {
+        const isWrite = isWriteFunction(fc.name);
+        onEvent?.({
+          type: "tool_start",
+          tool: {
+            name: fc.name,
+            description: getToolDescription(fc.name),
+            args: fc.args,
+          },
+        });
+
+        try {
+          if (!isWrite) {
+            const result = await executeQueryFunction(fc.name, fc.args || {});
+            results.push(
+              `${fc.name}:\n${JSON.stringify(result, null, 2).slice(0, 4000)}`,
+            );
+            onEvent?.({
+              type: "tool_result",
+              tool: { name: fc.name },
+              result: { success: true },
+            });
+            continue;
+          }
+
+          if (!householdId) {
+            results.push(
+              `${fc.name}: no ejecutada — se requiere un hogar activo para modificar datos.`,
+            );
+            onEvent?.({
+              type: "tool_result",
+              tool: { name: fc.name },
+              result: { success: false, summary: "Sin hogar activo" },
+            });
+            continue;
+          }
+
+          const execution = await executeFunctionWithLogging(
+            fc.name,
+            fc.args || {},
+            { householdId, userId: user.id, sessionId },
+          );
+          results.push(
+            `${fc.name} (ejecutada):\n${JSON.stringify(execution.result, null, 2).slice(0, 4000)}`,
+          );
+          executionMetadata.push({
+            functionName: fc.name,
+            auditLogId: execution.auditLogId,
+            canUndo: execution.canUndo,
+          });
+          onEvent?.({
+            type: "tool_result",
+            tool: { name: fc.name },
+            result: { success: true },
+          });
+        } catch (execError) {
+          const message =
+            execError instanceof Error
+              ? execError.message
+              : "error desconocido";
+          logger.error("[AI Chat] Falló la ejecución de una función", {
+            functionName: fc.name,
+            isWrite,
+            error: message,
+          });
+          results.push(`${fc.name}: la acción falló — ${message}`);
+          onEvent?.({
+            type: "tool_result",
+            tool: { name: fc.name },
+            result: { success: false, summary: message },
+          });
+        }
+      }
+
+      return results;
+    };
+
+    const synthesisPrompt = (results: string[]) =>
+      `El usuario dijo: "${lastUserMessage}"\n\nResultados:\n${results.join("\n\n")}\n\nResponde de forma útil, amigable y breve basándote en estos resultados. Si alguna acción se ejecutó, confírmalo explícitamente. Si alguna falló, dilo con claridad. No inventes datos que no estén en los resultados.`;
+
+    if (stream) {
+      const encoder = new TextEncoder();
+      const send = (
+        controller: ReadableStreamDefaultController,
+        event: ToolEvent,
+      ) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+
+      const readable = new ReadableStream({
+        async start(controller) {
+          try {
+            const results = await runCalls((event) => send(controller, event));
+
+            const content =
+              (await generateText({
+                system: dynamicSystemPrompt,
+                prompt: synthesisPrompt(results),
+                json: false,
+                temperature: 0.7,
+                maxTokens: 1000,
+              })) || "No pude procesar tu solicitud.";
+
+            send(controller, { type: "content", content });
+            send(controller, {
+              type: "done",
+              done: true,
+              sessionId,
+              ...(executionMetadata.length > 0 && {
+                executionMetadata: {
+                  actionsExecuted: executionMetadata.length,
+                  undoAvailable: executionMetadata.some((m) => m.canUndo),
+                  undoableActions: executionMetadata
+                    .filter((m) => m.canUndo)
+                    .map((m) => ({
+                      functionName: m.functionName,
+                      auditLogId: m.auditLogId,
+                    })),
+                },
+              }),
+            });
+          } catch (streamError) {
+            logger.error("[AI Chat] Error dentro del stream", {
+              error:
+                streamError instanceof Error
+                  ? streamError.message
+                  : String(streamError),
+            });
+            send(controller, {
+              type: "content",
+              content: "Ocurrió un error procesando tu solicitud.",
+            });
+            send(controller, { type: "done", done: true });
+          } finally {
+            controller.close();
+          }
+        },
+      });
+
+      return new Response(readable, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        },
+      });
+    }
+
+    const results = await runCalls();
     const finalContent =
       (await generateText({
         system: dynamicSystemPrompt,
-        prompt: `El usuario dijo: "${lastUserMessage}"\n\nResultados de las consultas:\n${results.join("\n\n")}\n\nResponde de forma útil, amigable y breve basándote en estos resultados. No inventes datos que no estén en ellos.`,
+        prompt: synthesisPrompt(results),
         json: false,
         temperature: 0.7,
         maxTokens: 1000,
       })) || "No pude procesar tu solicitud.";
 
-    if (stream) {
-      return new Response(
-        `data: ${JSON.stringify({ type: "content", content: finalContent })}\n\ndata: ${JSON.stringify({ type: "done", done: true })}\n\n`,
-        {
-          headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
-          },
-        },
-      );
-    }
-
-    return NextResponse.json({ content: finalContent, role: "assistant" });
+    return NextResponse.json({
+      content: finalContent,
+      role: "assistant",
+      sessionId,
+    });
   } catch (error) {
     logger.error("[AI Chat Simple] Error", {
       error: error instanceof Error ? error.message : String(error),
