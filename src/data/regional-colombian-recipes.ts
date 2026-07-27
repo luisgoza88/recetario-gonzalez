@@ -1,10 +1,17 @@
 import { Recipe, ColombianRegion } from "@/types";
 import { ExpandedRecipe } from "./expanded-recipes";
+import {
+  andinaRecipes,
+  amazoniaRecipes,
+  insularRecipes,
+} from "./regional-colombian-recipes-andina";
 
 // =====================================================
-// RECETAS REGIONALES COLOMBIANAS (24 recetas)
+// RECETAS REGIONALES COLOMBIANAS (36 recetas)
 // Regiones: Costa Caribe, Pacífico, Llanos Orientales,
-//           Santander, Valle del Cauca, Tolima-Huila
+//           Santander, Valle del Cauca, Tolima-Huila,
+//           Andina, Amazonía, Insular
+// Cubre las 9 regiones de `ColombianRegion`.
 // =====================================================
 
 export interface RegionalRecipe extends ExpandedRecipe {
@@ -1291,6 +1298,12 @@ export const regionalRecipes: RegionalRecipe[] = [
   ...santanderRecipes,
   ...valleRecipes,
   ...tolimaHuilaRecipes,
+  // Regiones agregadas en julio 2026 (antes el catálogo solo cubría 6 de las 9
+  // que declara `ColombianRegion`). Estas usan `total` por ingrediente en vez
+  // del reparto por persona — ver la nota del archivo.
+  ...andinaRecipes,
+  ...amazoniaRecipes,
+  ...insularRecipes,
 ].filter((r) => !DUPLICATED_IN_DB.has(r.id));
 
 // Helper: obtener recetas por region
