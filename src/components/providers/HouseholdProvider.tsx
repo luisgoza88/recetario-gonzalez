@@ -2,8 +2,8 @@
 
 import { useEffect, ReactNode } from "react";
 import { useHouseholdStore } from "@/lib/stores/useHouseholdStore";
-import { initializeHouseholdContext } from "@/lib/services/household-service";
 import { useAuth } from "@/contexts/AuthContext";
+import type { Household as StoreHousehold } from "@/lib/types/household";
 
 interface HouseholdProviderProps {
   children: ReactNode;
@@ -23,16 +23,19 @@ export function HouseholdProvider({ children }: HouseholdProviderProps) {
     setLoading,
     setInitialized,
     setError,
-    isInitialized,
   } = useHouseholdStore();
-  const { user: authUser, isLoading: authLoading } = useAuth();
+  const {
+    supabaseUser,
+    currentHousehold,
+    isLoading: authLoading,
+  } = useAuth();
 
   useEffect(() => {
     // Esperar a que AuthContext termine de resolver la sesion
     if (authLoading) return;
 
     // Si no hay usuario autenticado, limpiar y no fetchear
-    if (!authUser) {
+    if (!supabaseUser) {
       setHousehold(null);
       setUser(null);
       setInitialized(true);
@@ -40,31 +43,20 @@ export function HouseholdProvider({ children }: HouseholdProviderProps) {
       return;
     }
 
-    // Re-inicializar si el authUser cambio (ej: switch de cuenta)
-    if (isInitialized) return;
-
-    const initialize = async () => {
-      try {
-        setLoading(true);
-        const { household, user } = await initializeHouseholdContext(
-          authUser.id,
-        );
-        setHousehold(household);
-        setUser(user);
-        setInitialized(true);
-      } catch (error) {
-        console.error("Failed to initialize household context:", error);
-        setError("Error al cargar el contexto del hogar");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initialize();
+    // AuthContext ya carga y valida las membresías. Mantener una segunda
+    // consulta aquí permitía que ambos estados divergieran: si faltaba el
+    // perfil de usuario legacy, AuthContext sí tenía hogar pero este store
+    // quedaba inicializado en null. Sincronizar desde la única fuente de
+    // verdad también hace que cambiar de hogar se refleje inmediatamente.
+    setLoading(false);
+    setError(null);
+    setHousehold((currentHousehold as StoreHousehold | null) ?? null);
+    setUser(null);
+    setInitialized(true);
   }, [
-    authUser,
     authLoading,
-    isInitialized,
+    supabaseUser,
+    currentHousehold,
     setHousehold,
     setUser,
     setLoading,
