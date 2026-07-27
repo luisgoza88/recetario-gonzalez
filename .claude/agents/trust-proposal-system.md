@@ -1,6 +1,6 @@
 ---
 name: trust-proposal-system
-description: "Sistema de confianza IA con 5 niveles de trust, 4 de riesgo, propuestas con aprobacion, ejecucion transaccional, audit log y rollback. 2,800+ LOC."
+description: "Sistema de confianza IA con 5 niveles de trust, 4 de riesgo, propuestas con aprobacion, ejecucion transaccional, audit log y rollback. 2,800+ LOC. Conectado al chat via write-gate.ts."
 model: sonnet
 tools:
   - Read
@@ -64,12 +64,45 @@ Experto en el sistema de confianza, propuestas y auditoria de acciones de IA. Ge
 | HIGH (3)     | Requiere confirmacion     | Cambiar menu, editar receta     |
 | CRITICAL (4) | Multi-step + confirmacion | Eliminar datos, bulk operations |
 
+### Como entra una propuesta al sistema (reconectado 2026-07-27)
+
+Durante meses este sistema estuvo **desconectado**: el unico codigo que creaba
+propuestas vivia en `/api/ai-assistant/route.ts`, una ruta que ningun cliente
+llamaba. `ai_action_queue` nunca recibia filas y `AICommandCenter.tsx` siempre
+mostraba 0 pendientes. Esa ruta se elimino y el flujo se movio al chat vivo.
+
+Cadena actual:
+
+```
+useAIChat (chat UI)
+  └─> POST /api/ai-assistant/chat
+        └─> selectTools()  → el modelo pide una mutacion
+        └─> partitionCalls()            [write-gate.ts]
+        └─> needsHumanApproval()        [write-gate.ts]
+              ├─ true  → createFunctionProposal() → ai_action_queue
+              │            └─> respuesta JSON { type: "proposal", proposal }
+              │                  └─> useAIChat → onProposal() → ProposalCard
+              │                        └─> POST /api/ai-assistant/execute
+              └─ false → executeFunctionWithLogging() (audit log + undo)
+```
+
+`needsHumanApproval()` exige aprobacion si: la funcion esta en
+`ALWAYS_REQUIRE_APPROVAL`, **o** el riesgo maximo es HIGH+, **o** el trust del
+hogar no auto-aprueba ese riesgo. Tiene tests en
+`src/app/api/__tests__/write-gate.test.ts` (13 casos), incluido el escenario de
+"el registry miente y dice que un delete es riesgo 1".
+
 ### Bugs Conocidos (CRITICOS, vigentes)
 
 1. **BUG**: `recordRollback` en trust-service.ts usa `.rpc('increment', { x: 1 })` dentro de `.update()` — NO FUNCIONA
 2. Dos flujos de trust paralelos: `ai-command-service.ts` tiene su propia `getHouseholdTrust()` vs `trust-service.ts`
 3. `capturePreState` solo cubre 4 funciones
-4. Propuestas expiradas no se limpian automaticamente
+4. `/api/ai-assistant/execute` duplica implementaciones de funciones en vez de
+   importarlas — el propio archivo lo admite: *"we duplicate the essential ones"*.
+   Ahora que llegan propuestas reales, esta duplicacion **si puede divergir**
+   del comportamiento del orchestrator. Es la siguiente deuda a pagar aqui.
+5. `capturePreState` solo cubre 4 funciones → el undo real solo aplica a esas,
+   aunque `canUndo` se reporte por cada escritura ejecutada
 
 ### Bugs Conocidos (RESUELTOS — historia)
 

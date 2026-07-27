@@ -40,15 +40,48 @@ Experto en arquitectura de componentes React, refactoring de componentes monster
 
 ### UI Library Custom (`src/components/ui/`)
 
-- `Button.tsx`, `Card.tsx`, `Toast.tsx`, `ConfirmDialog.tsx`
-- `FocusTrap.tsx`, `Spinner.tsx`, `ErrorBoundary.tsx`, `OfflineIndicator.tsx`
+15 componentes: `Button`, `Card`, `Toast`, `ConfirmDialog`, `FocusTrap`,
+`Spinner`, `ErrorBoundary`, `OfflineIndicator`, `BottomSheet`, `EmptyState`,
+`Skeleton`, `RecipeCard`, `MoodChip`, `SeasonalBadge`, `index.ts`.
+
+`Skeleton.tsx` y `EmptyState.tsx` **ya estan cableados** (2026-07-27):
+skeletons en `TodayDashboard` y `RecipesView`, `EmptyState` en `RecipesView`.
+Siguen sin consumidores `Card.tsx` y el barrel `index.ts` (todo el mundo
+importa por ruta directa).
+
+Superficies que todavia muestran spinner y ganarian con skeleton:
+`MarketView`, `HomeView`, `CalendarView`.
 
 ### Anti-Patrones Identificados
 
 1. **CustomEvents** para navegacion desde SmartFAB — no testeable, no type-safe
-2. **Spinner inline** en varios archivos en vez del componente `<Spinner />`
-3. **Queries Supabase directas** en algunos componentes en vez de TanStack Query hooks
-4. **Accesibilidad inconsistente** — FocusTrap ya aplicado en `AddCustomItemModal.tsx`, `ScanPantryModal.tsx`, `SmartSuggestions.tsx`, `EmployeeDetailModal.tsx` y `ScheduleGenerator.tsx`; extenderlo al resto de modales que aun no lo tienen
+2. **Spinner en vez de Skeleton** (parcialmente resuelto): quedan ~35
+   componentes con `<Spinner />` centrado. Para listas el skeleton da mucha
+   mejor percepcion de velocidad. Es la mejora de UX de mejor relacion
+   esfuerzo/impacto.
+3. **`<img>` crudo en vez de `next/image`**: las 4 superficies de FOTO DE
+   RECETA ya migraron (`r/[slug]`, `CalendarView`, `KidsMode`,
+   `CookWithThisButton`). Los `<img>` que quedan son previews de camara con
+   URLs `blob:`/`data:` (ImageUpload, ScanPantryModal, PhotoCapture,
+   RoomScanner, InspectionMode, chat) — ahi `next/image` **no aplica**, es
+   correcto dejarlos.
+4. **Queries Supabase directas** en algunos componentes en vez de TanStack Query hooks
+5. **Accesibilidad inconsistente** — FocusTrap ya aplicado en `AddCustomItemModal.tsx`, `ScanPantryModal.tsx`, `SmartSuggestions.tsx`, `EmployeeDetailModal.tsx` y `ScheduleGenerator.tsx`; extenderlo al resto de modales que aun no lo tienen
+
+### Componentes construidos y NO cableados (knip, 2026-07-27)
+
+`HomeQuickActions`, `HomeTodayTasks`, `AssignToMeButton`,
+`EnableNotificationsBanner`, `PortionsAdjuster`, `SubstitutionSuggester`,
+`UpgradePrompt`. Tambien `lib/i18n/*` (traducciones + `useTranslation`) sin
+montar, y `fuse.js` instalado como dependencia sin un solo import.
+
+Antes de construir algo nuevo: revisar si ya existe aqui.
+
+### Sin drag & drop en ningun lado
+
+`grep -rn "onDrag\|draggable\|dnd"` devuelve **cero** resultados. El estandar
+de los planificadores de menu es arrastrar receta→dia o asignar en un toque.
+Hoy todo es navegacion por modales.
 
 ### Correccion importante: `dynamic()` SI se usa
 

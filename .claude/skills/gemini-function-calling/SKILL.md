@@ -1,6 +1,6 @@
 ---
 name: gemini-function-calling
-description: "Patrones de Google Gemini AI en recetario-app: function calling, streaming SSE, modelos, retry, sanitizacion, risk levels."
+description: "Patrones de IA en recetario-app: DeepSeek primario + Gemini fallback/vision, function calling, modelos, retry, sanitizacion, risk levels. Incluye la topologia real de endpoints."
 globs:
   - "src/app/api/ai-assistant/**"
   - "src/lib/gemini/**"
@@ -8,16 +8,55 @@ globs:
   - "src/lib/ai-assistant/**"
 ---
 
-# Gemini Function Calling Patterns
+# Function Calling Patterns (DeepSeek + Gemini)
 
-## Modelos Disponibles
+## ⚠️ Topologia real de endpoints (verificado 2026-07-27)
 
-| Modelo                    | Uso                            | Costo |
-| ------------------------- | ------------------------------ | ----- |
-| `gemini-2.0-flash`        | Texto rapido, function calling | Bajo  |
-| `gemini-2.0-flash-exp`    | Texto + generacion imagenes    | Medio |
-| `gemini-2.0-pro`          | Alta calidad, razonamiento     | Alto  |
-| `imagen-3.0-generate-002` | Generacion de imagenes         | Alto  |
+Antes de escribir codigo aqui, saber que hay **dos chats en paralelo** y solo
+uno esta conectado a la UI:
+
+- `/api/ai-assistant/chat` → **VIVO**. Tools: array propio `queryFunctions`
+  (linea 79), **20 tools read-only**. Lo llama `useAIChat.ts:205`.
+- `/api/ai-assistant` (raiz) → **HUERFANO**. Usa `declarations.ts` (48 tools con
+  mutaciones) + `orchestrator.ts` + propuestas. **Ningun cliente lo llama.**
+- `/api/ai-assistant/execute` → vivo, pero nadie crea propuestas que ejecutar.
+
+Consecuencia practica: **agregar una tool a `declarations.ts` no hace nada.**
+Si la tool debe estar disponible para el usuario hoy, hay que declararla en
+`queryFunctions` de `chat/route.ts` Y en el dispatcher `executeQueryFunction`
+del mismo archivo. Ver `.claude/agents/gemini-orchestrator.md` para el detalle.
+
+El "SSE streaming" de `chat/route.ts` tampoco es streaming real: emite un unico
+evento `data:` con la respuesta ya completa.
+
+## Modelos Reales en Uso
+
+Fuente de verdad: `src/lib/gemini/client.ts` y `src/lib/deepseek/client.ts`.
+Todos son overridables por env var.
+
+| Modelo                     | Uso                                    | Proveedor |
+| -------------------------- | -------------------------------------- | --------- |
+| `deepseek-v4-flash`        | **Texto y tool-calling PRIMARIO**      | DeepSeek  |
+| `gemini-3.5-flash`         | Fallback de texto + tool-calling       | Gemini    |
+| `gemini-2.5-flash-image`   | Texto + generacion de imagenes         | Gemini    |
+| `gemini-2.5-pro`           | Alta calidad, razonamiento             | Gemini    |
+| `imagen-3.0-generate-002`  | Generacion de imagenes profesional     | Gemini    |
+
+Reglas de routing (`chatProvider()` en `src/lib/ai/chat.ts`):
+
+1. `AI_CHAT_PROVIDER` explicito gana.
+2. Si el mensaje trae imagen → **siempre Gemini** (DeepSeek V4 no tiene vision).
+3. Si DeepSeek falla en tool-calling → fallback automatico a Gemini.
+4. `deepseek-pro` NO usar: timeout >30s y trunca JSON.
+
+## Oportunidad: Gemini Interactions API (GA junio 2026)
+
+`src/lib/ai/chat.ts` evita deliberadamente el formato multi-turno de
+tool-results porque "difiere mucho entre Gemini y OpenAI", y por eso hace
+seleccion de tools + sintesis en dos llamadas separadas. La Interactions API
+resuelve exactamente eso con estado en servidor (`previous_interaction_id`) y
+circulacion de contexto entre turnos. Si se reconecta el tool-calling con
+mutaciones, evaluarla antes de reimplementar el bucle a mano.
 
 ## Cliente Gemini (`src/lib/gemini/client.ts`)
 
@@ -27,9 +66,9 @@ import { GoogleGenAI } from '@google/genai';
 // Singleton client
 const genAI = new GoogleGenAI({ apiKey: process.env.GOOGLE_GEMINI_API_KEY });
 
-// Modelos
-export const flashModel = genAI.models.get('gemini-2.0-flash');
-export const proModel = genAI.models.get('gemini-2.0-pro');
+// Modelos (nombres reales, overridables por env — ver GEMINI_MODELS en el cliente)
+export const flashModel = genAI.models.get(process.env.GEMINI_MODEL_FLASH ?? 'gemini-3.5-flash');
+export const proModel = genAI.models.get(process.env.GEMINI_MODEL_PRO ?? 'gemini-2.5-pro');
 
 // Retry con backoff exponencial
 export async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {

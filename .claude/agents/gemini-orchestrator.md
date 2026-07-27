@@ -1,6 +1,6 @@
 ---
 name: gemini-orchestrator
-description: "Orquestador del sistema de IA (DeepSeek primario + Gemini fallback/vision). Gestiona function calling, chat SSE, prompts, herramientas y el orchestrator principal. 3,100+ LOC de IA."
+description: "Orquestador del sistema de IA (DeepSeek primario + Gemini fallback/vision). Function calling, prompts, herramientas, compuerta de escritura y propuestas. Endpoint unico: /api/ai-assistant/chat."
 model: sonnet
 tools:
   - Read
@@ -31,12 +31,46 @@ Experto en el sistema de IA de recetario-app: selección de proveedor (DeepSeek/
 - Modelo DeepSeek en uso: `deepseek-v4-flash` (el modelo `pro` hace timeout >30s y trunca JSON — ver commit de46cf9)
 - Gemini queda como: (a) fallback de texto si DeepSeek no está configurado o falla, (b) todo lo que sea visión/imágenes
 
+### TOPOLOGIA (reconectada 2026-07-27)
+
+**Un solo endpoint de chat.** Antes habia dos implementaciones en paralelo y la
+que tenia las mutaciones estaba huerfana (el bot no podia ejecutar nada). Se
+elimino `/api/ai-assistant` (raiz, 847 LOC) y sus capacidades se movieron al
+endpoint vivo.
+
+| Endpoint | Rol |
+| --- | --- |
+| `/api/ai-assistant/chat` | **Unico chat.** Consultas + escrituras + propuestas |
+| `/api/ai-assistant/execute` | Ejecuta/rechaza propuestas ya aprobadas (`useAIProposal.ts`) |
+
+Flujo de `chat/route.ts`:
+
+1. Auth → rate limit → **`requireHouseholdMembership(householdId)`**
+2. `selectTools()` con `queryFunctions` (consultas, declaradas en el propio
+   archivo) + `writeFunctions` (derivadas de `declarations.ts` filtrando por
+   `WRITE_FUNCTIONS`). Las escrituras **solo se ofrecen si hay householdId
+   verificado**.
+3. `partitionCalls()` separa lecturas de escrituras.
+4. `needsHumanApproval()` (`write-gate.ts`) decide: destructiva o riesgo HIGH+
+   → `createFunctionProposal()` y se devuelve **JSON** (no SSE) con
+   `{ type: "proposal", proposal }`; el cliente ya lo maneja en su rama JSON.
+   Riesgo bajo → `executeFunctionWithLogging()` con audit log y undo.
+5. En modo stream se emiten `tool_start`/`tool_result` por funcion y un `done`
+   con `executionMetadata`.
+
+**Al agregar una tool nueva**: declararla en `declarations.ts`; si modifica
+datos, agregarla a `WRITE_FUNCTIONS` en `write-gate.ts` y darle risk level en
+el registry. Si es destructiva, tambien a `ALWAYS_REQUIRE_APPROVAL`.
+
+**No existe un flag `executeDirectly`**: se elimino a proposito. El cliente no
+puede pedir saltarse la aprobacion humana.
+
 ### Archivos Clave
 
-- `src/app/api/ai-assistant/orchestrator.ts` — Orchestrator principal (718 LOC)
-- `src/app/api/ai-assistant/functions/declarations.ts` — 50+ herramientas declaradas (960 LOC)
-- `src/app/api/ai-assistant/chat/route.ts` — Chat con SSE streaming (722 LOC)
-- `src/app/api/ai-assistant/route.ts` — Action endpoint
+- `src/app/api/ai-assistant/chat/route.ts` — **el chat** (consultas + escrituras)
+- `src/app/api/ai-assistant/write-gate.ts` — compuerta de escritura (funcion pura, con tests)
+- `src/app/api/ai-assistant/orchestrator.ts` — dispatcher + audit + propuestas (718 LOC)
+- `src/app/api/ai-assistant/functions/declarations.ts` — catalogo canonico de tools (960 LOC)
 - `src/app/api/ai-assistant/execute/route.ts` — Execute endpoint (754 LOC)
 - `src/app/api/ai-assistant/functions/multi-step.ts` — Multi-step agent
 - `src/app/api/ai-assistant/functions/recetario-queries.ts` — Queries de recetario
@@ -68,13 +102,31 @@ Experto en el sistema de IA de recetario-app: selección de proveedor (DeepSeek/
 
 ### Problemas Conocidos (vigentes)
 
-- Duplicacion de funciones read-only entre `chat/route.ts` y `declarations.ts`
-- Rollback incompleto: `capturePostState()` reutiliza `capturePreState()`
-- Expiracion de propuestas sin job de limpieza automatica
+- **El texto no hace streaming token a token.** Ahora si se emiten
+  `tool_start`/`tool_result` progresivamente, pero el contenido final sale de
+  `generateText()` completo y se manda en un solo evento `content`. Para
+  streaming real hay que darle soporte de stream a `generateText()`.
+- Las declaraciones de las **consultas** siguen viviendo en `chat/route.ts`
+  (`queryFunctions`) y duplicadas en `declarations.ts`. Las escrituras ya no se
+  duplican (se derivan del catalogo). Falta unificar tambien las lecturas.
+- `detectRequiredFunction()` sigue siendo un clasificador por palabras clave —
+  red de seguridad cuando el modelo no llama ninguna funcion.
+- `capturePreState()` en el orchestrator solo cubre 4 funciones, asi que el
+  undo real solo aplica a esas.
+- `/api/ai-assistant/execute` duplica implementaciones en vez de importarlas.
 
-### Resuelto
+### Resuelto (2026-07-27)
 
-- ~~Routing de endpoint con regex fragil en `useAIChat.ts`~~ — reemplazado por endpoint único con function calling real (`selectTools()` + tool-calling nativo DeepSeek/Gemini), ya no hay clasificación por regex acción-vs-consulta.
+- ~~`/api/ai-assistant` huerfano~~ — **eliminado**; su funcionalidad vive en
+  `/chat`.
+- ~~El chat es read-only~~ — reconectado via `write-gate.ts`.
+- ~~Fuga cross-tenant~~: `householdId` llegaba del body sin validar y se pasaba
+  a `getCookingProfile()`/`getHouseholdMoodPatterns()`, que usan
+  `createServiceRoleClient()` (bypass de RLS). Ahora hay
+  `requireHouseholdMembership()` antes de usarlo.
+- ~~System prompt delgado~~ — ahora incluye mapa de capacidades de la app,
+  contexto colombiano (ingredientes locales, pisos termicos, cosecha del mes) y
+  comensales reales desde `family_size` en vez del hardcode de 5 porciones.
 
 ## Reglas
 

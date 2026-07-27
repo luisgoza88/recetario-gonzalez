@@ -1,6 +1,6 @@
 ---
 name: recetario-qa
-description: "QA: 15% coverage actual, ZERO tests de componentes, endpoints criticos sin tests. Build, lint, typecheck, vitest, coverage reports."
+description: "QA: 24 archivos de test (397 pasando), 3 de componentes. Endpoints de IA casi sin tests. Build, lint, typecheck, vitest, coverage reports."
 model: haiku
 tools:
   - Read
@@ -36,21 +36,33 @@ npm run test:run       # Vitest single run
 npm run test:coverage  # Coverage report
 ```
 
-### Tests Existentes
+### Estado Real (medido 2026-07-27)
 
-- `src/__tests__/countIngredientMatches.test.ts`
+- **24 archivos de test · 397 tests pasando · 8 skipped**
+- **Coverage global: 12%** (lineas 12 · branches 10.38 · funciones 10.74)
+- `npx tsc --noEmit`: limpio
+- `npm run lint`: 0 errores, 178 warnings (casi todos `no-unused-vars`)
+
+### Tests Existentes (destacados)
+
+- `src/__tests__/countIngredientMatches.test.ts` (44 tests)
 - `src/__tests__/menu-tasks-integration.test.ts`
-- ~12 archivos de test total
+- `src/lib/__tests__/units.test.ts` (39), `smart-substitutions` (18),
+  `rate-limit` (16), `recipe-recommendations` (15), `inventory-check` (14)
+- `src/app/api/__tests__/`: daily-completion (12), ai-assistant-execute (13),
+  scan-receipt (5) + validacion (10), validate-invitation (6)
+- **Componentes (SI existen, 3 archivos)**: `CalendarView.test.tsx`,
+  `RecipeModal.test.tsx`, `SmartSuggestions.test.tsx` — con 8 tests skipped
+  entre los tres. NO hay E2E (Playwright no esta cableado al proyecto).
 
 ### Lo que NO Tiene Tests (CRITICO)
 
-- `/api/daily-completion` — sin auth Y sin tests
-- `/api/ai-assistant/execute` — ejecuta acciones destructivas
-- `/api/generate-recipe` — endpoint core
-- `proposal-executor.ts` — ejecucion de propuestas IA
-- `ai-command-service.ts` — audit log y rollback
+- `/api/ai-assistant/route.ts` y `orchestrator.ts` — **0% coverage**
+- `/api/ai-assistant/chat/route.ts` — **0%**, y es el endpoint que la UI usa
+- `functions/*-mutations.ts` — 0%, son las mutaciones destructivas
+- `/api/generate-recipe`, `/api/generate-weekly-menu` — endpoints core
 - `middleware.ts`
-- ZERO tests de componentes React (ni RTL ni E2E)
+- Los 3 tests de componentes cubren solo 3 de ~180 componentes
 
 ### CI/CD
 

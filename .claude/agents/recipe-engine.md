@@ -1,6 +1,6 @@
 ---
 name: recipe-engine
-description: "Motor de recetas (290 con foto, 119 Mundo), menu rotativo 12 dias, matching 4 pasos de ingredientes, sustituciones inteligentes, Thermomix, lista de compras. Absorbe a data-curator (proyecto). 5,000+ LOC."
+description: "Motor de recetas (290 con foto, 36 regionales en 9 regiones), menu rotativo 12 dias, matching 4 pasos, sustituciones, Thermomix, lista de compras. Porciones por miembro via @/lib/portions. Absorbe a data-curator. 5,000+ LOC."
 model: sonnet
 tools:
   - Read
@@ -23,9 +23,11 @@ Experto en el modulo de recetas, menu rotativo, matching de ingredientes, sustit
 
 ### Archivos Clave
 
-- `src/data/recipes.ts` — 28 recetas simples
-- `src/data/expanded-recipes.ts` — 90KB con porciones Luis/Mariana
-- `src/data/regional-colombian-recipes.ts` — 59KB, recetas regionales colombianas (reemplaza a `recipe-library.ts`, ver "Resuelto" abajo)
+- ~~`src/data/recipes.ts`~~ — **eliminado** (2026-07-27): knip lo reportaba sin
+  un solo consumidor y arrastraba 173 referencias al modelo legacy de porciones
+- `src/data/expanded-recipes.ts` — 90KB, catalogo principal (aun con claves legacy `luis`/`mariana`, leidas via `@/lib/portions`)
+- `src/data/regional-colombian-recipes.ts` — recetas regionales (reemplaza a `recipe-library.ts`, ver "Resuelto" abajo)
+- `src/data/regional-colombian-recipes-andina.ts` — Andina, Amazonia e Insular
 - `src/data/colombian-seasons.ts` — 9KB, temporadas/estacionalidad de ingredientes colombianos
 - `src/data/menu.ts` — Ciclo 12 dias desde 2026-01-06 (excluyendo domingos)
 - `src/data/substitutions.ts` — 90+ sustituciones con tags dieteticos
@@ -38,6 +40,54 @@ Experto en el modulo de recetas, menu rotativo, matching de ingredientes, sustit
 
 - 290 recetas con foto en catalogo, de las cuales 119 son de la categoria "Mundo"
 - `Recipe.type` (en `src/types/index.ts`) incluye los tipos nuevos `dessert` y `snack` ademas de `breakfast | lunch | dinner`
+
+### Porciones por miembro (migrado 2026-07-27)
+
+El modelo hardcodeado `{ luis, mariana }` **ya no existe en codigo**. Ahora:
+
+```ts
+export type PersonPortions = Record<string, string>;  // miembro -> cantidad
+Recipe.portions?: PersonPortions
+Ingredient.per_person?: PersonPortions   // + luis?/mariana? @deprecated
+```
+
+**Regla: nunca leer `.luis`/`.mariana` directamente.** Usar
+`src/lib/portions.ts`:
+
+| Helper | Para que |
+| --- | --- |
+| `ingredientPortions(ing)` | normaliza `per_person` o el legacy a un mapa |
+| `resolveIngredientPortions(ing, cfg)` | lista lista para pintar (key/label/amount) |
+| `resolvePortions(portions, cfg)` | igual para un mapa suelto |
+| `representativeQuantity(ing)` | una cantidad sola (compras, matching, share) |
+| `portionMemberKeys(cfg)` / `emptyIngredient(cfg)` | para formularios |
+| `portionLabel(key, cfg)` | etiqueta visible de una clave |
+
+Las etiquetas y el ORDEN salen de `cooking_profile.portions_config`
+(`{ "Ana": 3, "Beto": 2 }`), accesible en cliente con `usePortionsConfig()`
+de `useHouseholdStore`. Sin config, cae a las claves legacy.
+
+**Compatibilidad**: los catalogos estaticos y las recetas ya guardadas siguen
+con claves `luis`/`mariana`. Como `{luis, mariana}` ya es un
+`Record<string,string>`, no hizo falta migrar datos — solo dejaron de asumirse
+en la UI. Tests: `src/lib/__tests__/portions.test.ts` (28 casos).
+
+Al crear recetas nuevas para el catalogo: usar `total` por ingrediente (la
+cantidad del hogar) y NO repartir por persona — el reparto depende del hogar.
+
+### Cobertura regional colombiana
+
+**36 recetas, las 9 regiones de `ColombianRegion` cubiertas**: Andina (8),
+Costa Caribe (6), Santander (4), Pacifico (4), Llanos (4), Valle (3),
+Tolima-Huila (3), Insular (2), Amazonia (2).
+
+Las de Andina, Amazonia e Insular viven en
+`src/data/regional-colombian-recipes-andina.ts` y se re-exportan desde el
+archivo principal. Ojo: **"Andina" engloba** Bogota/Cundinamarca, Antioquia,
+Boyaca, Narino y Eje Cafetero — el tipo no tiene un valor por departamento.
+
+`colombian-seasons.ts` SI esta cableado (3 consumidores: `generate-weekly-menu`,
+`MarketView`, `SeasonalBadge`) — usarlo al proponer recetas por temporada.
 
 ### Mas Archivos Clave
 
