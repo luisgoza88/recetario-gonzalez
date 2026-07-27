@@ -271,36 +271,53 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Suscribirse a cambios de autenticación
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
       logger.info("Auth state changed", { event });
 
       if (event === "SIGNED_IN" && newSession?.user) {
         setSession(newSession);
         setSupabaseUser(newSession.user);
 
-        const [profile, userMemberships] = await Promise.all([
-          loadUserProfile(newSession.user.id),
-          loadMemberships(newSession.user.id),
-        ]);
+        // El callback de onAuthStateChange corre dentro de un lock exclusivo
+        // de Supabase. Hacer await de otras consultas del mismo cliente aquí
+        // puede bloquear la autenticación entre pestañas. Diferir el trabajo
+        // libera el lock antes de cargar perfil y membresías.
+        window.setTimeout(() => {
+          void (async () => {
+            const [profile, userMemberships] = await Promise.all([
+              loadUserProfile(newSession.user.id),
+              loadMemberships(newSession.user.id),
+            ]);
 
-        setUser(profile);
-        setMemberships(userMemberships);
+            setUser(profile);
+            setMemberships(userMemberships);
 
-        if (userMemberships.length > 0) {
-          const savedHouseholdId = localStorage.getItem("currentHouseholdId");
-          if (
-            savedHouseholdId &&
-            userMemberships.some((m) => m.household_id === savedHouseholdId)
-          ) {
-            setCurrentHouseholdId(savedHouseholdId);
-          } else {
-            setCurrentHouseholdId(userMemberships[0].household_id);
-            localStorage.setItem(
-              "currentHouseholdId",
-              userMemberships[0].household_id,
+            if (userMemberships.length > 0) {
+              const savedHouseholdId =
+                localStorage.getItem("currentHouseholdId");
+              if (
+                savedHouseholdId &&
+                userMemberships.some(
+                  (m) => m.household_id === savedHouseholdId,
+                )
+              ) {
+                setCurrentHouseholdId(savedHouseholdId);
+              } else {
+                setCurrentHouseholdId(userMemberships[0].household_id);
+                localStorage.setItem(
+                  "currentHouseholdId",
+                  userMemberships[0].household_id,
+                );
+              }
+            }
+          })().catch((authError) => {
+            console.error(
+              "Error cargando datos después de iniciar sesión:",
+              authError,
             );
-          }
-        }
+            setError("Error al cargar los datos de la sesión");
+          });
+        }, 0);
       } else if (event === "SIGNED_OUT") {
         setSession(null);
         setSupabaseUser(null);
@@ -308,6 +325,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setMemberships([]);
         setCurrentHouseholdId(null);
         localStorage.removeItem("currentHouseholdId");
+      } else if (event === "TOKEN_REFRESHED" && newSession) {
+        setSession(newSession);
+        setSupabaseUser(newSession.user);
+      } else if (event === "USER_UPDATED" && newSession) {
+        setSession(newSession);
+        setSupabaseUser(newSession.user);
+        window.setTimeout(() => {
+          void loadUserProfile(newSession.user.id).then((profile) => {
+            if (profile) {
+              setUser(profile);
+            }
+          });
+        }, 0);
+      } else if (event === "INITIAL_SESSION" && newSession?.user) {
+        // initSession() completa la hidratación; actualizar estos campos aquí
+        // evita un redirect prematuro mientras terminan las consultas.
+        setSession(newSession);
+        setSupabaseUser(newSession.user);
+      } else if (event === "INITIAL_SESSION" && !newSession) {
+        setSession(null);
+        setSupabaseUser(null);
       }
 
       setIsLoading(false);
