@@ -12,8 +12,12 @@ import {
   getCachedRecipeImage,
   cacheRecipeImage,
 } from "@/lib/recipe-image-cache";
+import { buildRecipeImagePrompt } from "@/lib/recipe-image-prompt";
+import { generateRecipeImageWithOpenAI } from "@/lib/openai-images";
 
-const PEXELS_SCORE_THRESHOLD = 30;
+// Un alt genérico como "food" sumaba 30 y podía asignar un plato incorrecto.
+// Para recetas se exige coincidencia semántica fuerte antes de reutilizar stock.
+const PEXELS_SCORE_THRESHOLD = 70;
 
 interface GenerateImageRequest {
   recipeName: string;
@@ -135,8 +139,13 @@ export async function POST(request: NextRequest) {
     });
 
     if (pexelsPhotos.length > 0) {
-      const bestPhoto = pexelsPhotos[0];
-      const score = scorePexelsMatch(bestPhoto, recipeName);
+      const rankedPhotos = pexelsPhotos
+        .map((photo) => ({
+          photo,
+          score: scorePexelsMatch(photo, recipeName),
+        }))
+        .sort((a, b) => b.score - a.score);
+      const { photo: bestPhoto, score } = rankedPhotos[0];
 
       logger.info(
         `[generate-recipe-image] Pexels score: ${score} para "${bestPhoto.alt}"`,
@@ -202,39 +211,40 @@ export async function POST(request: NextRequest) {
 
     const gemini = getGeminiClient();
 
-    const mealTypeContext = {
-      breakfast: "plato de desayuno",
-      lunch: "plato de almuerzo",
-      dinner: "plato de cena",
-    };
-
-    const typeContext = recipeType ? mealTypeContext[recipeType] : "plato";
-    const ingredientsContext = ingredients?.length
-      ? `Los ingredientes principales son: ${ingredients.slice(0, 5).join(", ")}.`
-      : "";
-
-    const prompt = `Genera una fotografía profesional de comida del siguiente plato:
-
-"${recipeName}"
-${recipeDescription ? `Descripción: ${recipeDescription}` : ""}
-${ingredientsContext}
-
-Requisitos de la imagen:
-- Estilo: Fotografía gastronómica profesional de alta calidad
-- Iluminación: Luz natural suave, difusa, estilo food photography
-- Presentación: Plato bellamente emplatado en vajilla elegante pero sencilla
-- Ángulo: Vista desde arriba o ángulo de 45 grados
-- Fondo: Mesa de madera o mármol con fondo desenfocado (bokeh)
-- Ambiente: Cocina hogareña colombiana/latinoamericana acogedora
-- El ${typeContext} debe verse apetitoso, fresco y casero
-- NO incluir texto, marcas de agua ni elementos artificiales
-- Colores vibrantes y naturales`;
+    const prompt = buildRecipeImagePrompt({
+      recipeName,
+      recipeDescription,
+      recipeType,
+      ingredients,
+    });
 
     let imageData: string | null = null;
     let textResponse: string | null = null;
+    let generatedSource: "openai" | "imagen3" = "imagen3";
+    let outputMimeType: "image/jpeg" | "image/png" = "image/png";
+
+    // GPT Image 2 es el proveedor de mayor fidelidad cuando hay llave configurada.
+    try {
+      const openAIImage = await generateRecipeImageWithOpenAI(prompt);
+      if (openAIImage) {
+        imageData = openAIImage.imageData;
+        generatedSource = "openai";
+        outputMimeType = openAIImage.mimeType;
+        logger.info("[generate-recipe-image] Imagen generada con OpenAI", {
+          model: openAIImage.model,
+        });
+      }
+    } catch (openAIError) {
+      logger.error("[generate-recipe-image] OpenAI error, usando respaldo", {
+        error:
+          openAIError instanceof Error
+            ? openAIError.message
+            : String(openAIError),
+      });
+    }
 
     // Intentar con Imagen 3 primero
-    try {
+    if (!imageData) try {
       logger.info("[generate-recipe-image] Generando imagen con Imagen 3...");
       const imagen3Response = await gemini.models.generateImages({
         model: GEMINI_MODELS.IMAGE_GEN,
@@ -316,7 +326,8 @@ Requisitos de la imagen:
       try {
         const timestamp = Date.now();
         const randomId = Math.random().toString(36).substring(7);
-        const fileName = `recipes/${timestamp}-${randomId}.png`;
+        const extension = outputMimeType === "image/jpeg" ? "jpg" : "png";
+        const fileName = `recipes/${timestamp}-${randomId}.${extension}`;
 
         const imageBuffer = Buffer.from(imageData, "base64");
 
@@ -324,7 +335,7 @@ Requisitos de la imagen:
         const { error: uploadError } = await storageClient.storage
           .from("recipe-images")
           .upload(fileName, imageBuffer, {
-            contentType: "image/png",
+            contentType: outputMimeType,
             upsert: false,
           });
 
@@ -366,15 +377,15 @@ Requisitos de la imagen:
       await cacheRecipeImage({
         recipeName,
         imageUrl,
-        source: "imagen3",
+        source: generatedSource,
       });
     }
 
     return NextResponse.json({
       success: true,
-      image: `data:image/png;base64,${imageData}`,
+      image: `data:${outputMimeType};base64,${imageData}`,
       imageUrl,
-      source: "imagen3",
+      source: generatedSource,
       fromCache: false,
       recipeName,
       message: textResponse,

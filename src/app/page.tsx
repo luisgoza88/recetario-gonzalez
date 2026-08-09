@@ -137,7 +137,7 @@ export default function Home() {
 
     if (type === "navigate" && p?.tab) {
       navigateToRecetario(
-        p.tab as "calendar" | "market" | "recipes" | "suggestions",
+        p.tab as "calendar" | "market" | "recipes" | "diets" | "suggestions",
       );
     } else if (type === "add_to_shopping_list") {
       // Navega al mercado; la lista se gestiona alli
@@ -256,6 +256,7 @@ export default function Home() {
                     | "calendar"
                     | "market"
                     | "recipes"
+                    | "diets"
                     | "suggestions"
                     | undefined,
                 )

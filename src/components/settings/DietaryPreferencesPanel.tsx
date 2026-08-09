@@ -216,8 +216,29 @@ export default function DietaryPreferencesPanel({
         preferences,
         avoid_ingredients: avoidIngredients,
         meal_plan: {
+          preset_id:
+            allowedGroups.length === 3 &&
+            allowedGroups.includes("pollo-aves") &&
+            allowedGroups.includes("pescado") &&
+            allowedGroups.includes("verduras") &&
+            carbTarget === "muy-bajo"
+              ? "pollo-pescado-verduras"
+              : "personalizado",
+          preset_name:
+            allowedGroups.length === 3 &&
+            allowedGroups.includes("pollo-aves") &&
+            allowedGroups.includes("pescado") &&
+            allowedGroups.includes("verduras") &&
+            carbTarget === "muy-bajo"
+              ? "Pollo, pescado y verduras"
+              : "Plan personalizado",
           allowed_groups: allowedGroups,
           excluded_groups: excludedGroups,
+          required_any_groups:
+            allowedGroups.includes("pollo-aves") &&
+            allowedGroups.includes("pescado")
+              ? ["pollo-aves", "pescado"]
+              : undefined,
           carb_target: carbTarget,
           meal_types: mealTypes,
           max_difficulty: maxDifficulty || undefined,

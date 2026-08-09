@@ -52,8 +52,13 @@ export function scorePexelsMatch(
   photo: PexelsPhoto,
   recipeName: string,
 ): number {
-  const alt = (photo.alt || "").toLowerCase();
-  const name = recipeName.toLowerCase();
+  const normalize = (value: string) =>
+    value
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+  const alt = normalize(photo.alt || "");
+  const name = normalize(recipeName);
 
   let score = 0;
   if (
@@ -65,7 +70,10 @@ export function scorePexelsMatch(
     score += 30;
   }
 
-  const nameWords = name.split(/\s+/).filter((w) => w.length > 3);
+  const stopWords = new Set(["para", "sobre", "estilo", "receta", "thermomix"]);
+  const nameWords = name
+    .split(/\s+/)
+    .filter((word) => word.length > 3 && !stopWords.has(word));
   for (const word of nameWords) {
     if (alt.includes(word)) score += 20;
   }

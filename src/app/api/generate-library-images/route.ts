@@ -7,38 +7,56 @@ import {
   createStorageAdminClient,
 } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
+import { buildRecipeImagePrompt } from "@/lib/recipe-image-prompt";
+import { generateRecipeImageWithOpenAI } from "@/lib/openai-images";
 
 // Generate food photography prompt for a dish
 function generatePrompt(dish: DishForLibrary): string {
-  const ingredientsContext =
-    dish.key_ingredients.length > 0
-      ? `Key visible ingredients: ${dish.key_ingredients.slice(0, 5).join(", ")}.`
-      : "";
-
-  return `Generate a professional food photograph of:
-
-"${dish.name_en}" (${dish.name_es})
-${dish.description_en}
-${ingredientsContext}
-
-Requirements:
-- Style: Professional food photography, high quality, appetizing
-- Lighting: Soft natural light, diffused, food photography style
-- Presentation: Beautifully plated on elegant but simple dinnerware
-- Angle: 45-degree angle or overhead shot
-- Background: Wooden table or marble with soft bokeh
-- The dish should look fresh, homemade, and delicious
-- NO text, watermarks, or artificial elements
-- Vibrant, natural colors`;
+  return buildRecipeImagePrompt({
+    recipeName: `${dish.name_es} (${dish.name_en})`,
+    recipeDescription: dish.description_en,
+    recipeType:
+      dish.category === "breakfast"
+        ? "breakfast"
+        : dish.category === "dinner"
+          ? "dinner"
+          : "lunch",
+    ingredients: dish.key_ingredients,
+  });
 }
 
 // Generate a single image
 async function generateImage(
   dish: DishForLibrary,
-): Promise<{ success: boolean; imageData?: string; error?: string }> {
+): Promise<{
+  success: boolean;
+  imageData?: string;
+  mimeType?: "image/jpeg" | "image/png";
+  source?: "openai" | "imagen3";
+  error?: string;
+}> {
   try {
     const gemini = getGeminiClient();
     const prompt = generatePrompt(dish);
+
+    try {
+      const openAIImage = await generateRecipeImageWithOpenAI(prompt);
+      if (openAIImage) {
+        return {
+          success: true,
+          imageData: openAIImage.imageData,
+          mimeType: openAIImage.mimeType,
+          source: "openai",
+        };
+      }
+    } catch (openAIError) {
+      logger.error(`OpenAI failed for ${dish.name_en}`, {
+        error:
+          openAIError instanceof Error
+            ? openAIError.message
+            : String(openAIError),
+      });
+    }
 
     // Try Imagen 3 first
     try {
@@ -54,7 +72,12 @@ async function generateImage(
 
       const generatedImage = imagen3Response.generatedImages?.[0];
       if (generatedImage?.image?.imageBytes) {
-        return { success: true, imageData: generatedImage.image.imageBytes };
+        return {
+          success: true,
+          imageData: generatedImage.image.imageBytes,
+          mimeType: "image/png",
+          source: "imagen3",
+        };
       }
     } catch (imagen3Error) {
       logger.error(`Imagen 3 failed for ${dish.name_en}`, {
@@ -77,7 +100,12 @@ async function generateImage(
       if (parts) {
         for (const part of parts) {
           if (part.inlineData) {
-            return { success: true, imageData: part.inlineData.data as string };
+            return {
+              success: true,
+              imageData: part.inlineData.data as string,
+              mimeType: "image/png",
+              source: "imagen3",
+            };
           }
         }
       }
@@ -137,7 +165,9 @@ export async function GET(request: NextRequest) {
       stats: dishStats,
       existingImages: existingImages?.length || 0,
       remainingDishes: remainingDishes.length,
-      estimatedCost: `$${(remainingDishes.length * 0.035).toFixed(2)}`,
+      estimatedCost: `$${(
+        remainingDishes.length * (process.env.OPENAI_API_KEY ? 0.041 : 0.035)
+      ).toFixed(2)}`,
       byCuisine,
       byCategory,
       nextBatch: remainingDishes.slice(0, 10).map((d) => ({
@@ -230,14 +260,16 @@ export async function POST(request: NextRequest) {
         // Upload to Supabase Storage
         const timestamp = Date.now();
         const randomId = Math.random().toString(36).substring(7);
-        const fileName = `library/${dish.cuisine_type}/${timestamp}-${randomId}.png`;
+        const mimeType = imageResult.mimeType ?? "image/png";
+        const extension = mimeType === "image/jpeg" ? "jpg" : "png";
+        const fileName = `library/${dish.cuisine_type}/${timestamp}-${randomId}.${extension}`;
 
         const imageBuffer = Buffer.from(imageResult.imageData, "base64");
 
         const { error: uploadError } = await storageClient.storage
           .from("recipe-images")
           .upload(fileName, imageBuffer, {
-            contentType: "image/png",
+            contentType: mimeType,
             upsert: false,
           });
 
@@ -317,7 +349,8 @@ export async function POST(request: NextRequest) {
     }
 
     const successCount = results.filter((r) => r.success).length;
-    const totalCost = successCount * 0.035;
+    const totalCost =
+      successCount * (process.env.OPENAI_API_KEY ? 0.041 : 0.035);
 
     return NextResponse.json({
       success: true,

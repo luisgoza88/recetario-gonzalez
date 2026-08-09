@@ -494,8 +494,44 @@ export function hasActiveDietPlan(plan?: DietaryMealPlan | null): boolean {
       plan.meal_types?.length ||
       plan.max_difficulty ||
       plan.max_total_time ||
-      plan.colombia_easy_only,
+      plan.colombia_easy_only ||
+      plan.required_any_groups?.length ||
+      plan.min_protein ||
+      plan.max_sodium ||
+      plan.preset_id,
   );
+}
+
+const VEGETARIAN_EXCLUDED = new Set<DietaryIngredientGroup>([
+  "pollo-aves",
+  "pescado",
+  "mariscos",
+  "res",
+  "cerdo",
+  "otras-carnes",
+]);
+
+const VEGAN_EXCLUDED = new Set<DietaryIngredientGroup>([
+  ...VEGETARIAN_EXCLUDED,
+  "huevos",
+  "lacteos",
+]);
+
+const GLUTEN_PATTERNS = [
+  /\btrigo\b/,
+  /\bharina(?!\s+de\s+(arroz|maiz|almendra|coco|yuca))/,
+  /\bpan\b/,
+  /\bpasta\b/,
+  /\bcebada\b/,
+  /\bcenteno\b/,
+  /\bcuscus\b/,
+  /\bcouscous\b/,
+  /\bbulgur\b/,
+  /\bseitan\b/,
+];
+
+function ingredientText(recipe: Recipe): string {
+  return normalize((recipe.ingredients ?? []).map((item) => item.name).join(" "));
 }
 
 function carbLimitFor(target?: CarbTarget): number | null {
@@ -517,6 +553,73 @@ export function analyzeRecipeForDiet(
   const practicality = assessRecipePracticality(recipe);
   const carbsPerServing =
     typeof recipe.nutrition?.carbs === "number" ? recipe.nutrition.carbs : null;
+  const normalizedRestrictions = new Set(
+    (preferences?.restrictions ?? []).map(normalize),
+  );
+  const normalizedAllergies = (preferences?.allergies ?? []).map(normalize);
+  const ingredientsText = ingredientText(recipe);
+
+  const conflictsWith = (
+    restricted: Set<DietaryIngredientGroup>,
+    label: string,
+  ) => {
+    for (const group of groups) {
+      if (restricted.has(group)) {
+        reasons.push(
+          `${label}: contiene ${groupLabel(group).toLocaleLowerCase("es")}`,
+        );
+      }
+    }
+  };
+
+  if (normalizedRestrictions.has("vegetariano")) {
+    conflictsWith(VEGETARIAN_EXCLUDED, "No es vegetariana");
+  }
+  if (normalizedRestrictions.has("vegano")) {
+    conflictsWith(VEGAN_EXCLUDED, "No es vegana");
+  }
+  if (normalizedRestrictions.has("pescetariano")) {
+    conflictsWith(
+      new Set<DietaryIngredientGroup>([
+        "pollo-aves",
+        "res",
+        "cerdo",
+        "otras-carnes",
+      ]),
+      "No es pescetariana",
+    );
+  }
+  if (
+    normalizedRestrictions.has("sin-lactosa") &&
+    groupSet.has("lacteos") &&
+    !recipe.dietary_tags?.includes("sin-lactosa")
+  ) {
+    reasons.push("Contiene lácteos o requiere confirmar que sean sin lactosa");
+  }
+  if (
+    normalizedRestrictions.has("sin-gluten") &&
+    !recipe.dietary_tags?.includes("sin-gluten")
+  ) {
+    if (GLUTEN_PATTERNS.some((pattern) => pattern.test(ingredientsText))) {
+      reasons.push("Contiene una fuente probable de gluten");
+    } else {
+      reviewReasons.push("Falta confirmar contaminación cruzada o gluten oculto");
+    }
+  }
+
+  const allergyGroups: Record<string, DietaryIngredientGroup> = {
+    mariscos: "mariscos",
+    huevos: "huevos",
+    lacteos: "lacteos",
+  };
+  for (const allergy of normalizedAllergies) {
+    const allergyGroup = allergyGroups[allergy];
+    if (allergyGroup && groupSet.has(allergyGroup)) {
+      reasons.push(`Contiene el alérgeno indicado: ${groupLabel(allergyGroup)}`);
+    } else if (allergy && ingredientsText.includes(allergy)) {
+      reasons.push(`Contiene el alérgeno indicado: ${allergy}`);
+    }
+  }
 
   for (const excluded of plan?.excluded_groups ?? []) {
     if (groupSet.has(excluded)) {
@@ -538,19 +641,25 @@ export function analyzeRecipeForDiet(
     if (!hasAllowedMainGroup && disallowedDetected.length === 0) {
       reviewReasons.push("No se pudo identificar un grupo principal permitido");
     }
-    const allowedProteins = [...allowed].filter((group) =>
-      PROTEIN_GROUPS.has(group),
+  }
+
+  const explicitRequiredAny = plan?.required_any_groups;
+  const requiredAny =
+    explicitRequiredAny ??
+    [...allowed].filter((group) => PROTEIN_GROUPS.has(group));
+  if (
+    requiredAny.length > 0 &&
+    !groups.some((group) => requiredAny.includes(group))
+  ) {
+    reasons.push(
+      explicitRequiredAny
+        ? `Debe contener al menos uno de estos grupos: ${requiredAny
+            .map(groupLabel)
+            .join(" o ")}`
+        : `Debe contener al menos una proteína permitida: ${requiredAny
+            .map(groupLabel)
+            .join(" o ")}`,
     );
-    if (
-      allowedProteins.length > 0 &&
-      !groups.some((group) => allowedProteins.includes(group))
-    ) {
-      reasons.push(
-        `Debe contener al menos una proteína permitida: ${allowedProteins
-          .map(groupLabel)
-          .join(" o ")}`,
-      );
-    }
   }
 
   const normalizedAvoided = (preferences?.avoid_ingredients ?? []).map(normalize);
@@ -612,6 +721,28 @@ export function analyzeRecipeForDiet(
 
   if (plan?.colombia_easy_only && practicality.colombiaAvailability !== "comun") {
     reasons.push("Incluye ingredientes de disponibilidad variable en Colombia");
+  }
+
+  if (plan?.min_protein) {
+    const protein = recipe.nutrition?.protein;
+    if (typeof protein === "number" && protein < plan.min_protein) {
+      reasons.push(
+        `Tiene ${protein} g de proteína por porción (mínimo ${plan.min_protein} g)`,
+      );
+    } else if (typeof protein !== "number") {
+      reviewReasons.push("Falta confirmar la proteína por porción");
+    }
+  }
+
+  if (plan?.max_sodium) {
+    const sodium = recipe.nutrition?.sodium;
+    if (typeof sodium === "number" && sodium > plan.max_sodium) {
+      reasons.push(
+        `Tiene ${sodium} mg de sodio por porción (máximo ${plan.max_sodium} mg)`,
+      );
+    } else if (typeof sodium !== "number") {
+      reviewReasons.push("Falta confirmar el sodio por porción");
+    }
   }
 
   return {

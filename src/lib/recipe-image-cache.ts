@@ -14,7 +14,7 @@ export function normalizeRecipeName(name: string): string {
 
 export interface CachedRecipeImage {
   image_url: string;
-  source: "pexels" | "unsplash" | "imagen3" | "manual";
+  source: "pexels" | "unsplash" | "imagen3" | "openai" | "manual";
   attribution: string | null;
   attribution_url: string | null;
 }
@@ -124,7 +124,7 @@ export async function getRecipeImageHybrid(
 export async function cacheRecipeImage(params: {
   recipeName: string;
   imageUrl: string;
-  source: "pexels" | "unsplash" | "imagen3" | "manual";
+  source: "pexels" | "unsplash" | "imagen3" | "openai" | "manual";
   attribution?: string;
   attributionUrl?: string;
 }): Promise<void> {

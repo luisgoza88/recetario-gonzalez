@@ -6,6 +6,7 @@ import { withRateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/api/auth";
 import { logger } from "@/lib/logger";
 import type { ThermomixRecipe } from "@/types";
+import { validateThermomixRecipe } from "@/lib/thermomix-validation";
 
 // =====================================================
 // Input validation
@@ -25,18 +26,58 @@ const AdaptRecipeRequestSchema = z.object({
 // resto (speed, temperature, time, accessory, totalTimeMinutes, etc.) sin
 // imponer un esquema rigido. Generoso con opcionales para no rechazar
 // respuestas validas.
-const ThermomixStepSchema = z
-  .object({
-    description: z.string().optional(),
-    stepNumber: z.union([z.number(), z.string()]).optional(),
-  })
-  .passthrough();
+const ThermomixStepSchema = z.object({
+  description: z.string().min(3),
+  stepNumber: z.number().int().positive(),
+  speed: z.string().min(1),
+  temperature: z.string().min(1),
+  time: z.string().min(1),
+  accessory: z.enum([
+    "cuchilla",
+    "mariposa",
+    "cestillo",
+    "varoma",
+    "cubrecuchillas",
+    "protector-antisalpicaduras",
+    "vaso-medidor",
+    "espatula",
+    "ninguno",
+  ]),
+  accessoryEmoji: z.string().min(1),
+  tip: z.string().optional(),
+  mode: z
+    .enum([
+      "manual",
+      "triturar",
+      "turbo",
+      "amasar",
+      "coccion-lenta",
+      "sous-vide",
+      "fermentar",
+      "espesar",
+      "hervidor",
+      "cocinar-arroz",
+      "cocer-huevos",
+      "prelavado",
+      "vapor",
+    ])
+    .optional(),
+  reverse: z.boolean().optional(),
+});
 
-const ThermomixRecipeOutputSchema = z
-  .object({
-    thermomixSteps: z.array(ThermomixStepSchema).min(1),
-  })
-  .passthrough();
+const ThermomixRecipeOutputSchema = z.object({
+  name: z.string().min(1),
+  thermomixSteps: z.array(ThermomixStepSchema).min(2).max(20),
+  totalTimeMinutes: z.number().positive(),
+  manualTimeMinutes: z.number().positive(),
+  timeSaved: z.string(),
+  difficulty: z.enum(["fácil", "media", "avanzada"]),
+  accessories: z.array(z.string()),
+  tips: z.array(z.string()),
+  vasoPrincipal: z.boolean(),
+  varoma: z.boolean(),
+  cestillo: z.boolean(),
+});
 
 // =====================================================
 // POST handler
@@ -127,6 +168,20 @@ export async function POST(request: NextRequest) {
         );
       }
       thermomixRecipe = parsed.data as unknown as ThermomixRecipe;
+      const validation = validateThermomixRecipe(thermomixRecipe);
+      if (!validation.valid) {
+        logger.error("AI Thermomix adaptation failed safety validation", {
+          errors: validation.errors.slice(0, 8),
+        });
+        return NextResponse.json(
+          {
+            error:
+              "La adaptación no pasó las validaciones de seguridad de Thermomix",
+          },
+          { status: 502 },
+        );
+      }
+      thermomixRecipe.qualityWarnings = validation.warnings;
     } catch (parseError) {
       logger.error("JSON parse error for Thermomix adaptation", {
         error:
@@ -182,15 +237,20 @@ ${originalSteps.map((s, i) => `${i + 1}. ${s}`).join("\n")}
 
 REGLAS THERMOMIX TM6:
 - Capacidad vaso principal: 2.2L máximo
-- Velocidades: 1 a 10, Turbo (pulsos cortos), Spátula (velocidad cuchara, giro inverso)
-- Temperaturas: 37°C a 120°C, Varoma (aprox 120°C con vapor), o "Sin temp" si no calienta
-- Accesorios: Cuchilla (🔪), Mariposa (🦋), Cestillo (🧺), Varoma (🫕)
+- Velocidades manuales: 0.5 a 10, Turbo (pulsos cortos), Cuchara o Amasar
+- "Giro inverso" NO es una velocidad: indícalo con reverse: true
+- Temperaturas manuales: 37°C a 120°C, Varoma, o "Sin temp" si no calienta
+- Nunca inventes Alta Temperatura ni Puntos del azúcar: son modos cerrados de Cocina Guiada
+- Accesorios válidos: cuchilla, mariposa, cestillo, varoma, cubrecuchillas, protector-antisalpicaduras, vaso-medidor, espatula, ninguno
+- Mariposa: nunca superar velocidad 4 e indicar claramente cuándo ponerla o retirarla
+- Varoma: indicar el líquido del vaso; como referencia de seguridad, al menos 250 ml por cada 15 min de vapor
 - Si necesita lavar el vaso entre pasos, agrégalo como paso
 - Velocidad progresiva para triturar: ir subiendo 5→7→9
 - Mariposa: para montar claras, nata, mezclas suaves
 - Cestillo: para cocinar al vapor dentro del vaso, colar, escurrir
 - Varoma: para cocinar al vapor encima del vaso (dos bandejas)
-- Giro inverso (spátula): para sofritos sin triturar
+- Giro inverso + velocidad Cuchara: para mover preparaciones delicadas sin triturarlas
+- Los modos automáticos permitidos en esta guía son: manual, triturar, turbo, amasar, coccion-lenta, sous-vide, fermentar, espesar, hervidor, cocinar-arroz, cocer-huevos, prelavado y vapor
 
 FORMATO DE RESPUESTA - JSON ESTRICTO:
 {
@@ -204,6 +264,8 @@ FORMATO DE RESPUESTA - JSON ESTRICTO:
       "time": "10 seg",
       "accessory": "cuchilla",
       "accessoryEmoji": "🔪",
+      "mode": "manual",
+      "reverse": false,
       "tip": "Tip opcional (solo si agrega valor)"
     }
   ],
@@ -220,6 +282,7 @@ FORMATO DE RESPUESTA - JSON ESTRICTO:
 
 IMPORTANTE:
 - Cada paso debe ser claro y específico para Thermomix
+- Cada paso debe indicar exactamente tiempo, temperatura, velocidad, modo, giro y accesorio
 - Incluye pasos de preparación (pelar, cortar lo que no cabe en vaso)
 - Incluye pasos de limpieza del vaso si se necesita entre preparaciones
 - El tiempo total debe ser REALISTA para Thermomix

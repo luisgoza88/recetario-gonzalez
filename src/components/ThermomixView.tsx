@@ -17,8 +17,9 @@ import {
   Maximize2,
   Minimize2,
   Sparkles,
+  AlertTriangle,
 } from "lucide-react";
-import type { ThermomixRecipe, ThermomixStep } from "@/types";
+import type { ThermomixRecipe } from "@/types";
 
 // =====================================================
 // Accessory emoji map
@@ -42,6 +43,26 @@ const ACCESSORY_INFO: Record<
     emoji: "🫕",
     name: "Varoma",
     color: "bg-orange-100 text-orange-700",
+  },
+  cubrecuchillas: {
+    emoji: "🛡️",
+    name: "Cubrecuchillas",
+    color: "bg-sky-100 text-sky-700",
+  },
+  "protector-antisalpicaduras": {
+    emoji: "⭕",
+    name: "Protector antisalpicaduras",
+    color: "bg-cyan-100 text-cyan-700",
+  },
+  "vaso-medidor": {
+    emoji: "🥛",
+    name: "Vaso medidor",
+    color: "bg-blue-100 text-blue-700",
+  },
+  espatula: {
+    emoji: "🥄",
+    name: "Espátula",
+    color: "bg-lime-100 text-lime-700",
   },
   ninguno: {
     emoji: "✋",
@@ -301,6 +322,16 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
                 Vel <strong>{step.speed}</strong>
               </span>
             </div>
+            {step.mode && step.mode !== "manual" && (
+              <div className="rounded-xl bg-emerald-400/15 px-4 py-2 font-semibold text-emerald-300">
+                Modo {step.mode.replaceAll("-", " ")}
+              </div>
+            )}
+            {step.reverse && (
+              <div className="rounded-xl bg-violet-400/15 px-4 py-2 font-semibold text-violet-300">
+                ↺ Giro inverso
+              </div>
+            )}
             <div className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2">
               <Thermometer size={18} className="text-red-400" />
               <span className="tabular-nums">{step.temperature}</span>
@@ -557,6 +588,12 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
                     <SpecChip icon={<Zap size={10} />}>
                       Vel {step.speed}
                     </SpecChip>
+                    {step.mode && step.mode !== "manual" && (
+                      <SpecChip accent>
+                        {step.mode.replaceAll("-", " ")}
+                      </SpecChip>
+                    )}
+                    {step.reverse && <SpecChip accent>↺ inverso</SpecChip>}
                   </div>
                 </div>
 
@@ -642,6 +679,19 @@ export default function ThermomixView({ recipe, onClose }: ThermomixViewProps) {
               .
             </p>
           </div>
+
+          {recipe.qualityWarnings && recipe.qualityWarnings.length > 0 && (
+            <div className="rounded-xl border border-orange-200 bg-orange-50 p-3">
+              <div className="flex items-center gap-2 text-xs font-semibold text-orange-900">
+                <AlertTriangle size={14} /> Revisión antes de cocinar
+              </div>
+              <ul className="mt-2 space-y-1 text-[11px] leading-relaxed text-orange-800">
+                {recipe.qualityWarnings.slice(0, 3).map((warning) => (
+                  <li key={warning}>• {warning}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* Tips footer */}

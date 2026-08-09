@@ -4,9 +4,8 @@ import CalendarView from "../CalendarView";
 import MarketView from "../MarketView";
 import RecipesView from "../RecipesView";
 import SuggestionsPanel from "../SuggestionsPanel";
-import { Recipe, MarketItem } from "@/types";
-
-type RecetarioTab = "calendar" | "market" | "recipes" | "suggestions";
+import DietsView from "../DietsView";
+import type { Recipe, MarketItem, RecetarioTab } from "@/types";
 
 interface RecetarioSectionProps {
   activeTab: RecetarioTab;
@@ -25,12 +24,13 @@ export default function RecetarioSection({
   onUpdate,
 }: RecetarioSectionProps) {
   // Handler para navegación desde SuggestionsPanel
-  const handleNavigateFromSuggestions = (tab: string, mode?: string) => {
+  const handleNavigateFromSuggestions = (tab: string) => {
     // Navegar al tab correspondiente
     if (
       tab === "calendar" ||
       tab === "market" ||
       tab === "recipes" ||
+      tab === "diets" ||
       tab === "suggestions"
     ) {
       onTabChange(tab as RecetarioTab);
@@ -53,6 +53,15 @@ export default function RecetarioSection({
           <RecipesView
             recipes={recipes}
             onUpdate={onUpdate}
+            onOpenCalendar={() => onTabChange("calendar")}
+            onOpenDiets={() => onTabChange("diets")}
+          />
+        )}
+
+        {activeTab === "diets" && (
+          <DietsView
+            recipes={recipes}
+            onOpenRecipes={() => onTabChange("recipes")}
             onOpenCalendar={() => onTabChange("calendar")}
           />
         )}

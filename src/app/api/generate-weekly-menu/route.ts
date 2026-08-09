@@ -166,8 +166,9 @@ function validateGeneratedMenuDiet(
         );
       } else if (
         analysis.status === "review" &&
-        plan?.carb_target &&
-        plan.carb_target !== "sin-limite"
+        ((plan?.carb_target && plan.carb_target !== "sin-limite") ||
+          plan?.min_protein ||
+          plan?.max_sodium)
       ) {
         violations.push(
           `Día ${dayIndex + 1}, ${mealType}: ${analysis.reviewReasons.join("; ")}`,
@@ -680,6 +681,7 @@ function buildDietarySection(prefs?: DietaryPreferencesRow | null): string {
 
   const allowedGroups = (plan?.allowed_groups ?? []).map(groupLabel);
   const excludedGroups = (plan?.excluded_groups ?? []).map(groupLabel);
+  const requiredGroups = (plan?.required_any_groups ?? []).map(groupLabel);
   const mealLabels: Record<string, string> = {
     breakfast: "desayuno",
     lunch: "almuerzo",
@@ -694,10 +696,14 @@ function buildDietarySection(prefs?: DietaryPreferencesRow | null): string {
   const planLines = hasActiveDietPlan(plan)
     ? `
 PLAN ALIMENTARIO CONFIGURADO (REGLAS ESTRICTAS):
+- Plan elegido: ${plan?.preset_name || plan?.preset_id || "Personalizado"}
 - Aplicar a: ${planMeals}
 - Únicos grupos principales permitidos: ${allowedGroups.join(", ") || "sin lista cerrada"}
 - Grupos excluidos: ${excludedGroups.join(", ") || "ninguno adicional"}
+- La receta debe contener al menos uno de estos grupos: ${requiredGroups.join(", ") || "sin requisito adicional"}
 - Carbohidratos: ${carbTarget ? `${carbTarget.label} — ${carbTarget.description}` : "sin límite específico"}
+- Proteína mínima por porción: ${plan?.min_protein ? `${plan.min_protein} g` : "sin mínimo"}
+- Sodio máximo por porción: ${plan?.max_sodium ? `${plan.max_sodium} mg` : "sin máximo"}
 - Dificultad máxima: ${plan?.max_difficulty || "sin límite"}
 - Tiempo máximo por receta: ${plan?.max_total_time ? `${plan.max_total_time} minutos` : "sin límite"}
 - Disponibilidad en Colombia: ${plan?.colombia_easy_only ? "usar únicamente ingredientes comunes y fáciles de conseguir" : "se permiten ingredientes de disponibilidad variable"}

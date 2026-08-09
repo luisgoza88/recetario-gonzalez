@@ -14,6 +14,7 @@ import DayProgress from "./DayProgress";
 import RecipeModal from "@/components/RecipeModal";
 import ThermomixView from "@/components/ThermomixView";
 import { findThermomixRecipe } from "@/data/thermomix-recipes";
+import { attachThermomixQualityWarnings } from "@/lib/thermomix-validation";
 
 // =====================================================
 // Types
@@ -367,7 +368,7 @@ export default function YolimaView() {
     if (!recipe) return;
     const tmRecipe = findThermomixRecipe(recipe.name);
     if (tmRecipe) {
-      setThermomixRecipe(tmRecipe);
+      setThermomixRecipe(attachThermomixQualityWarnings(tmRecipe));
     }
   };
 

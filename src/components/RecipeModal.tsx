@@ -38,6 +38,7 @@ import {
   representativeQuantity,
 } from "@/lib/portions";
 import { usePortionsConfig } from "@/lib/stores/useHouseholdStore";
+import { attachThermomixQualityWarnings } from "@/lib/thermomix-validation";
 // findThermomixRecipe is loaded lazily inside the handler to avoid 40KB in initial bundle
 
 /**
@@ -106,8 +107,9 @@ export default function RecipeModal({
     const { findThermomixRecipe } = await import("@/data/thermomix-recipes");
     const libraryRecipe = findThermomixRecipe(recipe.name);
     if (libraryRecipe) {
-      thermomixCache.set(cacheKey, libraryRecipe);
-      setThermomixRecipe(libraryRecipe);
+      const checkedRecipe = attachThermomixQualityWarnings(libraryRecipe);
+      thermomixCache.set(cacheKey, checkedRecipe);
+      setThermomixRecipe(checkedRecipe);
       setShowThermomix(true);
       return;
     }

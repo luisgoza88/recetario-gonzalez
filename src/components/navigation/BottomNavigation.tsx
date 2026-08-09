@@ -9,11 +9,12 @@ import {
   BookOpen,
   Lightbulb,
   Sun,
+  Salad,
 } from "lucide-react";
 import SmartFAB, { FABAction } from "./SmartFAB";
+import type { RecetarioTab } from "@/types";
 
 type MainSection = "hoy" | "recetario" | "hogar" | "ajustes";
-type RecetarioTab = "calendar" | "market" | "recipes" | "suggestions";
 
 interface BottomNavigationProps {
   activeSection: MainSection;
@@ -49,7 +50,8 @@ const RECETARIO_TABS: {
   { id: "calendar", label: "Calendario", icon: <Calendar size={16} /> },
   { id: "market", label: "Mercado", icon: <ShoppingCart size={16} /> },
   { id: "recipes", label: "Recetas", icon: <BookOpen size={16} /> },
-  { id: "suggestions", label: "Sugerencias", icon: <Lightbulb size={16} /> },
+  { id: "diets", label: "Dietas", icon: <Salad size={16} /> },
+  { id: "suggestions", label: "Ideas", icon: <Lightbulb size={16} /> },
 ];
 
 export default function BottomNavigation({

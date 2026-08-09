@@ -402,6 +402,10 @@ export type DietaryIngredientGroup =
 export type CarbTarget = "sin-limite" | "moderado" | "bajo" | "muy-bajo";
 
 export interface DietaryMealPlan {
+  /** Identificador del plan elegido desde la sección Dietas. */
+  preset_id?: DietPresetId | "personalizado";
+  /** Nombre visible; permite conservar planes personalizados. */
+  preset_name?: string;
   /** Si tiene valores, solo se admiten estos grupos principales. */
   allowed_groups?: DietaryIngredientGroup[];
   /** Grupos que nunca deben aparecer, aunque estén permitidos por otra regla. */
@@ -412,7 +416,24 @@ export interface DietaryMealPlan {
   max_difficulty?: RecipeDifficulty;
   max_total_time?: number;
   colombia_easy_only?: boolean;
+  /** Al menos uno de estos grupos debe aparecer en la receta. */
+  required_any_groups?: DietaryIngredientGroup[];
+  /** Umbrales nutricionales por porción cuando la receta tiene datos. */
+  min_protein?: number;
+  max_sodium?: number;
 }
+
+export type DietPresetId =
+  | "pollo-pescado-verduras"
+  | "mediterranea"
+  | "pescetariana"
+  | "vegetariana"
+  | "vegana"
+  | "bajo-carbohidrato"
+  | "keto"
+  | "paleo"
+  | "alta-proteina"
+  | "dash";
 
 export interface Household {
   id: string;
@@ -669,7 +690,12 @@ export interface BudgetSummary {
 // =====================================================
 
 export type MainSection = "hoy" | "recetario" | "hogar" | "ajustes";
-export type RecetarioTab = "calendar" | "market" | "recipes" | "suggestions";
+export type RecetarioTab =
+  | "calendar"
+  | "market"
+  | "recipes"
+  | "diets"
+  | "suggestions";
 
 export interface FABAction {
   id: string;
@@ -1106,7 +1132,30 @@ export interface AIGuardrails {
 // =====================================================
 
 export type ThermomixAccessory =
-  "cuchilla" | "mariposa" | "cestillo" | "varoma" | "ninguno";
+  | "cuchilla"
+  | "mariposa"
+  | "cestillo"
+  | "varoma"
+  | "cubrecuchillas"
+  | "protector-antisalpicaduras"
+  | "vaso-medidor"
+  | "espatula"
+  | "ninguno";
+
+export type ThermomixMode =
+  | "manual"
+  | "triturar"
+  | "turbo"
+  | "amasar"
+  | "coccion-lenta"
+  | "sous-vide"
+  | "fermentar"
+  | "espesar"
+  | "hervidor"
+  | "cocinar-arroz"
+  | "cocer-huevos"
+  | "prelavado"
+  | "vapor";
 
 export type ThermomixDifficulty = "fácil" | "media" | "avanzada";
 
@@ -1119,6 +1168,8 @@ export interface ThermomixStep {
   accessory: ThermomixAccessory;
   accessoryEmoji: string; // 🔪🦋🧺🫕
   tip?: string; // Tip opcional de Thermomix
+  mode?: ThermomixMode;
+  reverse?: boolean;
 }
 
 export interface ThermomixRecipe {
@@ -1134,6 +1185,8 @@ export interface ThermomixRecipe {
   vasoPrincipal: boolean;
   varoma: boolean;
   cestillo: boolean;
+  /** Alertas de seguridad o de datos incompletos calculadas por la aplicación. */
+  qualityWarnings?: string[];
 }
 
 // =====================================================

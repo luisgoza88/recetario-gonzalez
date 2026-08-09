@@ -41,6 +41,7 @@ import {
   analyzeRecipeForDiet,
   hasActiveDietPlan,
 } from "@/lib/recipe-diet";
+import { mergeRecipeCatalog } from "@/lib/recipe-catalog";
 
 const RecipeModal = dynamic(() => import("./RecipeModal"), {
   loading: () => null,
@@ -55,6 +56,7 @@ interface RecipesViewProps {
   recipes: Recipe[];
   onUpdate: () => void;
   onOpenCalendar: () => void;
+  onOpenDiets: () => void;
 }
 
 // Category filter options
@@ -66,7 +68,6 @@ const CATEGORY_FILTERS: Array<{
   { key: "all", label: "Todas", icon: "📋" },
   { key: "colombiana", label: "Colombiana", icon: "🇨🇴" },
   { key: "rapida", label: "Rápida", icon: "⚡" },
-  { key: "thermomix", label: "Thermomix", icon: "🤖" },
   { key: "fitness", label: "Fitness", icon: "💪" },
   { key: "internacional", label: "Internacional", icon: "🍝" },
   { key: "meal-prep", label: "Meal Prep", icon: "🥘" },
@@ -120,6 +121,7 @@ export default function RecipesView({
   recipes,
   onUpdate,
   onOpenCalendar,
+  onOpenDiets,
 }: RecipesViewProps) {
   const toast = useToast();
   const householdId = useHouseholdId();
@@ -188,6 +190,7 @@ export default function RecipesView({
   const [dietFilter, setDietFilter] = useState<
     "all" | "compatible" | "review"
   >("all");
+  const [showMoodFilters, setShowMoodFilters] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -222,42 +225,10 @@ export default function RecipesView({
   }, []);
 
   // Combine DB recipes with expanded recipes and regional recipes (avoiding id duplicates)
-  const allRecipes = useMemo(() => {
-    const dbIds = new Set(recipes.map((r) => r.id));
-
-    const mapExpandedToRecipe = (
-      er: ExpandedRecipe | RegionalRecipe,
-    ): Recipe => ({
-      id: er.id,
-      name: er.name,
-      type: er.type,
-      portions: er.portions,
-      ingredients: er.ingredients,
-      steps: er.steps,
-      prep_time: er.prep_time,
-      cook_time: er.cook_time,
-      total_time: (er as RegionalRecipe).total_time,
-      category: er.category,
-      region: (er as RegionalRecipe).region,
-      thermomixCompatible: er.thermomixCompatible,
-      tags: er.tags,
-      nutrition: (er as RegionalRecipe).nutrition,
-      difficulty: (er as RegionalRecipe).difficulty,
-      dietary_tags: (er as RegionalRecipe).dietary_tags,
-      description: (er as RegionalRecipe).description,
-      source: "manual" as const,
-    });
-
-    const expandedAsRecipes: Recipe[] = expandedRecipes
-      .filter((er) => !dbIds.has(er.id))
-      .map(mapExpandedToRecipe);
-
-    const regionalAsRecipes: Recipe[] = regionalRecipes
-      .filter((rr) => !dbIds.has(rr.id))
-      .map(mapExpandedToRecipe);
-
-    return [...recipes, ...expandedAsRecipes, ...regionalAsRecipes];
-  }, [recipes, expandedRecipes, regionalRecipes]);
+  const allRecipes = useMemo(
+    () => mergeRecipeCatalog(recipes, expandedRecipes, regionalRecipes),
+    [recipes, expandedRecipes, regionalRecipes],
+  );
 
   const dietPlanActive = hasActiveDietPlan(dietaryPreferences?.meal_plan);
 
@@ -536,7 +507,32 @@ export default function RecipesView({
           >
             Crear menú semanal con estas reglas
           </button>
+          <button
+            type="button"
+            onClick={onOpenDiets}
+            className="mt-2 w-full rounded-xl border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold text-emerald-800"
+          >
+            Cambiar o personalizar la dieta
+          </button>
         </section>
+      )}
+
+      {!dietPlanActive && (
+        <button
+          type="button"
+          onClick={onOpenDiets}
+          className="mb-4 w-full rounded-2xl bg-gradient-to-r from-emerald-800 to-teal-600 p-4 text-left text-white shadow-sm"
+        >
+          <span className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">
+            Dietas y objetivos
+          </span>
+          <span className="mt-1 block text-base font-semibold">
+            Encuentra solo las recetas que sí puedes comer
+          </span>
+          <span className="mt-1 block text-xs text-white/80">
+            Compara planes populares y mira cuántas recetas tienes antes de elegir.
+          </span>
+        </button>
       )}
 
       {/* Category Filter - Scrollable horizontal chips */}
@@ -621,8 +617,16 @@ export default function RecipesView({
         </div>
       )}
 
+      <button
+        type="button"
+        onClick={() => setShowMoodFilters((current) => !current)}
+        className="mb-2 text-[11px] font-semibold text-stone-500 underline decoration-stone-300 underline-offset-4"
+      >
+        {showMoodFilters ? "Ocultar filtros de antojo" : "Más filtros: antojo, saludable, rápido…"}
+      </button>
+
       {/* Mood Filter */}
-      <div
+      {showMoodFilters && <div
         className="flex gap-2 mb-3 overflow-x-auto pb-2 scrollbar-hide"
         style={{ WebkitOverflowScrolling: "touch" }}
         role="group"
@@ -647,7 +651,7 @@ export default function RecipesView({
             onClick={() => toggleMoodFilter(m.id)}
           />
         ))}
-      </div>
+      </div>}
 
       {/* Meal Type Filter Chips (incluye TM6 dark) */}
       <div

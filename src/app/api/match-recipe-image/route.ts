@@ -151,14 +151,24 @@ Respond with JSON only:
       matchResult = JSON.parse(cleanedJson);
     } catch {
       logger.error(`Failed to parse AI response: ${responseText}`);
-      // Fallback: return a random match
-      const randomIndex = Math.floor(Math.random() * candidates.length);
-      matchResult = {
-        bestMatchIndex: randomIndex,
-        confidence: "low",
-        reason: "AI parsing failed, random selection",
-        alternativeIndices: [],
-      };
+      return NextResponse.json(
+        {
+          success: false,
+          fallback: true,
+          error: "No fue posible verificar una coincidencia visual confiable",
+        },
+        { status: 502 },
+      );
+    }
+
+    if (
+      !Number.isInteger(matchResult.bestMatchIndex) ||
+      !["high", "medium", "low"].includes(matchResult.confidence)
+    ) {
+      return NextResponse.json(
+        { success: false, fallback: true, error: "Resultado de coincidencia inválido" },
+        { status: 502 },
+      );
     }
 
     const bestMatch = candidates[matchResult.bestMatchIndex];
@@ -189,7 +199,9 @@ Respond with JSON only:
       .filter(Boolean);
 
     // If autoAssign and recipeId provided, update the recipe with this image
-    if (autoAssign && recipeId) {
+    const canAutoAssign =
+      autoAssign && recipeId && matchResult.confidence === "high";
+    if (canAutoAssign) {
       await supabase
         .from("recipes")
         .update({ image_url: matchedImage.image_url })
@@ -214,7 +226,7 @@ Respond with JSON only:
         reason: matchResult.reason,
       },
       alternatives,
-      autoAssigned: autoAssign && recipeId ? true : false,
+      autoAssigned: Boolean(canAutoAssign),
     });
   } catch (error) {
     logger.error("Match recipe image error", {

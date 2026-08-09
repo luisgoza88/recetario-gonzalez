@@ -15,7 +15,7 @@ export const THERMOMIX_LIBRARY: ThermomixRecipe[] = [
       {
         stepNumber: 1,
         description: "Pelar y partir en cuartos 4 tomates grandes y 2 cebollas",
-        speed: "Spátula",
+        speed: "0",
         temperature: "Sin temp",
         time: "0 seg",
         accessory: "ninguno",
@@ -556,7 +556,7 @@ export const THERMOMIX_LIBRARY: ThermomixRecipe[] = [
       {
         stepNumber: 1,
         description: "Precalentar horno a 180°C. Engrasar molde",
-        speed: "Spátula",
+        speed: "0",
         temperature: "Sin temp",
         time: "0 seg",
         accessory: "ninguno",
@@ -565,7 +565,7 @@ export const THERMOMIX_LIBRARY: ThermomixRecipe[] = [
       {
         stepNumber: 2,
         description: "Agregar 4 huevos y 200g de azúcar. Batir",
-        speed: "5",
+        speed: "4",
         temperature: "Sin temp",
         time: "5 min",
         accessory: "mariposa",
@@ -596,8 +596,8 @@ export const THERMOMIX_LIBRARY: ThermomixRecipe[] = [
       {
         stepNumber: 5,
         description:
-          "Verter en molde y hornear 35-40 minutos. Pinchar con palillo para verificar",
-        speed: "Spátula",
+          "Retirar la mariposa. Verter en molde y hornear 35-40 minutos. Pinchar con palillo para verificar",
+        speed: "0",
         temperature: "Sin temp",
         time: "40 min",
         accessory: "ninguno",

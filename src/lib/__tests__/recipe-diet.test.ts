@@ -120,6 +120,41 @@ describe("compatibilidad con un plan", () => {
     ).toBe("incompatible");
   });
 
+  it("rechaza productos animales en un plan vegano", () => {
+    const result = analyzeRecipeForDiet(recipe(), {
+      restrictions: ["vegano"],
+      meal_plan: { preset_id: "vegana", excluded_groups: ["pollo-aves"] },
+    });
+    expect(result.status).toBe("incompatible");
+    expect(result.reasons.join(" ")).toMatch(/vegana/i);
+  });
+
+  it("respeta alergias además del plan elegido", () => {
+    const result = analyzeRecipeForDiet(
+      recipe({ ingredients: [{ name: "Camarones frescos" }, { name: "Ajo" }] }),
+      { allergies: ["mariscos"], meal_plan: { preset_id: "mediterranea" } },
+    );
+    expect(result.status).toBe("incompatible");
+    expect(result.reasons.join(" ")).toMatch(/alérgeno/i);
+  });
+
+  it("valida objetivos de proteína y sodio", () => {
+    const result = analyzeRecipeForDiet(
+      recipe({
+        nutrition: {
+          calories: 300,
+          protein: 12,
+          carbs: 20,
+          fat: 8,
+          sodium: 800,
+        },
+      }),
+      { meal_plan: { min_protein: 25, max_sodium: 600 } },
+    );
+    expect(result.status).toBe("incompatible");
+    expect(result.reasons.join(" ")).toMatch(/proteína.*sodio/i);
+  });
+
   it("resume las tres clases de resultados", () => {
     const summary = summarizeDietCompatibility(
       [
