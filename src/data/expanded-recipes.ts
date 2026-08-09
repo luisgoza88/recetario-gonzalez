@@ -1,4 +1,5 @@
 import { Recipe } from "@/types";
+import { lowCarbColombianRecipes } from "./low-carb-colombian-recipes";
 
 // =====================================================
 // TIPOS EXTENDIDOS PARA BIBLIOTECA EXPANDIDA
@@ -3099,6 +3100,7 @@ export const expandedRecipes: ExpandedRecipe[] = [
   ...internacionalRecipes,
   ...mealPrepRecipes,
   ...cenaLigeraRecipes,
+  ...lowCarbColombianRecipes,
 ].filter((r) => !DUPLICATED_IN_DB.has(r.id));
 
 // Helper: obtener recetas por categoría

@@ -50,7 +50,11 @@ export default function RecetarioSection({
         )}
 
         {activeTab === "recipes" && (
-          <RecipesView recipes={recipes} onUpdate={onUpdate} />
+          <RecipesView
+            recipes={recipes}
+            onUpdate={onUpdate}
+            onOpenCalendar={() => onTabChange("calendar")}
+          />
         )}
 
         {activeTab === "suggestions" && (

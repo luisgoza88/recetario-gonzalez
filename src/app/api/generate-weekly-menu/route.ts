@@ -11,7 +11,7 @@ import {
   getFamilyDisplayName,
   getLocationString,
 } from "@/lib/cooking-profile";
-import type { CookingProfile } from "@/types";
+import type { CookingProfile, DietaryMealPlan } from "@/types";
 import { getSeasonalPromptText } from "@/data/colombian-seasons";
 import type { Mood } from "@/lib/moods";
 import {
@@ -19,6 +19,13 @@ import {
   formatMoodPatternsForPrompt,
 } from "@/lib/mood-learning";
 import { getAvoidPromptSection } from "@/lib/recipe-recommendations";
+import {
+  analyzeRecipeForDiet,
+  CARB_TARGET_OPTIONS,
+  groupLabel,
+  hasActiveDietPlan,
+} from "@/lib/recipe-diet";
+import type { Ingredient, NutritionInfo, Recipe } from "@/types";
 
 // =====================================================
 // Input validation
@@ -62,6 +69,115 @@ const WeeklyMenuOutputSchema = z
     days: z.array(WeeklyMenuDaySchema).min(1),
   })
   .passthrough();
+
+type ParsedWeeklyMenu = z.infer<typeof WeeklyMenuOutputSchema>;
+
+function parseWeeklyMenuContent(content: string): ParsedWeeklyMenu {
+  const jsonContent = cleanJsonResponse(content);
+  const rawMenu = JSON.parse(jsonContent);
+  const parsedMenu = WeeklyMenuOutputSchema.safeParse(rawMenu);
+  if (!parsedMenu.success) {
+    throw new Error(
+      parsedMenu.error.issues
+        .slice(0, 5)
+        .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+        .join("; "),
+    );
+  }
+  return parsedMenu.data;
+}
+
+function parseMinutes(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return undefined;
+  const match = value.match(/\d+/);
+  return match ? Number(match[0]) : undefined;
+}
+
+function validateGeneratedMenuDiet(
+  menu: ParsedWeeklyMenu,
+  preferences?: DietaryPreferencesRow | null,
+): string[] {
+  const plan = preferences?.meal_plan;
+  if (!preferences || !hasActiveDietPlan(plan)) return [];
+
+  const appliesTo = new Set(
+    plan?.meal_types?.length
+      ? plan.meal_types
+      : (["breakfast", "lunch", "dinner"] as const),
+  );
+  const auditPreferences: DietaryPreferencesRow = {
+    ...preferences,
+    avoid_ingredients: [
+      ...(preferences.avoid_ingredients ?? []),
+      ...(preferences.allergies ?? []),
+    ],
+  };
+  const violations: string[] = [];
+
+  for (const [dayIndex, day] of menu.days.entries()) {
+    for (const mealType of ["breakfast", "lunch", "dinner"] as const) {
+      if (!appliesTo.has(mealType)) continue;
+      const rawMeal = day[mealType] as Record<string, unknown> | null | undefined;
+      if (!rawMeal) continue;
+      const rawIngredients = Array.isArray(rawMeal.ingredients)
+        ? rawMeal.ingredients
+        : [];
+      const ingredients: Ingredient[] = rawIngredients
+        .map((ingredient) => {
+          if (typeof ingredient === "string") return { name: ingredient };
+          if (ingredient && typeof ingredient === "object") {
+            const name = (ingredient as { name?: unknown }).name;
+            if (typeof name === "string") return { name };
+          }
+          return null;
+        })
+        .filter((ingredient): ingredient is Ingredient => ingredient !== null);
+      const rawNutrition =
+        rawMeal.nutrition && typeof rawMeal.nutrition === "object"
+          ? (rawMeal.nutrition as Record<string, unknown>)
+          : null;
+      const nutrition: NutritionInfo | undefined = rawNutrition
+        ? {
+            calories: Number(rawNutrition.calories) || 0,
+            protein: Number(rawNutrition.protein) || 0,
+            carbs: Number(rawNutrition.carbs) || 0,
+            fat: Number(rawNutrition.fat) || 0,
+          }
+        : undefined;
+      const recipe: Recipe = {
+        id: `generated-${dayIndex}-${mealType}`,
+        name:
+          typeof rawMeal.name === "string" ? rawMeal.name : `Comida ${dayIndex + 1}`,
+        type: mealType,
+        ingredients,
+        steps: Array.isArray(rawMeal.steps)
+          ? rawMeal.steps.map((step) => String(step))
+          : [],
+        nutrition,
+        prep_time: parseMinutes(rawMeal.prepTime),
+        cook_time: parseMinutes(rawMeal.cookTime),
+        total_time: parseMinutes(rawMeal.totalTime),
+      };
+      const analysis = analyzeRecipeForDiet(recipe, auditPreferences);
+      if (analysis.status === "incompatible") {
+        violations.push(
+          `Día ${dayIndex + 1}, ${mealType}: ${analysis.reasons.join("; ")}`,
+        );
+      } else if (
+        analysis.status === "review" &&
+        plan?.carb_target &&
+        plan.carb_target !== "sin-limite"
+      ) {
+        violations.push(
+          `Día ${dayIndex + 1}, ${mealType}: ${analysis.reviewReasons.join("; ")}`,
+        );
+      }
+    }
+  }
+
+  return violations;
+}
 
 // =====================================================
 // Supabase client (server-side, service role for DB ops)
@@ -213,6 +329,7 @@ interface DietaryPreferencesRow {
   allergies?: string[];
   preferences?: string[];
   avoid_ingredients?: string[];
+  meal_plan?: DietaryMealPlan;
 }
 
 async function getHouseholdDietaryPreferences(
@@ -404,25 +521,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse the response
-    let menuData: z.infer<typeof WeeklyMenuOutputSchema>;
+    let menuData: ParsedWeeklyMenu;
     try {
-      const jsonContent = cleanJsonResponse(content);
-      const rawMenu = JSON.parse(jsonContent);
-
-      // Validar forma y tipos del output del modelo antes de persistir
-      const parsedMenu = WeeklyMenuOutputSchema.safeParse(rawMenu);
-      if (!parsedMenu.success) {
-        logger.error("AI weekly menu failed schema validation", {
-          issues: parsedMenu.error.issues
-            .slice(0, 5)
-            .map((i) => `${i.path.join(".")}: ${i.message}`),
-        });
-        return NextResponse.json(
-          { error: "La IA devolvió un menú con formato inválido" },
-          { status: 502 },
-        );
-      }
-      menuData = parsedMenu.data;
+      menuData = parseWeeklyMenuContent(content);
     } catch (parseError) {
       logger.error("JSON parse error for weekly menu", {
         error:
@@ -431,6 +532,55 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Error al procesar el menú generado. Intenta de nuevo." },
         { status: 500 },
+      );
+    }
+
+    // La IA propone; el código verifica. Si incumple el plan, se le da una
+    // única oportunidad de corregir antes de guardar cualquier menú.
+    let dietViolations = validateGeneratedMenuDiet(
+      menuData,
+      dietaryPreferences,
+    );
+    if (dietViolations.length > 0) {
+      const correctionPrompt = `${prompt}
+
+CORRECCIÓN OBLIGATORIA:
+El menú anterior incumplió estas reglas:
+${dietViolations.slice(0, 12).map((violation) => `- ${violation}`).join("\n")}
+
+Genera nuevamente TODO el JSON. Corrige cada incumplimiento y conserva exactamente el formato solicitado.`;
+      try {
+        const correctedContent = await generateText({
+          prompt: correctionPrompt,
+          temperature: 0.5,
+          maxTokens: 8000,
+          json: true,
+        });
+        menuData = parseWeeklyMenuContent(correctedContent);
+        dietViolations = validateGeneratedMenuDiet(
+          menuData,
+          dietaryPreferences,
+        );
+      } catch (correctionError) {
+        logger.error("AI weekly menu correction failed", {
+          error:
+            correctionError instanceof Error
+              ? correctionError.message
+              : String(correctionError),
+        });
+      }
+    }
+
+    if (dietViolations.length > 0) {
+      logger.warn("Weekly menu rejected by dietary post-validation", {
+        violations: dietViolations.slice(0, 12),
+      });
+      return NextResponse.json(
+        {
+          error:
+            "No pudimos generar un menú que cumpliera completamente el plan alimentario. Intenta de nuevo.",
+        },
+        { status: 422 },
       );
     }
 
@@ -492,11 +642,17 @@ async function getExpandedRecipeNames(): Promise<string[]> {
       .select("name, category, thermomix_compatible")
       .in("type", ["breakfast", "lunch", "dinner"])
       .order("name");
-    if (!data) return [];
-    return data.map((r) => {
+    const databaseNames = (data ?? []).map((r) => {
       const badge = r.thermomix_compatible ? " [TM6]" : "";
       return `${r.name}${r.category ? ` (${r.category})` : ""}${badge}`;
     });
+    const { lowCarbColombianRecipes } = await import(
+      "@/data/low-carb-colombian-recipes"
+    );
+    const lowCarbNames = lowCarbColombianRecipes.map(
+      (recipe) => `${recipe.name} (${recipe.category}) [bajo carbohidrato]`,
+    );
+    return [...new Set([...databaseNames, ...lowCarbNames])];
   } catch {
     return [];
   }
@@ -509,16 +665,45 @@ function buildDietarySection(prefs?: DietaryPreferencesRow | null): string {
   const allergies = prefs.allergies || [];
   const preferences = prefs.preferences || [];
   const avoidIngredients = prefs.avoid_ingredients || [];
+  const plan = prefs.meal_plan;
 
   // If everything is empty, skip the section
   if (
     restrictions.length === 0 &&
     allergies.length === 0 &&
     preferences.length === 0 &&
-    avoidIngredients.length === 0
+    avoidIngredients.length === 0 &&
+    !hasActiveDietPlan(plan)
   ) {
     return "";
   }
+
+  const allowedGroups = (plan?.allowed_groups ?? []).map(groupLabel);
+  const excludedGroups = (plan?.excluded_groups ?? []).map(groupLabel);
+  const mealLabels: Record<string, string> = {
+    breakfast: "desayuno",
+    lunch: "almuerzo",
+    dinner: "cena",
+  };
+  const planMeals = plan?.meal_types?.length
+    ? plan.meal_types.map((meal) => mealLabels[meal]).join(", ")
+    : "todos los horarios";
+  const carbTarget = CARB_TARGET_OPTIONS.find(
+    (option) => option.id === plan?.carb_target,
+  );
+  const planLines = hasActiveDietPlan(plan)
+    ? `
+PLAN ALIMENTARIO CONFIGURADO (REGLAS ESTRICTAS):
+- Aplicar a: ${planMeals}
+- Únicos grupos principales permitidos: ${allowedGroups.join(", ") || "sin lista cerrada"}
+- Grupos excluidos: ${excludedGroups.join(", ") || "ninguno adicional"}
+- Carbohidratos: ${carbTarget ? `${carbTarget.label} — ${carbTarget.description}` : "sin límite específico"}
+- Dificultad máxima: ${plan?.max_difficulty || "sin límite"}
+- Tiempo máximo por receta: ${plan?.max_total_time ? `${plan.max_total_time} minutos` : "sin límite"}
+- Disponibilidad en Colombia: ${plan?.colombia_easy_only ? "usar únicamente ingredientes comunes y fáciles de conseguir" : "se permiten ingredientes de disponibilidad variable"}
+
+Si hay una lista de grupos permitidos, NO agregues otros grupos principales. Aceites, agua, sal, especias y condimentos básicos no cuentan como grupo principal. En un objetivo muy bajo en carbohidratos evita arroz, pasta, pan, arepa, maíz, avena, harinas, papa, yuca, plátano, leguminosas, azúcar, panela y miel. Incluye carbohidratos estimados por porción en cada comida.`
+    : "";
 
   return `
 RESTRICCIONES DIETÉTICAS DEL HOGAR:
@@ -527,7 +712,8 @@ RESTRICCIONES DIETÉTICAS DEL HOGAR:
 - Preferencias: ${preferences.join(", ") || "Ninguna"}
 - Ingredientes a evitar: ${avoidIngredients.join(", ") || "Ninguno"}
 
-IMPORTANTE: NUNCA incluyas ingredientes que contengan alérgenos listados. Respeta estrictamente todas las restricciones alimentarias. Si el hogar es vegetariano o vegano, NO incluyas carne, pollo, pescado ni mariscos. Si hay alergias, verifica que NINGÚN ingrediente contenga el alérgeno.`;
+IMPORTANTE: NUNCA incluyas ingredientes que contengan alérgenos listados. Respeta estrictamente todas las restricciones alimentarias. Si el hogar es vegetariano o vegano, NO incluyas carne, pollo, pescado ni mariscos. Si hay alergias, verifica que NINGÚN ingrediente contenga el alérgeno.
+${planLines}`;
 }
 
 function buildMoodSection(desiredMoods?: Record<string, Mood>): string {
@@ -589,6 +775,28 @@ function buildPrompt(ctx: {
 
   const familyName = getFamilyDisplayName(cookingProfile);
   const location = getLocationString(cookingProfile);
+  const configuredPortions = Object.entries(cookingProfile.portions_config).filter(
+    ([, portions]) => Number.isFinite(portions) && portions > 0,
+  );
+  const totalPortions =
+    configuredPortions.reduce((total, [, portions]) => total + portions, 0) ||
+    cookingProfile.family_size;
+  const memberKeys =
+    configuredPortions.length > 0
+      ? configuredPortions.map(([member]) => member)
+      : Array.from(
+          { length: Math.max(1, cookingProfile.family_size) },
+          (_, index) => `miembro_${index + 1}`,
+        );
+  const memberDistribution =
+    configuredPortions.length > 0
+      ? configuredPortions
+          .map(([member, portions]) => `${member}: ${portions}`)
+          .join(", ")
+      : `${cookingProfile.family_size} porciones iguales`;
+  const perPersonExample = Object.fromEntries(
+    memberKeys.map((member) => [member, "cantidad correspondiente"]),
+  );
 
   const inventorySection =
     inventory.length > 0
@@ -640,7 +848,8 @@ Tu trabajo es crear un menú semanal variado, delicioso y práctico.
 
 FAMILIA:
 - ${cookingProfile.family_size} miembros en el hogar.
-- Total por receta: 5 porciones siempre (distribuidas según preferencias del hogar).
+- Total por receta: ${totalPortions} porciones.
+- Distribución habitual: ${memberDistribution}.
 
 REGLAS DEL MENÚ:
 - 6 días: Lunes a Sábado (domingos libres, no incluir)
@@ -695,8 +904,9 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura:
         "description": "Descripción breve",
         "mood": "nutritivo",
         "ingredients": [
-          { "name": "Ingrediente", "total": "cantidad total", "luis": "porción Luis", "mariana": "porción Mariana", "available": true }
+          { "name": "Ingrediente", "total": "cantidad total", "per_person": ${JSON.stringify(perPersonExample)}, "available": true }
         ],
+        "nutrition": { "calories": 350, "protein": 35, "carbs": 12, "fat": 16 },
         "steps": ["Paso 1", "Paso 2"],
         "prepTime": "10 min",
         "totalTime": "20 min",
@@ -711,7 +921,8 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura:
 }
 
 IMPORTANTE:
-- Cada ingrediente debe tener "total" (5 porciones), "luis" (3 porciones), "mariana" (2 porciones)
+- Cada ingrediente debe tener "total" (${totalPortions} porciones) y "per_person" con estas claves exactas: ${memberKeys.join(", ")}
+- Cada comida debe incluir "nutrition" con calories, protein, carbs y fat por porción
 - "available": true si el ingrediente está en el inventario
 - Viernes (dayNumber 4) y Sábado (dayNumber 5): dinner DEBE ser null
 - Genera exactamente 6 días (dayNumber 0-5)

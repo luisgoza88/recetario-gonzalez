@@ -29,7 +29,10 @@ import {
   ingredientPortions,
   resolveIngredientPortions,
 } from "@/lib/portions";
-import { usePortionsConfig } from "@/lib/stores/useHouseholdStore";
+import {
+  useHouseholdId,
+  usePortionsConfig,
+} from "@/lib/stores/useHouseholdStore";
 import {
   Recipe,
   Ingredient,
@@ -115,6 +118,7 @@ function getWeekMonday(date: Date): string {
 
 export default function CalendarView({ recipes }: CalendarViewProps) {
   const goToTodaySignal = useGoToTodaySignal();
+  const householdId = useHouseholdId();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   // Sprint 1 (mayo 2026): toggle entre vista mensual (grid clasico)
@@ -320,6 +324,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           weekStartDate: weekMonday,
+          householdId: householdId || undefined,
           preferences: {
             excludeRecent: 3,
             style: "colombiana casera con variaciones internacionales",

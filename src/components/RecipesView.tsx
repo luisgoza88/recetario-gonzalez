@@ -14,8 +14,16 @@ import {
   Moon,
   Soup,
   Sparkles,
+  ShieldCheck,
+  AlertTriangle,
 } from "lucide-react";
-import { Recipe, Ingredient, RecipeCategory, ColombianRegion } from "@/types";
+import {
+  Recipe,
+  Ingredient,
+  RecipeCategory,
+  ColombianRegion,
+  DietaryPreferences,
+} from "@/types";
 import RecipeCard from "@/components/ui/RecipeCard";
 import type { ExpandedRecipe } from "@/data/expanded-recipes";
 import type { RegionalRecipe } from "@/data/regional-colombian-recipes";
@@ -28,6 +36,11 @@ import { MOODS, Mood } from "@/lib/moods";
 import { MoodChip } from "@/components/ui/MoodChip";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { useHouseholdId } from "@/lib/stores/useHouseholdStore";
+import {
+  analyzeRecipeForDiet,
+  hasActiveDietPlan,
+} from "@/lib/recipe-diet";
 
 const RecipeModal = dynamic(() => import("./RecipeModal"), {
   loading: () => null,
@@ -41,6 +54,7 @@ const RecipeForm = dynamic(() => import("./forms/RecipeForm"), {
 interface RecipesViewProps {
   recipes: Recipe[];
   onUpdate: () => void;
+  onOpenCalendar: () => void;
 }
 
 // Category filter options
@@ -102,8 +116,13 @@ const CUISINE_FILTERS: Array<{ key: string; label: string; icon: string }> = [
   { key: "moderna", label: "Moderna", icon: "🥗" },
 ];
 
-export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
+export default function RecipesView({
+  recipes,
+  onUpdate,
+  onOpenCalendar,
+}: RecipesViewProps) {
   const toast = useToast();
+  const householdId = useHouseholdId();
   const [search, setSearch] = useState("");
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
@@ -164,6 +183,37 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
     "all",
   );
   const [moodFilters, setMoodFilters] = useState<Mood[]>([]);
+  const [dietaryPreferences, setDietaryPreferences] =
+    useState<DietaryPreferences | null>(null);
+  const [dietFilter, setDietFilter] = useState<
+    "all" | "compatible" | "review"
+  >("all");
+
+  useEffect(() => {
+    let mounted = true;
+    if (!householdId) {
+      setDietaryPreferences(null);
+      setDietFilter("all");
+      return;
+    }
+
+    supabase
+      .from("households")
+      .select("dietary_preferences")
+      .eq("id", householdId)
+      .single()
+      .then(({ data }) => {
+        if (!mounted) return;
+        const next = (data?.dietary_preferences as DietaryPreferences | null) ??
+          null;
+        setDietaryPreferences(next);
+        setDietFilter(hasActiveDietPlan(next?.meal_plan) ? "compatible" : "all");
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [householdId]);
 
   const toggleMoodFilter = useCallback((mood: Mood) => {
     setMoodFilters((prev) =>
@@ -207,7 +257,30 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
       .map(mapExpandedToRecipe);
 
     return [...recipes, ...expandedAsRecipes, ...regionalAsRecipes];
-  }, [recipes]);
+  }, [recipes, expandedRecipes, regionalRecipes]);
+
+  const dietPlanActive = hasActiveDietPlan(dietaryPreferences?.meal_plan);
+
+  const dietAnalyses = useMemo(() => {
+    const analyses = new Map<
+      string,
+      ReturnType<typeof analyzeRecipeForDiet>
+    >();
+    if (!dietPlanActive) return analyses;
+    for (const recipe of allRecipes) {
+      analyses.set(
+        recipe.id,
+        analyzeRecipeForDiet(recipe, dietaryPreferences),
+      );
+    }
+    return analyses;
+  }, [allRecipes, dietaryPreferences, dietPlanActive]);
+
+  const dietSummary = useMemo(() => {
+    const summary = { compatible: 0, review: 0, incompatible: 0 };
+    for (const analysis of dietAnalyses.values()) summary[analysis.status] += 1;
+    return summary;
+  }, [dietAnalyses]);
 
   // Memoizar filtrado de recetas para evitar recálculos innecesarios
   const filteredRecipes = useMemo(() => {
@@ -252,13 +325,21 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
       const matchesCuisine =
         cuisineFilter === "all" || (recipe.tags ?? []).includes(cuisineFilter);
 
+      const dietStatus = dietAnalyses.get(recipe.id)?.status;
+      const matchesDiet =
+        !dietPlanActive ||
+        dietFilter === "all" ||
+        (dietFilter === "compatible" && dietStatus === "compatible") ||
+        (dietFilter === "review" && dietStatus === "review");
+
       return (
         matchesSearch &&
         matchesFilter &&
         matchesCategory &&
         matchesRegion &&
         matchesMood &&
-        matchesCuisine
+        matchesCuisine &&
+        matchesDiet
       );
     });
   }, [
@@ -269,6 +350,9 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
     regionFilter,
     moodFilters,
     cuisineFilter,
+    dietAnalyses,
+    dietFilter,
+    dietPlanActive,
   ]);
 
   // Total de recetas TM6 disponibles (para el banner del filtro Thermomix)
@@ -336,7 +420,7 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
     async (recipe: Recipe) => {
       try {
         // Only delete from DB if it's a DB recipe (not expanded)
-        if (recipe.id.match(/^(col|rap|thm|tm6|fit|int|mp|cl|reg)-/)) {
+        if (recipe.id.match(/^(col|rap|thm|tm6|fit|int|mp|cl|reg|lc)-/)) {
           toast.error("Las recetas de la biblioteca no se pueden eliminar");
           return;
         }
@@ -373,7 +457,7 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
 
   // Check if recipe is from expanded library (not editable/deletable from DB)
   const isExpandedRecipe = (recipe: Recipe) => {
-    return recipe.id.match(/^(col|rap|thm|tm6|fit|int|mp|cl|reg)-/);
+    return recipe.id.match(/^(col|rap|thm|tm6|fit|int|mp|cl|reg|lc)-/);
   };
 
   return (
@@ -392,6 +476,68 @@ export default function RecipesView({ recipes, onUpdate }: RecipesViewProps) {
           className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-700"
         />
       </div>
+
+      {dietPlanActive && (
+        <section className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-3">
+          <div className="flex items-start gap-2.5 mb-3">
+            <div className="w-8 h-8 rounded-full bg-emerald-700 text-white flex items-center justify-center shrink-0">
+              <ShieldCheck size={16} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-emerald-950">
+                Plan alimentario activo
+              </p>
+              <p className="text-xs text-emerald-800 mt-0.5">
+                {dietSummary.compatible} aptas · {dietSummary.review} necesitan
+                revisión · {dietSummary.incompatible} excluidas
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5">
+            <button
+              type="button"
+              onClick={() => setDietFilter("compatible")}
+              className={`rounded-lg px-2 py-2 text-[11px] font-semibold ${
+                dietFilter === "compatible"
+                  ? "bg-emerald-700 text-white"
+                  : "bg-white text-emerald-800 border border-emerald-200"
+              }`}
+            >
+              Aptas ({dietSummary.compatible})
+            </button>
+            <button
+              type="button"
+              onClick={() => setDietFilter("review")}
+              className={`rounded-lg px-2 py-2 text-[11px] font-semibold flex items-center justify-center gap-1 ${
+                dietFilter === "review"
+                  ? "bg-amber-500 text-white"
+                  : "bg-white text-amber-700 border border-amber-200"
+              }`}
+            >
+              <AlertTriangle size={11} />
+              Revisar ({dietSummary.review})
+            </button>
+            <button
+              type="button"
+              onClick={() => setDietFilter("all")}
+              className={`rounded-lg px-2 py-2 text-[11px] font-semibold ${
+                dietFilter === "all"
+                  ? "bg-slate-800 text-white"
+                  : "bg-white text-slate-600 border border-slate-200"
+              }`}
+            >
+              Ver todas
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenCalendar}
+            className="mt-2.5 w-full rounded-xl bg-emerald-800 px-3 py-2.5 text-xs font-semibold text-white hover:bg-emerald-900"
+          >
+            Crear menú semanal con estas reglas
+          </button>
+        </section>
+      )}
 
       {/* Category Filter - Scrollable horizontal chips */}
       <div

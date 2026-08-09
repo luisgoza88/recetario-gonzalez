@@ -5,7 +5,17 @@ import { ArrowLeft, Plus, X, Save } from "lucide-react";
 import Spinner from "@/components/ui/Spinner";
 import { supabase } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
-import type { DietaryPreferences } from "@/types";
+import type {
+  CarbTarget,
+  DietaryIngredientGroup,
+  DietaryMealPlan,
+  DietaryPreferences,
+  RecipeDifficulty,
+} from "@/types";
+import {
+  CARB_TARGET_OPTIONS,
+  DIETARY_GROUP_OPTIONS,
+} from "@/lib/recipe-diet";
 
 // =====================================================
 // Constants
@@ -62,6 +72,22 @@ export default function DietaryPreferencesPanel({
   const [allergies, setAllergies] = useState<string[]>([]);
   const [preferences, setPreferences] = useState<string[]>([]);
   const [avoidIngredients, setAvoidIngredients] = useState<string[]>([]);
+  const [allowedGroups, setAllowedGroups] = useState<
+    DietaryIngredientGroup[]
+  >([]);
+  const [excludedGroups, setExcludedGroups] = useState<
+    DietaryIngredientGroup[]
+  >([]);
+  const [carbTarget, setCarbTarget] =
+    useState<CarbTarget>("sin-limite");
+  const [mealTypes, setMealTypes] = useState<
+    Array<"breakfast" | "lunch" | "dinner">
+  >([]);
+  const [maxDifficulty, setMaxDifficulty] = useState<
+    RecipeDifficulty | ""
+  >("");
+  const [maxTotalTime, setMaxTotalTime] = useState<number | "">("");
+  const [colombiaEasyOnly, setColombiaEasyOnly] = useState(false);
 
   // Input states for custom entries
   const [customAllergyInput, setCustomAllergyInput] = useState("");
@@ -88,6 +114,13 @@ export default function DietaryPreferencesPanel({
         setAllergies(prefs.allergies || []);
         setPreferences(prefs.preferences || []);
         setAvoidIngredients(prefs.avoid_ingredients || []);
+        setAllowedGroups(prefs.meal_plan?.allowed_groups || []);
+        setExcludedGroups(prefs.meal_plan?.excluded_groups || []);
+        setCarbTarget(prefs.meal_plan?.carb_target || "sin-limite");
+        setMealTypes(prefs.meal_plan?.meal_types || []);
+        setMaxDifficulty(prefs.meal_plan?.max_difficulty || "");
+        setMaxTotalTime(prefs.meal_plan?.max_total_time || "");
+        setColombiaEasyOnly(prefs.meal_plan?.colombia_easy_only || false);
       }
     } catch (err) {
       console.error("Error loading dietary preferences:", err);
@@ -147,6 +180,29 @@ export default function DietaryPreferencesPanel({
     setList(list.filter((i) => i !== item));
   }
 
+  function cycleIngredientGroup(group: DietaryIngredientGroup) {
+    if (allowedGroups.includes(group)) {
+      setAllowedGroups(allowedGroups.filter((item) => item !== group));
+      setExcludedGroups([...excludedGroups, group]);
+      return;
+    }
+    if (excludedGroups.includes(group)) {
+      setExcludedGroups(excludedGroups.filter((item) => item !== group));
+      return;
+    }
+    setAllowedGroups([...allowedGroups, group]);
+  }
+
+  function applyChickenFishPreset() {
+    setAllowedGroups(["pollo-aves", "pescado", "verduras"]);
+    setExcludedGroups([]);
+    setCarbTarget("muy-bajo");
+    setMealTypes(["lunch", "dinner"]);
+    setMaxDifficulty("media");
+    setMaxTotalTime(60);
+    setColombiaEasyOnly(true);
+  }
+
   // =====================================================
   // Save
   // =====================================================
@@ -159,6 +215,15 @@ export default function DietaryPreferencesPanel({
         allergies,
         preferences,
         avoid_ingredients: avoidIngredients,
+        meal_plan: {
+          allowed_groups: allowedGroups,
+          excluded_groups: excludedGroups,
+          carb_target: carbTarget,
+          meal_types: mealTypes,
+          max_difficulty: maxDifficulty || undefined,
+          max_total_time: maxTotalTime || undefined,
+          colombia_easy_only: colombiaEasyOnly,
+        } satisfies DietaryMealPlan,
       };
 
       const { error } = await supabase
@@ -338,6 +403,199 @@ export default function DietaryPreferencesPanel({
               );
             })}
           </div>
+        </section>
+
+        {/* ─── Plan alimentario automático ─── */}
+        <section className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-sm font-semibold text-emerald-900 uppercase tracking-wide">
+                Plan alimentario automático
+              </h2>
+              <p className="text-xs text-emerald-800/80 mt-1">
+                El Recetario contará las recetas aptas y aplicará estas reglas al
+                generar el menú semanal.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={applyChickenFishPreset}
+            className="w-full mb-5 px-3 py-2.5 rounded-xl bg-emerald-700 text-white text-sm font-semibold hover:bg-emerald-800 transition-colors"
+          >
+            Usar: pollo, pescado y verduras · muy bajo en carbohidratos
+          </button>
+
+          <div className="mb-5">
+            <h3 className="text-sm font-semibold text-gray-800 mb-1">
+              Grupos de ingredientes
+            </h3>
+            <p className="text-xs text-gray-600 mb-3">
+              Toca una vez para permitir, dos para excluir y tres para dejar sin
+              regla. Si permites grupos, los demás grupos principales no entran.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {DIETARY_GROUP_OPTIONS.map((group) => {
+                const isAllowed = allowedGroups.includes(group.id);
+                const isExcluded = excludedGroups.includes(group.id);
+                const stateLabel = isAllowed
+                  ? "Permitido"
+                  : isExcluded
+                    ? "Excluido"
+                    : "Sin regla";
+                return (
+                  <button
+                    key={group.id}
+                    type="button"
+                    onClick={() => cycleIngredientGroup(group.id)}
+                    aria-label={`${group.label}: ${stateLabel}`}
+                    className={`rounded-xl border p-2.5 text-left transition-colors ${
+                      isAllowed
+                        ? "border-emerald-500 bg-white text-emerald-900"
+                        : isExcluded
+                          ? "border-red-400 bg-red-50 text-red-800"
+                          : "border-gray-200 bg-white text-gray-700"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 text-sm font-medium">
+                      <span>{group.icon}</span>
+                      <span>{group.label}</span>
+                    </span>
+                    <span
+                      className={`block mt-1 text-[10px] font-semibold uppercase tracking-wide ${
+                        isAllowed
+                          ? "text-emerald-600"
+                          : isExcluded
+                            ? "text-red-500"
+                            : "text-gray-400"
+                      }`}
+                    >
+                      {stateLabel}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mb-5">
+            <h3 className="text-sm font-semibold text-gray-800 mb-2">
+              Carbohidratos por porción
+            </h3>
+            <div className="space-y-2">
+              {CARB_TARGET_OPTIONS.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setCarbTarget(option.id)}
+                  className={`w-full rounded-xl border px-3 py-2 text-left ${
+                    carbTarget === option.id
+                      ? "border-blue-500 bg-blue-50 text-blue-900"
+                      : "border-gray-200 bg-white text-gray-700"
+                  }`}
+                >
+                  <span className="block text-sm font-semibold">{option.label}</span>
+                  <span className="block text-xs opacity-75">
+                    {option.description}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mb-5">
+            <h3 className="text-sm font-semibold text-gray-800 mb-1">
+              Horarios del plan
+            </h3>
+            <p className="text-xs text-gray-600 mb-2">
+              Sin selección se aplica a todos los horarios.
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                ["breakfast", "Desayuno"],
+                ["lunch", "Almuerzo"],
+                ["dinner", "Cena"],
+              ].map(([id, label]) => {
+                const mealType = id as "breakfast" | "lunch" | "dinner";
+                const active = mealTypes.includes(mealType);
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() =>
+                      setMealTypes(
+                        active
+                          ? mealTypes.filter((item) => item !== mealType)
+                          : [...mealTypes, mealType],
+                      )
+                    }
+                    className={`rounded-xl border px-2 py-2 text-xs font-semibold ${
+                      active
+                        ? "border-violet-500 bg-violet-50 text-violet-800"
+                        : "border-gray-200 bg-white text-gray-600"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <label className="text-xs font-semibold text-gray-700">
+              Dificultad máxima
+              <select
+                value={maxDifficulty}
+                onChange={(event) =>
+                  setMaxDifficulty(event.target.value as RecipeDifficulty | "")
+                }
+                className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-normal"
+              >
+                <option value="">Sin límite</option>
+                <option value="fácil">Fácil</option>
+                <option value="media">Media</option>
+                <option value="difícil">Difícil</option>
+              </select>
+            </label>
+            <label className="text-xs font-semibold text-gray-700">
+              Tiempo máximo
+              <select
+                value={maxTotalTime}
+                onChange={(event) =>
+                  setMaxTotalTime(
+                    event.target.value ? Number(event.target.value) : "",
+                  )
+                }
+                className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-normal"
+              >
+                <option value="">Sin límite</option>
+                <option value="30">30 minutos</option>
+                <option value="45">45 minutos</option>
+                <option value="60">60 minutos</option>
+                <option value="90">90 minutos</option>
+              </select>
+            </label>
+          </div>
+
+          <label className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={colombiaEasyOnly}
+              onChange={(event) => setColombiaEasyOnly(event.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-emerald-700"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-gray-800">
+                Ingredientes fáciles de conseguir en Colombia
+              </span>
+              <span className="block text-xs text-gray-500 mt-0.5">
+                Excluye recetas con ingredientes especializados o de oferta muy
+                variable.
+              </span>
+            </span>
+          </label>
         </section>
 
         {/* ─── Ingredientes a evitar ─── */}

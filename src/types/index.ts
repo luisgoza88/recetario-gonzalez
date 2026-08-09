@@ -372,6 +372,46 @@ export interface DietaryPreferences {
   allergies?: string[];
   preferences?: string[];
   avoid_ingredients?: string[];
+  /** Plan configurable que se aplica al catálogo y al menú semanal. */
+  meal_plan?: DietaryMealPlan;
+}
+
+/**
+ * Grupos culinarios usados para decidir qué recetas puede incluir un plan.
+ * Se inspiran en los grupos GABA de Colombia, separando las proteínas animales
+ * para permitir reglas como "pollo y pescado sí; res, cerdo y mariscos no".
+ */
+export type DietaryIngredientGroup =
+  | "pollo-aves"
+  | "pescado"
+  | "mariscos"
+  | "res"
+  | "cerdo"
+  | "otras-carnes"
+  | "huevos"
+  | "lacteos"
+  | "verduras"
+  | "frutas"
+  | "leguminosas"
+  | "cereales-harinas"
+  | "tuberculos-platanos"
+  | "frutos-secos-semillas"
+  | "grasas"
+  | "azucares";
+
+export type CarbTarget = "sin-limite" | "moderado" | "bajo" | "muy-bajo";
+
+export interface DietaryMealPlan {
+  /** Si tiene valores, solo se admiten estos grupos principales. */
+  allowed_groups?: DietaryIngredientGroup[];
+  /** Grupos que nunca deben aparecer, aunque estén permitidos por otra regla. */
+  excluded_groups?: DietaryIngredientGroup[];
+  carb_target?: CarbTarget;
+  /** Horarios a los que se aplica la selección del plan. */
+  meal_types?: Array<"breakfast" | "lunch" | "dinner">;
+  max_difficulty?: RecipeDifficulty;
+  max_total_time?: number;
+  colombia_easy_only?: boolean;
 }
 
 export interface Household {
