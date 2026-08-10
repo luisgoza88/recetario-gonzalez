@@ -25,6 +25,14 @@ import Spinner from "@/components/ui/Spinner";
 
 type MealType = "breakfast" | "lunch" | "dinner";
 
+function getCurrentWeekMonday(): string {
+  const date = new Date();
+  const day = date.getDay();
+  const daysSinceMonday = day === 0 ? 6 : day - 1;
+  date.setDate(date.getDate() - daysSinceMonday);
+  return date.toISOString().split("T")[0];
+}
+
 interface DietsViewProps {
   recipes: Recipe[];
   onOpenRecipes: () => void;
@@ -183,6 +191,7 @@ export default function DietsView({
   async function applySelectedPreset() {
     if (!selectedPreset || !householdId || !previewPreferences) return;
     setSaving(true);
+    let dietWasSaved = false;
     try {
       const { error } = await supabase
         .from("households")
@@ -190,10 +199,70 @@ export default function DietsView({
         .eq("id", householdId);
       if (error) throw error;
       setPreferences(previewPreferences);
-      toast.success(`${selectedPreset.name} quedó activa en el Recetario`);
+      dietWasSaved = true;
+
+      // Un menú generado antes puede contener recetas que el nuevo plan acaba
+      // de excluir. Lo archivamos y generamos otra vez las semanas futuras
+      // para que el calendario nunca siga proponiendo comidas incompatibles.
+      const currentWeek = getCurrentWeekMonday();
+      const { data: menusToReplace, error: menusError } = await supabase
+        .from("generated_menus")
+        .select("id, week_start_date")
+        .eq("household_id", householdId)
+        .in("status", ["draft", "approved", "active"])
+        .gte("week_start_date", currentWeek)
+        .order("week_start_date", { ascending: true });
+      if (menusError) throw menusError;
+
+      const weeksToGenerate = Array.from(
+        new Set([
+          currentWeek,
+          ...(menusToReplace ?? []).map((menu) => menu.week_start_date),
+        ]),
+      );
+
+      if (menusToReplace?.length) {
+        const { error: archiveError } = await supabase
+          .from("generated_menus")
+          .update({ status: "archived", updated_at: new Date().toISOString() })
+          .in(
+            "id",
+            menusToReplace.map((menu) => menu.id),
+          );
+        if (archiveError) throw archiveError;
+      }
+
+      const regenerationResults = await Promise.all(
+        weeksToGenerate.map(async (weekStartDate) => {
+          const response = await fetch("/api/generate-weekly-menu", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              weekStartDate,
+              householdId,
+              preferences: {
+                excludeRecent: 3,
+                style: "colombiana casera con variaciones internacionales",
+              },
+            }),
+          });
+          if (!response.ok) throw new Error("No se pudo actualizar el calendario");
+        }),
+      );
+      void regenerationResults;
+
+      window.dispatchEvent(new Event("dietary-menu-updated"));
+      const plural = weeksToGenerate.length === 1 ? "semana" : "semanas";
+      toast.success(
+        `${selectedPreset.name} quedó activa y el calendario se ajustó para ${weeksToGenerate.length} ${plural}`,
+      );
     } catch (error) {
       console.error("Error saving diet preset", error);
-      toast.error("No se pudo guardar la dieta");
+      toast.error(
+        dietWasSaved
+          ? "La dieta se guardó, pero no pudimos actualizar el calendario"
+          : "No se pudo guardar la dieta",
+      );
     } finally {
       setSaving(false);
     }

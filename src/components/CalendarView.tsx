@@ -300,6 +300,15 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
     }
   }, [loadMenu, loadCompletedDays, loadGeneratedMenus, getDayOfCycle]);
 
+  useEffect(() => {
+    const reloadGeneratedMenus = () => {
+      void loadGeneratedMenus();
+    };
+    window.addEventListener("dietary-menu-updated", reloadGeneratedMenus);
+    return () =>
+      window.removeEventListener("dietary-menu-updated", reloadGeneratedMenus);
+  }, [loadGeneratedMenus]);
+
   // React to "go to today" signal from Zustand store (replaces CustomEvent 'goToToday')
   useEffect(() => {
     if (goToTodaySignal === 0) return; // Skip initial mount
