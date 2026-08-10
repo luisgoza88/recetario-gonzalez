@@ -4,6 +4,7 @@ import {
   applyRecipeImageOverride,
   mapLibraryRecipe,
 } from "@/lib/recipe-catalog";
+import { RECIPE_IMAGE_OVERRIDES } from "@/data/recipe-image-overrides";
 import { lowCarbColombianRecipes } from "@/data/low-carb-colombian-recipes";
 
 describe("recipe catalog image overrides", () => {
@@ -45,5 +46,17 @@ describe("recipe catalog image overrides", () => {
 
     expect(applyRecipeImageOverride(recipe)).toBe(recipe);
   });
-});
 
+  it("includes the fifty-image follow-up batch", () => {
+    expect(Object.keys(RECIPE_IMAGE_OVERRIDES)).toHaveLength(62);
+    expect(
+      applyRecipeImageOverride({
+        id: "reg-08",
+        name: "Tapao de Pescado",
+        type: "lunch",
+        ingredients: [],
+        steps: [],
+      }).image_url,
+    ).toBe("/images/recipes/batch-2026-08/reg-08.webp");
+  });
+});

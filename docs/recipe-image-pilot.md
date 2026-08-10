@@ -49,3 +49,11 @@ plastic-looking food, excessive garnish
 
 Las imágenes finales se guardan como WebP de 1200 × 800 px con calidad 84.
 
+## Lote 2 · 50 recetas
+
+El segundo lote aplica la misma dirección visual a 50 recetas adicionales:
+las 22 recetas bajas en carbohidratos restantes de pollo y pescado, recetas
+rápidas y familiares, preparaciones TM6, fitness, cenas ligeras y tres platos
+del Caribe colombiano. Los archivos se guardan en
+`public/images/recipes/batch-2026-08/` y se vinculan por ID en
+`src/data/recipe-image-overrides.ts`.
