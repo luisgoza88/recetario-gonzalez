@@ -5,7 +5,9 @@ import {
   mapLibraryRecipe,
 } from "@/lib/recipe-catalog";
 import { RECIPE_IMAGE_OVERRIDES } from "@/data/recipe-image-overrides";
+import { expandedRecipes } from "@/data/expanded-recipes";
 import { lowCarbColombianRecipes } from "@/data/low-carb-colombian-recipes";
+import { regionalRecipes } from "@/data/regional-colombian-recipes";
 
 describe("recipe catalog image overrides", () => {
   it("adds the approved pilot image to a static library recipe", () => {
@@ -47,8 +49,8 @@ describe("recipe catalog image overrides", () => {
     expect(applyRecipeImageOverride(recipe)).toBe(recipe);
   });
 
-  it("includes the fifty-image follow-up batch", () => {
-    expect(Object.keys(RECIPE_IMAGE_OVERRIDES)).toHaveLength(62);
+  it("includes the reviewed follow-up images", () => {
+    expect(Object.keys(RECIPE_IMAGE_OVERRIDES)).toHaveLength(118);
     expect(
       applyRecipeImageOverride({
         id: "reg-08",
@@ -58,5 +60,15 @@ describe("recipe catalog image overrides", () => {
         steps: [],
       }).image_url,
     ).toBe("/images/recipes/batch-2026-08/reg-08.webp");
+  });
+
+  it("covers every static recipe with a reviewed local image", () => {
+    const staticRecipeIds = new Set(
+      [...expandedRecipes, ...regionalRecipes].map((recipe) => recipe.id),
+    );
+
+    expect(Object.keys(RECIPE_IMAGE_OVERRIDES).sort()).toEqual(
+      [...staticRecipeIds].sort(),
+    );
   });
 });
