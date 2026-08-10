@@ -1,12 +1,18 @@
 import type { ExpandedRecipe } from "@/data/expanded-recipes";
+import { RECIPE_IMAGE_OVERRIDES } from "@/data/recipe-image-overrides";
 import type { RegionalRecipe } from "@/data/regional-colombian-recipes";
 import type { Recipe } from "@/types";
+
+export function applyRecipeImageOverride(recipe: Recipe): Recipe {
+  const imageUrl = RECIPE_IMAGE_OVERRIDES[recipe.id];
+  return imageUrl ? { ...recipe, image_url: imageUrl } : recipe;
+}
 
 export function mapLibraryRecipe(
   recipe: ExpandedRecipe | RegionalRecipe,
 ): Recipe {
   const regional = recipe as RegionalRecipe;
-  return {
+  return applyRecipeImageOverride({
     id: recipe.id,
     name: recipe.name,
     type: recipe.type,
@@ -25,7 +31,7 @@ export function mapLibraryRecipe(
     dietary_tags: regional.dietary_tags,
     description: regional.description,
     source: "manual",
-  };
+  });
 }
 
 export function mergeRecipeCatalog(
@@ -34,7 +40,7 @@ export function mergeRecipeCatalog(
   regionalRecipes: RegionalRecipe[],
 ): Recipe[] {
   const ids = new Set(databaseRecipes.map((recipe) => recipe.id));
-  const merged = [...databaseRecipes];
+  const merged = databaseRecipes.map(applyRecipeImageOverride);
 
   for (const recipe of [...expandedRecipes, ...regionalRecipes]) {
     if (ids.has(recipe.id)) continue;
