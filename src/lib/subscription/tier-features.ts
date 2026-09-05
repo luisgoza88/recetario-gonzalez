@@ -43,7 +43,7 @@ export const TIER_LIMITS: Record<Tier, TierLimits> = {
     imagesGeneratedPerMonth: -1,
     maxHouseholdMembers: 8,
     multipleHouseholds: true,
-    whatsappBot: true,
+    whatsappBot: false,
     voiceAssistant: true,
     monthlyReports: true,
     customMoods: true,

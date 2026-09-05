@@ -12,7 +12,7 @@ import {
   PendingOperation,
 } from "@/lib/indexedDB";
 
-const MAX_RETRY_ATTEMPTS = 3;
+let syncInFlight = false;
 const CACHE_MAX_AGE_HOURS = 24;
 
 interface UseOfflineSyncReturn {
@@ -62,6 +62,15 @@ export function useOfflineSync(): UseOfflineSyncReturn {
     }
   }, []);
 
+  useEffect(() => {
+    window.addEventListener("recetario-offline-changed", updatePendingCount);
+    return () =>
+      window.removeEventListener(
+        "recetario-offline-changed",
+        updatePendingCount,
+      );
+  }, [updatePendingCount]);
+
   // Limpiar cache expirado
   const clearExpiredCache = useCallback(async () => {
     try {
@@ -99,62 +108,57 @@ export function useOfflineSync(): UseOfflineSyncReturn {
   }, [updatePendingCount, isOnline]);
 
   // Sincronizar operaciones pendientes con retry y backoff
-  const syncNow = useCallback(async () => {
-    if (!isOnline || isSyncing) return;
+  const runSync = useCallback(async () => {
+    if (!isOnline || syncInFlight) return;
+    const scope = localStorage.getItem("recetario-session-scope");
+    if (!scope) return;
+    const householdId = localStorage.getItem("currentHouseholdId");
+    syncInFlight = true;
 
     setIsSyncing(true);
     const errors: string[] = [];
 
     try {
-      const operations = await getPendingOperations();
+      const operations = (await getPendingOperations()).sort(
+        (a, b) => a.createdAt - b.createdAt,
+      );
 
       for (const op of operations) {
         const retryCount = retryCountRef.current.get(op.id) || 0;
 
-        // Skip if max retries exceeded
-        if (retryCount >= MAX_RETRY_ATTEMPTS) {
-          errors.push(
-            `"${op.table}" falló después de ${MAX_RETRY_ATTEMPTS} intentos`,
-          );
-          // Remove the failed operation to prevent infinite retries
-          await removePendingOperation(op.id);
-          retryCountRef.current.delete(op.id);
-          continue;
-        }
+        if (localStorage.getItem("recetario-session-scope") !== scope) break;
 
         try {
           let error = null;
 
-          switch (op.operation) {
-            case "update": {
-              const updateData = op.data as {
-                id: string;
-                [key: string]: unknown;
-              };
-              const { id, ...updateFields } = updateData;
-              const result = await supabase
-                .from(op.table)
-                .update(updateFields)
-                .eq("id", id);
-              error = result.error;
-              break;
-            }
-
-            case "insert": {
-              const result = await supabase.from(op.table).insert(op.data);
-              error = result.error;
-              break;
-            }
-
-            case "delete": {
-              const deleteData = op.data as { id: string };
-              const result = await supabase
-                .from(op.table)
-                .delete()
-                .eq("id", deleteData.id);
-              error = result.error;
-              break;
-            }
+          // Queue only the two supported, idempotent market operations.
+          if (!["inventory", "market_checklist"].includes(op.table)) {
+            throw new Error(
+              "Operación pendiente no compatible; se conserva para revisión",
+            );
+          }
+          const data = op.data as Record<string, unknown>;
+          const itemId = data.item_id ?? data.id;
+          if (typeof itemId !== "string")
+            throw new Error("Producto pendiente sin identificador");
+          if (op.operation === "delete") {
+            const result = await supabase
+              .from(op.table)
+              .delete()
+              .eq("item_id", itemId)
+              .eq("household_id", householdId);
+            error = result.error;
+          } else {
+            const { id: _id, ...fields } = data;
+            const result = await supabase.from(op.table).upsert(
+              {
+                ...fields,
+                item_id: itemId,
+                household_id: householdId,
+              },
+              { onConflict: "item_id" },
+            );
+            error = result.error;
           }
 
           if (error) {
@@ -163,6 +167,10 @@ export function useOfflineSync(): UseOfflineSyncReturn {
               error,
             );
             retryCountRef.current.set(op.id, retryCount + 1);
+            errors.push(
+              `No se pudo sincronizar ${op.table}. El cambio sigue guardado.`,
+            );
+            break;
           } else {
             // Eliminar operación exitosa
             await removePendingOperation(op.id);
@@ -171,6 +179,12 @@ export function useOfflineSync(): UseOfflineSyncReturn {
         } catch (opError) {
           console.error(`Failed to sync operation ${op.id}:`, opError);
           retryCountRef.current.set(op.id, retryCount + 1);
+          errors.push(
+            opError instanceof Error
+              ? opError.message
+              : "Error de sincronización",
+          );
+          break;
         }
       }
 
@@ -179,10 +193,23 @@ export function useOfflineSync(): UseOfflineSyncReturn {
     } catch (error) {
       console.error("Sync error:", error);
     } finally {
+      syncInFlight = false;
       setIsSyncing(false);
       await updatePendingCount();
     }
-  }, [isOnline, isSyncing, updatePendingCount]);
+  }, [isOnline, updatePendingCount]);
+
+  const syncNow = useCallback(async () => {
+    if (navigator.locks) {
+      await navigator.locks.request(
+        "recetario-offline-sync",
+        { ifAvailable: true },
+        async (lock) => {
+          if (lock) await runSync();
+        },
+      );
+    } else await runSync();
+  }, [runSync]);
 
   // Auto-sync cuando vuelve la conexión
   useEffect(() => {

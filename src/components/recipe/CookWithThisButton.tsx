@@ -1,4 +1,8 @@
 "use client";
+import dynamic from "next/dynamic";
+import { supabase } from "@/lib/supabase/client";
+import type { Recipe } from "@/types";
+const RecipeModal = dynamic(() => import("@/components/RecipeModal"));
 import { useState } from "react";
 import Image from "next/image";
 import { Sparkles, X, Loader2, Clock, ChefHat } from "lucide-react";
@@ -34,6 +38,7 @@ export function CookWithThisButton({
   ingredients,
   className = "",
 }: CookWithThisButtonProps) {
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<CookWithThisResponse | null>(null);
@@ -66,6 +71,50 @@ export function CookWithThisButton({
     }
   };
 
+  const openRecipe = async (recipe: DBRecipe | AIRecipe) => {
+    setLoading(true);
+    setError(null);
+    try {
+      if ("id" in recipe) {
+        const { data, error } = await supabase
+          .from("recipes")
+          .select("*")
+          .eq("id", recipe.id)
+          .single();
+        if (error || !data) throw new Error("No se pudo abrir la receta");
+        setSelectedRecipe(data as Recipe);
+      } else {
+        const response = await fetch("/api/generate-recipe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            availableIngredients: ingredients,
+            mealType: "lunch",
+            preferences: [`Prepara ${recipe.name}`],
+            generateImage: false,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.recipe)
+          throw new Error(
+            data.error || "No se pudo generar la receta completa",
+          );
+        setSelectedRecipe({
+          ...data.recipe,
+          id: crypto.randomUUID(),
+          type: "lunch",
+        });
+      }
+      setOpen(false);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "No se pudo abrir la receta",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleClose = () => {
     setOpen(false);
     setResult(null);
@@ -76,6 +125,12 @@ export function CookWithThisButton({
 
   return (
     <>
+      {selectedRecipe && (
+        <RecipeModal
+          recipe={selectedRecipe}
+          onClose={() => setSelectedRecipe(null)}
+        />
+      )}
       <button
         onClick={handleOpen}
         disabled={!hasIngredients}
@@ -112,6 +167,7 @@ export function CookWithThisButton({
                 </p>
               </div>
               <button
+                aria-label="Cerrar sugerencias"
                 onClick={handleClose}
                 className="text-gray-400 hover:text-gray-600 p-1"
               >
@@ -168,6 +224,12 @@ export function CookWithThisButton({
                             <p className="font-medium text-gray-900 text-sm truncate">
                               {recipe.name}
                             </p>
+                            <button
+                              className="mt-2 text-sm text-emerald-700 underline"
+                              onClick={() => openRecipe(recipe)}
+                            >
+                              Ver receta y cocinar
+                            </button>
                             <div className="flex items-center gap-2 mt-1">
                               {recipe.total_time && (
                                 <span className="text-xs text-gray-400 flex items-center gap-1">
@@ -211,6 +273,12 @@ export function CookWithThisButton({
                           <p className="text-xs text-gray-600 mt-1">
                             {recipe.description}
                           </p>
+                          <button
+                            className="mt-2 text-sm text-purple-700 underline"
+                            onClick={() => openRecipe(recipe)}
+                          >
+                            Preparar receta completa
+                          </button>
                           <div className="flex items-center gap-3 mt-2">
                             {recipe.estimated_time_min && (
                               <span className="text-xs text-gray-400 flex items-center gap-1">

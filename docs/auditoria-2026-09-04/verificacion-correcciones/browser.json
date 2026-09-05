@@ -1,0 +1,540 @@
+{
+  "checks": [
+    "Invitation URL validates once",
+    "Valid invitation has no throttling error",
+    "Authenticated fixture opens the requested recipe tab",
+    "Navigation writes the section URL",
+    "Browser Back restores the recipe tab",
+    "Shopping tab has a direct URL",
+    "Single AI entry opens the conversation",
+    "Quick action opens the add-product form",
+    "Offline purchase preserves checklist and inventory operations in the scoped queue",
+    "Reconnection synchronizes and clears confirmed operations",
+    "Every observed household data request has the active household filter",
+    "Mobile layout does not overflow horizontally",
+    "No browser runtime exceptions"
+  ],
+  "errors": [],
+  "requests": [
+    {
+      "table": "user_profiles",
+      "method": "GET",
+      "household": []
+    },
+    {
+      "table": "household_memberships",
+      "method": "GET",
+      "household": []
+    },
+    {
+      "table": "market_items",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "adjustment_suggestions",
+      "method": "HEAD",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "market_items",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "meal_feedback",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "ai_action_queue",
+      "method": "HEAD",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "adjustment_suggestions",
+      "method": "HEAD",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "recipes",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "market_items",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "inventory",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "inventory",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "ai_conversations",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "market_items",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "adjustment_suggestions",
+      "method": "HEAD",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "market_items",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "meal_feedback",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "market_items",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "inventory",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "inventory",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "households",
+      "method": "GET",
+      "household": []
+    },
+    {
+      "table": "households",
+      "method": "GET",
+      "household": []
+    },
+    {
+      "table": "spaces",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "home_employees",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "scheduled_tasks",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "scheduled_tasks",
+      "method": "HEAD",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "home_employees",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "scheduled_tasks",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "home_employees",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "scheduled_tasks",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "home_employees",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "scheduled_tasks",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "home_employees",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "scheduled_tasks",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "home_employees",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "scheduled_tasks",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "home_employees",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "scheduled_tasks",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "home_employees",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "scheduled_tasks",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "home_employees",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "scheduled_tasks",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "spaces",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "home_employees",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "home_employees",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "scheduled_tasks",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "home_employees",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "scheduled_tasks",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "home_employees",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "scheduled_tasks",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "home_employees",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "scheduled_tasks",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "home_employees",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "scheduled_tasks",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "households",
+      "method": "GET",
+      "household": []
+    },
+    {
+      "table": "home_employees",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "scheduled_tasks",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "home_employees",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "scheduled_tasks",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "market_items",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "market_checklist",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "inventory",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "ai_conversations",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "budgets",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "budgets",
+      "method": "GET",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "ingredient_categories",
+      "method": "GET",
+      "household": []
+    },
+    {
+      "table": "ingredient_categories",
+      "method": "GET",
+      "household": []
+    },
+    {
+      "table": "adjustment_suggestions",
+      "method": "HEAD",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333",
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "market_checklist",
+      "method": "POST",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    },
+    {
+      "table": "inventory",
+      "method": "POST",
+      "household": [
+        "eq.33333333-3333-4333-8333-333333333333"
+      ]
+    }
+  ],
+  "synthetic": true
+}

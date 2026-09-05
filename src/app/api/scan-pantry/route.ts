@@ -10,7 +10,7 @@ import {
 } from "@/lib/gemini/client";
 import { withRateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/api/auth";
-import { createServiceRoleClient } from "@/lib/supabase/server";
+import { createHouseholdClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 
 // Zod schemas for input validation
@@ -68,8 +68,8 @@ const ScanPantryPutSchema = z.object({
     .optional(),
 });
 
-function getSupabase() {
-  return createServiceRoleClient();
+async function getSupabase() {
+  return await createHouseholdClient();
 }
 
 interface IdentifiedProduct {
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
 
     if (!rateLimit.allowed) {
       return NextResponse.json(rateLimit.response, {
-        status: 429,
+        status: rateLimit.status ?? 429,
         headers: rateLimit.headers,
       });
     }
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
     const gemini = getGeminiClient();
 
     // 1. Obtener lista actual de items del mercado para matching
-    const { data: marketItems } = (await getSupabase()
+    const { data: marketItems } = (await (await getSupabase())
       .from("market_items")
       .select("id, name, category, quantity")) as {
       data: Array<{
@@ -419,15 +419,17 @@ export async function PUT(request: NextRequest) {
     for (const match of matched || []) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error } = await (getSupabase() as any).from("inventory").upsert(
-          {
-            item_id: match.marketItemId,
-            current_quantity: `${match.product.quantity} ${match.product.unit}`,
-            current_number: match.product.quantity,
-            last_updated: new Date().toISOString(),
-          },
-          { onConflict: "item_id" },
-        );
+        const { error } = await ((await getSupabase()) as any)
+          .from("inventory")
+          .upsert(
+            {
+              item_id: match.marketItemId,
+              current_quantity: `${match.product.quantity} ${match.product.unit}`,
+              current_number: match.product.quantity,
+              last_updated: new Date().toISOString(),
+            },
+            { onConflict: "item_id" },
+          );
 
         if (error) throw error;
         results.inventoryUpdated++;
@@ -443,7 +445,7 @@ export async function PUT(request: NextRequest) {
       try {
         // Obtener el max order_index
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: maxOrder } = await (getSupabase() as any)
+        const { data: maxOrder } = await ((await getSupabase()) as any)
           .from("market_items")
           .select("order_index")
           .order("order_index", { ascending: false })
@@ -452,7 +454,7 @@ export async function PUT(request: NextRequest) {
         const nextOrder = (maxOrder?.[0]?.order_index || 0) + 1;
 
         // Crear el nuevo item
-        const supabase = getSupabase();
+        const supabase = await getSupabase();
         const { data: createdItem, error: createError } = await supabase
           .from("market_items")
           .insert({
@@ -471,7 +473,7 @@ export async function PUT(request: NextRequest) {
         // Crear entrada de inventario
         if (createdItem) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (getSupabase() as any).from("inventory").upsert(
+          await ((await getSupabase()) as any).from("inventory").upsert(
             {
               item_id: createdItem.id,
               current_quantity: `${newItem.product.quantity} ${newItem.product.unit}`,

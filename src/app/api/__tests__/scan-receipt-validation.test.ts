@@ -388,3 +388,7 @@ describe("POST /api/scan-receipt - Zod Validation", () => {
     expect(body.error).toBe("Error al procesar el recibo");
   });
 });
+
+vi.mock("@/lib/rate-limit", () => ({
+  withRateLimit: vi.fn().mockResolvedValue({ allowed: true, headers: {} }),
+}));

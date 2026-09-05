@@ -1,4 +1,4 @@
-import { createServiceRoleClient } from "@/lib/supabase/server";
+import { createAuthenticatedClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 
 interface MoodHistoryRow {
@@ -19,7 +19,7 @@ export async function getHouseholdMoodPatterns(
   householdId: string,
 ): Promise<HouseholdMoodPatterns | null> {
   try {
-    const supabase = createServiceRoleClient();
+    const supabase = await createAuthenticatedClient();
 
     const { data } = (await supabase
       .from("household_mood_history")

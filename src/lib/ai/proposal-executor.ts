@@ -20,9 +20,21 @@ import {
   generateSessionId,
 } from "./ai-command-service";
 import { logger } from "@/lib/logger";
+import { householdDate } from "@/lib/menu-date";
 
 async function getClient(): Promise<SupabaseClient> {
   return createAuthenticatedClient();
+}
+
+/** Tool implementations may return an error instead of throwing. */
+export function assertExecutionSucceeded(result: unknown): void {
+  if (!result || typeof result !== "object") return;
+  const value = result as Record<string, unknown>;
+  if (value.success === false || value.error) {
+    throw new Error(
+      String(value.error || value.message || "Function execution failed"),
+    );
+  }
 }
 
 // ============================================
@@ -36,13 +48,35 @@ interface StateCapture {
   query?: string;
 }
 
+/** Only existing records with matching snapshots can be restored by SQL. */
+function hasRestorableState(
+  before: StateCapture[],
+  after: StateCapture[],
+): boolean {
+  return (
+    before.length > 0 &&
+    before.every((state) => {
+      const next = after.find((candidate) => candidate.table === state.table);
+      return (
+        !!state.data?.id &&
+        !!state.data?.household_id &&
+        next?.data?.id === state.data.id &&
+        next?.data?.household_id === state.data.household_id
+      );
+    })
+  );
+}
+
 /**
  * Captura el estado actual antes de ejecutar una acción
  */
-async function captureState(action: AIProposedAction): Promise<StateCapture[]> {
+async function captureState(
+  action: AIProposedAction,
+  householdId: string,
+): Promise<StateCapture[]> {
   const states: StateCapture[] = [];
   const { function_name, parameters } = action;
-  const db = await getClient();
+  const db: SupabaseClient = await createAuthenticatedClient(householdId);
 
   try {
     // Determinar qué estado capturar basado en la función
@@ -108,7 +142,7 @@ async function captureState(action: AIProposedAction): Promise<StateCapture[]> {
 
       case "complete_task": {
         const taskName = parameters.task_name as string;
-        const today = new Date().toISOString().split("T")[0];
+        const today = householdDate();
         const { data: tasks } = await db
           .from("scheduled_tasks")
           .select("*, task_template:task_templates(name)")
@@ -268,7 +302,7 @@ export async function executeProposal(
   // Obtener la propuesta
   const proposal = await getProposal(proposalId);
 
-  if (!proposal) {
+  if (!proposal || proposal.household_id !== householdId) {
     return {
       success: false,
       proposal_id: proposalId,
@@ -304,19 +338,35 @@ export async function executeProposal(
     };
   }
 
-  // Marcar como ejecutando
-  await db
-    .from("ai_action_queue")
-    .update({
-      status: "executing",
-      execution_started_at: new Date().toISOString(),
-    })
-    .eq("proposal_id", proposalId);
+  // Atomic claim prevents double execution from simultaneous approvals/retries.
+  const { data: claimed, error: claimError } = await db.rpc(
+    "claim_ai_proposal",
+    {
+      p_proposal_id: proposalId,
+      p_household_id: householdId,
+    },
+  );
+  if (claimError || claimed !== true) {
+    return {
+      success: false,
+      proposal_id: proposalId,
+      executed_actions: [],
+      failed_actions: [
+        {
+          action_id: "unknown",
+          function_name: "unknown",
+          error: "La propuesta expiró o ya está en ejecución",
+        },
+      ],
+      can_rollback: false,
+    };
+  }
 
   const sessionId = generateSessionId();
   const executedActions: ProposalExecutionResult["executed_actions"] = [];
   const failedActions: ProposalExecutionResult["failed_actions"] = [];
   const auditLogIds: string[] = [];
+  let canRollback = false;
 
   // Determinar qué acciones ejecutar
   const actionsToExecute =
@@ -328,9 +378,10 @@ export async function executeProposal(
 
   // Ejecutar cada acción
   for (const action of actionsToExecute) {
+    let actionAuditLogId: string | null = null;
     try {
       // 1. Capturar estado previo
-      const previousStates = await captureState(action);
+      const previousStates = await captureState(action, householdId);
       const previousStateObj: Record<string, unknown> = {};
       for (const state of previousStates) {
         previousStateObj[state.table] = state.data;
@@ -346,6 +397,7 @@ export async function executeProposal(
         riskLevel: action.risk_level as AIRiskLevel,
       });
 
+      actionAuditLogId = auditLogId;
       if (!auditLogId) {
         failedActions.push({
           action_id: action.id,
@@ -361,15 +413,17 @@ export async function executeProposal(
         action.parameters,
       );
 
+      assertExecutionSucceeded(result);
+
       // 4. Capturar nuevo estado
-      const newStates = await captureState(action);
+      const newStates = await captureState(action, householdId);
       const newStateObj: Record<string, unknown> = {};
       for (const state of newStates) {
         newStateObj[state.table] = state.data;
       }
 
       // 5. Completar audit log
-      await completeAuditLog({
+      const auditCompleted = await completeAuditLog({
         logId: auditLogId,
         status: "completed",
         result: result as Record<string, unknown>,
@@ -389,11 +443,20 @@ export async function executeProposal(
         audit_log_id: auditLogId,
       });
       auditLogIds.push(auditLogId);
+      canRollback ||=
+        auditCompleted && hasRestorableState(previousStates, newStates);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
 
-      // Intentar registrar el fallo en el audit log si existe
+      if (actionAuditLogId) {
+        await completeAuditLog({
+          logId: actionAuditLogId,
+          status: "failed",
+          errorMessage,
+        });
+      }
+      // Registrar la acción fallida
       failedActions.push({
         action_id: action.id,
         function_name: action.function_name,
@@ -408,11 +471,7 @@ export async function executeProposal(
 
   // Determinar resultado final
   const success = failedActions.length === 0;
-  const finalStatus = success
-    ? "completed"
-    : executedActions.length > 0
-      ? "completed"
-      : "failed";
+  const finalStatus = success ? "completed" : "failed";
 
   // Actualizar propuesta
   await db
@@ -433,7 +492,7 @@ export async function executeProposal(
     proposal_id: proposalId,
     executed_actions: executedActions,
     failed_actions: failedActions.length > 0 ? failedActions : undefined,
-    can_rollback: executedActions.some((a) => a.audit_log_id !== undefined),
+    can_rollback: canRollback,
   };
 }
 
@@ -469,7 +528,7 @@ export async function executeActionWithLogging(
 
   try {
     // 1. Capturar estado previo
-    const previousStates = await captureState(tempAction);
+    const previousStates = await captureState(tempAction, householdId);
     const previousStateObj: Record<string, unknown> = {};
     for (const state of previousStates) {
       previousStateObj[state.table] = state.data;
@@ -492,17 +551,19 @@ export async function executeActionWithLogging(
 
     // 3. Ejecutar función
     const result = await executor.execute(functionName, parameters);
+    assertExecutionSucceeded(result);
 
     // 4. Capturar nuevo estado
-    const newStates = await captureState(tempAction);
+    const newStates = await captureState(tempAction, householdId);
     const newStateObj: Record<string, unknown> = {};
     for (const state of newStates) {
       newStateObj[state.table] = state.data;
     }
 
     // 5. Completar audit log
+    let auditCompleted = false;
     if (auditLogId) {
-      await completeAuditLog({
+      auditCompleted = await completeAuditLog({
         logId: auditLogId,
         status: "completed",
         result: result as Record<string, unknown>,
@@ -517,7 +578,7 @@ export async function executeActionWithLogging(
       result,
       audit_log_id: auditLogId || undefined,
       can_rollback:
-        auditLogId !== null && Object.keys(previousStateObj).length > 0,
+        auditCompleted && hasRestorableState(previousStates, newStates),
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -649,7 +710,7 @@ export async function executeProposalTransactional(
   // Obtener la propuesta
   const proposal = await getProposal(proposalId);
 
-  if (!proposal) {
+  if (!proposal || proposal.household_id !== householdId) {
     return {
       success: false,
       proposal_id: proposalId,
@@ -687,14 +748,30 @@ export async function executeProposalTransactional(
     };
   }
 
-  // Marcar como ejecutando
-  await db
-    .from("ai_action_queue")
-    .update({
-      status: "executing",
-      execution_started_at: new Date().toISOString(),
-    })
-    .eq("proposal_id", proposalId);
+  // Atomic claim prevents double execution from simultaneous approvals/retries.
+  const { data: claimed, error: claimError } = await db.rpc(
+    "claim_ai_proposal",
+    {
+      p_proposal_id: proposalId,
+      p_household_id: householdId,
+    },
+  );
+  if (claimError || claimed !== true) {
+    return {
+      success: false,
+      proposal_id: proposalId,
+      executed_actions: [],
+      failed_actions: [
+        {
+          action_id: "unknown",
+          function_name: "unknown",
+          error: "La propuesta expiró o ya está en ejecución",
+        },
+      ],
+      was_rolled_back: false,
+      execution_time_ms: 0,
+    };
+  }
 
   const sessionId = generateSessionId();
   const executedActions: ProposalExecutionResult["executed_actions"] = [];
@@ -739,7 +816,7 @@ export async function executeProposalTransactional(
 
     try {
       // 1. Capturar estado previo
-      const previousStates = await captureState(action);
+      const previousStates = await captureState(action, householdId);
       const previousStateObj: Record<string, unknown> = {};
       for (const state of previousStates) {
         previousStateObj[state.table] = state.data;
@@ -777,8 +854,10 @@ export async function executeProposalTransactional(
         );
       }
 
+      assertExecutionSucceeded(result);
+
       // 4. Capturar nuevo estado
-      const newStates = await captureState(action);
+      const newStates = await captureState(action, householdId);
       const newStateObj: Record<string, unknown> = {};
       for (const state of newStates) {
         newStateObj[state.table] = state.data;
@@ -882,7 +961,9 @@ export async function executeProposalTransactional(
     await db
       .from("ai_action_queue")
       .update({
-        status: "rolled_back",
+        status: rolledBackActions.every((a) => a.rollback_success)
+          ? "rolled_back"
+          : "failed",
         execution_completed_at: new Date().toISOString(),
         execution_result: {
           executed: executedActions.length,
@@ -899,7 +980,9 @@ export async function executeProposalTransactional(
       executed_actions: executedActions,
       failed_actions: failedActions.length > 0 ? failedActions : undefined,
       rolled_back_actions: rolledBackActions,
-      was_rolled_back: true,
+      was_rolled_back:
+        rolledBackActions.length === executedActions.length &&
+        rolledBackActions.every((a) => a.rollback_success),
       rollback_reason: rollbackReason,
       execution_time_ms: Date.now() - startTime,
     };
@@ -907,11 +990,7 @@ export async function executeProposalTransactional(
 
   // Determinar resultado final (sin rollback)
   const success = failedActions.length === 0;
-  const finalStatus = success
-    ? "completed"
-    : executedActions.length > 0
-      ? "completed"
-      : "failed";
+  const finalStatus = success ? "completed" : "failed";
 
   // Actualizar propuesta
   await db

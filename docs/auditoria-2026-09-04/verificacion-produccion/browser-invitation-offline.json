@@ -1,0 +1,10 @@
+{
+  "checks": [
+    "Real invitation can be accepted through the published app",
+    "Accepting invitation selects the joined household",
+    "Published app preserves two offline purchase operations",
+    "Production worker reconnects and syncs the real database",
+    "No runtime errors during invitation and offline flows"
+  ],
+  "errors": []
+}

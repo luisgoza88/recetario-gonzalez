@@ -67,6 +67,7 @@ export type RateLimitAction = keyof typeof RATE_LIMIT_CONFIG;
 
 interface RateLimitResult {
   allowed: boolean;
+  unavailable?: boolean;
   remaining: number;
   resetAt: Date;
   retryAfterMs?: number;
@@ -96,13 +97,14 @@ export async function checkRateLimit(
     });
 
     if (error || !data || data.length === 0) {
-      // Si falla la BD, permitir la request (fail-open)
-      logger.error("[RateLimit] DB error, allowing request", {
+      // No ejecutar llamadas de pago sin poder verificar el límite.
+      logger.error("[RateLimit] DB error, refusing unmetered request", {
         error: error?.message ? String(error.message) : "unknown",
       });
       return {
-        allowed: true,
-        remaining: limit,
+        allowed: false,
+        unavailable: true,
+        remaining: 0,
         resetAt: new Date(Date.now() + windowMs),
       };
     }
@@ -120,13 +122,14 @@ export async function checkRateLimit(
         : Math.max(0, resetAt.getTime() - now),
     };
   } catch (err) {
-    // Fail-open: si hay error de conexión, no bloquear al usuario
-    logger.error("[RateLimit] Exception, allowing request", {
+    // Rechazar temporalmente si no es posible verificar el límite.
+    logger.error("[RateLimit] Exception, refusing unmetered request", {
       error: err instanceof Error ? err.message : String(err),
     });
     return {
-      allowed: true,
-      remaining: limit,
+      allowed: false,
+      unavailable: true,
+      remaining: 0,
       resetAt: new Date(Date.now() + windowMs),
     };
   }
@@ -141,9 +144,12 @@ export function createRateLimitResponse(result: RateLimitResult) {
     : 3600;
 
   return {
-    error: "Rate limit exceeded",
-    message:
-      "Has excedido el límite de solicitudes. Por favor espera antes de intentar de nuevo.",
+    error: result.unavailable
+      ? "Rate limit temporarily unavailable"
+      : "Rate limit exceeded",
+    message: result.unavailable
+      ? "No podemos verificar el límite ahora. Intenta de nuevo en un momento."
+      : "Has excedido el límite de solicitudes. Por favor espera antes de intentar de nuevo.",
     retryAfter: retryAfterSeconds,
     resetAt: result.resetAt.toISOString(),
   };
@@ -159,6 +165,7 @@ export async function withRateLimit(
   allowed: boolean;
   response?: ReturnType<typeof createRateLimitResponse>;
   headers: Record<string, string>;
+  status?: number;
 }> {
   const result = await checkRateLimit(identifier, action);
 
@@ -174,6 +181,7 @@ export async function withRateLimit(
     );
     return {
       allowed: false,
+      status: result.unavailable ? 503 : 429,
       response: createRateLimitResponse(result),
       headers,
     };

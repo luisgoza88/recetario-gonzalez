@@ -1,0 +1,5 @@
+{
+  "membershipEscalationBlocked": true,
+  "proposalImpersonationBlocked": true,
+  "anonymousPrivateReadBlocked": true
+}

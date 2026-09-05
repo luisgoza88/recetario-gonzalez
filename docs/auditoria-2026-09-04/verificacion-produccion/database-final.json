@@ -1,0 +1,49 @@
+{
+  "migrations": [
+    {
+      "version": "20260905000000",
+      "name": "proposal_execution_guards"
+    },
+    {
+      "version": "20260905001000",
+      "name": "complete_onboarding"
+    },
+    {
+      "version": "20260905002000",
+      "name": "explicit_recipe_sharing"
+    },
+    {
+      "version": "20260905003000",
+      "name": "household_reference_integrity"
+    },
+    {
+      "version": "20260905004000",
+      "name": "household_write_permissions"
+    },
+    {
+      "version": "20260905005000",
+      "name": "audit_actor_and_real_rollback"
+    },
+    {
+      "version": "20260905006000",
+      "name": "live_household_boundaries"
+    },
+    {
+      "version": "20260905007000",
+      "name": "invitation_actor_reference"
+    },
+    {
+      "version": "20260905008000",
+      "name": "audit_update_timestamp"
+    },
+    {
+      "version": "20260905009000",
+      "name": "invitation_result_and_family_inventory"
+    }
+  ],
+  "policies": [
+    {
+      "boundaries": 38
+    }
+  ]
+}

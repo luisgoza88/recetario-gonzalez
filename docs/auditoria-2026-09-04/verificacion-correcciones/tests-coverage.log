@@ -1,0 +1,196 @@
+
+> recetario-app@0.1.0 test:coverage
+> vitest run --coverage
+
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /Users/marianatejada/Documents/GitHub/recetario-app
+      Coverage enabled with v8
+
+
+ Test Files  33 passed (33)
+      Tests  459 passed | 8 skipped (467)
+   Start at  00:08:41
+   Duration  4.89s (transform 3.25s, setup 4.69s, import 6.72s, tests 4.03s, environment 35.53s)
+
+ % Coverage report from v8
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-------------------|---------|----------|---------|---------|-------------------
+All files          |   16.14 |    15.15 |   15.76 |   16.26 |                   
+ ...cipe-thermomix |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 15-236            
+ ...i/ai-assistant |    14.2 |     7.19 |   13.51 |   11.72 |                   
+  orchestrator.ts  |       0 |        0 |       0 |       0 | 92-719            
+ ...assistant/chat |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 66-997            
+ ...istant/execute |   49.43 |       30 |      50 |   48.27 |                   
+  route.ts         |   49.43 |       30 |      50 |   48.27 | ...61-366,402-405 
+ ...tant/functions |    3.78 |     2.89 |    6.95 |    3.59 |                   
+  ...-mutations.ts |       0 |        0 |       0 |       0 | 6-972             
+  home-queries.ts  |       0 |        0 |       0 |       0 | 6-420             
+  multi-step.ts    |       0 |        0 |       0 |       0 | 25-300            
+  ...-mutations.ts |       0 |        0 |       0 |       0 | 7-625             
+  ...io-queries.ts |   18.13 |    12.69 |   22.85 |   17.27 | 8,103-574         
+  reports.ts       |       0 |        0 |       0 |       0 | 6-467             
+ ...i/analyze-room |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 53-316            
+ ...cook-with-this |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 10-168            
+ ...anup-proposals |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 16-67             
+ ...-recipe-images |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 27-172            
+ ...ily-completion |   83.05 |     87.5 |     100 |   83.05 |                   
+  route.ts         |   83.05 |     87.5 |     100 |   83.05 | ...33,142,197-198 
+ ...search-recipes |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 12-108            
+ ...library-images |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 16-375            
+ ...enerate-recipe |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 30-619            
+ ...ipe-from-image |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 20-207            
+ ...e-recipe-image |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 20-563            
+ ...-shopping-list |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 11-376            
+ ...te-weekly-menu |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 41-891            
+ ...generated-menu |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 9-114             
+ app/api/log-price |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 7-116             
+ ...h-recipe-image |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 36-282            
+ ...e-market-items |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 26-482            
+ app/api/push/send |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 30-210            
+ ...i/recipe-share |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 11-63             
+ ...ecurring-items |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 19-39             
+ ...pi/scan-pantry |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 18-504            
+ ...i/scan-receipt |   96.36 |    66.66 |     100 |   96.29 |                   
+  route.ts         |   96.36 |    66.66 |     100 |   96.29 | 110,229           
+ .../seed-schedule |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 27-471            
+ ...-shopping-list |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 7-17              
+ ...t-substitution |       0 |        0 |       0 |       0 |                   
+  route.ts         |       0 |        0 |       0 |       0 | 9-85              
+ ...ate-invitation |   94.73 |     91.3 |     100 |   94.73 |                   
+  route.ts         |   94.73 |     91.3 |     100 |   94.73 | 82                
+ lib               |   31.05 |    31.98 |   29.92 |    31.1 |                   
+  ai-memory.ts     |       0 |        0 |       0 |       0 | 34-317            
+  ...ifications.ts |       0 |        0 |       0 |       0 | 35-462            
+  ...et-service.ts |       0 |        0 |       0 |       0 | 13-457            
+  categoryIcons.ts |       0 |        0 |       0 |       0 | 8-1615            
+  ...ng-profile.ts |       0 |        0 |       0 |       0 | 13-93             
+  ...ctive-menu.ts |       0 |        0 |       0 |       0 | 10-59             
+  ...k-learning.ts |    0.68 |        0 |       0 |    0.78 | 76-497            
+  indexedDB.ts     |       0 |        0 |       0 |       0 | 106-425           
+  ...tory-check.ts |   57.94 |    46.15 |   66.66 |   59.01 | ...48-353,461-517 
+  ...on-service.ts |       0 |        0 |       0 |       0 | 52-322            
+  logger.ts        |   69.56 |    45.45 |   57.14 |   72.72 | 60-63,69-73       
+  menu-date.ts     |   93.33 |     87.5 |     100 |     100 | 16                
+  ...ntegration.ts |   86.73 |    76.56 |   76.47 |   87.05 | ...88-389,418-434 
+  mood-learning.ts |       0 |        0 |       0 |       0 | 21-121            
+  moods.ts         |      25 |        0 |       0 |      40 | 63-71             
+  notifications.ts |       0 |        0 |       0 |       0 | 20-83             
+  openai-images.ts |       0 |        0 |       0 |       0 | 14-50             
+  pexels.ts        |       0 |        0 |       0 |       0 | 1-81              
+  portions.ts      |   98.61 |    96.42 |     100 |     100 | 78,201            
+  rate-limit.ts    |     100 |    81.48 |     100 |     100 | ...47-150,180-184 
+  ...pe-catalog.ts |   30.76 |       50 |      50 |   36.36 | 42-51             
+  recipe-diet.ts   |   83.15 |    67.63 |   85.71 |   85.88 | ...32-733,743-744 
+  ...mage-cache.ts |       0 |        0 |       0 |       0 | 6-151             
+  ...age-prompt.ts |     100 |    57.14 |     100 |     100 | 29-36             
+  ...e-portions.ts |       0 |        0 |       0 |       0 | 27-63             
+  ...ring-items.ts |       0 |        0 |       0 |       0 | 16-50             
+  ...quantities.ts |     100 |    83.33 |     100 |     100 | 17-24             
+  ...stitutions.ts |   63.55 |       50 |    92.3 |   65.34 | ...93,349,369-382 
+  store-prices.ts  |       0 |        0 |       0 |       0 | 19-165            
+  ...isle-order.ts |       0 |        0 |       0 |       0 | 5-96              
+  ...validation.ts |      75 |    72.58 |   88.88 |   84.78 | ...63,66,81,94-95 
+  units.ts         |     100 |    94.64 |     100 |     100 | 167,171,243       
+  ...references.ts |       0 |        0 |       0 |       0 | 1-265             
+  utils.ts         |       0 |        0 |       0 |       0 | 10-76             
+  ...e-commands.ts |       0 |        0 |       0 |       0 | 24-288            
+  ...sapp-share.ts |       0 |        0 |       0 |       0 | 29-234            
+ lib/ai            |   41.82 |    32.94 |   48.14 |    43.8 |                   
+  ...nd-service.ts |   48.61 |    42.06 |   58.62 |      50 | ...82-588,619-645 
+  chat.ts          |       0 |        0 |       0 |       0 | 48-221            
+  generate.ts      |       0 |        0 |       0 |       0 | 39-105            
+  ...l-executor.ts |   44.76 |    34.68 |   58.33 |    45.1 | ...0,572,705-1009 
+  trust-service.ts |   63.15 |    50.92 |   72.72 |   63.15 | ...37,583,611-664 
+ lib/ai-assistant  |   16.66 |     8.04 |    5.55 |   16.98 |                   
+  constants.ts     |      90 |    58.33 |      50 |      90 | 151               
+  db.ts            |       0 |        0 |       0 |       0 | 18-53             
+  utils.ts         |       0 |        0 |       0 |       0 | 42-324            
+ lib/analytics     |     2.4 |        0 |    1.38 |    2.63 |                   
+  index.ts         |       0 |        0 |       0 |       0 | 167-729           
+  useAnalytics.ts  |   15.15 |        0 |    8.33 |   16.12 | 27,34,38,66-140   
+ lib/config        |       0 |        0 |       0 |       0 |                   
+  spaceConfig.ts   |       0 |        0 |       0 |       0 | 32-659            
+ lib/constants     |       0 |      100 |     100 |       0 |                   
+  categories.ts    |       0 |      100 |     100 |       0 | 3-22              
+ lib/deepseek      |       0 |        0 |       0 |       0 |                   
+  client.ts        |       0 |        0 |       0 |       0 | 14-119            
+ lib/gemini        |       0 |        0 |       0 |       0 |                   
+  client.ts        |       0 |        0 |       0 |       0 | 5-384             
+ lib/home          |       0 |        0 |       0 |       0 |                   
+  defaults.ts      |       0 |        0 |       0 |       0 | 10-291            
+  intelligence.ts  |       0 |        0 |       0 |       0 | 74-700            
+ lib/hooks         |     0.9 |     0.27 |    1.02 |    0.99 |                   
+  useAIChat.ts     |       0 |        0 |       0 |       0 | 1-518             
+  useAIProposal.ts |       0 |        0 |       0 |       0 | 1-248             
+  useAppData.ts    |    1.16 |        0 |       0 |    1.35 | 22-279            
+  ...yDashboard.ts |       0 |        0 |       0 |       0 | 8-193             
+  useFavorites.ts  |      40 |    13.33 |    37.5 |   47.61 | 20-25,32-51,57    
+  useHomeData.ts   |       0 |        0 |       0 |       0 | 11-198            
+  useImageInput.ts |       0 |        0 |       0 |       0 | 1-58              
+  ...tiveAlerts.ts |       0 |        0 |       0 |       0 | 1-925             
+  ...ecipeStats.ts |       0 |        0 |       0 |       0 | 1-76              
+  ...ssignments.ts |       0 |        0 |       0 |       0 | 1-59              
+  ...FABContext.ts |       0 |        0 |       0 |       0 | 1-450             
+  useSpacesData.ts |       0 |        0 |       0 |       0 | 10-206            
+  ...bscription.ts |       0 |        0 |       0 |       0 | 1-41              
+  ...yDashboard.ts |       0 |        0 |       0 |       0 | 45-405            
+  useVoiceInput.ts |       0 |        0 |       0 |       0 | 1-113             
+  ...lyCalendar.ts |       0 |        0 |       0 |       0 | 8-88              
+ lib/i18n          |       0 |        0 |       0 |       0 |                   
+  translations.ts  |       0 |      100 |     100 |       0 | 3-13              
+  ...ranslation.ts |       0 |        0 |       0 |       0 | 1-46              
+ lib/push          |       0 |        0 |       0 |       0 |                   
+  vapid.ts         |       0 |        0 |       0 |       0 | 15-39             
+ lib/services      |   45.96 |    32.95 |      65 |   46.34 |                   
+  ...ld-service.ts |   45.96 |    32.95 |      65 |   46.34 | ...95-442,468-630 
+ lib/share         |       0 |        0 |       0 |       0 |                   
+  whatsapp.ts      |       0 |        0 |       0 |       0 | 23-68             
+ lib/spoonacular   |       0 |        0 |       0 |       0 |                   
+  client.ts        |       0 |        0 |       0 |       0 | 9-143             
+ lib/stores        |   20.22 |        0 |   18.64 |   22.72 |                   
+  useAppStore.ts   |       0 |        0 |       0 |       0 | 66-202            
+  ...eholdStore.ts |   48.64 |        0 |   47.82 |   53.57 | 56-81,100         
+ lib/subscription  |       0 |        0 |       0 |       0 |                   
+  tier-features.ts |       0 |        0 |       0 |       0 | 16-62             
+ lib/supabase      |   54.09 |       62 |   38.88 |   52.72 |                   
+  client.ts        |      80 |       60 |      50 |      80 | 41                
+  ...hold-fetch.ts |   96.66 |    92.59 |   85.71 |   96.15 | 44                
+  server.ts        |       0 |        0 |       0 |       0 | 14-90             
+ lib/utils         |       0 |        0 |       0 |       0 |                   
+  dates.ts         |       0 |        0 |       0 |       0 | 1-31              
+  sql-escape.ts    |       0 |      100 |       0 |       0 | 16                
+-------------------|---------|----------|---------|---------|-------------------
+
+=============================== Coverage summary ===============================
+Statements   : 16.14% ( 1352/8374 )
+Branches     : 15.15% ( 927/6116 )
+Functions    : 15.76% ( 225/1427 )
+Lines        : 16.26% ( 1265/7778 )
+================================================================================

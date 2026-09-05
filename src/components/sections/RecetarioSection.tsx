@@ -1,10 +1,11 @@
 "use client";
 
-import CalendarView from "../CalendarView";
-import MarketView from "../MarketView";
-import RecipesView from "../RecipesView";
-import SuggestionsPanel from "../SuggestionsPanel";
-import DietsView from "../DietsView";
+import dynamic from "next/dynamic";
+const CalendarView = dynamic(() => import("../CalendarView"));
+const MarketView = dynamic(() => import("../MarketView"));
+const RecipesView = dynamic(() => import("../RecipesView"));
+const SuggestionsPanel = dynamic(() => import("../SuggestionsPanel"));
+const DietsView = dynamic(() => import("../DietsView"));
 import type { Recipe, MarketItem, RecetarioTab } from "@/types";
 
 interface RecetarioSectionProps {

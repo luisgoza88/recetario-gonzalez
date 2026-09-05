@@ -1,3 +1,4 @@
+import { withRateLimit } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
@@ -104,6 +105,12 @@ const ScanReceiptOutputSchema = z
 export async function POST(request: NextRequest) {
   const auth = requireAuth(request);
   if (auth instanceof NextResponse) return auth;
+  const rateLimit = await withRateLimit(auth.userId, "analyze-image");
+  if (!rateLimit.allowed)
+    return NextResponse.json(rateLimit.response, {
+      status: rateLimit.status ?? 429,
+      headers: rateLimit.headers,
+    });
 
   try {
     const formData = await request.formData();

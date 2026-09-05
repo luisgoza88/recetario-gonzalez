@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase/client";
@@ -28,12 +28,21 @@ interface SubmitParams {
 
 export function useOnboardingSubmit() {
   const router = useRouter();
-  const { currentHousehold, refreshMemberships } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+  const {
+    currentHousehold,
+    refreshMemberships,
+    isAuthenticated,
+  } = useAuth();
   const { onboarding: onboardingAnalytics } = useAnalytics();
 
   const completeOnboarding = useCallback(
     async (params: SubmitParams) => {
-      if (!currentHousehold) return;
+      setError(null);
+      if (!isAuthenticated) {
+        router.replace("/auth/login?redirect=%2Fonboarding");
+        return;
+      }
 
       const {
         householdName,
@@ -51,54 +60,42 @@ export function useOnboardingSubmit() {
 
       setIsLoading(true);
       try {
-        // 1. Update household settings
-        const settings = {
-          members_count: membersCount,
-          dietary_preferences: dietaryPreferences,
-          allergies: allergies
-            .split(",")
-            .map((a) => a.trim())
-            .filter(Boolean),
-          cuisine_template: selectedCuisine,
-          goals: selectedGoals,
-          profile_type: profileType,
-        };
-
-        await supabase
-          .from("households")
-          .update({
-            name: householdName,
-            settings,
-            setup_completed: true,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", currentHousehold.id);
-
-        // 2. Create spaces (if admin selected spaces)
-        if (profileType === "admin") {
-          const selectedSpaces = spaces.filter((s) => s.selected);
-          if (selectedSpaces.length > 0) {
-            await supabase.from("spaces").insert(
-              selectedSpaces.map((s) => ({
-                household_id: currentHousehold.id,
-                custom_name: s.name,
-                category: s.category,
+        const { data: householdId, error: saveError } = await supabase.rpc(
+          "complete_household_onboarding",
+          {
+            p_household_id: currentHousehold?.id ?? null,
+            p_config: {
+              name: householdName,
+              members_count: membersCount,
+              restrictions: dietaryPreferences.filter(
+                (value) => value !== "none",
+              ),
+              allergies: allergies
+                .split(",")
+                .map((a) => a.trim())
+                .filter(Boolean),
+              cuisine_template: selectedCuisine,
+              goals: selectedGoals,
+              profile_type: profileType,
+              spaces:
+                profileType === "admin"
+                  ? spaces
+                      .filter((s) => s.selected)
+                      .map((s) => ({ name: s.name, category: s.category }))
+                  : [],
+              employees: employees.map((e) => ({
+                name: e.name,
+                role: e.role,
+                workDays: e.workDays,
               })),
-            );
-          }
-        }
-
-        // 3. Create employees (if any)
-        if (employees.length > 0) {
-          await supabase.from("home_employees").insert(
-            employees.map((e) => ({
-              household_id: currentHousehold.id,
-              name: e.name,
-              role: e.role,
-              work_days: e.workDays,
-            })),
+            },
+          },
+        );
+        if (saveError || !householdId)
+          throw new Error(
+            saveError?.message || "No se guardó la configuración",
           );
-        }
+        await refreshMemberships(householdId);
 
         // 4. Track onboarding completion for analytics
         onboardingAnalytics.completed(
@@ -118,12 +115,21 @@ export function useOnboardingSubmit() {
         }, 2500);
       } catch (error) {
         console.error("Error completing onboarding:", error);
+        setError(
+          "No se pudo guardar la configuración. Tus datos siguen aquí; vuelve a intentarlo.",
+        );
       } finally {
         setIsLoading(false);
       }
     },
-    [currentHousehold, refreshMemberships, onboardingAnalytics, router],
+    [
+      currentHousehold,
+      refreshMemberships,
+        isAuthenticated,
+      onboardingAnalytics,
+      router,
+    ],
   );
 
-  return { completeOnboarding };
+  return { completeOnboarding, error };
 }

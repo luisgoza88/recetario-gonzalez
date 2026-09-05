@@ -1,0 +1,266 @@
+{
+  "api": [
+    {
+      "route": "/api/adapt-recipe-thermomix",
+      "method": "POST",
+      "status": 401
+    },
+    {
+      "route": "/api/ai-assistant/chat",
+      "method": "POST",
+      "status": 401
+    },
+    {
+      "route": "/api/ai-assistant/execute",
+      "method": "GET",
+      "status": 401
+    },
+    {
+      "route": "/api/analyze-room",
+      "method": "POST",
+      "status": 401
+    },
+    {
+      "route": "/api/cook-with-this",
+      "method": "POST",
+      "status": 401
+    },
+    {
+      "route": "/api/daily-completion",
+      "method": "GET",
+      "status": 401
+    },
+    {
+      "route": "/api/external/search-recipes",
+      "method": "POST",
+      "status": 401
+    },
+    {
+      "route": "/api/generate-library-images",
+      "method": "GET",
+      "status": 401
+    },
+    {
+      "route": "/api/generate-recipe",
+      "method": "POST",
+      "status": 401
+    },
+    {
+      "route": "/api/generate-recipe-from-image",
+      "method": "POST",
+      "status": 401
+    },
+    {
+      "route": "/api/generate-recipe-image",
+      "method": "GET",
+      "status": 401
+    },
+    {
+      "route": "/api/generate-shopping-list",
+      "method": "GET",
+      "status": 401
+    },
+    {
+      "route": "/api/generate-weekly-menu",
+      "method": "POST",
+      "status": 401
+    },
+    {
+      "route": "/api/generated-menu",
+      "method": "GET",
+      "status": 401
+    },
+    {
+      "route": "/api/log-price",
+      "method": "POST",
+      "status": 401
+    },
+    {
+      "route": "/api/match-recipe-image",
+      "method": "GET",
+      "status": 401
+    },
+    {
+      "route": "/api/parse-market-items",
+      "method": "POST",
+      "status": 401
+    },
+    {
+      "route": "/api/recurring-items",
+      "method": "GET",
+      "status": 401
+    },
+    {
+      "route": "/api/scan-pantry",
+      "method": "POST",
+      "status": 401
+    },
+    {
+      "route": "/api/scan-receipt",
+      "method": "POST",
+      "status": 401
+    },
+    {
+      "route": "/api/seed-schedule",
+      "method": "GET",
+      "status": 401
+    },
+    {
+      "route": "/api/smart-shopping-list",
+      "method": "GET",
+      "status": 401
+    },
+    {
+      "route": "/api/suggest-substitution",
+      "method": "POST",
+      "status": 401
+    }
+  ],
+  "anonymousRead": [
+    {
+      "table": "users",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "user_profiles",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "households",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "household_memberships",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "household_invitations",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "employees",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "home_employees",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "employee_checkins",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "purchases",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "budgets",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "inventory",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "shopping_lists",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "market_items",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "market_checklist",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "day_menu",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "subscriptions",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "recipes",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "generated_menus",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "daily_completions",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "purchase_patterns",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "price_history",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "ai_action_queue",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "ai_audit_log",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "household_ai_trust",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "spaces",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "scheduled_tasks",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "task_templates",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "meal_feedback",
+      "status": 401,
+      "range": null
+    },
+    {
+      "table": "adjustment_suggestions",
+      "status": 401,
+      "range": null
+    }
+  ]
+}

@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  requireAuth,
+  requireHouseholdMembership,
+  forbiddenResponse,
+} from "@/lib/api/auth";
 import { getDueItems } from "@/lib/recurring-items";
 
 /**
@@ -11,6 +16,8 @@ import { getDueItems } from "@/lib/recurring-items";
  * arriba de la lista (patron Whole Foods "Popular items").
  */
 export async function GET(request: NextRequest) {
+  const auth = requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
   const { searchParams } = new URL(request.url);
   const householdId = searchParams.get("household_id");
 
@@ -19,6 +26,10 @@ export async function GET(request: NextRequest) {
       { error: "household_id is required" },
       { status: 400 },
     );
+  }
+
+  if (!(await requireHouseholdMembership(householdId))) {
+    return forbiddenResponse("No perteneces a este hogar");
   }
 
   try {

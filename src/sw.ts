@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { Serwist } from "serwist";
+import { Serwist, NetworkOnly } from "serwist";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -16,7 +16,15 @@ const serwist = new Serwist({
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
-  runtimeCaching: defaultCache,
+  runtimeCaching: [
+    {
+      matcher: ({ url }) =>
+        url.pathname.startsWith("/api/") ||
+        url.hostname.endsWith(".supabase.co"),
+      handler: new NetworkOnly(),
+    },
+    ...defaultCache,
+  ],
   fallbacks: {
     entries: [
       {
@@ -82,7 +90,14 @@ self.addEventListener("push", (event: PushEvent) => {
 // Manejar click en notificación
 self.addEventListener("notificationclick", (event: NotificationEvent) => {
   event.notification.close();
-  const url = (event.notification.data?.url as string) || "/";
+  const target = new URL(
+    (event.notification.data?.url as string) || "/",
+    self.location.origin,
+  );
+  const url =
+    target.origin === self.location.origin
+      ? target.href
+      : `${self.location.origin}/`;
 
   event.waitUntil(
     self.clients.matchAll({ type: "window" }).then((clients) => {

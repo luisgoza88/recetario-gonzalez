@@ -1,5 +1,8 @@
+import { useHouseholdDate } from "@/hooks/useHouseholdDate";
+import { householdDate } from "@/lib/menu-date";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import type { Household, Space, HomeEmployee, ScheduledTask } from "@/types";
 
 // ============================================
@@ -9,18 +12,20 @@ export const homeQueryKeys = {
   household: (id?: string) => ["household", id] as const,
   spaces: (householdId: string) => ["spaces", householdId] as const,
   employees: (householdId: string) => ["employees", householdId] as const,
-  todayTasks: (householdId: string) => ["todayTasks", householdId] as const,
-  pendingTasks: (householdId: string) => ["pendingTasks", householdId] as const,
+  todayTasks: (householdId: string) =>
+    ["todayTasks", householdId, householdDate()] as const,
+  pendingTasks: (householdId: string) =>
+    ["pendingTasks", householdId, householdDate()] as const,
 };
 
 // ============================================
 // FETCH FUNCTIONS
 // ============================================
-async function fetchHousehold() {
+async function fetchHousehold(householdId: string) {
   const { data, error } = await supabase
     .from("households")
     .select("*")
-    .order("created_at", { ascending: false })
+    .eq("id", householdId)
     .limit(1);
 
   if (error) throw error;
@@ -49,7 +54,7 @@ async function fetchEmployees(householdId: string) {
 }
 
 async function fetchTodayTasks(householdId: string) {
-  const today = new Date().toISOString().split("T")[0];
+  const today = householdDate(new Date());
   const { data, error } = await supabase
     .from("scheduled_tasks")
     .select(
@@ -63,7 +68,7 @@ async function fetchTodayTasks(householdId: string) {
 }
 
 async function fetchPendingTasksCount(householdId: string) {
-  const today = new Date().toISOString().split("T")[0];
+  const today = householdDate(new Date());
   const { count, error } = await supabase
     .from("scheduled_tasks")
     .select("*", { count: "exact", head: true })
@@ -83,9 +88,12 @@ async function fetchPendingTasksCount(householdId: string) {
  * Hook para obtener el hogar del usuario
  */
 export function useHousehold() {
+  const { currentHousehold } = useAuth();
+  const householdId = currentHousehold?.id;
   return useQuery({
-    queryKey: homeQueryKeys.household(),
-    queryFn: fetchHousehold,
+    queryKey: homeQueryKeys.household(householdId),
+    enabled: !!householdId,
+    queryFn: () => fetchHousehold(householdId!),
   });
 }
 
@@ -93,6 +101,7 @@ export function useHousehold() {
  * Hook combinado para obtener todos los datos del hogar
  */
 export function useHouseholdData(householdId: string | undefined) {
+  useHouseholdDate();
   const spacesQuery = useQuery({
     queryKey: homeQueryKeys.spaces(householdId!),
     queryFn: () => fetchSpaces(householdId!),

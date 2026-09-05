@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
           error:
             "Demasiados intentos. Por favor espera 15 minutos antes de intentar de nuevo.",
         },
-        { status: 429, headers: rateLimit.headers },
+        { status: rateLimit.status ?? 429, headers: rateLimit.headers },
       );
     }
 

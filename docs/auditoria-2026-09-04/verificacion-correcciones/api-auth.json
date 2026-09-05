@@ -1,0 +1,27 @@
+[
+  {
+    "path": "/api/recipe-share",
+    "method": "POST",
+    "status": 401
+  },
+  {
+    "path": "/api/generated-menu",
+    "method": "GET",
+    "status": 401
+  },
+  {
+    "path": "/api/ai-assistant/execute",
+    "method": "POST",
+    "status": 401
+  },
+  {
+    "path": "/api/recurring-items",
+    "method": "GET",
+    "status": 401
+  },
+  {
+    "path": "/api/daily-completion",
+    "method": "POST",
+    "status": 401
+  }
+]

@@ -28,7 +28,7 @@ interface SmartFABProps {
   onToggle: () => void;
   actions?: FABAction[];
   activeSection: "hoy" | "recetario" | "hogar" | "ajustes";
-  onOpenAICommandCenter?: () => void;
+  onOpenAssistant?: () => void;
   pendingProposals?: number;
 }
 
@@ -44,7 +44,7 @@ export default function SmartFAB({
   open,
   onToggle,
   activeSection,
-  onOpenAICommandCenter,
+  onOpenAssistant,
   pendingProposals = 0,
 }: SmartFABProps) {
   const [showQuickActions, setShowQuickActions] = useState(false);
@@ -196,9 +196,12 @@ export default function SmartFAB({
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
-    if (!isLongPress.current && !showQuickActions) onOpenAICommandCenter?.();
+    if (!isLongPress.current) {
+      if (showQuickActions) setShowQuickActions(false);
+      else onOpenAssistant?.();
+    }
     isLongPress.current = false;
-  }, [showQuickActions, onOpenAICommandCenter]);
+  }, [showQuickActions, onOpenAssistant]);
 
   const handleQuickActionClick = (a: QuickAction) => {
     a.onClick();
@@ -221,6 +224,7 @@ export default function SmartFAB({
           {quickActions.map((a, i) => (
             <button
               key={a.id}
+              tabIndex={showQuickActions ? 0 : -1}
               onClick={() => handleQuickActionClick(a)}
               className={`flex items-center gap-3 px-4 py-3 rounded-2xl font-medium text-sm bg-gradient-to-r ${a.color} text-white shadow-lg active:scale-[0.98]`}
               style={{ transitionDelay: `${i * 50}ms` }}
@@ -236,7 +240,19 @@ export default function SmartFAB({
           </div>
         </div>
         <button
-          aria-label="Asistente de IA"
+          aria-label={
+            showQuickActions ? "Cerrar accesos rápidos" : "Asistente de IA"
+          }
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              if (showQuickActions) setShowQuickActions(false);
+              else onOpenAssistant?.();
+            } else if (event.key === "ArrowUp") {
+              event.preventDefault();
+              setShowQuickActions(true);
+            } else if (event.key === "Escape") setShowQuickActions(false);
+          }}
           onMouseDown={handlePressStart}
           onMouseUp={handlePressEnd}
           onMouseLeave={() => {

@@ -1,0 +1,22 @@
+[
+  {
+    "path": "/api/recipe-share",
+    "status": 401,
+    "spoofedHeaderRejected": true
+  },
+  {
+    "path": "/api/ai-assistant/execute",
+    "status": 401,
+    "spoofedHeaderRejected": true
+  },
+  {
+    "path": "/api/daily-completion",
+    "status": 401,
+    "spoofedHeaderRejected": true
+  },
+  {
+    "path": "/auth/callback",
+    "status": 307,
+    "missingCodeHandled": true
+  }
+]

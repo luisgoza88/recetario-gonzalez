@@ -106,12 +106,27 @@ interface RecetarioDBSchema extends DBSchema {
 const DB_NAME = "recetario-offline";
 const DB_VERSION = 2; // Incrementar version para agregar nuevos stores
 
+let currentDatabaseName = "";
 let dbPromise: Promise<IDBPDatabase<RecetarioDBSchema>> | null = null;
 
 // Inicializar la base de datos
 export async function getDB(): Promise<IDBPDatabase<RecetarioDBSchema>> {
+  const scope =
+    typeof window === "undefined"
+      ? null
+      : localStorage.getItem("recetario-session-scope");
+  if (!scope)
+    throw new Error(
+      "Inicia sesión y selecciona un hogar para usar datos sin conexión",
+    );
+  const databaseName = `${DB_NAME}:${scope}`;
+  if (databaseName !== currentDatabaseName) {
+    if (dbPromise) void dbPromise.then((db) => db.close());
+    dbPromise = null;
+    currentDatabaseName = databaseName;
+  }
   if (!dbPromise) {
-    dbPromise = openDB<RecetarioDBSchema>(DB_NAME, DB_VERSION, {
+    dbPromise = openDB<RecetarioDBSchema>(databaseName, DB_VERSION, {
       upgrade(db, oldVersion) {
         // Version 1: Datos de usuario
         if (oldVersion < 1) {
@@ -279,6 +294,25 @@ export async function addPendingOperation(
     createdAt: Date.now(),
   };
   await db.put("pendingOperations", operation);
+  const data = op.data as Record<string, unknown>;
+  const itemId = String(data.item_id ?? data.id ?? "");
+  if (op.table === "market_checklist") {
+    const item = await db.get("cachedMarketItems", itemId);
+    if (item)
+      await db.put("cachedMarketItems", {
+        ...item,
+        checked: op.operation === "delete" ? false : data.checked === true,
+        cachedAt: Date.now(),
+      });
+  } else if (op.table === "inventory") {
+    await db.put("cachedInventory", {
+      item_id: itemId,
+      current_number: Number(data.current_number) || 0,
+      current_quantity: String(data.current_quantity ?? "0"),
+      cachedAt: Date.now(),
+    });
+  }
+  window.dispatchEvent(new Event("recetario-offline-changed"));
   return id;
 }
 

@@ -29,10 +29,10 @@ function sh(cmd) {
   }
 }
 
-// Base de comparación: origin/master si existe, si no el árbol actual (nada nuevo).
+// Sin rama remota, HEAD permite revisar también migraciones locales sin commit.
 let base = "origin/master";
 if (!sh(`git rev-parse --verify ${base} 2>/dev/null`)) {
-  base = sh("git rev-parse --verify master 2>/dev/null") ? "master" : "";
+  base = sh("git rev-parse --verify master 2>/dev/null") ? "master" : "HEAD";
 }
 
 let files = [];

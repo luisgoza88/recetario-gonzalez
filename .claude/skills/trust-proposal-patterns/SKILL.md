@@ -6,104 +6,12 @@ globs:
   - "src/components/ai/**"
 ---
 
-# Trust & Proposal Patterns
+# Propuestas de IA
 
-## Arquitectura del Sistema
+`write-gate.ts` contiene la clasificación explícita de escrituras y las acciones que siempre necesitan aprobación. No interpretar confianza alta como permiso para omitir la aprobación de acciones destructivas.
 
-```
-Usuario → AI Assistant → Clasificar riesgo → Verificar trust level
-                                                    ↓
-                              Trust permite auto?  → SI → Ejecutar + Audit log
-                                                    ↓ NO
-                              Crear propuesta → Usuario aprueba/rechaza
-                                                    ↓ Aprobado
-                              Ejecutar transaccional → Capturar post-state → Audit log
-                                                    ↓ Falla
-                              Rollback → Restaurar pre-state
-```
+La decisión verifica actor real, hogar, estado pendiente, expiración y acciones seleccionadas. Respetar el BOOLEAN devuelto por decide_ai_proposal; la ausencia de error no implica aprobación.
 
-## Trust Levels (por hogar)
+Antes de ejecutar, claim_ai_proposal cambia el estado de forma atómica. Dos solicitudes no pueden ejecutar la misma propuesta. `/execute` verifica también la pertenencia de propuesta y audit log. Despachar mediante orchestrator, no mediante una lista parcial duplicada.
 
-| Nivel | Auto-aprueba riesgo | Rate limit | Max criticas/dia | Max items bulk |
-| ----- | ------------------- | ---------- | ---------------- | -------------- |
-| 1     | Solo 1              | 5/min      | 2                | 10             |
-| 2     | 1-2                 | 10/min     | 5                | 25             |
-| 3     | 1-2                 | 15/min     | 10               | 50             |
-| 4     | 1-3                 | 20/min     | 15               | 75             |
-| 5     | 1-3                 | 30/min     | 20               | 100            |
-
-**Riesgo 4 (CRITICAL) NUNCA es auto-aprobado**, sin importar el trust level.
-
-## Risk Levels
-
-| Nivel | Nombre   | Auto-ejecuta  | Undo    | Ejemplo                      |
-| ----- | -------- | ------------- | ------- | ---------------------------- |
-| 1     | LOW      | Si            | No      | Consultas read-only          |
-| 2     | MEDIUM   | Si (trust>=2) | Si, 30s | Marcar item, completar tarea |
-| 3     | HIGH     | Si (trust>=4) | No      | Cambiar menu, editar receta  |
-| 4     | CRITICAL | Nunca         | No      | Eliminar datos, bulk ops     |
-
-## Flujo de Propuesta
-
-```typescript
-// 1. Crear propuesta
-const proposal = await createProposal({
-  householdId,
-  actions: [{ functionName: 'swap_menu_recipe', args: {...}, riskLevel: 3 }],
-  summary: 'Cambiar receta del almuerzo del lunes',
-  expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 min
-});
-
-// 2. Usuario decide
-await decideProposal(proposalId, 'approved'); // o 'rejected', 'partially_approved'
-
-// 3. Ejecutar si aprobado
-const result = await executeProposal(proposalId, {
-  rollbackOnFailure: true,
-  capturePreState: true
-});
-```
-
-## Audit Log Pattern
-
-```typescript
-// Antes de ejecutar
-const auditId = await createAuditLog({
-  householdId,
-  userId,
-  functionName,
-  args,
-  riskLevel,
-  previousState: await capturePreState(functionName, args),
-});
-
-// Despues de ejecutar
-await completeAuditLog(auditId, {
-  success: true,
-  newState: await capturePostState(functionName, args),
-  duration: Date.now() - startTime,
-});
-```
-
-## Rollback Pattern
-
-```typescript
-// Revertir accion
-await rollbackAction(auditId, {
-  restoreState: auditLog.previousState,
-  reason: "user_requested" | "execution_failed",
-});
-```
-
-## Tablas
-
-- `household_ai_trust` — Trust level por hogar (1-5)
-- `ai_audit_log` — Log inmutable de acciones
-- `ai_action_queue` — Cola de acciones pendientes
-- `ai_function_registry` — Funciones registradas con risk level
-
-## Bugs Conocidos
-
-1. `recordRollback` usa `.rpc('increment')` incorrectamente dentro de `.update()`
-2. `capturePreState` solo cubre 4 funciones — agregar mas
-3. Propuestas expiradas no se limpian automaticamente
+`proposal-executor.ts` reconoce tanto excepciones como errores devueltos por las herramientas. La compensación con rollback no es una transacción SQL: registrar fallos parciales y no afirmar que todo se revirtió si una compensación falla. Pruebas: proposal-executor y audit-migrations.

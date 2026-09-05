@@ -37,6 +37,8 @@ type ActiveSection = "hoy" | "recetario" | "hogar" | "ia" | "ajustes";
 
 interface FloatingAIAssistantProps {
   activeSection?: ActiveSection;
+  openSignal?: number;
+  showLauncher?: boolean;
 }
 
 interface QuickAction {
@@ -117,8 +119,13 @@ const getContextualActions = (section: ActiveSection): QuickAction[] => {
 
 export default function FloatingAIAssistant({
   activeSection = "hoy",
+  openSignal = 0,
+  showLauncher = true,
 }: FloatingAIAssistantProps) {
   const [isOpen, setIsOpen] = useState(false);
+  useEffect(() => {
+    if (openSignal > 0) setIsOpen(true);
+  }, [openSignal]);
   const [input, setInput] = useState("");
   const [showProposalModal, setShowProposalModal] = useState(false);
 
@@ -250,8 +257,10 @@ export default function FloatingAIAssistant({
 
   // Floating button (closed state)
   if (!isOpen) {
+    if (!showLauncher) return null;
     return (
       <button
+        aria-label="Abrir asistente de IA"
         onClick={() => setIsOpen(true)}
         className="fixed bottom-24 right-4 z-[100] w-14 h-14 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center"
       >
@@ -304,6 +313,7 @@ export default function FloatingAIAssistant({
               </button>
             )}
             <button
+              aria-label="Cerrar asistente"
               onClick={() => setIsOpen(false)}
               className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center backdrop-blur transition-colors hover:bg-white/30"
             >

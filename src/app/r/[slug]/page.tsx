@@ -21,33 +21,17 @@ interface RecipeRow {
   steps: string[];
 }
 
-const RECIPE_PUBLIC_COLUMNS =
-  "id, name, description, image_url, prep_time, cook_time, region, ingredients, steps";
-
 async function getRecipe(slug: string): Promise<RecipeRow | null> {
-  // Página pública: se usa service-role en el servidor (nunca llega al cliente)
-  // para que el share funcione sin exponer la tabla al rol anónimo.
+  if (!/^[\da-f-]{36}$/i.test(slug)) return null;
   const supabase = createServiceRoleClient();
-
-  // 1) Búsqueda exacta por id (parametrizada, sin riesgo de inyección de filtro).
-  const byId = await supabase
-    .from("recipes")
-    .select(RECIPE_PUBLIC_COLUMNS)
+  const { data, error } = await supabase
+    .from("recipe_shares")
+    .select("snapshot")
     .eq("id", slug)
+    .is("revoked_at", null)
     .maybeSingle();
-  if (byId.data) return byId.data as unknown as RecipeRow;
-
-  // 2) Fallback por nombre normalizado. Se escapan los comodines de LIKE y se
-  //    limita a 1 fila para no romper con múltiples coincidencias.
-  const nameFromSlug = slug.replace(/-/g, " ");
-  const escaped = nameFromSlug.replace(/[%_]/g, "\\$&");
-  const byName = await supabase
-    .from("recipes")
-    .select(RECIPE_PUBLIC_COLUMNS)
-    .ilike("name", `%${escaped}%`)
-    .limit(1);
-
-  return (byName.data?.[0] as unknown as RecipeRow | undefined) ?? null;
+  if (error || !data) return null;
+  return data.snapshot as unknown as RecipeRow;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -103,7 +87,7 @@ export default async function PublicRecipePage({ params }: Props) {
 
           <div className="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400 mb-6">
             {totalTime > 0 && <span>⏱️ {totalTime} min</span>}
-            <span>🍽️ 5 porciones</span>
+            <span>🍽️ Ajusta las cantidades a tu hogar</span>
             {recipe.region && <span>🇨🇴 {recipe.region}</span>}
           </div>
 
@@ -142,10 +126,10 @@ export default async function PublicRecipePage({ params }: Props) {
 
           <div className="border-t dark:border-gray-800 pt-6 text-center">
             <a
-              href="/auth/register"
+              href={`/auth/register?redirect=${encodeURIComponent(`/r/${slug}`)}`}
               className="inline-block px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all"
             >
-              Agregar a mi recetario
+              Crear mi recetario
             </a>
             <p className="text-xs text-gray-500 mt-3">
               Compartido desde Recetario

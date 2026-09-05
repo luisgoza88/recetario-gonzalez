@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuth } from "@/lib/api/auth";
-import { createServiceRoleClient } from "@/lib/supabase/server";
+import { createHouseholdClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 
 const LogPriceSchema = z.object({
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { itemName, price, store, quantity } = LogPriceSchema.parse(body);
-    const supabase = createServiceRoleClient();
+    const supabase = await createHouseholdClient();
 
     // 1. Save to price_history
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

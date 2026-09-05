@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import type { Recipe, MarketItem } from "@/types";
 
 // ============================================
@@ -17,10 +18,11 @@ export const queryKeys = {
 // ============================================
 // FETCH FUNCTIONS
 // ============================================
-async function fetchRecipes() {
+async function fetchRecipes(householdId: string) {
   const { data, error } = await supabase
     .from("recipes")
     .select("*")
+    .eq("household_id", householdId)
     .order("name");
 
   if (error) throw error;
@@ -31,38 +33,42 @@ async function fetchRecipes() {
   })) as Recipe[];
 }
 
-async function fetchMarketItems() {
+async function fetchMarketItems(householdId: string) {
   const { data, error } = await supabase
     .from("market_items")
     .select("*")
+    .eq("household_id", householdId)
     .order("order_index");
 
   if (error) throw error;
   return data;
 }
 
-async function fetchChecklist() {
+async function fetchChecklist(householdId: string) {
   const { data, error } = await supabase
     .from("market_checklist")
-    .select("item_id, checked");
+    .select("item_id, checked")
+    .eq("household_id", householdId);
 
   if (error) throw error;
   return data;
 }
 
-async function fetchInventory() {
+async function fetchInventory(householdId: string) {
   const { data, error } = await supabase
     .from("inventory")
-    .select("item_id, current_quantity, current_number");
+    .select("item_id, current_quantity, current_number")
+    .eq("household_id", householdId);
 
   if (error) throw error;
   return data;
 }
 
-async function fetchSuggestionsCount() {
+async function fetchSuggestionsCount(householdId: string) {
   const { count, error } = await supabase
     .from("adjustment_suggestions")
     .select("*", { count: "exact", head: true })
+    .eq("household_id", householdId)
     .eq("status", "pending");
 
   if (error) throw error;
@@ -76,25 +82,63 @@ async function fetchSuggestionsCount() {
 /**
  * Hook para obtener todas las recetas
  */
-export function useRecipes() {
+export function useRecipes(enabled = true) {
+  const { currentHousehold, supabaseUser } = useAuth();
+  const householdId = currentHousehold?.id;
   return useQuery({
-    queryKey: queryKeys.recipes,
-    queryFn: fetchRecipes,
+    queryKey: [...queryKeys.recipes, supabaseUser?.id, householdId],
+    enabled: enabled && !!householdId && !!supabaseUser,
+    networkMode: "always",
+    queryFn: async () => {
+      const cache = await import("@/lib/indexedDB");
+      if (!navigator.onLine)
+        return (await cache.getCachedRecipes()) as Recipe[];
+      const recipes = await fetchRecipes(householdId!);
+      await cache
+        .cacheRecipes(
+          recipes.map((recipe) => ({ ...recipe, cachedAt: Date.now() })),
+        )
+        .catch(() => undefined);
+      return recipes;
+    },
   });
 }
 
 /**
  * Hook para obtener items del mercado con checklist e inventario combinados
  */
-export function useMarketItems() {
+export function useMarketItems(enabled = true) {
+  const { currentHousehold, supabaseUser } = useAuth();
+  const householdId = currentHousehold?.id;
   const queryClient = useQueryClient();
 
   return useQuery({
-    queryKey: queryKeys.marketItems,
+    queryKey: [...queryKeys.marketItems, supabaseUser?.id, householdId],
+    enabled: enabled && !!householdId && !!supabaseUser,
+    networkMode: "always",
     queryFn: async () => {
+      if (!navigator.onLine) {
+        const cache = await import("@/lib/indexedDB");
+        const [items, inventory] = await Promise.all([
+          cache.getCachedMarketItems(),
+          cache.getCachedInventory(),
+        ]);
+        return items.map((item) => ({
+          ...item,
+          currentQuantity:
+            inventory.find((i) => i.item_id === item.id)?.current_quantity ||
+            "0",
+          currentNumber:
+            inventory.find((i) => i.item_id === item.id)?.current_number || 0,
+        })) as MarketItem[];
+      }
       // Ejecutar todas las queries en paralelo
       const [itemsResult, checklistResult, inventoryResult] = await Promise.all(
-        [fetchMarketItems(), fetchChecklist(), fetchInventory()],
+        [
+          fetchMarketItems(householdId!),
+          fetchChecklist(householdId!),
+          fetchInventory(householdId!),
+        ],
       );
 
       // Crear mapas para búsqueda rápida
@@ -117,8 +161,14 @@ export function useMarketItems() {
       }));
 
       // También actualizar queries individuales en cache
-      queryClient.setQueryData(queryKeys.checklist, checklistResult);
-      queryClient.setQueryData(queryKeys.inventory, inventoryResult);
+      queryClient.setQueryData(
+        [...queryKeys.checklist, supabaseUser?.id, householdId],
+        checklistResult,
+      );
+      queryClient.setQueryData(
+        [...queryKeys.inventory, supabaseUser?.id, householdId],
+        inventoryResult,
+      );
 
       return items;
     },
@@ -129,9 +179,12 @@ export function useMarketItems() {
  * Hook para obtener el conteo de sugerencias pendientes
  */
 export function useSuggestionsCount() {
+  const { currentHousehold, supabaseUser } = useAuth();
+  const householdId = currentHousehold?.id;
   return useQuery({
-    queryKey: queryKeys.suggestions,
-    queryFn: fetchSuggestionsCount,
+    queryKey: [...queryKeys.suggestions, supabaseUser?.id, householdId],
+    enabled: !!householdId && !!supabaseUser,
+    queryFn: () => fetchSuggestionsCount(householdId!),
     // Refrescar cada 5 minutos
     refetchInterval: 5 * 60 * 1000,
   });
@@ -145,6 +198,8 @@ export function useSuggestionsCount() {
  * Hook para actualizar el estado de un item en el checklist
  */
 export function useToggleChecklist() {
+  const { currentHousehold, supabaseUser } = useAuth();
+  const householdId = currentHousehold?.id;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -155,9 +210,13 @@ export function useToggleChecklist() {
       itemId: string;
       checked: boolean;
     }) => {
+      if (!householdId || !supabaseUser) throw new Error("Selecciona un hogar");
       const { error } = await supabase
         .from("market_checklist")
-        .upsert({ item_id: itemId, checked }, { onConflict: "item_id" });
+        .upsert(
+          { household_id: householdId, item_id: itemId, checked },
+          { onConflict: "item_id" },
+        );
 
       if (error) throw error;
       return { itemId, checked };
@@ -173,6 +232,8 @@ export function useToggleChecklist() {
  * Hook para actualizar el inventario de un item
  */
 export function useUpdateInventory() {
+  const { currentHousehold, supabaseUser } = useAuth();
+  const householdId = currentHousehold?.id;
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -185,8 +246,10 @@ export function useUpdateInventory() {
       quantity: string;
       number: number;
     }) => {
+      if (!householdId || !supabaseUser) throw new Error("Selecciona un hogar");
       const { error } = await supabase.from("inventory").upsert(
         {
+          household_id: householdId,
           item_id: itemId,
           current_quantity: quantity,
           current_number: number,

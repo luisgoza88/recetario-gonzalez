@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
   const rateLimit = await withRateLimit(userId, "analyze-image");
   if (!rateLimit.allowed) {
     return NextResponse.json(rateLimit.response, {
-      status: 429,
+      status: rateLimit.status ?? 429,
       headers: rateLimit.headers,
     });
   }
@@ -113,7 +113,15 @@ export async function POST(request: NextRequest) {
   try {
     const { images, referenceObject, capturedSteps } = await request.json();
 
-    if (!images || !Array.isArray(images) || images.length === 0) {
+    if (
+      !images ||
+      !Array.isArray(images) ||
+      images.length === 0 ||
+      images.length > 5 ||
+      images.some(
+        (image) => typeof image !== "string" || image.length > 4_000_000,
+      )
+    ) {
       return NextResponse.json(
         { error: "Se requiere al menos una imagen" },
         { status: 400 },

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuth } from "@/lib/api/auth";
-import { createServiceRoleClient } from "@/lib/supabase/server";
+import { createHouseholdClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 
 // GET: Fetch generated menu for a week
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let query = (createServiceRoleClient() as any)
+    let query = ((await createHouseholdClient()) as any)
       .from("generated_menus")
       .select("*")
       .order("created_at", { ascending: false });
@@ -82,7 +82,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (createServiceRoleClient() as any)
+    const { data, error } = await ((await createHouseholdClient()) as any)
       .from("generated_menus")
       .update(updates)
       .eq("id", menuId)

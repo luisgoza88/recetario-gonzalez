@@ -1,6 +1,6 @@
 ---
 name: native-data-fetching
-description: Use when implementing or debugging ANY network request, API call, or data fetching. Covers fetch API, axios, React Query, SWR, error handling, caching strategies, offline support.
+description: "Guía de native-data-fetching para trabajo explícito en React Native o Expo. No aplica a la PWA web Next.js de este repositorio."
 version: 1.0.0
 license: MIT
 ---

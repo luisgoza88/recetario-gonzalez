@@ -3,6 +3,7 @@
  * Genera tareas de preparación de comidas basadas en el menú planificado
  */
 
+import { householdDate } from "@/lib/menu-date";
 import { Recipe, DayMenu, Ingredient } from "@/types";
 // Usa el singleton del browser (createBrowserClient con cookies) para
 // que comparta la misma sesion auth y evite "Multiple GoTrueClient instances".
@@ -143,7 +144,7 @@ function analyzeRecipeForTasks(
           const existingTask = tasks.find(
             (t) =>
               t.title === title &&
-              t.scheduled_date === taskDateTime.toISOString().split("T")[0],
+              t.scheduled_date === householdDate(taskDateTime),
           );
 
           if (!existingTask) {
@@ -154,7 +155,7 @@ function analyzeRecipeForTasks(
               recipe_id: recipe.id,
               recipe_name: recipe.name,
               meal_type: mealType,
-              scheduled_date: taskDateTime.toISOString().split("T")[0],
+              scheduled_date: householdDate(taskDateTime),
               scheduled_time: taskDateTime.toTimeString().slice(0, 5),
               estimated_minutes: rule.estimatedMinutes,
               priority: rule.priority,
@@ -183,7 +184,7 @@ function analyzeRecipeForTasks(
         recipe_id: recipe.id,
         recipe_name: recipe.name,
         meal_type: mealType,
-        scheduled_date: cookStartTime.toISOString().split("T")[0],
+        scheduled_date: householdDate(cookStartTime),
         scheduled_time: cookStartTime.toTimeString().slice(0, 5),
         estimated_minutes: cookTime,
         priority: "alta",
@@ -218,7 +219,7 @@ export async function generateKitchenTasks(
   for (let i = 0; i < daysAhead; i++) {
     const targetDate = new Date(today);
     targetDate.setDate(today.getDate() + i);
-    const targetDateStr = targetDate.toISOString().split("T")[0];
+    const targetDateStr = householdDate(targetDate);
 
     // Calcular día del ciclo (excluyendo domingos)
     // Esto es una simplificación - en producción deberías usar la lógica real del menú
@@ -334,7 +335,7 @@ export async function saveKitchenTasks(
  * Obtener tareas de cocina para hoy
  */
 export async function getTodayKitchenTasks(): Promise<KitchenTask[]> {
-  const today = new Date().toISOString().split("T")[0];
+  const today = householdDate(new Date());
   const tasks = await generateKitchenTasks(1);
 
   return tasks.filter((t) => t.scheduled_date === today);
@@ -365,10 +366,8 @@ export async function getPrepSummary(): Promise<{
 }> {
   const tasks = await generateKitchenTasks(2);
   const now = new Date();
-  const today = now.toISOString().split("T")[0];
-  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
-    .toISOString()
-    .split("T")[0];
+  const today = householdDate(now);
+  const tomorrow = householdDate(new Date(now.getTime() + 24 * 60 * 60 * 1000));
 
   const todayTasks = tasks.filter((t) => t.scheduled_date === today);
   const tomorrowTasks = tasks.filter((t) => t.scheduled_date === tomorrow);

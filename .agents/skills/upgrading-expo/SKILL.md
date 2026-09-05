@@ -1,6 +1,6 @@
 ---
 name: upgrading-expo
-description: Guidelines for upgrading Expo SDK versions and fixing dependency issues
+description: "Guía de upgrading-expo para trabajo explícito en React Native o Expo. No aplica a la PWA web Next.js de este repositorio."
 version: 1.0.0
 license: MIT
 ---

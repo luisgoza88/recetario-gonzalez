@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import analytics from "./index";
 
@@ -17,21 +17,24 @@ export default function AnalyticsProvider({
 }: AnalyticsProviderProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const initializedRef = useRef(false);
+  const [initialized, setInitialized] = useState(false);
 
   // Inicializar analytics una sola vez (lazy: posthog se carga async)
   useEffect(() => {
-    if (!initializedRef.current) {
-      initializedRef.current = true;
-      analytics.init().then(() => {
-        analytics.sessionStart();
-      });
-    }
+    let active = true;
+    analytics.init().then(() => {
+      if (!active) return;
+      analytics.sessionStart();
+      setInitialized(true);
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Trackear cambios de página
   useEffect(() => {
-    if (!initializedRef.current) return;
+    if (!initialized) return;
 
     // Construir URL actual
     const url =
@@ -52,7 +55,7 @@ export default function AnalyticsProvider({
     analytics.track("feature_discovered", {
       feature_name: `pageview_${pageName}`,
     });
-  }, [pathname, searchParams]);
+  }, [pathname, searchParams, initialized]);
 
   return <>{children}</>;
 }

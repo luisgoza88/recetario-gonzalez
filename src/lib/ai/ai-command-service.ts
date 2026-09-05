@@ -251,14 +251,20 @@ export async function completeAuditLog(params: {
   errorMessage?: string;
 }): Promise<boolean> {
   const db = await getClient();
-  const { error } = await db.rpc("complete_ai_audit_log", {
+  const { data, error } = await db.rpc("complete_ai_audit_log", {
     p_log_id: params.logId,
     p_status: params.status,
     p_result: params.result || null,
     p_previous_state: params.previousState || null,
     p_new_state: params.newState || null,
     p_affected_tables: params.affectedTables || null,
-    p_affected_record_ids: params.affectedRecordIds || null,
+    // Legacy audit index is uuid[]; complete snapshots retain text recipe IDs.
+    p_affected_record_ids:
+      params.affectedRecordIds?.filter((id) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          id,
+        ),
+      ) || null,
     p_error_message: params.errorMessage || null,
   });
 
@@ -269,7 +275,7 @@ export async function completeAuditLog(params: {
     return false;
   }
 
-  return true;
+  return data === true;
 }
 
 /**
@@ -396,7 +402,7 @@ export async function approveProposal(
   notes?: string,
 ): Promise<boolean> {
   const db = await getClient();
-  const { error } = await db.rpc("decide_ai_proposal", {
+  const { data, error } = await db.rpc("decide_ai_proposal", {
     p_proposal_id: proposalId,
     p_decision: "approved",
     p_decision_by: userId,
@@ -410,7 +416,7 @@ export async function approveProposal(
     return false;
   }
 
-  return true;
+  return data === true;
 }
 
 /**
@@ -422,7 +428,7 @@ export async function rejectProposal(
   notes?: string,
 ): Promise<boolean> {
   const db = await getClient();
-  const { error } = await db.rpc("decide_ai_proposal", {
+  const { data, error } = await db.rpc("decide_ai_proposal", {
     p_proposal_id: proposalId,
     p_decision: "rejected",
     p_decision_by: userId,
@@ -436,7 +442,7 @@ export async function rejectProposal(
     return false;
   }
 
-  return true;
+  return data === true;
 }
 
 /**
@@ -449,7 +455,7 @@ export async function partiallyApproveProposal(
   notes?: string,
 ): Promise<boolean> {
   const db = await getClient();
-  const { error } = await db.rpc("decide_ai_proposal", {
+  const { data, error } = await db.rpc("decide_ai_proposal", {
     p_proposal_id: proposalId,
     p_decision: "partially_approved",
     p_decision_by: userId,
@@ -464,7 +470,7 @@ export async function partiallyApproveProposal(
     return false;
   }
 
-  return true;
+  return data === true;
 }
 
 /**

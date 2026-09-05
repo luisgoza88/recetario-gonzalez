@@ -18,7 +18,7 @@ import {
 
 export default function OnboardingPage() {
   const state = useOnboardingState();
-  const { completeOnboarding } = useOnboardingSubmit();
+  const { completeOnboarding, error } = useOnboardingSubmit();
 
   const handleComplete = () => {
     completeOnboarding({
@@ -129,6 +129,11 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[var(--bg)]">
+      {error && (
+        <p role="alert" className="m-4 rounded-xl bg-red-50 p-4 text-red-800">
+          {error}
+        </p>
+      )}
       {/* Top progress: back + segmented bar + counter */}
       {!isComplete && (
         <div className="px-5 pt-12 pb-3">

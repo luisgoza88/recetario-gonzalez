@@ -291,6 +291,16 @@ export function identifyUser(
   userId: string,
   properties?: UserProperties,
 ): void {
+  // Use pseudonymous identifiers; never send names or contact information.
+  if (properties) {
+    const {
+      email: _email,
+      name: _name,
+      household_name: _householdName,
+      ...safe
+    } = properties;
+    properties = safe;
+  }
   if (typeof window === "undefined") return;
 
   if (process.env.NODE_ENV === "development") {
@@ -455,14 +465,13 @@ export const authAnalytics = {
   signupCompleted: (userId: string, email: string) => {
     identifyUser(userId, {
       user_id: userId,
-      email,
       created_at: new Date().toISOString(),
     });
     trackEvent("signup_completed");
   },
 
   loginCompleted: (userId: string, email: string) => {
-    identifyUser(userId, { user_id: userId, email });
+    identifyUser(userId, { user_id: userId });
     trackEvent("login_completed");
   },
 

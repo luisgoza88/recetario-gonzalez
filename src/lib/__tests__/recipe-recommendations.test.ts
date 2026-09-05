@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mocks
 // ---------------------------------------------------------------------------
 
-// Mock createServiceRoleClient before importing the module under test
+// Mock createAuthenticatedClient before importing the module under test
 const mockFrom = vi.fn();
 const mockSelect = vi.fn();
 const mockLte = vi.fn();
@@ -13,7 +13,7 @@ const mockGte = vi.fn();
 const mockEq = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
-  createServiceRoleClient: vi.fn(() => ({
+  createAuthenticatedClient: vi.fn(() => ({
     from: (...args: unknown[]) => mockFrom(...args),
   })),
 }));

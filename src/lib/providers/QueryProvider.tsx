@@ -26,8 +26,8 @@ export default function QueryProvider({ children }: QueryProviderProps) {
             refetchOnReconnect: true,
           },
           mutations: {
-            // Reintentar mutaciones una vez
-            retry: 1,
+            // Las escrituras no idempotentes no se repiten automáticamente.
+            retry: 0,
           },
         },
       }),

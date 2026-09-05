@@ -3,8 +3,15 @@ import { z } from "zod";
 import { cleanJsonResponse, sanitizeUserInput } from "@/lib/gemini/client";
 import { generateText } from "@/lib/ai/generate";
 import { withRateLimit } from "@/lib/rate-limit";
-import { requireAuth } from "@/lib/api/auth";
-import { createServiceRoleClient } from "@/lib/supabase/server";
+import {
+  requireAuth,
+  requirePermission,
+  forbiddenResponse,
+} from "@/lib/api/auth";
+import {
+  createHouseholdClient,
+  resolveActiveHouseholdId,
+} from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 import {
   getCookingProfile,
@@ -52,7 +59,15 @@ const GenerateWeeklyMenuRequestSchema = z.object({
 // viernes/sabado, meals enteros pueden faltar).
 const WeeklyMenuMealSchema = z
   .object({
-    name: z.string().optional(),
+    name: z.string().min(1),
+    ingredients: z
+      .array(
+        z.union([
+          z.string().min(1),
+          z.object({ name: z.string().min(1) }).passthrough(),
+        ]),
+      )
+      .min(1),
   })
   .passthrough();
 
@@ -99,7 +114,7 @@ function validateGeneratedMenuDiet(
   preferences?: DietaryPreferencesRow | null,
 ): string[] {
   const plan = preferences?.meal_plan;
-  if (!preferences || !hasActiveDietPlan(plan)) return [];
+  if (!preferences) return [];
 
   const appliesTo = new Set(
     plan?.meal_types?.length
@@ -117,8 +132,11 @@ function validateGeneratedMenuDiet(
 
   for (const [dayIndex, day] of menu.days.entries()) {
     for (const mealType of ["breakfast", "lunch", "dinner"] as const) {
-      if (!appliesTo.has(mealType)) continue;
-      const rawMeal = day[mealType] as Record<string, unknown> | null | undefined;
+      // Allergies apply to every meal, regardless of the selected diet plan.
+      const rawMeal = day[mealType] as
+        | Record<string, unknown>
+        | null
+        | undefined;
       if (!rawMeal) continue;
       const rawIngredients = Array.isArray(rawMeal.ingredients)
         ? rawMeal.ingredients
@@ -148,7 +166,9 @@ function validateGeneratedMenuDiet(
       const recipe: Recipe = {
         id: `generated-${dayIndex}-${mealType}`,
         name:
-          typeof rawMeal.name === "string" ? rawMeal.name : `Comida ${dayIndex + 1}`,
+          typeof rawMeal.name === "string"
+            ? rawMeal.name
+            : `Comida ${dayIndex + 1}`,
         type: mealType,
         ingredients,
         steps: Array.isArray(rawMeal.steps)
@@ -159,7 +179,12 @@ function validateGeneratedMenuDiet(
         cook_time: parseMinutes(rawMeal.cookTime),
         total_time: parseMinutes(rawMeal.totalTime),
       };
-      const analysis = analyzeRecipeForDiet(recipe, auditPreferences);
+      const analysis = analyzeRecipeForDiet(recipe, {
+        ...auditPreferences,
+        meal_plan: appliesTo.has(mealType)
+          ? auditPreferences.meal_plan
+          : undefined,
+      });
       if (analysis.status === "incompatible") {
         violations.push(
           `Día ${dayIndex + 1}, ${mealType}: ${analysis.reasons.join("; ")}`,
@@ -184,8 +209,8 @@ function validateGeneratedMenuDiet(
 // Supabase client (server-side, service role for DB ops)
 // =====================================================
 
-function getSupabase() {
-  return createServiceRoleClient();
+async function getSupabase() {
+  return await createHouseholdClient();
 }
 
 // =====================================================
@@ -199,7 +224,7 @@ interface InventoryItemRow {
 
 async function getAvailableInventory(): Promise<string[]> {
   try {
-    const { data } = (await getSupabase()
+    const { data } = (await (await getSupabase())
       .from("inventory")
       .select("current_number, market_items(name, category)")
       .gt("current_number", 0)) as { data: InventoryItemRow[] | null };
@@ -221,7 +246,7 @@ async function getAvailableInventory(): Promise<string[]> {
 
 async function getMarketItems(): Promise<string[]> {
   try {
-    const { data } = (await getSupabase()
+    const { data } = (await (await getSupabase())
       .from("market_items")
       .select("name, category")
       .order("category")) as {
@@ -250,7 +275,7 @@ async function getRecentMenuRecipes(weeksBack: number = 3): Promise<string[]> {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - weeksBack * 7);
 
-    const { data } = (await getSupabase()
+    const { data } = (await (await getSupabase())
       .from("generated_menus")
       .select("menu_data")
       .gte("week_start_date", cutoffDate.toISOString().split("T")[0])
@@ -288,7 +313,7 @@ async function getMealFeedback(): Promise<{
   disliked: string[];
 }> {
   try {
-    const { data } = (await getSupabase()
+    const { data } = (await (await getSupabase())
       .from("meal_feedback")
       .select("recipe_name, star_rating, would_repeat, notes")
       .not("recipe_name", "is", null)
@@ -338,7 +363,7 @@ async function getHouseholdDietaryPreferences(
 ): Promise<DietaryPreferencesRow | null> {
   if (!householdId) return null;
   try {
-    const { data } = await getSupabase()
+    const { data } = await (await getSupabase())
       .from("households")
       .select("dietary_preferences")
       .eq("id", householdId)
@@ -362,7 +387,7 @@ interface PreparationRow {
 
 async function getPreparations(): Promise<PreparationRow[]> {
   try {
-    const { data } = (await getSupabase()
+    const { data } = (await (await getSupabase())
       .from("preparations")
       .select("name, ingredients, description")) as {
       data: PreparationRow[] | null;
@@ -425,7 +450,7 @@ export async function POST(request: NextRequest) {
     const rateLimit = await withRateLimit(userId, "generate-recipe");
     if (!rateLimit.allowed) {
       return NextResponse.json(rateLimit.response, {
-        status: 429,
+        status: rateLimit.status ?? 429,
         headers: rateLimit.headers,
       });
     }
@@ -453,7 +478,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { weekStartDate, householdId, preferences, desiredMoods } = body;
+    const {
+      weekStartDate,
+      householdId: requestedHouseholdId,
+      preferences,
+      desiredMoods,
+    } = body;
+    const householdId = await resolveActiveHouseholdId();
+    if (requestedHouseholdId && requestedHouseholdId !== householdId) {
+      return NextResponse.json(
+        { error: "Selecciona el hogar de esta solicitud" },
+        { status: 403 },
+      );
+    }
+    if (!(await requirePermission(householdId, "edit_menu")))
+      return forbiddenResponse();
     const excludeRecentWeeks = preferences?.excludeRecent ?? 3;
     const style = preferences?.style
       ? sanitizeUserInput(preferences.style, 200)
@@ -547,7 +586,10 @@ export async function POST(request: NextRequest) {
 
 CORRECCIÓN OBLIGATORIA:
 El menú anterior incumplió estas reglas:
-${dietViolations.slice(0, 12).map((violation) => `- ${violation}`).join("\n")}
+${dietViolations
+  .slice(0, 12)
+  .map((violation) => `- ${violation}`)
+  .join("\n")}
 
 Genera nuevamente TODO el JSON. Corrige cada incumplimiento y conserva exactamente el formato solicitado.`;
       try {
@@ -586,8 +628,10 @@ Genera nuevamente TODO el JSON. Corrige cada incumplimiento y conserva exactamen
     }
 
     // Store in database
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: savedMenu, error: saveError } = await (getSupabase() as any)
+    const { data: savedMenu, error: saveError } = await (
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Generated menu JSON insert uses the shared dynamic client.
+      (await getSupabase()) as any
+    )
       .from("generated_menus")
       .insert({
         household_id: householdId || null,
@@ -601,18 +645,13 @@ Genera nuevamente TODO el JSON. Corrige cada incumplimiento y conserva exactamen
 
     if (saveError) {
       logger.error("Error saving generated menu", { error: saveError.message });
-      // Still return the menu even if save fails
-      return NextResponse.json({
-        success: true,
-        menu: {
-          id: null,
-          week_start_date: weekStartDate,
-          status: "draft",
-          menu_data: menuData.days,
-          generated_by: "ai",
+      return NextResponse.json(
+        {
+          success: false,
+          error: "No se pudo guardar el menú. Vuelve a intentarlo.",
         },
-        saveError: "No se pudo guardar en la base de datos",
-      });
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({
@@ -638,7 +677,7 @@ Genera nuevamente TODO el JSON. Corrige cada incumplimiento y conserva exactamen
 // no solo el pack estático original
 async function getExpandedRecipeNames(): Promise<string[]> {
   try {
-    const { data } = await getSupabase()
+    const { data } = await (await getSupabase())
       .from("recipes")
       .select("name, category, thermomix_compatible")
       .in("type", ["breakfast", "lunch", "dinner"])
@@ -781,9 +820,9 @@ function buildPrompt(ctx: {
 
   const familyName = getFamilyDisplayName(cookingProfile);
   const location = getLocationString(cookingProfile);
-  const configuredPortions = Object.entries(cookingProfile.portions_config).filter(
-    ([, portions]) => Number.isFinite(portions) && portions > 0,
-  );
+  const configuredPortions = Object.entries(
+    cookingProfile.portions_config,
+  ).filter(([, portions]) => Number.isFinite(portions) && portions > 0);
   const totalPortions =
     configuredPortions.reduce((total, [, portions]) => total + portions, 0) ||
     cookingProfile.family_size;

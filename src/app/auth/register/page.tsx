@@ -1,5 +1,7 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
+import { safeRedirect } from "@/lib/safe-redirect";
 import { useState } from "react";
 import Link from "next/link";
 import { Eye, EyeOff, AlertCircle, Check, ArrowRight } from "lucide-react";
@@ -7,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import Spinner from "@/components/ui/Spinner";
 
 export default function RegisterPage() {
+  const searchParams = useSearchParams();
   const { signUp, isLoading } = useAuth();
 
   const [fullName, setFullName] = useState("");
@@ -78,7 +81,7 @@ export default function RegisterPage() {
               bandeja de entrada y haz clic en el enlace para activar tu cuenta.
             </p>
             <Link
-              href="/auth/login"
+              href={`/auth/login?redirect=${encodeURIComponent(safeRedirect(searchParams.get("redirect")))}`}
               className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-[var(--accent)] text-white text-[14px] font-semibold rounded-xl transition-all active:scale-[0.99] hover:opacity-95"
             >
               Ir a Iniciar Sesión
@@ -110,7 +113,7 @@ export default function RegisterPage() {
           {/* Tabs login / registro */}
           <div className="flex bg-stone-100 rounded-xl p-1 mb-5">
             <Link
-              href="/auth/login"
+              href={`/auth/login?redirect=${encodeURIComponent(safeRedirect(searchParams.get("redirect")))}`}
               className="flex-1 py-2 rounded-lg text-[13px] font-semibold text-center text-stone-500 transition-all hover:text-[var(--ink)]"
             >
               Iniciar sesión
@@ -263,7 +266,7 @@ export default function RegisterPage() {
         <p className="mt-6 text-center text-[13px] text-[var(--ink-soft)]">
           ¿Ya tienes cuenta?{" "}
           <Link
-            href="/auth/login"
+            href={`/auth/login?redirect=${encodeURIComponent(safeRedirect(searchParams.get("redirect")))}`}
             className="text-[var(--accent)] font-semibold hover:underline"
           >
             Inicia sesión

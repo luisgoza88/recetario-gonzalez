@@ -30,7 +30,7 @@ export async function generateRecipeImageWithOpenAI(
       output_format: "jpeg",
       output_compression: 88,
     }),
-    signal: AbortSignal.timeout(120_000),
+    signal: AbortSignal.timeout(40_000),
   });
 
   if (!response.ok) {
@@ -44,7 +44,8 @@ export async function generateRecipeImageWithOpenAI(
     data?: Array<{ b64_json?: string }>;
   };
   const imageData = data.data?.[0]?.b64_json;
-  if (!imageData) throw new Error("OpenAI image response did not include image data");
+  if (!imageData)
+    throw new Error("OpenAI image response did not include image data");
 
   return { imageData, mimeType: "image/jpeg", model };
 }

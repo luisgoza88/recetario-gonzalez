@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { householdDate } from "@/lib/menu-date";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { X, Sparkles, ChefHat, Apple } from "lucide-react";
 import type { Recipe } from "@/types";
@@ -20,6 +21,22 @@ export function KidsMode({ todayRecipe, onClose }: KidsModeProps) {
   const [points, setPoints] = useState(0);
   const [helped, setHelped] = useState<string[]>([]);
 
+  const storageKey = `kids:${typeof window !== "undefined" ? localStorage.getItem("recetario-session-scope") : ""}:${householdDate()}`;
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
+      if (
+        saved &&
+        Array.isArray(saved.helped) &&
+        typeof saved.points === "number"
+      ) {
+        setHelped(saved.helped);
+        setPoints(saved.points);
+      }
+    } catch {
+      /* Corrupt local progress can safely start fresh. */
+    }
+  }, [storageKey]);
   const tasks: Task[] = todayRecipe
     ? [
         { id: "wash", emoji: "🥕", label: "Lavar las verduras", points: 5 },
@@ -33,6 +50,13 @@ export function KidsMode({ todayRecipe, onClose }: KidsModeProps) {
     if (helped.includes(taskId)) return;
     setHelped((prev) => [...prev, taskId]);
     setPoints((p) => p + taskPoints);
+    localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        helped: [...helped, taskId],
+        points: points + taskPoints,
+      }),
+    );
   };
 
   return (

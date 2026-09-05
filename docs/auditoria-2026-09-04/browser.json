@@ -1,0 +1,74 @@
+[
+  {
+    "route": "/auth/login",
+    "status": 200,
+    "url": "http://127.0.0.1:3187/auth/login",
+    "text": "R\nRecetario Familiar\n\nTu cocina, tu hogar, tu IA\n\nIniciar sesión\nCrear cuenta\nEMAIL\nCONTRASEÑA\n¿Olvidaste tu contraseña?\nEntrar\nO\nTengo un código de invitación\n\n¿No tienes cuenta? Regístrate",
+    "errors": [],
+    "overflow": false
+  },
+  {
+    "route": "/auth/register",
+    "status": 200,
+    "url": "http://127.0.0.1:3187/auth/register",
+    "text": "R\nRecetario Familiar\n\nTu cocina, tu hogar, tu IA\n\nIniciar sesión\nCrear cuenta\nNOMBRE COMPLETO\nEMAIL\nCONTRASEÑA\nCONFIRMAR CONTRASEÑA\nCrear mi recetario\n\n¿Ya tienes cuenta? Inicia sesión",
+    "errors": [],
+    "overflow": false
+  },
+  {
+    "route": "/auth/forgot-password",
+    "status": 200,
+    "url": "http://127.0.0.1:3187/auth/forgot-password",
+    "text": "Recuperar contraseña\n\nTe enviaremos un enlace para restablecerla\n\nEmail\nEnviar enlace de recuperación\n\n¿Recordaste tu contraseña? Inicia sesión",
+    "errors": [],
+    "overflow": false
+  },
+  {
+    "route": "/auth/reset-password",
+    "status": 200,
+    "url": "http://127.0.0.1:3187/auth/reset-password",
+    "text": "Nueva contraseña\n\nActualiza tu contraseña de acceso\n\nEste enlace de recuperación no es válido o ya expiró.\nNueva contraseña\nConfirmar nueva contraseña\nGuardar nueva contraseña\n\nVolver a iniciar sesión",
+    "errors": [],
+    "overflow": false
+  },
+  {
+    "route": "/join",
+    "status": 200,
+    "url": "http://127.0.0.1:3187/join",
+    "text": "Unirse a un Hogar\n\nIngresa tu código de invitación\n\nCódigo de invitación\n\n8 caracteres alfanuméricos\n\nValidar código\no\nYa tengo cuenta\nCrear cuenta nueva\nVolver al inicio",
+    "errors": [],
+    "overflow": false
+  },
+  {
+    "route": "/onboarding",
+    "status": 200,
+    "url": "http://127.0.0.1:3187/onboarding",
+    "text": "1/8\n¡Bienvenido a Recetario!\n\nTu asistente inteligente para organizar comidas, lista de compras y gestión del hogar.\n\nIA que te ayuda a planificar\nLista de compras automática\nMenú semanal organizado\nGestión de empleados del hogar\nDatos seguros\nGratis para empezar\nContinuar\nSaltar configuración",
+    "errors": [],
+    "overflow": false
+  },
+  {
+    "route": "/offline",
+    "status": 200,
+    "url": "http://127.0.0.1:3187/offline",
+    "text": "📡\nSin conexión\n\nParece que no tienes conexión a internet. Algunas funciones pueden no estar disponibles.\n\nLos datos que hayas cargado previamente estarán disponibles.\n\nReintentar conexión",
+    "errors": [],
+    "overflow": false
+  },
+  {
+    "route": "/",
+    "status": 200,
+    "url": "http://127.0.0.1:3187/auth/login",
+    "text": "R\nRecetario Familiar\n\nTu cocina, tu hogar, tu IA\n\nIniciar sesión\nCrear cuenta\nEMAIL\nCONTRASEÑA\n¿Olvidaste tu contraseña?\nEntrar\nO\nTengo un código de invitación\n\n¿No tienes cuenta? Regístrate",
+    "errors": [],
+    "overflow": false
+  },
+  {
+    "route": "/?tab=market",
+    "status": 200,
+    "url": "http://127.0.0.1:3187/auth/login",
+    "text": "R\nRecetario Familiar\n\nTu cocina, tu hogar, tu IA\n\nIniciar sesión\nCrear cuenta\nEMAIL\nCONTRASEÑA\n¿Olvidaste tu contraseña?\nEntrar\nO\nTengo un código de invitación\n\n¿No tienes cuenta? Regístrate",
+    "errors": [],
+    "overflow": false
+  }
+]

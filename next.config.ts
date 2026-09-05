@@ -9,10 +9,13 @@ const withBundleAnalyzer = bundleAnalyzer({
 const withSerwist = withSerwistInit({
   swSrc: "src/sw.ts",
   swDest: "public/sw.js",
+  // The offline queue reconnects without discarding open forms or navigation.
+  reloadOnOnline: false,
   disable: process.env.NODE_ENV !== "production",
 });
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: process.cwd(),
   // Headers de seguridad
   async headers() {
     // CSP permite: self, Supabase, PostHog, Google APIs, y recursos inline de Next.js

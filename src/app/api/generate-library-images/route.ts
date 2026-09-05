@@ -1,3 +1,4 @@
+import { withRateLimit } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 import { getGeminiClient, GEMINI_MODELS } from "@/lib/gemini/client";
 import type { DishForLibrary } from "@/data/image-library-dishes";
@@ -26,9 +27,7 @@ function generatePrompt(dish: DishForLibrary): string {
 }
 
 // Generate a single image
-async function generateImage(
-  dish: DishForLibrary,
-): Promise<{
+async function generateImage(dish: DishForLibrary): Promise<{
   success: boolean;
   imageData?: string;
   mimeType?: "image/jpeg" | "image/png";
@@ -142,8 +141,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { allDishes, dishStats } =
-      await import("@/data/image-library-dishes");
+    const { allDishes, dishStats } = await import(
+      "@/data/image-library-dishes"
+    );
     const existingNames = new Set(
       existingImages?.map((img) => img.name_en) || [],
     );
@@ -192,6 +192,12 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const auth = requireAuth(request);
   if (auth instanceof NextResponse) return auth;
+  const rateLimit = await withRateLimit(auth.userId, "generate-image");
+  if (!rateLimit.allowed)
+    return NextResponse.json(rateLimit.response, {
+      status: rateLimit.status ?? 429,
+      headers: rateLimit.headers,
+    });
 
   const supabase = await createAuthenticatedClient();
   const storageClient = createStorageAdminClient();
@@ -201,15 +207,16 @@ export async function POST(request: NextRequest) {
     const { batchSize = 5, startIndex = 0, specificDishes } = body;
 
     // Limit batch size to avoid timeouts
-    const limitedBatchSize = Math.min(batchSize, 10);
+    const limitedBatchSize = Math.max(1, Math.min(Number(batchSize) || 1, 1));
 
     // Get existing images
     const { data: existingImages } = await supabase
       .from("image_library")
       .select("name_en");
 
-    const { allDishes: allDishesData } =
-      await import("@/data/image-library-dishes");
+    const { allDishes: allDishesData } = await import(
+      "@/data/image-library-dishes"
+    );
     const existingNames = new Set(
       existingImages?.map((img) => img.name_en) || [],
     );
@@ -221,7 +228,8 @@ export async function POST(request: NextRequest) {
       // Process specific dishes by name
       dishesToProcess = allDishesData.filter(
         (d) =>
-          specificDishes.includes(d.name_en) && !existingNames.has(d.name_en),
+          specificDishes.slice(0, limitedBatchSize).includes(d.name_en) &&
+          !existingNames.has(d.name_en),
       );
     } else {
       // Process next batch of remaining dishes

@@ -131,7 +131,7 @@ describe("checkRateLimit", () => {
     expect(result.retryAfterMs).toBeDefined();
   });
 
-  it("should fail-open when DB returns an error", async () => {
+  it("should fail-closed when DB returns an error", async () => {
     mockRpc.mockResolvedValue({
       data: null,
       error: { message: "DB connection failed" },
@@ -141,14 +141,15 @@ describe("checkRateLimit", () => {
 
     const result = await checkRateLimit("user-123", "generate-recipe");
 
-    expect(result.allowed).toBe(true);
-    expect(result.remaining).toBe(20); // full limit
+    expect(result.allowed).toBe(false);
+    expect(result.unavailable).toBe(true);
+    expect(result.remaining).toBe(0); // full limit
     expect(consoleSpy).toHaveBeenCalled();
 
     consoleSpy.mockRestore();
   });
 
-  it("should fail-open when DB returns empty data", async () => {
+  it("should fail-closed when DB returns empty data", async () => {
     mockRpc.mockResolvedValue({
       data: [],
       error: null,
@@ -158,21 +159,23 @@ describe("checkRateLimit", () => {
 
     const result = await checkRateLimit("user-123", "generate-recipe");
 
-    expect(result.allowed).toBe(true);
-    expect(result.remaining).toBe(20);
+    expect(result.allowed).toBe(false);
+    expect(result.unavailable).toBe(true);
+    expect(result.remaining).toBe(0);
 
     consoleSpy.mockRestore();
   });
 
-  it("should fail-open when rpc throws an exception", async () => {
+  it("should fail-closed when rpc throws an exception", async () => {
     mockRpc.mockRejectedValue(new Error("Network error"));
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const result = await checkRateLimit("user-123", "generate-recipe");
 
-    expect(result.allowed).toBe(true);
-    expect(result.remaining).toBe(20);
+    expect(result.allowed).toBe(false);
+    expect(result.unavailable).toBe(true);
+    expect(result.remaining).toBe(0);
 
     consoleSpy.mockRestore();
   });

@@ -1,5 +1,6 @@
 "use client";
 
+import { useAppNavigation } from "@/hooks/useAppNavigation";
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import BottomNavigation from "@/components/navigation/BottomNavigation";
@@ -50,14 +51,6 @@ const SettingsView = dynamic(
   },
 );
 
-const AICommandCenter = dynamic(
-  () => import("@/components/ai/AICommandCenter"),
-  {
-    loading: () => <DynamicLoadingSpinner />,
-    ssr: false,
-  },
-);
-
 const FloatingAIAssistant = dynamic(
   () => import("@/components/FloatingAIAssistant"),
   {
@@ -86,6 +79,7 @@ import logger from "@/lib/logger";
 
 export default function Home() {
   // Check if user is employee → render YolimaView (simplified mode)
+  useAppNavigation();
   const auth = useOptionalAuth();
   const isEmployee = auth?.isEmployee?.() ?? false;
 
@@ -96,9 +90,19 @@ export default function Home() {
   const isAuthenticated = auth?.isAuthenticated ?? false;
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      window.location.href = "/auth/login";
+      window.location.href = `/auth/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
     }
   }, [authLoading, isAuthenticated]);
+
+  useEffect(() => {
+    if (
+      !authLoading &&
+      isAuthenticated &&
+      !auth?.currentHousehold &&
+      !auth?.error
+    )
+      window.location.replace("/onboarding");
+  }, [authLoading, isAuthenticated, auth?.currentHousehold, auth?.error]);
 
   // Estado global con Zustand (navegación y UI)
   const {
@@ -113,7 +117,7 @@ export default function Home() {
   } = useAppStore();
 
   // AI Command Center state
-  const [showAICommandCenter, setShowAICommandCenter] = useState(false);
+  const [assistantOpenSignal, setAssistantOpenSignal] = useState(0);
   const [pendingAIProposals, setPendingAIProposals] = useState(0);
   const householdId = useHouseholdId();
 
@@ -192,8 +196,18 @@ export default function Home() {
   // (navigateTo action). The CustomEvent listener for 'appNavigate' has been removed.
 
   // Datos con TanStack Query (cache automático, refetch inteligente)
-  const { data: recipes = [], isLoading: recipesLoading } = useRecipes();
-  const { data: marketItems = [], isLoading: itemsLoading } = useMarketItems();
+  const {
+    data: recipes = [],
+    isLoading: recipesLoading,
+    error: recipesError,
+  } = useRecipes(!isEmployee && activeSection === "recetario");
+  const {
+    data: marketItems = [],
+    isLoading: itemsLoading,
+    error: itemsError,
+  } = useMarketItems(
+    !isEmployee && activeSection === "recetario" && recetarioTab === "market",
+  );
   const { data: pendingSuggestions = 0 } = useSuggestionsCount();
   const refreshAppData = useRefreshAppData();
 
@@ -214,6 +228,27 @@ export default function Home() {
             {authLoading ? "Cargando…" : "Redirigiendo…"}
           </p>
         </div>
+      </div>
+    );
+  }
+
+  if (
+    activeSection === "recetario" &&
+    (recipesError || (recetarioTab === "market" && itemsError))
+  ) {
+    return (
+      <div
+        className="min-h-screen flex flex-col items-center justify-center gap-4 p-6"
+        role="alert"
+      >
+        <p>No pudimos cargar los datos de tu hogar.</p>
+        <button
+          className="rounded-xl bg-green-700 px-5 py-3 text-white"
+          onClick={handleUpdate}
+        >
+          Volver a intentar
+        </button>
+        <button onClick={() => setActiveSection("hoy")}>Ir a Hoy</button>
       </div>
     );
   }
@@ -305,17 +340,11 @@ export default function Home() {
       )}
 
       {/* Floating AI Assistant Chat */}
-      <FloatingAIAssistant activeSection={activeSection} />
-
-      {/* AI Command Center Overlay - fullscreen above everything */}
-      {showAICommandCenter && (
-        <div className="fixed inset-0 z-[100] bg-gray-50">
-          <AICommandCenter
-            onClose={() => setShowAICommandCenter(false)}
-            householdId={householdId || undefined}
-          />
-        </div>
-      )}
+      <FloatingAIAssistant
+        activeSection={activeSection}
+        openSignal={assistantOpenSignal}
+        showLauncher={false}
+      />
 
       {/* Bottom Navigation with AI FAB */}
       <BottomNavigation
@@ -327,7 +356,7 @@ export default function Home() {
         recetarioTab={recetarioTab}
         onRecetarioTabChange={setRecetarioTab}
         pendingSuggestions={pendingSuggestions}
-        onOpenAICommandCenter={() => setShowAICommandCenter(true)}
+        onOpenAssistant={() => setAssistantOpenSignal((value) => value + 1)}
         pendingAIProposals={pendingAIProposals}
       />
     </div>

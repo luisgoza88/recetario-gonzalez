@@ -134,7 +134,7 @@ export function ProactiveSuggestionToast({
       role="alert"
       aria-live="polite"
       className={[
-        "fixed bottom-24 left-4 right-4 z-[90] max-w-sm mx-auto",
+        "fixed bottom-36 left-4 right-4 z-40 max-w-sm mx-auto",
         "border rounded-2xl shadow-lg overflow-hidden",
         "transition-all duration-300 ease-out",
         colors.container,

@@ -1,0 +1,10 @@
+.git
+.claude
+.agents
+.codex
+.next
+node_modules
+coverage
+docs
+.env*
+*.log

@@ -1,3 +1,5 @@
+import { analyzeRecipeForDiet } from "@/lib/recipe-diet";
+import type { DietaryPreferences, Recipe } from "@/types";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
@@ -11,7 +13,10 @@ import {
 import { generateText } from "@/lib/ai/generate";
 import { withRateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/api/auth";
-import { createServiceRoleClient } from "@/lib/supabase/server";
+import {
+  createHouseholdClient,
+  resolveActiveHouseholdId,
+} from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 import {
   getCookingProfile,
@@ -83,8 +88,8 @@ const GeneratedRecipeSchema = z
   })
   .passthrough();
 
-function getSupabase() {
-  return createServiceRoleClient();
+async function getSupabase() {
+  return await createHouseholdClient();
 }
 
 interface IngredientWithContext {
@@ -130,7 +135,7 @@ async function getAvailablePreparations(
   availableIngredients: string[],
 ): Promise<Preparation[]> {
   try {
-    const { data: preparations } = (await getSupabase()
+    const { data: preparations } = (await (await getSupabase())
       .from("preparations")
       .select("name, ingredients, description")) as {
       data: Array<{
@@ -192,7 +197,7 @@ async function getAvailablePreparations(
 // Obtener recetas recientes para evitar repetición
 async function getRecentRecipeNames(): Promise<string[]> {
   try {
-    const { data: feedback } = (await getSupabase()
+    const { data: feedback } = (await (await getSupabase())
       .from("meal_feedback")
       .select("recipe_name")
       .order("created_at", { ascending: false })
@@ -209,6 +214,7 @@ async function getRecentRecipeNames(): Promise<string[]> {
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now();
   const auth = requireAuth(request);
   if (auth instanceof NextResponse) return auth;
 
@@ -222,12 +228,10 @@ export async function POST(request: NextRequest) {
 
     if (!rateLimit.allowed) {
       return NextResponse.json(rateLimit.response, {
-        status: 429,
+        status: rateLimit.status ?? 429,
         headers: rateLimit.headers,
       });
     }
-
-    const gemini = getGeminiClient();
 
     // Parse and validate request body with Zod
     let body: GenerateRecipeRequest;
@@ -255,19 +259,36 @@ export async function POST(request: NextRequest) {
     const {
       availableIngredients,
       mealType,
-      servings = 5,
+      servings: requestedServings,
       preferences = [],
       recipeStyle = "saludable",
       recentRecipes = [],
       ingredientsByCategory,
       customItems = [],
       generateImage = false,
-      householdId,
+      householdId: requestedHouseholdId,
       mood,
     } = body;
 
+    const householdId = await resolveActiveHouseholdId();
+    if (requestedHouseholdId && requestedHouseholdId !== householdId) {
+      return NextResponse.json(
+        { error: "Selecciona el hogar de esta solicitud" },
+        { status: 403 },
+      );
+    }
     // Fetch cooking profile for this household
     const cookingProfile = await getCookingProfile(householdId);
+    const db = await createHouseholdClient();
+    const { data: household, error: dietaryError } = await db
+      .from("households")
+      .select("dietary_preferences")
+      .eq("id", householdId)
+      .single();
+    if (dietaryError) throw dietaryError;
+    const dietaryPreferences =
+      household.dietary_preferences as DietaryPreferences | null;
+    const servings = requestedServings ?? cookingProfile.family_size;
     const familyName = getFamilyDisplayName(cookingProfile);
     const location = getLocationString(cookingProfile);
 
@@ -399,7 +420,8 @@ La receta DEBE alinearse con este mood. Prioriza características propias del mo
       }
     }
 
-    const prompt = `Eres un chef profesional especializado en cocina ${cookingProfile.cooking_style || "colombiana y latinoamericana saludable"}.
+    const prompt = `Restricciones y alergias obligatorias del hogar: ${JSON.stringify(dietaryPreferences || {})}.
+Eres un chef profesional especializado en cocina ${cookingProfile.cooking_style || "colombiana y latinoamericana saludable"}.
 Trabajas para ${familyName} ${location}. Cocinas para ${cookingProfile.family_size} personas.
 
 INGREDIENTES DISPONIBLES EN LA DESPENSA:
@@ -490,11 +512,34 @@ Responde ÚNICAMENTE en formato JSON válido con esta estructura exacta:
         );
       }
       const recipe = parsedRecipe.data;
+      const dietResult = analyzeRecipeForDiet(
+        {
+          ...recipe,
+          id: "preview",
+          type: mealType,
+          steps: recipe.steps.map(String),
+        } as Recipe,
+        dietaryPreferences ?? undefined,
+      );
+      if (dietResult.status === "incompatible")
+        return NextResponse.json(
+          {
+            error:
+              "La receta no respeta las restricciones del hogar. Intenta otra combinación.",
+            reasons: dietResult.reasons,
+          },
+          { status: 422 },
+        );
 
       // Si se solicitó generar imagen, hacerlo de forma asíncrona
       let recipeImage = null;
-      if (generateImage) {
+      const remainingMs = 27_000 - (Date.now() - startedAt);
+      if (generateImage && remainingMs > 5_000) {
         try {
+          const imageLimit = await withRateLimit(auth.userId, "generate-image");
+          if (!imageLimit.allowed)
+            throw new Error("Generación de imagen no disponible temporalmente");
+          const gemini = getGeminiClient();
           // Generar imagen con Gemini
           const ingredientNames = recipe.ingredients
             .map((ing: { name: string }) => ing.name)
@@ -505,20 +550,25 @@ ${recipe.description ? `Descripción: ${recipe.description}` : ""}
 Ingredientes principales: ${ingredientNames.join(", ")}.
 Estilo: Fotografía gastronómica profesional, luz natural, plato emplatado elegantemente, fondo desenfocado.`;
 
-          const imageResponse = await geminiWithRetry(() =>
-            gemini.models.generateContent({
-              model: GEMINI_MODELS.FLASH_IMAGE,
-              contents: [
-                {
-                  role: "user",
-                  parts: [{ text: imagePrompt }],
+          const imageResponse = await geminiWithRetry(
+            () =>
+              gemini.models.generateContent({
+                model: GEMINI_MODELS.FLASH_IMAGE,
+                contents: [
+                  {
+                    role: "user",
+                    parts: [{ text: imagePrompt }],
+                  },
+                ],
+                config: {
+                  httpOptions: {
+                    timeout: Math.min(10_000, remainingMs - 2000),
+                  },
+                  responseModalities: ["image", "text"],
+                  responseMimeType: "image/png",
                 },
-              ],
-              config: {
-                responseModalities: ["image", "text"],
-                responseMimeType: "image/png",
-              },
-            }),
+              }),
+            0,
           );
 
           const imageParts = imageResponse.candidates?.[0]?.content?.parts;
@@ -551,7 +601,6 @@ Estilo: Fotografía gastronómica profesional, luz natural, plato emplatado eleg
         error:
           parseError instanceof Error ? parseError.message : String(parseError),
       });
-      logger.error(`Raw content: ${content.slice(0, 500)}`);
 
       return NextResponse.json(
         {

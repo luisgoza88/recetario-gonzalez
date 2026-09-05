@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createAuthenticatedClient } from "@/lib/supabase/server";
 import {
-  createAuthenticatedClient,
-  createServiceRoleClient,
-} from "@/lib/supabase/server";
-import { requireHouseholdMembership, forbiddenResponse } from "@/lib/api/auth";
+  requireHouseholdMembership,
+  requirePermission,
+  forbiddenResponse,
+} from "@/lib/api/auth";
 
 // ============================================
 // GET - Retrieve daily completion for a date
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
       return forbiddenResponse("No perteneces a este hogar");
     }
 
-    const supabase = createServiceRoleClient();
+    const supabase = authClient;
 
     let query = supabase
       .from("daily_completions")
@@ -128,7 +129,19 @@ export async function POST(request: NextRequest) {
       return forbiddenResponse("No perteneces a este hogar");
     }
 
-    const supabase = createServiceRoleClient();
+    if (!(await requirePermission(household_id, "complete_tasks")))
+      return forbiddenResponse();
+    if (employee_id) {
+      const { data: employee } = await authClient
+        .from("home_employees")
+        .select("id")
+        .eq("id", employee_id)
+        .eq("household_id", household_id)
+        .maybeSingle();
+      if (!employee)
+        return forbiddenResponse("La persona no pertenece a este hogar");
+    }
+    const supabase = authClient;
 
     // Check if a record exists for this date
     const { data: existing } = await supabase

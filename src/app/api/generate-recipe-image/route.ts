@@ -3,7 +3,7 @@ import { getGeminiClient, GEMINI_MODELS } from "@/lib/gemini/client";
 import { requireAuth } from "@/lib/api/auth";
 import { withRateLimit } from "@/lib/rate-limit";
 import {
-  createAuthenticatedClient,
+  createHouseholdClient,
   createStorageAdminClient,
 } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       // Si hay recipeId y saveToSupabase, actualizar receta con la URL cacheada
       if (saveToSupabase && recipeId) {
         try {
-          const supabase = await createAuthenticatedClient();
+          const supabase = await createHouseholdClient();
           await supabase
             .from("recipes")
             .update({ image_url: cached.image_url })
@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
         // Guardar en receta si se solicita
         if (saveToSupabase && recipeId) {
           try {
-            const supabase = await createAuthenticatedClient();
+            const supabase = await createHouseholdClient();
             await supabase
               .from("recipes")
               .update({ image_url: imageUrl })
@@ -204,7 +204,7 @@ export async function POST(request: NextRequest) {
     const rateLimit = await withRateLimit(userId, "generate-image");
     if (!rateLimit.allowed) {
       return NextResponse.json(rateLimit.response, {
-        status: 429,
+        status: rateLimit.status ?? 429,
         headers: rateLimit.headers,
       });
     }
@@ -244,36 +244,37 @@ export async function POST(request: NextRequest) {
     }
 
     // Intentar con Imagen 3 primero
-    if (!imageData) try {
-      logger.info("[generate-recipe-image] Generando imagen con Imagen 3...");
-      const imagen3Response = await gemini.models.generateImages({
-        model: GEMINI_MODELS.IMAGE_GEN,
-        prompt: prompt,
-        config: {
-          numberOfImages: 1,
-          aspectRatio: "4:3",
-          outputMimeType: "image/png",
-        },
-      });
+    if (!imageData)
+      try {
+        logger.info("[generate-recipe-image] Generando imagen con Imagen 3...");
+        const imagen3Response = await gemini.models.generateImages({
+          model: GEMINI_MODELS.IMAGE_GEN,
+          prompt: prompt,
+          config: {
+            numberOfImages: 1,
+            aspectRatio: "4:3",
+            outputMimeType: "image/png",
+          },
+        });
 
-      const generatedImage = imagen3Response.generatedImages?.[0];
-      if (generatedImage?.image?.imageBytes) {
-        imageData = generatedImage.image.imageBytes;
-        logger.info(
-          "[generate-recipe-image] Imagen generada exitosamente con Imagen 3",
+        const generatedImage = imagen3Response.generatedImages?.[0];
+        if (generatedImage?.image?.imageBytes) {
+          imageData = generatedImage.image.imageBytes;
+          logger.info(
+            "[generate-recipe-image] Imagen generada exitosamente con Imagen 3",
+          );
+        }
+      } catch (imagen3Error) {
+        logger.error(
+          "[generate-recipe-image] Imagen 3 error, intentando con Gemini Flash",
+          {
+            error:
+              imagen3Error instanceof Error
+                ? imagen3Error.message
+                : String(imagen3Error),
+          },
         );
       }
-    } catch (imagen3Error) {
-      logger.error(
-        "[generate-recipe-image] Imagen 3 error, intentando con Gemini Flash",
-        {
-          error:
-            imagen3Error instanceof Error
-              ? imagen3Error.message
-              : String(imagen3Error),
-        },
-      );
-    }
 
     // Si Imagen 3 falla, usar Gemini 2.0 Flash Exp como respaldo
     if (!imageData) {
@@ -354,7 +355,7 @@ export async function POST(request: NextRequest) {
           imageUrl = urlData?.publicUrl || null;
 
           if (recipeId && imageUrl) {
-            const supabase = await createAuthenticatedClient();
+            const supabase = await createHouseholdClient();
             await supabase
               .from("recipes")
               .update({ image_url: imageUrl })
@@ -407,7 +408,7 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   try {
-    const supabase = await createAuthenticatedClient();
+    const supabase = await createHouseholdClient();
     const { data: recipes, error } = await supabase
       .from("recipes")
       .select("id, name, description, type, ingredients, image_url")
@@ -467,7 +468,7 @@ export async function PUT(request: NextRequest) {
 
     const limitedIds = recipeIds.slice(0, 10);
 
-    const supabase = await createAuthenticatedClient();
+    const supabase = await createHouseholdClient();
     const { data: recipes, error } = await supabase
       .from("recipes")
       .select("id, name, description, type, ingredients")

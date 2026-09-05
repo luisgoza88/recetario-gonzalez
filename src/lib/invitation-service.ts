@@ -33,6 +33,7 @@ export interface InvitationValidation {
 export interface UseInvitationResult {
   success: boolean;
   membership?: HouseholdMembership;
+  householdId?: string;
   error?: string;
 }
 
@@ -144,10 +145,14 @@ export async function redeemInvitationCode(
       };
     }
 
-    return {
-      success: true,
-      membership: data as HouseholdMembership,
-    };
+    const result = data?.[0];
+    if (!result?.success) {
+      return {
+        success: false,
+        error: result?.error || "No se pudo aceptar la invitación",
+      };
+    }
+    return { success: true, householdId: result.household_id };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error desconocido";
     return {

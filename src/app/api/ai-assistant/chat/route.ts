@@ -5,11 +5,12 @@ import { selectTools, type ChatMessageInput } from "@/lib/ai/chat";
 import { generateText } from "@/lib/ai/generate";
 import { withRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
-import { createAuthenticatedClient } from "@/lib/supabase/server";
 import {
-  requireHouseholdMembership,
-  forbiddenResponse,
-} from "@/lib/api/auth";
+  createAuthenticatedClient,
+  createHouseholdClient,
+  resolveActiveHouseholdId,
+} from "@/lib/supabase/server";
+import { forbiddenResponse } from "@/lib/api/auth";
 // Reconexión de escrituras: el catálogo completo de tools y el orchestrator
 // que ya sabía despacharlas, ejecutarlas con audit log y proponerlas.
 import { functionDeclarations } from "../functions";
@@ -312,8 +313,8 @@ const queryFunctions: FunctionDeclaration[] = [
  * Solo se ofrecen cuando hay `householdId` verificado — sin hogar no hay a
  * quién auditar ni a quién pedirle aprobación.
  */
-const writeFunctions: FunctionDeclaration[] = functionDeclarations.filter((d) =>
-  d.name ? isWriteFunction(d.name) : false,
+const writeFunctions: FunctionDeclaration[] = functionDeclarations.filter(
+  (d) => (d.name ? isWriteFunction(d.name) : false),
 );
 
 // ============================================
@@ -625,7 +626,7 @@ export async function POST(request: NextRequest) {
 
     if (!rateLimit.allowed) {
       return NextResponse.json(rateLimit.response, {
-        status: 429,
+        status: rateLimit.status ?? 429,
         headers: rateLimit.headers,
       });
     }
@@ -656,30 +657,20 @@ export async function POST(request: NextRequest) {
     const {
       messages,
       stream = false,
-      householdId,
+      householdId: requestedHouseholdId,
       conversationContext,
     } = validatedBody;
 
-    // ─── Gate cross-tenant ────────────────────────────────────────────────────
-    // `householdId` llega del BODY, y tanto getCookingProfile como
-    // getHouseholdMoodPatterns usan createServiceRoleClient (bypass de RLS).
-    // Sin este chequeo, un usuario autenticado del hogar A podía pasar el UUID
-    // del hogar B y recibir su perfil (nombre de familia, ciudad, estilo,
-    // tamaño) y 90 días de patrones de ánimo inyectados en el system prompt —
-    // y luego pedirle al bot que se los repitiera.
-    if (householdId) {
-      const isMember = await requireHouseholdMembership(householdId);
-      if (!isMember) {
-        return forbiddenResponse("No perteneces a este hogar");
-      }
-    }
+    const householdId = await resolveActiveHouseholdId();
+    if (requestedHouseholdId && requestedHouseholdId !== householdId)
+      return forbiddenResponse("Selecciona el hogar de esta conversación");
 
     // Fetch cooking profile, learning insights, and mood patterns in parallel
     // getLearningInsights is imported dynamically to avoid top-level env access at build time
     const [cookingProfile, learningInsights, moodPatterns] = await Promise.all([
       getCookingProfile(householdId),
       import("@/lib/feedback-learning")
-        .then((m) => m.getLearningInsights())
+        .then(async (m) => m.getLearningInsights(await createHouseholdClient()))
         .catch(() => null),
       householdId
         ? getHouseholdMoodPatterns(householdId).catch(() => null)
@@ -692,7 +683,8 @@ export async function POST(request: NextRequest) {
       cookingStyle: cookingProfile.cooking_style,
       familySize: cookingProfile.family_size,
       conversationContext: conversationContext as
-        ConversationContextPayload | undefined,
+        | ConversationContextPayload
+        | undefined,
       learningInsights: learningInsights ?? undefined,
       moodPatterns: formatMoodPatternsForPrompt(moodPatterns),
     });
@@ -917,7 +909,10 @@ export async function POST(request: NextRequest) {
       const send = (
         controller: ReadableStreamDefaultController,
         event: ToolEvent,
-      ) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+      ) =>
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
+        );
 
       const readable = new ReadableStream({
         async start(controller) {

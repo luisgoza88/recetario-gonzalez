@@ -1,0 +1,112 @@
+
+> recetario-app@0.1.0 test:run
+> vitest run
+
+
+ RUN  v4.0.18 /Users/marianatejada/Documents/GitHub/recetario-app
+
+ ✓ src/lib/__tests__/portions.test.ts (31 tests) 23ms
+ ✓ src/lib/__tests__/api-auth.test.ts (12 tests) 12ms
+stderr | src/lib/__tests__/household-service.test.ts > getHousehold > debe retornar null cuando hay error
+[2026-09-05T01:27:54.909Z] [ERROR] Error fetching household {"error":"[object Object]"}
+
+stderr | src/lib/__tests__/household-service.test.ts > createHousehold > debe retornar null si falla crear household
+[2026-09-05T01:27:54.912Z] [ERROR] Error creating household {"error":"[object Object]"}
+
+stderr | src/lib/__tests__/household-service.test.ts > createHousehold > debe hacer rollback si falla crear usuario
+[2026-09-05T01:27:54.912Z] [ERROR] Error creating user {"error":"[object Object]"}
+
+stderr | src/lib/__tests__/household-service.test.ts > getUserByAuthId > debe retornar null si no existe
+[2026-09-05T01:27:54.914Z] [ERROR] Error fetching user {"error":"[object Object]"}
+
+stderr | src/lib/__tests__/household-service.test.ts > getHouseholdUsers > debe retornar array vacío si hay error
+[2026-09-05T01:27:54.915Z] [ERROR] Error fetching household users {"error":"[object Object]"}
+
+stderr | src/app/api/__tests__/daily-completion.test.ts > POST /api/daily-completion > RLS prevents updating completion from different household
+Error saving daily completion: { message: 'RLS policy violation', code: '42501' }
+
+stderr | src/app/api/__tests__/daily-completion.test.ts > POST /api/daily-completion > returns 500 when database error occurs
+Error saving daily completion: { message: 'Database connection lost' }
+
+ ✓ src/data/__tests__/low-carb-colombian-recipes.test.ts (3 tests) 26ms
+ ✓ src/app/api/__tests__/daily-completion.test.ts (12 tests) 16ms
+ ✓ src/lib/__tests__/rate-limit.test.ts (16 tests) 9ms
+stderr | src/lib/__tests__/household-service.test.ts > createInvitation > debe retornar null si falla
+[2026-09-05T01:27:54.932Z] [ERROR] Error creating invitation {"error":"[object Object]"}
+
+stderr | src/lib/__tests__/household-service.test.ts > getInvitationByToken > debe retornar null para token inválido
+[2026-09-05T01:27:54.932Z] [ERROR] Error fetching invitation {"error":"[object Object]"}
+
+ ✓ src/lib/__tests__/household-service.test.ts (26 tests) 82ms
+ ✓ src/__tests__/menu-tasks-integration.test.ts (40 tests) 50ms
+ ✓ src/app/api/__tests__/scan-receipt-validation.test.ts (10 tests) 16ms
+stderr | src/app/api/__tests__/scan-receipt.test.ts > POST /api/scan-receipt > returns 500 when Gemini throws an unexpected error
+[2026-09-05T01:27:55.068Z] [ERROR] Error scanning receipt {"error":"Gemini network failure"}
+
+ ✓ src/app/api/__tests__/scan-receipt.test.ts (5 tests) 20ms
+ ✓ src/app/api/__tests__/ai-assistant-execute.test.ts (13 tests) 14ms
+ ✓ src/components/providers/__tests__/HouseholdProvider.test.tsx (2 tests) 44ms
+ ✓ src/lib/__tests__/smart-substitutions.test.ts (18 tests) 245ms
+ ✓ src/components/__tests__/SmartSuggestions.test.tsx (6 tests | 4 skipped) 243ms
+ ✓ src/components/__tests__/CalendarView.test.tsx (5 tests | 3 skipped) 290ms
+ ✓ src/components/__tests__/RecipeModal.test.tsx (6 tests | 1 skipped) 345ms
+ ✓ src/lib/__tests__/recipe-diet.test.ts (15 tests) 10ms
+stderr | src/lib/__tests__/inventory-check-matching.test.ts > checkRecipeIngredients - coincidencia exacta > debe detectar ingredientes faltantes
+[ALIASES-ERROR] No market_items returned from query
+
+stderr | src/lib/__tests__/inventory-check-matching.test.ts > checkRecipeIngredients - coincidencia exacta > debe manejar inventario completamente vacío
+[ALIASES-ERROR] No market_items returned from query
+
+stderr | src/lib/__tests__/inventory-check-matching.test.ts > checkRecipeIngredients - coincidencia parcial > debe encontrar "Pollo pechuga" cuando receta pide "Pollo"
+[ALIASES-ERROR] No market_items returned from query
+
+stderr | src/lib/__tests__/inventory-check-matching.test.ts > checkRecipeIngredients - coincidencia parcial > debe encontrar match parcial para ingredientes con descripciones
+[ALIASES-ERROR] No market_items returned from query
+
+stderr | src/lib/__tests__/inventory-check-matching.test.ts > checkRecipeIngredients - ingredientes compuestos > debe separar ingredientes con + y verificar cada uno
+[ALIASES-ERROR] No market_items returned from query
+
+stderr | src/lib/__tests__/inventory-check-matching.test.ts > checkRecipeIngredients - fuzzy matching > debe encontrar match por palabra clave >= 4 caracteres
+[ALIASES-ERROR] No market_items returned from query
+
+stderr | src/lib/__tests__/inventory-check-matching.test.ts > checkRecipeIngredients - fuzzy matching > no debe hacer fuzzy match con palabras < 4 caracteres
+[ALIASES-ERROR] No market_items returned from query
+
+stderr | src/lib/__tests__/inventory-check-matching.test.ts > availablePercent > debe calcular porcentaje parcial correctamente
+[ALIASES-ERROR] No market_items returned from query
+
+stderr | src/lib/__tests__/inventory-check-matching.test.ts > findAlternativeRecipes > debe encontrar recetas alternativas con >= 80% disponibilidad
+[ALIASES-ERROR] No market_items returned from query
+
+ ✓ src/lib/__tests__/inventory-check-matching.test.ts (19 tests) 10ms
+ ✓ src/app/api/__tests__/validate-invitation.test.ts (6 tests) 11ms
+stderr | src/lib/__tests__/trust-service.test.ts > checkAutoApproval > debe permitir riesgo 2 cuando no hay trust record (comportamiento por defecto)
+[2026-09-05T01:27:56.727Z] [ERROR] Error creating household trust {"error":"[object Object]"}
+
+stderr | src/lib/__tests__/trust-service.test.ts > checkAutoApproval > debe rechazar riesgo 3 sin trust record
+[2026-09-05T01:27:56.728Z] [ERROR] Error creating household trust {"error":"[object Object]"}
+
+stderr | src/lib/__tests__/trust-service.test.ts > checkRateLimit > debe retornar no permitido cuando no hay trust config
+[2026-09-05T01:27:56.729Z] [ERROR] Error creating household trust {"error":"[object Object]"}
+
+ ✓ src/lib/__tests__/recipe-recommendations.test.ts (15 tests) 8ms
+stderr | src/lib/__tests__/trust-service.test.ts > recordSuccessfulAction > debe retornar error si no hay trust record
+[2026-09-05T01:27:56.731Z] [ERROR] Error creating household trust {"error":"[object Object]"}
+
+ ✓ src/lib/__tests__/units.test.ts (39 tests) 6ms
+ ✓ src/lib/ai/__tests__/ai-command-service.test.ts (20 tests) 10ms
+ ✓ src/lib/__tests__/trust-service.test.ts (18 tests) 8ms
+ ✓ src/lib/ai/__tests__/proposal-executor.test.ts (11 tests) 13ms
+ ✓ src/__tests__/countIngredientMatches.test.ts (44 tests) 9ms
+ ✓ src/app/api/__tests__/write-gate.test.ts (13 tests) 9ms
+ ✓ src/lib/__tests__/inventory-check.test.ts (14 tests) 5ms
+ ✓ src/lib/__tests__/api-auth-household.test.ts (9 tests) 5ms
+ ✓ src/lib/__tests__/thermomix-validation.test.ts (4 tests) 4ms
+ ✓ src/lib/__tests__/recipe-image-prompt.test.ts (1 test) 2ms
+ ✓ src/lib/__tests__/recipe-catalog.test.ts (5 tests) 3ms
+
+ Test Files  30 passed (30)
+      Tests  430 passed | 8 skipped (438)
+   Start at  20:27:52
+   Duration  4.26s (transform 7.16s, setup 5.01s, import 10.18s, tests 1.55s, environment 36.15s)
+

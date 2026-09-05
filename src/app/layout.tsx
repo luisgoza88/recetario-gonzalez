@@ -1,26 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import {
-  Geist,
-  Geist_Mono,
-  Fraunces,
-  Plus_Jakarta_Sans,
-  JetBrains_Mono,
-} from "next/font/google";
+import { Fraunces, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 import Providers from "@/lib/providers/Providers";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-  display: "swap",
-});
 
 const fraunces = Fraunces({
   variable: "--font-display",
@@ -45,8 +27,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Recetario Familia González",
-  description: "Plan de 15 días - Menú rotativo familiar",
+  title: "Recetario Familiar",
+  description: "Recetas, menú, compras y tareas para tu hogar",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -68,12 +50,11 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} ${plusJakarta.variable} ${jetbrainsMono.variable} antialiased warm-mode min-h-screen`}
+        className={`${fraunces.variable} ${plusJakarta.variable} ${jetbrainsMono.variable} antialiased warm-mode min-h-screen`}
         style={{
-          fontFamily: "var(--font-jakarta), var(--font-geist-sans)",
+          fontFamily: "var(--font-jakarta), system-ui, sans-serif",
           background: "var(--bg)",
           color: "var(--ink)",
-          paddingBottom: "96px",
           lineHeight: 1.5,
         }}
       >

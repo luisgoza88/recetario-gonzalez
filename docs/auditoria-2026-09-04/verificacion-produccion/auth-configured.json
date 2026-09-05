@@ -1,0 +1,4 @@
+{
+  "site_url": "https://recetario-app-self.vercel.app",
+  "uri_allow_list": "https://recetario-app-self.vercel.app/auth/callback,https://recetario-app-self.vercel.app/auth/callback?**,https://recetario-app-self.vercel.app/auth/reset-password"
+}

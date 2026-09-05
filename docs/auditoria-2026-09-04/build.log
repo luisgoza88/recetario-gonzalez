@@ -1,0 +1,82 @@
+
+> recetario-app@0.1.0 build
+> next build --webpack
+
+⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /Users/marianatejada/package-lock.json as the root directory.
+ To silence this warning, set `outputFileTracingRoot` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats for more information.
+ Detected additional lockfiles: 
+   * /Users/marianatejada/Documents/GitHub/recetario-app/package-lock.json
+
+▲ Next.js 16.2.7 (webpack)
+- Environments: .env.local
+- Experiments (use with caution):
+  · optimizePackageImports
+
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+✓ (serwist) Bundling the service worker script with the URL '/sw.js' and the scope '/'...
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (131kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+✓ Compiled successfully in 11.0s
+  Running TypeScript ...
+  Finished TypeScript in 9.6s ...
+  Collecting page data using 15 workers ...
+⚠ Using edge runtime on a page currently disables static generation for that page
+  Generating static pages using 15 workers (0/39) ...
+  Generating static pages using 15 workers (9/39) 
+  Generating static pages using 15 workers (19/39) 
+  Generating static pages using 15 workers (29/39) 
+✓ Generating static pages using 15 workers (39/39) in 195ms
+  Finalizing page optimization ...
+  Collecting build traces ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/adapt-recipe-thermomix
+├ ƒ /api/ai-assistant/chat
+├ ƒ /api/ai-assistant/execute
+├ ƒ /api/analyze-room
+├ ƒ /api/cook-with-this
+├ ƒ /api/cron/cleanup-proposals
+├ ƒ /api/cron/preload-recipe-images
+├ ƒ /api/daily-completion
+├ ƒ /api/external/search-recipes
+├ ƒ /api/generate-library-images
+├ ƒ /api/generate-recipe
+├ ƒ /api/generate-recipe-from-image
+├ ƒ /api/generate-recipe-image
+├ ƒ /api/generate-shopping-list
+├ ƒ /api/generate-weekly-menu
+├ ƒ /api/generated-menu
+├ ƒ /api/log-price
+├ ƒ /api/match-recipe-image
+├ ƒ /api/parse-market-items
+├ ƒ /api/push/send
+├ ƒ /api/pwa-icon/[size]
+├ ƒ /api/recurring-items
+├ ƒ /api/scan-pantry
+├ ƒ /api/scan-receipt
+├ ƒ /api/seed-schedule
+├ ƒ /api/smart-shopping-list
+├ ƒ /api/suggest-substitution
+├ ƒ /api/validate-invitation
+├ ƒ /apple-icon
+├ ○ /auth/forgot-password
+├ ○ /auth/login
+├ ○ /auth/register
+├ ○ /auth/reset-password
+├ ƒ /icon
+├ ○ /join
+├ ○ /manifest.webmanifest
+├ ○ /offline
+├ ○ /onboarding
+└ ƒ /r/[slug]
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

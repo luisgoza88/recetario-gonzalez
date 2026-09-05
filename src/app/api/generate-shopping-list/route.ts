@@ -1,12 +1,14 @@
+import { shoppingRequirement } from "@/lib/shopping-quantities";
+import { menuCycleDay } from "@/lib/menu-date";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuth } from "@/lib/api/auth";
-import { createServiceRoleClient } from "@/lib/supabase/server";
+import { createHouseholdClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 import type { ShoppingListItem } from "@/types";
 
-function getSupabase() {
-  return createServiceRoleClient();
+async function getSupabase() {
+  return await createHouseholdClient();
 }
 
 const RequestSchema = z.object({
@@ -35,6 +37,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 interface IngredientAccum {
+  quantities: string[];
   name: string;
   recipes: string[];
   category: string;
@@ -47,7 +50,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { menuId, weekStartDate } = RequestSchema.parse(body);
-    const supabase = getSupabase();
+    const supabase = await getSupabase();
 
     // 1. Get ingredients from generated menu or fallback to cycle menu
     const ingredientMap = new Map<string, IngredientAccum>();
@@ -92,11 +95,13 @@ export async function POST(request: NextRequest) {
             if (!ingredientMap.has(key)) {
               ingredientMap.set(key, {
                 name: ing.name,
+                quantities: [],
                 recipes: [],
                 category: "otros",
               });
             }
             const entry = ingredientMap.get(key)!;
+            entry.quantities.push(ing.total || "");
             if (!entry.recipes.includes(meal.name)) {
               entry.recipes.push(meal.name);
             }
@@ -105,12 +110,12 @@ export async function POST(request: NextRequest) {
       }
     } else {
       // Fallback: get from 7-day cycle menu
-      const today = new Date(weekStartDate);
+      const today = new Date(`${weekStartDate}T12:00:00-05:00`);
       for (let i = 0; i < 7; i++) {
         const date = new Date(today);
         date.setDate(today.getDate() + i);
-        const dow = date.getDay();
-        const cycleDay = (((dow === 0 ? 7 : dow) - 1) % 12) + 1;
+        const cycleDay = menuCycleDay(date);
+        if (cycleDay < 0) continue;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: menu } = await (supabase as any)
@@ -129,7 +134,7 @@ export async function POST(request: NextRequest) {
 
         interface RecipeWithIngredients {
           name?: string;
-          ingredients?: Array<string | { name?: string }>;
+          ingredients?: Array<string | { name?: string; total?: string }>;
         }
 
         for (const recipe of [
@@ -145,11 +150,15 @@ export async function POST(request: NextRequest) {
             if (!ingredientMap.has(key)) {
               ingredientMap.set(key, {
                 name: ingName,
+                quantities: [],
                 recipes: [],
                 category: "otros",
               });
             }
             const entry = ingredientMap.get(key)!;
+            entry.quantities.push(
+              typeof ing === "string" ? "" : ing.total || "",
+            );
             if (!entry.recipes.includes(recipe.name!)) {
               entry.recipes.push(recipe.name!);
             }
@@ -165,65 +174,17 @@ export async function POST(request: NextRequest) {
       .select("*, market_item:market_items(name, category)")
       .gt("current_number", 0);
 
-    const availableItems = new Set<string>();
+    const availableItems = new Map<string, string>();
     inventory?.forEach(
-      (item: { market_item?: { name?: string }; current_number: number }) => {
+      (item: {
+        market_item?: { name?: string };
+        current_number: number;
+        current_quantity: string;
+      }) => {
         const name = item.market_item?.name?.toLowerCase() || "";
-        if (name) availableItems.add(name);
+        if (name) availableItems.set(name, item.current_quantity);
       },
     );
-
-    // 3. Get price history for estimates
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: priceData } = await (supabase as any)
-      .from("price_history")
-      .select("item_name, price, store")
-      .order("recorded_at", { ascending: false });
-
-    // Build avg price + best store per item
-    const priceMap = new Map<
-      string,
-      { avgPrice: number; bestStore: string; bestPrice: number }
-    >();
-    if (priceData) {
-      const grouped = new Map<
-        string,
-        Array<{ price: number; store: string }>
-      >();
-      for (const p of priceData) {
-        const key = p.item_name.toLowerCase();
-        if (!grouped.has(key)) grouped.set(key, []);
-        grouped
-          .get(key)!
-          .push({ price: Number(p.price), store: p.store || "Otro" });
-      }
-      for (const [key, records] of grouped) {
-        const avg = records.reduce((s, r) => s + r.price, 0) / records.length;
-        // Find cheapest store
-        const storeAvgs = new Map<string, { sum: number; count: number }>();
-        for (const r of records) {
-          if (!storeAvgs.has(r.store))
-            storeAvgs.set(r.store, { sum: 0, count: 0 });
-          const sa = storeAvgs.get(r.store)!;
-          sa.sum += r.price;
-          sa.count++;
-        }
-        let bestStore = "Otro";
-        let bestPrice = avg;
-        for (const [store, data] of storeAvgs) {
-          const storeAvg = data.sum / data.count;
-          if (storeAvg < bestPrice) {
-            bestPrice = storeAvg;
-            bestStore = store;
-          }
-        }
-        priceMap.set(key, {
-          avgPrice: Math.round(avg),
-          bestStore,
-          bestPrice: Math.round(bestPrice),
-        });
-      }
-    }
 
     // 4. Get market item categories
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -238,17 +199,14 @@ export async function POST(request: NextRequest) {
 
     // 5. Build shopping list items
     const shoppingItems: ShoppingListItem[] = [];
-    let totalEstimated = 0;
+    const totalEstimated = 0;
 
     for (const [key, data] of ingredientMap) {
-      // Check if available in inventory (fuzzy match)
-      let inStock = false;
-      for (const available of availableItems) {
-        if (available.includes(key) || key.includes(available)) {
-          inStock = true;
-          break;
-        }
-      }
+      const requirement = shoppingRequirement(
+        data.quantities,
+        availableItems.get(key),
+      );
+      const inStock = requirement.inStock;
 
       // Determine category
       const marketCategory = marketCatMap.get(key);
@@ -257,14 +215,14 @@ export async function POST(request: NextRequest) {
         : "otros";
 
       // Get price info
-      const priceInfo = priceMap.get(key);
 
       const item: ShoppingListItem = {
         name: data.name,
-        quantity: "1",
+        quantity: requirement.quantity,
         category,
-        estimatedPrice: priceInfo?.avgPrice,
-        store: priceInfo?.bestStore,
+        // Pack sizes in price history may differ; do not invent a total.
+        estimatedPrice: undefined,
+        store: undefined,
         checked: false,
         fromRecipe: data.recipes.join(", "),
         inStock,
@@ -272,9 +230,6 @@ export async function POST(request: NextRequest) {
       };
 
       // Only add estimated price to total for items that still need to be bought
-      if (!inStock && priceInfo?.avgPrice) {
-        totalEstimated += priceInfo.avgPrice;
-      }
 
       shoppingItems.push(item);
     }
@@ -286,51 +241,25 @@ export async function POST(request: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: savedList, error: saveError } = await (supabase as any)
       .from("shopping_lists")
-      .upsert(
-        {
-          week_start_date: weekStartDate,
-          menu_id: menuId || null,
-          items: shoppingItems,
-          total_estimated: totalEstimated > 0 ? totalEstimated : null,
-          status: "active",
-          created_at: new Date().toISOString(),
-        },
-        { onConflict: "week_start_date" },
-      )
+      .insert({
+        week_start_date: weekStartDate,
+        menu_id: menuId || null,
+        items: shoppingItems,
+        total_estimated: totalEstimated > 0 ? totalEstimated : null,
+        status: "active",
+      })
       .select()
       .single();
 
     if (saveError) {
-      // If upsert fails (no unique constraint), try insert
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: inserted, error: insertError } = await (supabase as any)
-        .from("shopping_lists")
-        .insert({
-          week_start_date: weekStartDate,
-          menu_id: menuId || null,
-          items: shoppingItems,
-          total_estimated: totalEstimated > 0 ? totalEstimated : null,
-          status: "active",
-        })
-        .select()
-        .single();
-
-      if (insertError) {
-        logger.error("Error saving shopping list", {
-          error: insertError.message,
-        });
-        // Still return items even if save fails
-      }
-
-      return NextResponse.json({
-        success: true,
-        list: inserted || {
-          items: shoppingItems,
-          total_estimated: totalEstimated,
-          week_start_date: weekStartDate,
+      logger.error("Error saving shopping list", { error: saveError.message });
+      return NextResponse.json(
+        {
+          success: false,
+          error: "No se pudo guardar la lista. Vuelve a intentarlo.",
         },
-        category_labels: CATEGORY_LABELS,
-      });
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({
@@ -365,7 +294,7 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const weekStartDate = searchParams.get("weekStartDate");
-  const supabase = getSupabase();
+  const supabase = await getSupabase();
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

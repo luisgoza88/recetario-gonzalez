@@ -1,5 +1,7 @@
 "use client";
 
+import { householdDate } from "@/lib/menu-date";
+import { getEffectiveMenu } from "@/lib/effective-menu";
 import { useState, useEffect, useCallback } from "react";
 import { LogOut, CheckCircle2, Lightbulb } from "lucide-react";
 import Spinner from "@/components/ui/Spinner";
@@ -128,7 +130,7 @@ export default function YolimaView() {
 
   // Today's info
   const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
+  const todayStr = householdDate(today);
   const dayName = today.toLocaleDateString("es-CO", { weekday: "long" });
   const dateFormatted = today.toLocaleDateString("es-CO", {
     day: "numeric",
@@ -171,44 +173,13 @@ export default function YolimaView() {
 
   const loadTodayMenu = useCallback(async () => {
     try {
-      // Calculate day in cycle (same logic as useTodayDashboard)
-      const startDate = new Date("2025-01-06");
-      const diffDays = Math.floor(
-        (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
-      );
-
-      let sundays = 0;
-      const tempDate = new Date(startDate);
-      while (tempDate <= today) {
-        if (tempDate.getDay() === 0) sundays++;
-        tempDate.setDate(tempDate.getDate() + 1);
-      }
-
-      const effectiveDays = diffDays - sundays;
-      const dayNumber = ((effectiveDays % 12) + 12) % 12;
-
-      const { data: menuData, error: menuError } = await supabase
-        .from("day_menu")
-        .select(
-          `
-          *,
-          breakfast:recipes!day_menu_breakfast_id_fkey(*),
-          lunch:recipes!day_menu_lunch_id_fkey(*),
-          dinner:recipes!day_menu_dinner_id_fkey(*)
-        `,
-        )
-        .eq("day_number", dayNumber)
-        .single();
-
-      if (menuError) {
-        console.error("Error loading menu:", menuError);
-        return;
-      }
+      const menuData = await getEffectiveMenu(supabase, today);
+      const dayNumber = menuData?.day_number ?? -1;
 
       if (menuData) {
         const menu: TodayMenuData = {
-          breakfast: menuData.breakfast,
-          lunch: menuData.lunch,
+          breakfast: menuData.breakfast ?? undefined,
+          lunch: menuData.lunch ?? undefined,
           dinner: menuData.dinner,
           dayNumber,
           reminder: menuData.reminder,

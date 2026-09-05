@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuth } from "@/lib/api/auth";
-import { createServiceRoleClient } from "@/lib/supabase/server";
+import { createHouseholdClient } from "@/lib/supabase/server";
 import { withRateLimit } from "@/lib/rate-limit";
 import { cleanJsonResponse } from "@/lib/gemini/client";
 import { generateText } from "@/lib/ai/generate";
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
   const rateLimit = await withRateLimit(auth.userId, "cook-with-this");
   if (!rateLimit.allowed) {
     return NextResponse.json(rateLimit.response, {
-      status: 429,
+      status: rateLimit.status ?? 429,
       headers: rateLimit.headers,
     });
   }
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const supabase = createServiceRoleClient();
+    const supabase = await createHouseholdClient();
 
     // Buscar recetas que usen el mayor numero de ingredientes dados
     const { data: recipes } = await supabase
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
       .sort((a, b) => b.matchScore - a.matchScore)
       .slice(0, 5);
 
-    if (scored.length >= 3) {
+    if (scored.length > 0) {
       return NextResponse.json(
         { source: "database", recipes: scored },
         { headers: rateLimit.headers },

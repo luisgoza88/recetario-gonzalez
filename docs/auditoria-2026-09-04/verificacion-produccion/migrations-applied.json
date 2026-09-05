@@ -1,0 +1,52 @@
+[
+  {
+    "file": "20260905000000_proposal_execution_guards.sql",
+    "sha256": "cb6036de63e8d3f6f39468c37952dbb758dcb805b05ff6b15fdd501cb2929417",
+    "applied": true
+  },
+  {
+    "file": "20260905001000_complete_onboarding.sql",
+    "sha256": "80583fa9cded2a08709889359282a37fa2c0a9bcb0fb0d10a74eb4bf5b722d86",
+    "applied": true
+  },
+  {
+    "file": "20260905002000_explicit_recipe_sharing.sql",
+    "sha256": "3763139b3180108d5cef845459974c67684b864bf49cca8ccaf88e4aaeaa49d2",
+    "applied": true
+  },
+  {
+    "file": "20260905003000_household_reference_integrity.sql",
+    "sha256": "da18c15b11721548b757034d04a3ea6bd05165077b77a180e118bcf8244eb8f0",
+    "applied": true
+  },
+  {
+    "file": "20260905004000_household_write_permissions.sql",
+    "sha256": "3bc2c31afefc7526c0f23f0d57950f878f33c5732e177fbe4078c5de7b36e551",
+    "applied": true
+  },
+  {
+    "file": "20260905005000_audit_actor_and_real_rollback.sql",
+    "sha256": "aab8c8519bd97fb934f9e8f469d951f6eeee12aa5cf55762d53525c9afb1b029",
+    "applied": true
+  },
+  {
+    "file": "20260905006000_live_household_boundaries.sql",
+    "sha256": "97e51a93c8eff0c5e04ba4bd5a7b173d4f4abcca6493d0f3cd5ed8a90f4f9999",
+    "applied": true
+  },
+  {
+    "file": "20260905007000_invitation_actor_reference.sql",
+    "sha256": "051c3ba3f1a546ee2a226bea48d3eaabd8b3fa562f4e384161c899783a4e9d91",
+    "applied": true
+  },
+  {
+    "file": "20260905008000_audit_update_timestamp.sql",
+    "sha256": "f71b2ff2e922ab29e4866cffcfc67bfd01b81ddfda2462f63351394bb36b24e4",
+    "applied": true
+  },
+  {
+    "file": "20260905009000_invitation_result_and_family_inventory.sql",
+    "sha256": "50121658a5236431686cfc2662a12f38d47c1abbee8a1730ed1ad18e44598293",
+    "applied": true
+  }
+]

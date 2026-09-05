@@ -1,3 +1,4 @@
+import { useShallow } from "zustand/react/shallow";
 import { create } from "zustand";
 import type { MainSection, RecetarioTab } from "@/types";
 
@@ -113,7 +114,13 @@ export const useAppStore = create<AppStore>((set) => ({
   // Navegación genérica (reemplaza CustomEvent 'appNavigate' y 'navigateToSection')
   navigateTo: (section, tab) =>
     set((state) => {
-      if (section === "recetario" && tab) {
+      if (!["hoy", "recetario", "hogar", "ajustes"].includes(section))
+        return state;
+      if (
+        section === "recetario" &&
+        tab &&
+        ["calendar", "market", "recipes", "suggestions", "diets"].includes(tab)
+      ) {
         return {
           activeSection: "recetario" as MainSection,
           recetarioTab: tab as RecetarioTab,
@@ -170,24 +177,30 @@ export const useIsModalOpen = (modalName: ModalName) =>
 
 // Acciones individuales
 export const useNavigationActions = () =>
-  useAppStore((state) => ({
-    setActiveSection: state.setActiveSection,
-    setRecetarioTab: state.setRecetarioTab,
-    setShowSettings: state.setShowSettings,
-    navigateToRecetario: state.navigateToRecetario,
-    navigateToHogar: state.navigateToHogar,
-    navigateToAjustes: state.navigateToAjustes,
-    navigateTo: state.navigateTo,
-  }));
+  useAppStore(
+    useShallow((state) => ({
+      setActiveSection: state.setActiveSection,
+      setRecetarioTab: state.setRecetarioTab,
+      setShowSettings: state.setShowSettings,
+      navigateToRecetario: state.navigateToRecetario,
+      navigateToHogar: state.navigateToHogar,
+      navigateToAjustes: state.navigateToAjustes,
+      navigateTo: state.navigateTo,
+    })),
+  );
 
 export const useFabActions = () =>
-  useAppStore((state) => ({
-    setFabOpen: state.setFabOpen,
-    toggleFab: state.toggleFab,
-  }));
+  useAppStore(
+    useShallow((state) => ({
+      setFabOpen: state.setFabOpen,
+      toggleFab: state.toggleFab,
+    })),
+  );
 
 export const useModalActions = () =>
-  useAppStore((state) => ({
-    openModal: state.openModal,
-    closeModal: state.closeModal,
-  }));
+  useAppStore(
+    useShallow((state) => ({
+      openModal: state.openModal,
+      closeModal: state.closeModal,
+    })),
+  );

@@ -1,5 +1,6 @@
 "use client";
 
+import { menuCycleDay, householdDate } from "@/lib/menu-date";
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import {
@@ -25,10 +26,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
-import {
-  ingredientPortions,
-  resolveIngredientPortions,
-} from "@/lib/portions";
+import { ingredientPortions, resolveIngredientPortions } from "@/lib/portions";
 import {
   useHouseholdId,
   usePortionsConfig,
@@ -103,8 +101,6 @@ const WEEKDAYS = [
   "Sábado",
 ];
 
-const CYCLE_START = new Date(2026, 0, 6); // Lunes 6 de Enero 2026
-
 // =====================================================
 // Helper: Get Monday of the week for a given date
 // =====================================================
@@ -113,7 +109,7 @@ function getWeekMonday(date: Date): string {
   const day = d.getDay();
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
   d.setDate(diff);
-  return d.toISOString().split("T")[0];
+  return householdDate(d);
 }
 
 export default function CalendarView({ recipes }: CalendarViewProps) {
@@ -190,20 +186,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
   // =====================================================
   // Cycle day calculation (legacy static menu)
   // =====================================================
-  const getDayOfCycle = useCallback((date: Date): number => {
-    if (date.getDay() === 0) return -1; // Domingo
-    const diffTime = date.getTime() - CYCLE_START.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    if (diffDays < 0) return -2;
-    let workingDays = 0;
-    const tempDate = new Date(CYCLE_START);
-    while (tempDate <= date) {
-      if (tempDate.getDay() !== 0) workingDays++;
-      tempDate.setDate(tempDate.getDate() + 1);
-    }
-    workingDays--;
-    return workingDays % 12;
-  }, []);
+  const getDayOfCycle = useCallback(menuCycleDay, []);
 
   const getMenuForDate = useCallback(
     (date: Date) => {
@@ -219,7 +202,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
   // =====================================================
   const getGeneratedMenuForDate = useCallback(
     (date: Date): { menu: GeneratedMenu; dayData: GeneratedDayMenu } | null => {
-      const dateStr = date.toISOString().split("T")[0];
+      const dateStr = householdDate(date);
       const weekMonday = getWeekMonday(date);
       const menu = generatedMenus.get(weekMonday);
       if (!menu || !Array.isArray(menu.menu_data)) return null;
@@ -266,12 +249,14 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
         .select("*")
         .in("status", ["draft", "approved", "active"])
         .order("week_start_date", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(8);
 
       if (data && !error) {
         const menuMap = new Map<string, GeneratedMenu>();
         for (const menu of data) {
-          menuMap.set(menu.week_start_date, menu as GeneratedMenu);
+          if (!menuMap.has(menu.week_start_date))
+            menuMap.set(menu.week_start_date, menu as GeneratedMenu);
         }
         setGeneratedMenus(menuMap);
       }
@@ -603,7 +588,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
 
   const toggleDayComplete = async () => {
     if (!selectedDate) return;
-    const dateKey = selectedDate.toISOString().split("T")[0];
+    const dateKey = householdDate(selectedDate);
     const isCompleted = completedDays.has(dateKey);
     if (isCompleted) {
       // Optimista: des-marcar el día de inmediato
@@ -728,7 +713,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
       const isToday = date.toDateString() === today.toDateString();
       const isSelected =
         selectedDate && date.toDateString() === selectedDate.toDateString();
-      const dateKey = date.toISOString().split("T")[0];
+      const dateKey = householdDate(date);
       const isCompleted = completedDays.has(dateKey);
       const generatedInfo = getGeneratedMenuForDate(date);
       const hasGenerated = !!generatedInfo;
@@ -794,7 +779,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
   ) => {
     if (!selectedDate) return null;
     const dayName = WEEKDAYS[selectedDate.getDay()];
-    const dateKey = selectedDate.toISOString().split("T")[0];
+    const dateKey = householdDate(selectedDate);
     const isCompleted = completedDays.has(dateKey);
     const isDraft = menu.status === "draft";
 
@@ -1065,7 +1050,7 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
     const cycleDay = getDayOfCycle(selectedDate);
     const weekNum = cycleDay < 6 ? 1 : 2;
     const dayName = WEEKDAYS[selectedDate.getDay()];
-    const dateKey = selectedDate.toISOString().split("T")[0];
+    const dateKey = householdDate(selectedDate);
     const isCompleted = completedDays.has(dateKey);
 
     const breakfast = getRecipeById(menu.breakfast_id);
@@ -1575,12 +1560,12 @@ export default function CalendarView({ recipes }: CalendarViewProps) {
 
       {feedbackRecipe && selectedDate && (
         <FeedbackModal
-          date={selectedDate.toISOString().split("T")[0]}
+          date={householdDate(selectedDate)}
           mealType={feedbackRecipe.mealType}
           recipe={feedbackRecipe.recipe}
           onClose={() => {
             // Mark as skipped so the auto-prompt doesn't fire again this session
-            const dateKey = selectedDate.toISOString().split("T")[0];
+            const dateKey = householdDate(selectedDate);
             if (typeof sessionStorage !== "undefined") {
               sessionStorage.setItem(`feedback-skipped-${dateKey}`, "1");
             }

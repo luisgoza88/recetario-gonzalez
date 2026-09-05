@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   executeProposal,
+  assertExecutionSucceeded,
   executeActionWithLogging,
   rollbackProposal,
   FunctionExecutor,
@@ -15,7 +16,7 @@ const mockDb: Record<string, ReturnType<typeof vi.fn>> = {
   update: vi.fn(() => mockDb),
   eq: vi.fn(() => mockDb),
   single: vi.fn(() => ({ data: null, error: null })),
-  rpc: vi.fn(() => ({ data: null, error: null })),
+  rpc: vi.fn(() => ({ data: true, error: null })),
 };
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -122,12 +123,22 @@ describe("proposal-executor", () => {
 
       // Mock state capture: day_menu antes de ejecutar
       mockDb.single.mockResolvedValueOnce({
-        data: { id: "menu-1", day_number: 1, breakfast_id: "old-recipe" },
+        data: {
+          id: "menu-1",
+          household_id: "household-123",
+          day_number: 1,
+          breakfast_id: "old-recipe",
+        },
         error: null,
       });
       // Mock state capture: day_menu después de ejecutar
       mockDb.single.mockResolvedValueOnce({
-        data: { id: "menu-1", day_number: 1, breakfast_id: "recipe-456" },
+        data: {
+          id: "menu-1",
+          household_id: "household-123",
+          day_number: 1,
+          breakfast_id: "recipe-456",
+        },
         error: null,
       });
 
@@ -145,6 +156,23 @@ describe("proposal-executor", () => {
       expect(mockExecutor.executedFunctions).toContain("swap_menu_recipe");
     });
 
+    it("does not offer rollback without complete snapshots", async () => {
+      const { getProposal } = await import("../ai-command-service");
+      vi.mocked(getProposal).mockResolvedValue(
+        createMockProposal("approved", [createMockAction()]),
+      );
+      mockDb.single.mockResolvedValueOnce({ data: null, error: null });
+      mockDb.single.mockResolvedValueOnce({ data: null, error: null });
+      const result = await executeProposal(
+        "proposal-123",
+        mockExecutor,
+        "household-123",
+        "user-123",
+      );
+      expect(result.success).toBe(true);
+      expect(result.can_rollback).toBe(false);
+    });
+
     it("should capture pre-state before execution", async () => {
       const action = createMockAction({
         function_name: "swap_menu_recipe",
@@ -157,12 +185,22 @@ describe("proposal-executor", () => {
 
       // Mock day_menu pre-state
       mockDb.single.mockResolvedValueOnce({
-        data: { id: "menu-1", day_number: 1, breakfast_id: "old-recipe" },
+        data: {
+          id: "menu-1",
+          household_id: "household-123",
+          day_number: 1,
+          breakfast_id: "old-recipe",
+        },
         error: null,
       });
       // Mock day_menu post-state
       mockDb.single.mockResolvedValueOnce({
-        data: { id: "menu-1", day_number: 1, breakfast_id: "recipe-456" },
+        data: {
+          id: "menu-1",
+          household_id: "household-123",
+          day_number: 1,
+          breakfast_id: "recipe-456",
+        },
         error: null,
       });
 
@@ -303,8 +341,9 @@ describe("proposal-executor", () => {
       ]);
       proposal.audit_log_ids = ["log-1", "log-2"];
 
-      const { getProposal, rollbackAction } =
-        await import("../ai-command-service");
+      const { getProposal, rollbackAction } = await import(
+        "../ai-command-service"
+      );
       vi.mocked(getProposal).mockResolvedValue(proposal);
       vi.mocked(rollbackAction).mockResolvedValue({
         success: true,
@@ -354,8 +393,9 @@ describe("proposal-executor", () => {
       const proposal = createMockProposal("completed", []);
       proposal.audit_log_ids = ["log-1", "log-2"];
 
-      const { getProposal, rollbackAction } =
-        await import("../ai-command-service");
+      const { getProposal, rollbackAction } = await import(
+        "../ai-command-service"
+      );
       vi.mocked(getProposal).mockResolvedValue(proposal);
       vi.mocked(rollbackAction)
         .mockResolvedValueOnce({
@@ -378,5 +418,46 @@ describe("proposal-executor", () => {
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0]).toContain("Rollback failed");
     });
+  });
+});
+
+describe("returned tool failures", () => {
+  it.each([
+    { error: "Unsupported function" },
+    { success: false, message: "No guardado" },
+  ])("rejects %j", async (failure) => {
+    const { getProposal } = await import("../ai-command-service");
+    vi.mocked(getProposal).mockResolvedValue(
+      createMockProposal("approved", [createMockAction()]),
+    );
+    const result = await executeProposal(
+      "proposal-123",
+      { execute: async () => failure },
+      "household-123",
+      "user-123",
+    );
+    expect(result.success).toBe(false);
+    expect(result.executed_actions).toHaveLength(0);
+    expect(result.failed_actions).toHaveLength(1);
+  });
+  it("refuses a proposal from another household before dispatch", async () => {
+    const { getProposal } = await import("../ai-command-service");
+    vi.mocked(getProposal).mockResolvedValue(
+      createMockProposal("approved", [createMockAction()]),
+    );
+    const execute = vi.fn();
+    const result = await executeProposal(
+      "proposal-123",
+      { execute },
+      "other-household",
+      "user-123",
+    );
+    expect(result.success).toBe(false);
+    expect(execute).not.toHaveBeenCalled();
+  });
+  it("accepts successful tools with a null error field", () => {
+    expect(() =>
+      assertExecutionSucceeded({ data: {}, error: null }),
+    ).not.toThrow();
   });
 });

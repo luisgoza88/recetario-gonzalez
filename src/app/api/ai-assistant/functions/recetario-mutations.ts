@@ -12,6 +12,7 @@ export async function addToShoppingList(itemName: string, quantity?: string) {
   const { data: existingItem } = await supabase
     .from("market_items")
     .select("id")
+    .throwOnError()
     .ilike("name", `%${itemName}%`)
     .single();
 
@@ -19,7 +20,9 @@ export async function addToShoppingList(itemName: string, quantity?: string) {
     await supabase
       .from("market_checklist")
       .upsert({ item_id: existingItem.id, checked: false })
-      .select();
+      .throwOnError()
+      .select()
+      .throwOnError();
     return {
       success: true,
       message: `"${itemName}" agregado a la lista de compras`,
@@ -37,13 +40,16 @@ export async function addToShoppingList(itemName: string, quantity?: string) {
       is_custom: true,
       order_index: 999,
     })
+    .throwOnError()
     .select()
+    .throwOnError()
     .single();
 
   if (newItem) {
     await supabase
       .from("market_checklist")
-      .insert({ item_id: newItem.id, checked: false });
+      .insert({ item_id: newItem.id, checked: false })
+      .throwOnError();
     return {
       success: true,
       message: `"${itemName}" creado y agregado a la lista`,
@@ -58,6 +64,7 @@ export async function markShoppingItem(itemName: string, checked: boolean) {
   const { data: item } = await supabase
     .from("market_items")
     .select("id")
+    .throwOnError()
     .ilike("name", `%${itemName}%`)
     .single();
 
@@ -71,6 +78,7 @@ export async function markShoppingItem(itemName: string, checked: boolean) {
   await supabase
     .from("market_checklist")
     .update({ checked })
+    .throwOnError()
     .eq("item_id", item.id);
 
   return {
@@ -133,6 +141,7 @@ export async function swapMenuRecipe(
   const { data: recipe } = await supabase
     .from("recipes")
     .select("id, name")
+    .throwOnError()
     .ilike("name", `%${newRecipeName}%`)
     .single();
 
@@ -174,6 +183,7 @@ export async function updateInventory(
   const { data: item } = await supabase
     .from("market_items")
     .select("id, name")
+    .throwOnError()
     .ilike("name", `%${itemName}%`)
     .single();
 
@@ -187,6 +197,7 @@ export async function updateInventory(
   const { data: currentInv } = await supabase
     .from("inventory")
     .select("current_number")
+    .throwOnError()
     .eq("item_id", item.id)
     .single();
 
@@ -252,6 +263,7 @@ export async function bulkUpdateInventory(
       const { data: item } = await supabase
         .from("market_items")
         .select("id, name")
+        .throwOnError()
         .ilike("name", `%${update.item_name}%`)
         .single();
 
@@ -267,6 +279,7 @@ export async function bulkUpdateInventory(
       const { data: inventory } = await supabase
         .from("inventory")
         .select("*")
+        .throwOnError()
         .eq("item_id", item.id)
         .single();
 
@@ -357,22 +370,28 @@ export async function resetInventoryToDefault(confirm: boolean) {
   try {
     const { data: previousInventory } = await supabase
       .from("inventory")
-      .select("*, item:market_items(name)");
+      .select("*, item:market_items(name)")
+      .throwOnError();
 
     const { data: defaultValues } = await supabase
       .from("market_items")
-      .select("id");
+      .select("id")
+      .throwOnError();
 
     for (const item of defaultValues || []) {
-      await supabase.from("inventory").upsert({
-        item_id: item.id,
-        current_number: 0,
-      });
+      await supabase
+        .from("inventory")
+        .upsert({
+          item_id: item.id,
+          current_number: 0,
+        })
+        .throwOnError();
     }
 
     const { data: newInventory } = await supabase
       .from("inventory")
-      .select("*, item:market_items(name)");
+      .select("*, item:market_items(name)")
+      .throwOnError();
 
     return {
       success: true,
@@ -481,6 +500,7 @@ export async function updateRecipe(
     const { data: previousRecipe } = await supabase
       .from("recipes")
       .select("*")
+      .throwOnError()
       .eq("id", recipeId)
       .single();
 
@@ -554,6 +574,7 @@ export async function deleteRecipe(recipeId: string, confirm: boolean) {
     const { data: previousRecipe } = await supabase
       .from("recipes")
       .select("*")
+      .throwOnError()
       .eq("id", recipeId)
       .single();
 
@@ -564,6 +585,7 @@ export async function deleteRecipe(recipeId: string, confirm: boolean) {
     const { data: menuUsage } = await supabase
       .from("day_menu")
       .select("day_number")
+      .throwOnError()
       .or(
         `breakfast_id.eq.${recipeId},lunch_id.eq.${recipeId},dinner_id.eq.${recipeId}`,
       );

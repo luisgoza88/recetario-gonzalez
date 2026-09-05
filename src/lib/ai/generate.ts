@@ -66,13 +66,17 @@ export async function generateText(opts: GenerateTextOptions): Promise<string> {
       // DEEPSEEK_MODEL_TEXT si se quiere otro. Subimos el piso de tokens para
       // dejar espacio al reasoning y evitar JSON truncado.
       const model = process.env.DEEPSEEK_MODEL_TEXT ?? DEEPSEEK_MODELS.FLASH;
-      return await deepseekChatWithRetry({
-        model,
-        messages,
-        temperature,
-        maxTokens: Math.max(maxTokens, 4000),
-        json,
-      });
+      return await deepseekChatWithRetry(
+        {
+          model,
+          messages,
+          temperature,
+          maxTokens: Math.max(maxTokens, 4000),
+          json,
+          signal: AbortSignal.timeout(14_000),
+        },
+        0,
+      );
     } catch (err) {
       // Fallback a Gemini para no romper la feature si DeepSeek falla.
       logger.warn("[AI] DeepSeek falló, usando Gemini como fallback", {
@@ -84,16 +88,19 @@ export async function generateText(opts: GenerateTextOptions): Promise<string> {
   // Gemini (default o fallback)
   const gemini = getGeminiClient();
   const text = system ? `${system}\n\n${prompt}` : prompt;
-  const response = await geminiWithRetry(() =>
-    gemini.models.generateContent({
-      model: GEMINI_MODELS.FLASH,
-      contents: [{ role: "user", parts: [{ text }] }],
-      config: {
-        temperature,
-        maxOutputTokens: maxTokens,
-        ...(json ? { responseMimeType: "application/json" } : {}),
-      },
-    }),
+  const response = await geminiWithRetry(
+    () =>
+      gemini.models.generateContent({
+        model: GEMINI_MODELS.FLASH,
+        contents: [{ role: "user", parts: [{ text }] }],
+        config: {
+          httpOptions: { timeout: 10_000 },
+          temperature,
+          maxOutputTokens: maxTokens,
+          ...(json ? { responseMimeType: "application/json" } : {}),
+        },
+      }),
+    0,
   );
   return response.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 }

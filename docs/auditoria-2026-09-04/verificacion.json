@@ -1,0 +1,52 @@
+{
+  "date": "2026-09-04",
+  "timezone": "America/Bogota",
+  "pages": 9,
+  "apiEndpoints": 28,
+  "distinctSkills": 19,
+  "skillLinks": 4,
+  "agentProfiles": 15,
+  "commands": 11,
+  "migrations": 38,
+  "componentTsxFilesIncludingTests": 118,
+  "build": "pass",
+  "lint": {
+    "errors": 0,
+    "warnings": 174
+  },
+  "tests": {
+    "files": 30,
+    "passed": 430,
+    "skipped": 8
+  },
+  "coverage": {
+    "scope": [
+      "src/lib/**/*.ts",
+      "src/app/api/**/*.ts"
+    ],
+    "lines": 15.41,
+    "statements": 15.29,
+    "branches": 14.05,
+    "functions": 14.89
+  },
+  "apiUnauthenticatedChecks": 23,
+  "anonymousReadHeads": 29,
+  "cycleExample": {
+    "date": "2026-09-04T12:00:00-05:00",
+    "calendar": 3,
+    "dashboardAndEmployee": 3,
+    "ai": 5
+  },
+  "limitations": [
+    "Authenticated end-to-end flows not executed",
+    "Provider generation and push sending not executed",
+    "Remote migration state not inspected"
+  ],
+  "isolatedDefectReproduction": {
+    "tests": 1,
+    "reproduced": true,
+    "module": "src/lib/ai/proposal-executor.ts",
+    "scenario": "unsupported executor result is marked successful",
+    "remoteWrites": false
+  }
+}

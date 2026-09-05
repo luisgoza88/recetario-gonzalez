@@ -1,0 +1,16 @@
+
+> recetario-app@0.1.0 test:run
+> vitest run
+
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /Users/marianatejada/Documents/GitHub/recetario-app
+
+
+ Test Files  33 passed (33)
+      Tests  461 passed | 8 skipped (469)
+   Start at  00:43:23
+   Duration  3.34s (transform 2.40s, setup 3.40s, import 4.46s, tests 2.82s, environment 29.80s)
+

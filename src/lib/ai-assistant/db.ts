@@ -6,7 +6,7 @@
  */
 
 import { SupabaseClient } from "@supabase/supabase-js";
-import { createAuthenticatedClient } from "@/lib/supabase/server";
+import { createHouseholdClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database.types";
 
 /**
@@ -15,7 +15,7 @@ import type { Database } from "@/types/database.types";
  * Tipado con Database para que los joins se infieran y no haga falta castear.
  */
 export async function createAIClient(): Promise<SupabaseClient<Database>> {
-  return createAuthenticatedClient();
+  return createHouseholdClient();
 }
 
 /**

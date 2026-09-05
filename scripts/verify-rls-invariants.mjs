@@ -8,7 +8,7 @@
  * JAMÁS debe leer ninguna de esas tablas ni escribir. Verificado limpio vs prod
  * (snyelpbcfbzaxadrtxpa) el 2026-07-08: todas dan 401 (app requiere login).
  *
- * SEGURO contra prod. Env: SUPABASE_URL + SUPABASE_ANON_KEY. Sin env → skip.
+ * SEGURO contra prod. Env: SUPABASE_URL + SUPABASE_ANON_KEY. Sin env → error. Escrituras solo con RLS_WRITE_PROBES=isolated-test-database.
  */
 
 const SUPABASE_URL =
@@ -18,9 +18,9 @@ const ANON_KEY =
 
 if (!SUPABASE_URL || !ANON_KEY) {
   console.log(
-    "verify-rls-invariants: sin SUPABASE_URL/SUPABASE_ANON_KEY — omitido (skip).",
+    "verify-rls-invariants: sin SUPABASE_URL/SUPABASE_ANON_KEY — no se puede verificar.",
   );
-  process.exit(0);
+  process.exit(2);
 }
 
 const HEADERS = {
@@ -65,7 +65,7 @@ for (const table of NO_READ) {
       `${SUPABASE_URL}/rest/v1/${table}?select=id&limit=1`,
       { headers: HEADERS },
     );
-    if (!res.ok) {
+    if ([401, 403].includes(res.status)) {
       report(true, `anon NO lee ${table} (HTTP ${res.status})`);
       continue;
     }
@@ -79,20 +79,20 @@ for (const table of NO_READ) {
   }
 }
 
-for (const { table, body } of NO_WRITE) {
+for (const { table, body } of (process.env.RLS_WRITE_PROBES === "isolated-test-database" ? NO_WRITE : [])) {
   try {
     const ins = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
       method: "POST",
       headers: { ...HEADERS, Prefer: "return=minimal" },
       body: JSON.stringify(body),
     });
-    report(!ins.ok, `anon NO inserta en ${table} (HTTP ${ins.status})`);
+    report([401, 403].includes(ins.status), `anon NO inserta en ${table} (HTTP ${ins.status})`);
     const upd = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${GHOST}`, {
       method: "PATCH",
       headers: { ...HEADERS, Prefer: "return=representation" },
       body: JSON.stringify({ updated_at: new Date().toISOString() }),
     });
-    let updOk = !upd.ok;
+    let updOk = [401, 403].includes(upd.status);
     if (upd.ok) {
       const rows = await upd.json().catch(() => null);
       updOk = Array.isArray(rows) && rows.length === 0;
@@ -103,7 +103,7 @@ for (const { table, body } of NO_WRITE) {
   }
 }
 
-const total = NO_READ.length + NO_WRITE.length * 2;
+const total = NO_READ.length + (process.env.RLS_WRITE_PROBES === "isolated-test-database" ? NO_WRITE.length * 2 : 0);
 console.log(
   failures === 0
     ? `\n✅ ${total} invariantes RLS OK`

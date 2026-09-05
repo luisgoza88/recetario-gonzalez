@@ -245,11 +245,13 @@ export async function executeMultiStepTask(
       const { data: recipes } = await supabase
         .from("recipes")
         .select("name, ingredients, prep_time, category")
+        .throwOnError()
         .limit(30);
 
       const { data: invItems } = await supabase
         .from("inventory")
         .select("market_item:market_items(name)")
+        .throwOnError()
         .gt("current_number", 0);
 
       const availableItems =

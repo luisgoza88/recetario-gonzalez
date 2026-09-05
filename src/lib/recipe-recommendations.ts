@@ -1,4 +1,4 @@
-import { createServiceRoleClient } from "@/lib/supabase/server";
+import { createAuthenticatedClient } from "@/lib/supabase/server";
 
 /**
  * Returns recipe IDs (and names) that the AI should NOT suggest because they
@@ -11,7 +11,7 @@ export async function getRecipesToAvoid(
   householdId?: string,
 ): Promise<string[]> {
   try {
-    const supabase = createServiceRoleClient();
+    const supabase = await createAuthenticatedClient();
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 

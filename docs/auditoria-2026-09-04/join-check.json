@@ -1,0 +1,6 @@
+{
+  "fixture": true,
+  "calls": 1,
+  "throttleError": true,
+  "text": "Unirse a un Hogar\n\nIngresa tu código de invitación\n\nCódigo de invitación\n\n8 caracteres alfanuméricos\n\nEspera un momento antes de intentar de nuevo\n\nHogar de prueba\n\nFamilia\n\nVer menú, lista de compras y estado del hogar\n\nSerás registrado como: Invitado\n\nContinuar\n\nNecesitarás iniciar sesión o crear una cuenta para continuar\n\no\nYa tengo cuenta\nCrear cuenta nueva\nVolver al inicio"
+}

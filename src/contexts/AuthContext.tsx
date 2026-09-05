@@ -6,7 +6,10 @@ import React, {
   useEffect,
   useState,
   useCallback,
+  useRef,
 } from "react";
+import { safeRedirect } from "@/lib/safe-redirect";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 import analytics from "@/lib/analytics";
@@ -50,7 +53,7 @@ interface AuthContextType {
 
   // Gestión de hogares
   switchHousehold: (householdId: string) => void;
-  refreshMemberships: () => Promise<void>;
+  refreshMemberships: (preferredHouseholdId?: string) => Promise<void>;
 
   // Permisos
   hasPermission: (permission: Permission) => boolean;
@@ -110,6 +113,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "edit_menu",
     "edit_recipes",
     "edit_shopping_list",
+    "update_inventory",
   ],
   empleado: [
     "view_menu",
@@ -131,6 +135,8 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
+  const sessionEpoch = useRef(0);
+  const queryClient = useQueryClient();
   const [supabaseUser, setSupabaseUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -187,12 +193,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (error) {
           console.error("Error cargando membresías:", error);
-          return [];
+          throw error;
         }
 
+        localStorage.setItem(
+          `recetario-memberships:${userId}`,
+          JSON.stringify(data || []),
+        );
         return (data || []) as HouseholdMembership[];
       } catch (err) {
         console.error("Error cargando membresías:", err);
+        if (!navigator.onLine) {
+          try {
+            return JSON.parse(
+              localStorage.getItem(`recetario-memberships:${userId}`) || "[]",
+            ) as HouseholdMembership[];
+          } catch {
+            return [];
+          }
+        }
+        setError(
+          "No se pudieron cargar los hogares. Revisa tu conexión y vuelve a intentar.",
+        );
         return [];
       }
     },
@@ -200,26 +222,40 @@ export function AuthProvider({ children }: AuthProviderProps) {
   );
 
   // Refrescar membresías
-  const refreshMemberships = useCallback(async () => {
-    if (!supabaseUser) return;
+  const refreshMemberships = useCallback(
+    async (preferredHouseholdId?: string) => {
+      if (!supabaseUser) return;
 
-    const loadedMemberships = await loadMemberships(supabaseUser.id);
-    setMemberships(loadedMemberships);
+      const loadedMemberships = await loadMemberships(supabaseUser.id);
+      setMemberships(loadedMemberships);
 
-    // Si el hogar actual ya no está en las membresías, cambiar al primero
-    if (currentHouseholdId) {
-      const stillMember = loadedMemberships.some(
-        (m) => m.household_id === currentHouseholdId,
-      );
-      if (!stillMember && loadedMemberships.length > 0) {
-        setCurrentHouseholdId(loadedMemberships[0].household_id);
-        localStorage.setItem(
-          "currentHouseholdId",
-          loadedMemberships[0].household_id,
-        );
+      const requestedHouseholdId = preferredHouseholdId ?? currentHouseholdId;
+      const nextHouseholdId = loadedMemberships.some(
+        (m) => m.household_id === requestedHouseholdId,
+      )
+        ? requestedHouseholdId
+        : (loadedMemberships[0]?.household_id ?? null);
+      setCurrentHouseholdId(nextHouseholdId);
+      if (nextHouseholdId) {
+        localStorage.setItem("currentHouseholdId", nextHouseholdId);
+      } else {
+        localStorage.removeItem("currentHouseholdId");
       }
-    }
-  }, [supabaseUser, currentHouseholdId, loadMemberships]);
+    },
+    [supabaseUser, currentHouseholdId, loadMemberships],
+  );
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const scope =
+      supabaseUser && currentHouseholdId
+        ? `${supabaseUser.id}:${currentHouseholdId}`
+        : null;
+    if (scope) localStorage.setItem("recetario-session-scope", scope);
+    else localStorage.removeItem("recetario-session-scope");
+    queryClient.clear();
+    document.cookie = `currentHouseholdId=${currentHouseholdId ?? ""}; Path=/; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}${currentHouseholdId ? "" : "; Max-Age=0"}`;
+  }, [currentHouseholdId, supabaseUser?.id, queryClient]);
 
   // Inicializar sesión
   useEffect(() => {
@@ -275,6 +311,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       logger.info("Auth state changed", { event });
 
       if (event === "SIGNED_IN" && newSession?.user) {
+        const epoch = ++sessionEpoch.current;
+        setIsLoading(true);
         setSession(newSession);
         setSupabaseUser(newSession.user);
 
@@ -289,6 +327,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
               loadMemberships(newSession.user.id),
             ]);
 
+            if (epoch !== sessionEpoch.current) return;
             setUser(profile);
             setMemberships(userMemberships);
 
@@ -297,9 +336,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 localStorage.getItem("currentHouseholdId");
               if (
                 savedHouseholdId &&
-                userMemberships.some(
-                  (m) => m.household_id === savedHouseholdId,
-                )
+                userMemberships.some((m) => m.household_id === savedHouseholdId)
               ) {
                 setCurrentHouseholdId(savedHouseholdId);
               } else {
@@ -310,15 +347,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 );
               }
             }
-          })().catch((authError) => {
-            console.error(
-              "Error cargando datos después de iniciar sesión:",
-              authError,
-            );
-            setError("Error al cargar los datos de la sesión");
-          });
+          })()
+            .catch((authError) => {
+              console.error(
+                "Error cargando datos después de iniciar sesión:",
+                authError,
+              );
+              setError("Error al cargar los datos de la sesión");
+            })
+            .finally(() => {
+              if (epoch === sessionEpoch.current) setIsLoading(false);
+            });
         }, 0);
       } else if (event === "SIGNED_OUT") {
+        sessionEpoch.current++;
         setSession(null);
         setSupabaseUser(null);
         setUser(null);
@@ -348,7 +390,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setSupabaseUser(null);
       }
 
-      setIsLoading(false);
+      if (event !== "SIGNED_IN" && event !== "INITIAL_SESSION")
+        setIsLoading(false);
     });
 
     return () => {
@@ -416,6 +459,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         email,
         password,
         options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(safeRedirect(new URLSearchParams(window.location.search).get("redirect")))}`,
           data: {
             full_name: fullName,
           },
@@ -448,10 +492,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsLoading(true);
       // Track logout
       analytics.auth.logout();
-      await supabase.auth.signOut();
+      const { clearAllCache } = await import("@/lib/indexedDB");
+      await clearAllCache().catch(() => undefined);
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) throw signOutError;
+      await queryClient.cancelQueries();
+      queryClient.clear();
+      localStorage.removeItem("recetario-session-scope");
+      document.cookie = "currentHouseholdId=; Path=/; SameSite=Lax; Max-Age=0";
       localStorage.removeItem("currentHouseholdId");
     } catch (err) {
       console.error("Error al cerrar sesión:", err);
+      throw err;
     } finally {
       setIsLoading(false);
     }

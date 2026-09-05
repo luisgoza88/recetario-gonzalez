@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
   const rateLimit = await withRateLimit(userId, "analyze-image");
   if (!rateLimit.allowed) {
     return NextResponse.json(rateLimit.response, {
-      status: 429,
+      status: rateLimit.status ?? 429,
       headers: rateLimit.headers,
     });
   }

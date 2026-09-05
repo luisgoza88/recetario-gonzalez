@@ -37,10 +37,7 @@ import { MoodChip } from "@/components/ui/MoodChip";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useHouseholdId } from "@/lib/stores/useHouseholdStore";
-import {
-  analyzeRecipeForDiet,
-  hasActiveDietPlan,
-} from "@/lib/recipe-diet";
+import { analyzeRecipeForDiet, hasActiveDietPlan } from "@/lib/recipe-diet";
 import { mergeRecipeCatalog } from "@/lib/recipe-catalog";
 
 const RecipeModal = dynamic(() => import("./RecipeModal"), {
@@ -125,7 +122,9 @@ export default function RecipesView({
 }: RecipesViewProps) {
   const toast = useToast();
   const householdId = useHouseholdId();
+  const [visibleCount, setVisibleCount] = useState(24);
   const [search, setSearch] = useState("");
+  useEffect(() => setVisibleCount(24), [search]);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -187,9 +186,9 @@ export default function RecipesView({
   const [moodFilters, setMoodFilters] = useState<Mood[]>([]);
   const [dietaryPreferences, setDietaryPreferences] =
     useState<DietaryPreferences | null>(null);
-  const [dietFilter, setDietFilter] = useState<
-    "all" | "compatible" | "review"
-  >("all");
+  const [dietFilter, setDietFilter] = useState<"all" | "compatible" | "review">(
+    "all",
+  );
   const [showMoodFilters, setShowMoodFilters] = useState(false);
 
   useEffect(() => {
@@ -207,10 +206,12 @@ export default function RecipesView({
       .single()
       .then(({ data }) => {
         if (!mounted) return;
-        const next = (data?.dietary_preferences as DietaryPreferences | null) ??
-          null;
+        const next =
+          (data?.dietary_preferences as DietaryPreferences | null) ?? null;
         setDietaryPreferences(next);
-        setDietFilter(hasActiveDietPlan(next?.meal_plan) ? "compatible" : "all");
+        setDietFilter(
+          hasActiveDietPlan(next?.meal_plan) ? "compatible" : "all",
+        );
       });
 
     return () => {
@@ -233,16 +234,10 @@ export default function RecipesView({
   const dietPlanActive = hasActiveDietPlan(dietaryPreferences?.meal_plan);
 
   const dietAnalyses = useMemo(() => {
-    const analyses = new Map<
-      string,
-      ReturnType<typeof analyzeRecipeForDiet>
-    >();
+    const analyses = new Map<string, ReturnType<typeof analyzeRecipeForDiet>>();
     if (!dietPlanActive) return analyses;
     for (const recipe of allRecipes) {
-      analyses.set(
-        recipe.id,
-        analyzeRecipeForDiet(recipe, dietaryPreferences),
-      );
+      analyses.set(recipe.id, analyzeRecipeForDiet(recipe, dietaryPreferences));
     }
     return analyses;
   }, [allRecipes, dietaryPreferences, dietPlanActive]);
@@ -530,7 +525,8 @@ export default function RecipesView({
             Encuentra solo las recetas que sí puedes comer
           </span>
           <span className="mt-1 block text-xs text-white/80">
-            Compara planes populares y mira cuántas recetas tienes antes de elegir.
+            Compara planes populares y mira cuántas recetas tienes antes de
+            elegir.
           </span>
         </button>
       )}
@@ -622,36 +618,40 @@ export default function RecipesView({
         onClick={() => setShowMoodFilters((current) => !current)}
         className="mb-2 text-[11px] font-semibold text-stone-500 underline decoration-stone-300 underline-offset-4"
       >
-        {showMoodFilters ? "Ocultar filtros de antojo" : "Más filtros: antojo, saludable, rápido…"}
+        {showMoodFilters
+          ? "Ocultar filtros de antojo"
+          : "Más filtros: antojo, saludable, rápido…"}
       </button>
 
       {/* Mood Filter */}
-      {showMoodFilters && <div
-        className="flex gap-2 mb-3 overflow-x-auto pb-2 scrollbar-hide"
-        style={{ WebkitOverflowScrolling: "touch" }}
-        role="group"
-        aria-label="Filtrar por mood"
-      >
-        <button
-          onClick={() => setMoodFilters([])}
-          className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border ${
-            moodFilters.length === 0
-              ? "bg-orange-500 text-white border-green-700"
-              : "bg-white text-gray-600 hover:bg-gray-50 border-gray-200"
-          }`}
+      {showMoodFilters && (
+        <div
+          className="flex gap-2 mb-3 overflow-x-auto pb-2 scrollbar-hide"
+          style={{ WebkitOverflowScrolling: "touch" }}
+          role="group"
+          aria-label="Filtrar por mood"
         >
-          <span>📋</span>
-          <span>Todos</span>
-        </button>
-        {MOODS.map((m) => (
-          <MoodChip
-            key={m.id}
-            mood={m.id}
-            selected={moodFilters.includes(m.id)}
-            onClick={() => toggleMoodFilter(m.id)}
-          />
-        ))}
-      </div>}
+          <button
+            onClick={() => setMoodFilters([])}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border ${
+              moodFilters.length === 0
+                ? "bg-orange-500 text-white border-green-700"
+                : "bg-white text-gray-600 hover:bg-gray-50 border-gray-200"
+            }`}
+          >
+            <span>📋</span>
+            <span>Todos</span>
+          </button>
+          {MOODS.map((m) => (
+            <MoodChip
+              key={m.id}
+              mood={m.id}
+              selected={moodFilters.includes(m.id)}
+              onClick={() => toggleMoodFilter(m.id)}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Meal Type Filter Chips (incluye TM6 dark) */}
       <div
@@ -788,7 +788,7 @@ export default function RecipesView({
 
       {/* Recipe Grid - 2 columnas de RecipeCard */}
       <div className="grid grid-cols-2 gap-3">
-        {filteredRecipes.map((recipe) => {
+        {filteredRecipes.slice(0, visibleCount).map((recipe) => {
           const isLibrary = isExpandedRecipe(recipe);
           return (
             <div key={recipe.id} className="relative">
@@ -829,6 +829,15 @@ export default function RecipesView({
           );
         })}
       </div>
+
+      {visibleCount < filteredRecipes.length && (
+        <button
+          className="mx-auto my-6 block rounded-xl border px-5 py-3 text-sm font-semibold"
+          onClick={() => setVisibleCount((count) => count + 24)}
+        >
+          Ver más recetas
+        </button>
+      )}
 
       {filteredRecipes.length === 0 && !catalogLoading && (
         <EmptyState

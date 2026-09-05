@@ -1,61 +1,7 @@
-# Crear Nuevo API Route
+# Crear una ruta API
 
-## Parametros
+Crear `src/app/api/$ROUTE_PATH/route.ts` para `$METHOD` y verificar su cobertura en `src/proxy.ts`. Para APIs privadas usar `requireAuth(request)` y `createHouseholdClient()`; para identidad usar `createAuthenticatedClient()`. No usar auth-helpers-nextjs ni service role como plantilla.
 
-- $ROUTE_PATH: Path del route (ej: analyze-nutrition)
-- $METHOD: Metodo HTTP (GET, POST, PUT, DELETE)
-- $AUTH_REQUIRED: Si requiere auth (true/false, default true)
+Validar entrada con Zod, acotar tamaños/cantidades, comprobar permisos y pertenencia de recursos. Verificar `{ data, error }` o throwOnError y devolver estados HTTP coherentes. Las APIs de IA requieren withRateLimit y un presupuesto temporal compatible con la función; 503 significa límite no verificable, 429 límite agotado.
 
-## Instrucciones
-
-1. **Crear archivo** `src/app/api/$ROUTE_PATH/route.ts`
-
-2. **Boilerplate con auth**:
-
-```typescript
-import { NextRequest, NextResponse } from "next/server";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
-
-export async function $METHOD(request: NextRequest) {
-  try {
-    // Auth
-    const userId = request.headers.get("x-user-id");
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const supabase = createRouteHandlerClient({ cookies });
-
-    // Validar input
-    const body = await request.json();
-    // TODO: Validar con schema
-
-    // Logica...
-
-    return NextResponse.json({ success: true, data: result });
-  } catch (error) {
-    console.error(`Error in /api/$ROUTE_PATH:`, error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
-  }
-}
-```
-
-3. **Si necesita mas de 10s**, agregar en route config:
-
-```typescript
-export const maxDuration = 30; // segundos
-```
-
-4. **Agregar rate limiting** si es endpoint publico o de IA
-
-5. **Verificar**:
-   - [ ] `npm run build` exitoso
-   - [ ] Auth implementado (o explicitamente publico)
-   - [ ] Input validado
-   - [ ] Error handling con try/catch
-   - [ ] Sin console.log (usar logger.ts)
-   - [ ] Rate limiting si necesario
+Reutilizar los contratos de `docs/architecture.md`. Añadir pruebas para autenticación, pertenencia a hogares y fallos relevantes; ejecutar verificaciones locales sin ampliar workflows ni triggers. No registrar entradas sensibles.

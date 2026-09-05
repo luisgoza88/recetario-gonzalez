@@ -28,377 +28,15 @@ import {
 } from "@/lib/api/auth";
 import { createAuthenticatedClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
-import { escapeIlike } from "@/lib/utils/sql-escape";
 
-// ============================================
-// FUNCTION IMPLEMENTATIONS (copied from main route)
-// ============================================
-
-// Note: In production, these would be imported from a shared module
-// For now, we duplicate the essential ones needed for proposal execution
-
-import type { SupabaseClient } from "@supabase/supabase-js";
-
-async function swapMenuRecipe(
-  supabase: SupabaseClient,
-  dayNumber: number,
-  mealType: string,
-  newRecipeName: string,
-) {
-  if (dayNumber < 1 || dayNumber > 12) {
-    return { success: false, message: "El día debe estar entre 1 y 12" };
-  }
-
-  const validMealTypes = ["breakfast", "lunch", "dinner"];
-  if (!validMealTypes.includes(mealType)) {
-    return {
-      success: false,
-      message: "Tipo de comida debe ser: breakfast, lunch o dinner",
-    };
-  }
-
-  const { data: recipe } = await supabase
-    .from("recipes")
-    .select("id, name")
-    .ilike("name", `%${escapeIlike(newRecipeName)}%`)
-    .single();
-
-  if (!recipe) {
-    return {
-      success: false,
-      message: `No se encontró la receta "${newRecipeName}"`,
-    };
-  }
-
-  const updateField = `${mealType}_id`;
-  const { error } = await supabase
-    .from("day_menu")
-    .update({ [updateField]: recipe.id })
-    .eq("day_number", dayNumber);
-
-  if (error) {
-    return { success: false, message: "Error al actualizar el menú" };
-  }
-
-  const mealTypeSpanish: Record<string, string> = {
-    breakfast: "desayuno",
-    lunch: "almuerzo",
-    dinner: "cena",
-  };
-
-  return {
-    success: true,
-    message: `${mealTypeSpanish[mealType]} del día ${dayNumber} cambiado a "${recipe.name}"`,
-  };
-}
-
-async function updateInventory(
-  supabase: SupabaseClient,
-  itemName: string,
-  quantity: number,
-  action: string = "set",
-) {
-  const { data: item } = await supabase
-    .from("market_items")
-    .select("id, name")
-    .ilike("name", `%${escapeIlike(itemName)}%`)
-    .single();
-
-  if (!item) {
-    return {
-      success: false,
-      message: `No se encontró "${itemName}" en el inventario`,
-    };
-  }
-
-  const { data: currentInv } = await supabase
-    .from("inventory")
-    .select("current_number")
-    .eq("item_id", item.id)
-    .single();
-
-  let newQuantity = quantity;
-  const currentQty = currentInv?.current_number || 0;
-
-  if (action === "add") {
-    newQuantity = currentQty + quantity;
-  } else if (action === "subtract") {
-    newQuantity = Math.max(0, currentQty - quantity);
-  }
-
-  const { error } = await supabase.from("inventory").upsert(
-    {
-      item_id: item.id,
-      current_number: newQuantity,
-      current_quantity: `${newQuantity}`,
-    },
-    { onConflict: "item_id" },
-  );
-
-  if (error) {
-    return { success: false, message: "Error al actualizar el inventario" };
-  }
-
-  return {
-    success: true,
-    message: `${item.name}: ${currentQty} → ${newQuantity}`,
-    item: item.name,
-    previous: currentQty,
-    current: newQuantity,
-  };
-}
-
-async function markShoppingItem(
-  supabase: SupabaseClient,
-  itemName: string,
-  checked: boolean,
-) {
-  const { data: item } = await supabase
-    .from("market_items")
-    .select("id")
-    .ilike("name", `%${escapeIlike(itemName)}%`)
-    .single();
-
-  if (!item) {
-    return {
-      success: false,
-      message: `No se encontró "${itemName}" en la lista`,
-    };
-  }
-
-  await supabase
-    .from("market_checklist")
-    .update({ checked })
-    .eq("item_id", item.id);
-
-  return {
-    success: true,
-    message: checked
-      ? `"${itemName}" marcado como comprado`
-      : `"${itemName}" desmarcado`,
-  };
-}
-
-async function addToShoppingList(
-  supabase: SupabaseClient,
-  itemName: string,
-  quantity?: string,
-) {
-  const { data: existingItem } = await supabase
-    .from("market_items")
-    .select("id")
-    .ilike("name", `%${escapeIlike(itemName)}%`)
-    .single();
-
-  if (existingItem) {
-    await supabase
-      .from("market_checklist")
-      .upsert({ item_id: existingItem.id, checked: false })
-      .select();
-
-    return {
-      success: true,
-      message: `"${itemName}" agregado a la lista de compras`,
-    };
-  }
-
-  const { data: newItem } = await supabase
-    .from("market_items")
-    .insert({
-      name: itemName,
-      category: "Otros",
-      unit: quantity || "unidad",
-      is_custom: true,
-    })
-    .select()
-    .single();
-
-  if (newItem) {
-    await supabase
-      .from("market_checklist")
-      .insert({ item_id: newItem.id, checked: false });
-
-    return {
-      success: true,
-      message: `"${itemName}" creado y agregado a la lista`,
-    };
-  }
-
-  return { success: false, message: "No se pudo agregar el item" };
-}
-
-async function completeTask(
-  supabase: SupabaseClient,
-  taskName: string,
-  _employeeName?: string,
-  householdId?: string,
-) {
-  const today = new Date().toISOString().split("T")[0];
-
-  let query = supabase
-    .from("scheduled_tasks")
-    .select("id, task_template:task_templates(name)")
-    .eq("scheduled_date", today)
-    .neq("status", "completada");
-
-  if (householdId) {
-    query = query.eq("household_id", householdId);
-  }
-
-  const { data: tasks } = await query;
-
-  const matched = tasks?.find((task) => {
-    const template = task.task_template as unknown as { name?: string } | null;
-    const templateName = template?.name || "";
-    return templateName.toLowerCase().includes(taskName.toLowerCase());
-  });
-
-  if (!matched) {
-    return { success: false, message: `No se encontró la tarea "${taskName}"` };
-  }
-
-  await supabase
-    .from("scheduled_tasks")
-    .update({
-      status: "completada",
-      completed_at: new Date().toISOString(),
-    })
-    .eq("id", matched.id);
-
-  const templateName =
-    (matched.task_template as unknown as { name?: string } | null)?.name ||
-    taskName;
-  return {
-    success: true,
-    message: `Tarea "${templateName}" marcada como completada`,
-  };
-}
-
-async function addQuickTask(
-  supabase: SupabaseClient,
-  taskName: string,
-  employeeName?: string,
-  category?: string,
-  householdId?: string,
-) {
-  const today = new Date().toISOString().split("T")[0];
-
-  if (!householdId) {
-    return {
-      success: false,
-      message: "householdId es requerido para crear tareas rápidas",
-    };
-  }
-
-  let employeeId = null;
-  if (employeeName) {
-    const { data: emp } = await supabase
-      .from("home_employees")
-      .select("id")
-      .ilike("name", `%${escapeIlike(employeeName)}%`)
-      .single();
-
-    employeeId = emp?.id;
-  }
-
-  const { data: template, error: templateError } = await supabase
-    .from("task_templates")
-    .insert({
-      household_id: householdId,
-      name: taskName,
-      category: category || "general",
-      frequency: "diaria",
-      estimated_minutes: 60,
-      priority: "normal",
-      assigned_employee_id: employeeId,
-      is_active: false,
-    })
-    .select("id")
-    .single();
-
-  if (templateError) {
-    return {
-      success: false,
-      message: "No se pudo crear la plantilla de tarea rápida",
-    };
-  }
-
-  const { error } = await supabase.from("scheduled_tasks").insert({
-    household_id: householdId,
-    task_template_id: template?.id,
-    employee_id: employeeId,
-    scheduled_date: today,
-    status: "pendiente",
-  });
-
-  if (error) {
-    return { success: false, message: "No se pudo crear la tarea" };
-  }
-
-  return {
-    success: true,
-    message: `Tarea "${taskName}" creada para hoy${employeeName ? ` (asignada a ${employeeName})` : ""}`,
-  };
-}
-
-// ============================================
-// FUNCTION EXECUTOR
-// ============================================
+import { executeFunction } from "../orchestrator";
 
 async function createFunctionExecutor(
-  householdId?: string,
+  householdId: string,
 ): Promise<FunctionExecutor> {
-  const supabase = await createAuthenticatedClient();
   return {
-    execute: async (functionName: string, args: Record<string, unknown>) => {
-      switch (functionName) {
-        case "swap_menu_recipe":
-          return await swapMenuRecipe(
-            supabase,
-            args.day_number as number,
-            args.meal_type as string,
-            args.new_recipe_name as string,
-          );
-        case "update_inventory":
-          return await updateInventory(
-            supabase,
-            args.item_name as string,
-            args.quantity as number,
-            args.action as string,
-          );
-        case "mark_shopping_item":
-          return await markShoppingItem(
-            supabase,
-            args.item_name as string,
-            args.checked as boolean,
-          );
-        case "add_to_shopping_list":
-          return await addToShoppingList(
-            supabase,
-            args.item_name as string,
-            args.quantity as string,
-          );
-        case "complete_task":
-          return await completeTask(
-            supabase,
-            args.task_name as string,
-            args.employee_name as string,
-            householdId,
-          );
-        case "add_quick_task":
-          return await addQuickTask(
-            supabase,
-            args.task_name as string,
-            args.employee_name as string,
-            args.category as string,
-            householdId,
-          );
-        default:
-          return {
-            error: `Función no soportada para ejecución de propuestas: ${functionName}`,
-          };
-      }
-    },
+    execute: (name, args) =>
+      executeFunction(name, { ...args, household_id: householdId }),
   };
 }
 
@@ -447,6 +85,24 @@ export async function POST(request: NextRequest) {
     const isMember = await requireHouseholdMembership(householdId);
     if (!isMember) {
       return forbiddenResponse("No perteneces a este hogar");
+    }
+
+    if (proposalId) {
+      const proposal = await getProposal(proposalId);
+      if (!proposal || proposal.household_id !== householdId) {
+        return forbiddenResponse("La propuesta no pertenece a este hogar");
+      }
+    }
+    if (auditLogId) {
+      const db = await createAuthenticatedClient();
+      const { data, error } = await db
+        .from("ai_audit_log")
+        .select("household_id")
+        .eq("id", auditLogId)
+        .single();
+      if (error || !data || data.household_id !== householdId) {
+        return forbiddenResponse("La acción no pertenece a este hogar");
+      }
     }
 
     const functionExecutor = await createFunctionExecutor(householdId);

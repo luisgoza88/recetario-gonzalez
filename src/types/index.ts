@@ -813,6 +813,7 @@ export const DEFAULT_PERMISSIONS: Record<UserRole, Permission[]> = {
     "edit_menu",
     "edit_recipes",
     "edit_shopping_list",
+    "update_inventory",
   ],
   empleado: [
     "view_menu",

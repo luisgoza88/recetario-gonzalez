@@ -15,8 +15,6 @@ import {
   Sparkles,
   Trash2,
   WifiOff,
-  Camera,
-  PlusIcon,
   ListChecks,
   TrendingDown,
   ShoppingBasket,
@@ -25,7 +23,6 @@ import {
   ScanLine,
   ChevronDown,
   Tag,
-  Receipt,
 } from "lucide-react";
 import Spinner from "@/components/ui/Spinner";
 import { supabase } from "@/lib/supabase/client";
@@ -58,6 +55,7 @@ import { CookWithThisButton } from "@/components/recipe/CookWithThisButton";
 // items recurrentes basados en purchase_patterns arriba de la lista
 import { RecurringItemsCard } from "@/components/market/RecurringItemsCard";
 import { useHouseholdId } from "@/lib/stores/useHouseholdStore";
+import { useAppStore } from "@/lib/stores/useAppStore";
 import type { DueItem } from "@/lib/recurring-items";
 
 const AddCustomItemModal = dynamic(() => import("./AddCustomItemModal"), {
@@ -99,7 +97,14 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({});
   const [showAddModal, setShowAddModal] = useState(false);
   const [showScanModal, setShowScanModal] = useState(false);
-  const [fabOpen, setFabOpen] = useState(false);
+  const addRequested = useAppStore((state) => state.activeModals.addMarketItem);
+  const closeModal = useAppStore((state) => state.closeModal);
+  useEffect(() => {
+    if (addRequested) {
+      setShowAddModal(true);
+      closeModal("addMarketItem");
+    }
+  }, [addRequested, closeModal]);
   const [categoryData, setCategoryData] = useState<
     Record<string, IngredientCategory>
   >({});
@@ -122,7 +127,9 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
     if (typeof window !== "undefined") {
       return (
         (localStorage.getItem("market_list_layout") as
-          "category" | "aisle" | null) ?? "aisle"
+          | "category"
+          | "aisle"
+          | null) ?? "aisle"
       );
     }
     return "aisle";
@@ -619,8 +626,6 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
   const isCatOpen = (name: string, index: number) =>
     expandedCats[name] === undefined ? index < 3 : expandedCats[name];
 
-  const totalEstimate = "$782.450";
-
   return (
     <div className="max-w-lg mx-auto">
       {/* Header — título + acciones scan/add */}
@@ -630,7 +635,7 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
             Mercado
           </h1>
           <p className="text-[13px] text-[var(--ink-soft)] mt-0.5">
-            Ciclo del 19 enero al 2 febrero
+            Lista de compras de tu hogar
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -715,15 +720,12 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
               style={{ width: `${progressPercent}%` }}
             />
           </div>
-          <div className="flex items-center gap-2 mt-2">
-            <span className="text-[11px] text-[var(--ink-soft)] flex items-center gap-1">
-              <Receipt size={11} /> {totalEstimate} estimado
-            </span>
-            <span className="text-[11px] text-stone-400">·</span>
-            <span className="text-[11px] text-[var(--ink-soft)]">
-              15 días · 5 porciones
-            </span>
-          </div>
+          <p className="text-xs text-[var(--ink-soft)] mt-2">
+            {totalCount - checkedCount}{" "}
+            {totalCount - checkedCount === 1
+              ? "producto pendiente"
+              : "productos pendientes"}
+          </p>
         </div>
       )}
 
@@ -1335,72 +1337,6 @@ export default function MarketView({ items, onUpdate }: MarketViewProps) {
           onClose={() => setShowSupermarketMode(false)}
         />
       )}
-
-      {/* Speed Dial FAB */}
-      <>
-        {/* Backdrop overlay */}
-        {fabOpen && (
-          <div
-            className="fixed inset-0 bg-black/30 z-40 transition-opacity duration-200"
-            onClick={() => setFabOpen(false)}
-          />
-        )}
-
-        {/* FAB Container */}
-        <div className="fixed bottom-36 right-5 z-50 flex flex-col-reverse items-end gap-3">
-          {/* Speed Dial Options */}
-          <div
-            className={`flex flex-col-reverse items-end gap-3 transition-all duration-300 ${
-              fabOpen
-                ? "opacity-100 translate-y-0"
-                : "opacity-0 translate-y-4 pointer-events-none"
-            }`}
-          >
-            {/* Scan Pantry Option */}
-            <button
-              onClick={() => {
-                setShowScanModal(true);
-                setFabOpen(false);
-              }}
-              className="flex items-center gap-3 group"
-            >
-              <span className="bg-white text-gray-700 px-3 py-2 rounded-lg shadow-lg text-sm font-medium whitespace-nowrap transform transition-all duration-200 group-hover:scale-105">
-                Escanear despensa
-              </span>
-              <div className="bg-green-500 text-white p-3.5 rounded-full shadow-lg transition-all duration-200 hover:bg-green-600 hover:scale-110">
-                <Camera size={22} />
-              </div>
-            </button>
-
-            {/* Add Custom Item Option */}
-            <button
-              onClick={() => {
-                setShowAddModal(true);
-                setFabOpen(false);
-              }}
-              className="flex items-center gap-3 group"
-            >
-              <span className="bg-white text-gray-700 px-3 py-2 rounded-lg shadow-lg text-sm font-medium whitespace-nowrap transform transition-all duration-200 group-hover:scale-105">
-                Agregar con IA
-              </span>
-              <div className="bg-purple-500 text-white p-3.5 rounded-full shadow-lg transition-all duration-200 hover:bg-purple-600 hover:scale-110">
-                <Sparkles size={22} />
-              </div>
-            </button>
-          </div>
-
-          {/* Main FAB Button */}
-          <button
-            onClick={() => setFabOpen(!fabOpen)}
-            className={`bg-gradient-to-br from-orange-500 to-emerald-600 text-white p-4 rounded-full shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-105 ${
-              fabOpen ? "rotate-45" : "rotate-0"
-            }`}
-            aria-label={fabOpen ? "Cerrar opciones" : "Abrir opciones"}
-          >
-            <PlusIcon size={26} strokeWidth={2.5} />
-          </button>
-        </div>
-      </>
 
       {/* Add Custom Item Modal */}
       {showAddModal && (

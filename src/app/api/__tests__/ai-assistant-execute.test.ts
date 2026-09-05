@@ -102,6 +102,9 @@ function createMockSupabaseClient() {
 describe("POST /api/ai-assistant/execute", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getProposal).mockResolvedValue({ household_id: "h1" } as Awaited<
+      ReturnType<typeof getProposal>
+    >);
   });
 
   // -----------------------------------------------------------------------
@@ -312,9 +315,8 @@ describe("POST /api/ai-assistant/execute", () => {
     );
     const response = await POST(request);
 
-    expect(response.status).toBe(500);
-    const body = await response.json();
-    expect(body.error).toBe("No se pudo aprobar la propuesta");
+    expect(response.status).toBe(403);
+    expect(approveProposal).not.toHaveBeenCalled();
   });
 });
 

@@ -25,7 +25,7 @@ interface BottomNavigationProps {
   recetarioTab?: RecetarioTab;
   onRecetarioTabChange?: (tab: RecetarioTab) => void;
   pendingSuggestions?: number;
-  onOpenAICommandCenter?: () => void;
+  onOpenAssistant?: () => void;
   pendingAIProposals?: number;
 }
 
@@ -63,7 +63,7 @@ export default function BottomNavigation({
   recetarioTab = "calendar",
   onRecetarioTabChange,
   pendingSuggestions = 0,
-  onOpenAICommandCenter,
+  onOpenAssistant,
   pendingAIProposals = 0,
 }: BottomNavigationProps) {
   return (
@@ -75,7 +75,7 @@ export default function BottomNavigation({
       {activeSection === "recetario" && onRecetarioTabChange && (
         <div
           className="flex border-b border-[var(--border)] bg-stone-50"
-          role="tablist"
+          role="group"
         >
           {RECETARIO_TABS.map((tab) => {
             const isActive = recetarioTab === tab.id;
@@ -85,8 +85,7 @@ export default function BottomNavigation({
               <button
                 key={tab.id}
                 onClick={() => onRecetarioTabChange(tab.id)}
-                role="tab"
-                aria-selected={isActive}
+                aria-current={isActive ? "page" : undefined}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-1 relative transition-colors ${
                   isActive ? "text-[var(--accent)] bg-white" : "text-stone-500"
                 }`}
@@ -102,7 +101,7 @@ export default function BottomNavigation({
                     </span>
                   )}
                 </div>
-                <span className="text-[10.5px] font-medium">{tab.label}</span>
+                <span className="text-[12px] font-medium">{tab.label}</span>
               </button>
             );
           })}
@@ -111,7 +110,7 @@ export default function BottomNavigation({
 
       <div
         className="flex items-end justify-around px-2 pt-2 pb-1 relative"
-        role="tablist"
+        role="group"
       >
         <NavTab
           icon={<Sun size={20} />}
@@ -133,7 +132,7 @@ export default function BottomNavigation({
             onToggle={onFabToggle}
             actions={fabActions}
             activeSection={activeSection}
-            onOpenAICommandCenter={onOpenAICommandCenter}
+            onOpenAssistant={onOpenAssistant}
             pendingProposals={pendingAIProposals}
           />
         </div>
@@ -172,12 +171,11 @@ function NavTab({
   return (
     <button
       onClick={onClick}
-      role="tab"
-      aria-selected={active}
+      aria-current={active ? "page" : undefined}
       className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl min-w-[58px] transition-colors ${active ? `${accent.activeClass} ${accent.bgClass}` : "text-stone-400"}`}
     >
       {icon}
-      <span className="text-[10px] mt-0.5 font-medium">{label}</span>
+      <span className="text-[12px] mt-0.5 font-medium">{label}</span>
     </button>
   );
 }

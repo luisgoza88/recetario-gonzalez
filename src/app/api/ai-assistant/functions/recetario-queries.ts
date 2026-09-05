@@ -1,3 +1,5 @@
+import { getEffectiveMenu } from "@/lib/effective-menu";
+import { menuCycleDay } from "@/lib/menu-date";
 import { createAIClient } from "@/lib/ai-assistant/db";
 import { RECIPE_VARIANTS } from "@/lib/ai-assistant/constants";
 import { logger } from "@/lib/logger";
@@ -102,26 +104,11 @@ export async function getTodayMenu() {
     const supabase = await getSupabase();
     const today = new Date();
     const dayOfWeek = today.getDay();
-    const cycleDay = (((dayOfWeek === 0 ? 7 : dayOfWeek) - 1) % 12) + 1;
+    const cycleDay = menuCycleDay(today);
     const isWeekend = dayOfWeek === 5 || dayOfWeek === 6;
 
-    const { data: menu, error } = await supabase
-      .from("day_menu")
-      .select(
-        `
-        *,
-        breakfast:recipes!day_menu_breakfast_id_fkey(name, prep_time),
-        lunch:recipes!day_menu_lunch_id_fkey(name, prep_time),
-        dinner:recipes!day_menu_dinner_id_fkey(name, prep_time)
-      `,
-      )
-      .eq("day_number", cycleDay)
-      .single();
-
-    if (error || !menu) {
-      logger.error("Error fetching menu", {
-        error: error instanceof Error ? error.message : String(error),
-      });
+    const menu = await getEffectiveMenu(supabase, today);
+    if (!menu) {
       return {
         message: "No hay menú programado para hoy",
         date: today.toLocaleDateString("es-ES", {
@@ -145,9 +132,7 @@ export async function getTodayMenu() {
       cycle_day: cycleDay,
       breakfast: menu.breakfast?.name || "No programado",
       lunch: menu.lunch?.name || "No programado",
-      dinner: isWeekend
-        ? "Sin cena (salen a comer)"
-        : menu.dinner?.name || "No programado",
+      dinner: menu.dinner?.name || "No programado",
     };
   } catch (err) {
     logger.error("getTodayMenu error", {
@@ -303,6 +288,7 @@ export async function getRecipeDetails(recipeName: string) {
   let { data: recipe } = await supabase
     .from("recipes")
     .select("*")
+    .throwOnError()
     .ilike("name", `%${recipeName}%`)
     .single();
 
@@ -311,7 +297,10 @@ export async function getRecipeDetails(recipeName: string) {
       .toLowerCase()
       .split(/\s+/)
       .filter((t) => t.length > 2);
-    const { data: recipes } = await supabase.from("recipes").select("*");
+    const { data: recipes } = await supabase
+      .from("recipes")
+      .select("*")
+      .throwOnError();
 
     if (recipes && recipes.length > 0) {
       const scored = recipes.map((r) => {
@@ -340,6 +329,7 @@ export async function getRecipeDetails(recipeName: string) {
     const { data: inventory } = await supabase
       .from("inventory")
       .select("*, market_item:market_items(name)")
+      .throwOnError()
       .gt("current_number", 0);
 
     const availableIngredients =
@@ -385,6 +375,7 @@ export async function getMissingIngredients(recipeName: string) {
   const { data: recipe } = await supabase
     .from("recipes")
     .select("name, ingredients")
+    .throwOnError()
     .ilike("name", `%${recipeName}%`)
     .single();
 
@@ -395,6 +386,7 @@ export async function getMissingIngredients(recipeName: string) {
   const { data: inventory } = await supabase
     .from("inventory")
     .select("*, market_item:market_items(name)")
+    .throwOnError()
     .gt("current_number", 0);
 
   const availableItems =
@@ -543,6 +535,7 @@ export async function suggestRecipe(_preferences?: string) {
   const { data: inventory } = await supabase
     .from("inventory")
     .select("market_item:market_items(name)")
+    .throwOnError()
     .gt("current_number", 0);
 
   const availableItems =
@@ -555,7 +548,8 @@ export async function suggestRecipe(_preferences?: string) {
 
   const { data: recipes } = await supabase
     .from("recipes")
-    .select("name, ingredients, prep_time, category");
+    .select("name, ingredients, prep_time, category")
+    .throwOnError();
 
   if (!recipes || recipes.length === 0) {
     return { suggestion: "No hay recetas disponibles" };

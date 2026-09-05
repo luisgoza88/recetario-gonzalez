@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Ticket, AlertCircle, Check, Users, ArrowRight } from "lucide-react";
@@ -30,44 +30,44 @@ function JoinPageContent() {
   );
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [lastValidationTime, setLastValidationTime] = useState(0);
+  const lastValidationTime = useRef(0);
+  const lastValidatedCode = useRef<string | null>(null);
 
   // Define handleValidate first (before useEffects that use it)
-  const handleValidate = useCallback(
-    async (codeToValidate: string) => {
-      if (codeToValidate.length !== 8) {
-        setError("El código debe tener 8 caracteres");
-        return;
-      }
+  const handleValidate = useCallback(async (codeToValidate: string) => {
+    if (codeToValidate.length !== 8) {
+      setError("El código debe tener 8 caracteres");
+      return;
+    }
 
-      // Throttle: 2 segundos entre intentos
-      const now = Date.now();
-      if (now - lastValidationTime < 2000) {
-        setError("Espera un momento antes de intentar de nuevo");
-        return;
-      }
-      setLastValidationTime(now);
+    // Throttle: 2 segundos entre intentos
+    const now = Date.now();
+    if (lastValidatedCode.current === codeToValidate) return;
+    if (now - lastValidationTime.current < 2000) {
+      setError("Espera un momento antes de intentar de nuevo");
+      return;
+    }
+    lastValidationTime.current = now;
+    lastValidatedCode.current = codeToValidate;
 
-      setIsValidating(true);
-      setError(null);
+    setIsValidating(true);
+    setError(null);
 
-      const result = await validateInvitationCode(codeToValidate);
-      setValidation(result);
+    const result = await validateInvitationCode(codeToValidate);
+    setValidation(result);
 
-      if (!result.isValid) {
-        setError(result.error || "Código inválido");
-      }
+    if (!result.isValid) {
+      setError(result.error || "Código inválido");
+    }
 
-      setIsValidating(false);
-    },
-    [lastValidationTime],
-  );
+    setIsValidating(false);
+  }, []);
 
   // Si hay un codigo en la URL, usarlo
   useEffect(() => {
     const codeParam = searchParams.get("code");
     if (codeParam) {
-      const upperCode = codeParam.toUpperCase();
+      const upperCode = codeParam.toUpperCase().replace(/[^A-Z0-9]/g, "");
       setCode(upperCode);
       handleValidate(upperCode);
     }
@@ -105,7 +105,7 @@ function JoinPageContent() {
     if (result.success) {
       setSuccess(true);
       // Refrescar memberships
-      await auth.refreshMemberships();
+      await auth.refreshMemberships(result.householdId);
       // Redirigir despues de 2 segundos
       setTimeout(() => {
         router.push("/");

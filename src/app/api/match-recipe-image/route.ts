@@ -6,7 +6,7 @@ import {
 } from "@/lib/gemini/client";
 import { requireAuth } from "@/lib/api/auth";
 import { withRateLimit } from "@/lib/rate-limit";
-import { createAuthenticatedClient } from "@/lib/supabase/server";
+import { createHouseholdClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 
 interface MatchRequest {
@@ -43,12 +43,12 @@ export async function POST(request: NextRequest) {
   const rateLimit = await withRateLimit(userId, "analyze-image");
   if (!rateLimit.allowed) {
     return NextResponse.json(rateLimit.response, {
-      status: 429,
+      status: rateLimit.status ?? 429,
       headers: rateLimit.headers,
     });
   }
 
-  const supabase = await createAuthenticatedClient();
+  const supabase = await createHouseholdClient();
 
   try {
     const body: MatchRequest = await request.json();
@@ -166,7 +166,11 @@ Respond with JSON only:
       !["high", "medium", "low"].includes(matchResult.confidence)
     ) {
       return NextResponse.json(
-        { success: false, fallback: true, error: "Resultado de coincidencia inválido" },
+        {
+          success: false,
+          fallback: true,
+          error: "Resultado de coincidencia inválido",
+        },
         { status: 502 },
       );
     }
@@ -241,7 +245,7 @@ export async function GET(request: NextRequest) {
   const authCheck = requireAuth(request);
   if (authCheck instanceof NextResponse) return authCheck;
 
-  const supabase = await createAuthenticatedClient();
+  const supabase = await createHouseholdClient();
   try {
     const { data: stats, error } = await supabase
       .from("image_library")

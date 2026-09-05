@@ -5,7 +5,7 @@
  * Used by AI API routes to replace hardcoded family/city references.
  */
 
-import { createServiceRoleClient } from "@/lib/supabase/server";
+import { createAuthenticatedClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 import type { CookingProfile } from "@/types";
 
@@ -32,7 +32,7 @@ export async function getCookingProfile(
   }
 
   try {
-    const supabase = createServiceRoleClient();
+    const supabase = await createAuthenticatedClient();
     const { data, error } = await supabase
       .from("households")
       .select("cooking_profile, name")

@@ -1,3 +1,4 @@
+import { householdDate } from "@/lib/menu-date";
 import { createAIClient } from "@/lib/ai-assistant/db";
 import { logger } from "@/lib/logger";
 
@@ -72,12 +73,13 @@ function shouldScheduleTemplate(
 
 export async function completeTask(taskName: string, _employeeName?: string) {
   const supabase = await getSupabase();
-  const today = new Date().toISOString().split("T")[0];
+  const today = householdDate(new Date());
 
   // First try scheduled_tasks (unified system)
   const { data: scheduledTasks } = await supabase
     .from("scheduled_tasks")
     .select("id, task_template:task_templates(name)")
+    .throwOnError()
     .eq("scheduled_date", today)
     .neq("status", "completada");
 
@@ -96,6 +98,7 @@ export async function completeTask(taskName: string, _employeeName?: string) {
   await supabase
     .from("scheduled_tasks")
     .update({ status: "completada", completed_at: new Date().toISOString() })
+    .throwOnError()
     .eq("id", matched.id);
 
   return {
@@ -111,7 +114,7 @@ export async function addQuickTask(
   householdId?: string,
 ) {
   const supabase = await getSupabase();
-  const today = new Date().toISOString().split("T")[0];
+  const today = householdDate(new Date());
 
   if (!householdId) {
     return {
@@ -125,6 +128,7 @@ export async function addQuickTask(
     const { data: emp } = await supabase
       .from("home_employees")
       .select("id")
+      .throwOnError()
       .ilike("name", `%${employeeName}%`)
       .single();
     employeeId = emp?.id;
@@ -143,7 +147,9 @@ export async function addQuickTask(
       assigned_employee_id: employeeId,
       is_active: false, // Quick tasks don't repeat
     })
+    .throwOnError()
     .select("id")
+    .throwOnError()
     .single();
 
   // Create the scheduled task
@@ -181,6 +187,7 @@ export async function createSpace(
     const { data: typeData } = await supabase
       .from("space_types")
       .select("id, category")
+      .throwOnError()
       .ilike("name", `%${spaceType}%`)
       .single();
 
@@ -250,6 +257,7 @@ export async function updateSpace(
     const { data: previousSpace } = await supabase
       .from("spaces")
       .select("*")
+      .throwOnError()
       .eq("id", spaceId)
       .single();
 
@@ -314,6 +322,7 @@ export async function deleteSpace(spaceId: string, confirm: boolean) {
     const { data: previousSpace } = await supabase
       .from("spaces")
       .select("*")
+      .throwOnError()
       .eq("id", spaceId)
       .single();
 
@@ -426,6 +435,7 @@ export async function updateEmployee(
     const { data: previousEmployee } = await supabase
       .from("home_employees")
       .select("*")
+      .throwOnError()
       .eq("id", employeeId)
       .single();
 
@@ -496,6 +506,7 @@ export async function deleteEmployee(
     const { data: previousEmployee } = await supabase
       .from("home_employees")
       .select("*")
+      .throwOnError()
       .eq("id", employeeId)
       .single();
 
@@ -579,6 +590,7 @@ export async function createTaskTemplate(
     const { data: employee } = await supabase
       .from("home_employees")
       .select("id, name")
+      .throwOnError()
       .ilike("name", `%${employeeName}%`)
       .single();
 
@@ -656,6 +668,7 @@ export async function updateTaskTemplate(
     const { data: previousTemplate } = await supabase
       .from("task_templates")
       .select("*")
+      .throwOnError()
       .eq("id", templateId)
       .single();
 
@@ -680,6 +693,7 @@ export async function updateTaskTemplate(
       const { data: employee } = await supabase
         .from("home_employees")
         .select("id")
+        .throwOnError()
         .ilike("name", `%${updates.employeeName}%`)
         .single();
       if (employee) {
@@ -735,6 +749,7 @@ export async function deleteTaskTemplate(templateId: string, confirm: boolean) {
     const { data: previousTemplate } = await supabase
       .from("task_templates")
       .select("*")
+      .throwOnError()
       .eq("id", templateId)
       .single();
 
@@ -782,6 +797,7 @@ export async function rescheduleTask(
     const { data: previousTask } = await supabase
       .from("scheduled_tasks")
       .select("*, task_template:task_templates(name)")
+      .throwOnError()
       .eq("id", taskId)
       .single();
 
@@ -796,6 +812,7 @@ export async function rescheduleTask(
       const { data: employee } = await supabase
         .from("home_employees")
         .select("id")
+        .throwOnError()
         .ilike("name", `%${newEmployeeName}%`)
         .single();
       if (employee) {
@@ -870,6 +887,7 @@ export async function generateTasksForDate(
     const { count: existingCount } = await supabase
       .from("scheduled_tasks")
       .select("id", { count: "exact", head: true })
+      .throwOnError()
       .eq("household_id", householdId)
       .eq("scheduled_date", dateStr);
 

@@ -1,0 +1,13 @@
+{
+  "checks": [
+    "Real account 1 signs in and creates its household",
+    "Real account 2 signs in and creates its household",
+    "Household read isolation and completed onboarding",
+    "Owner can save a recipe",
+    "Other household cannot read the private recipe",
+    "Other household cannot modify the recipe",
+    "Owner can save market and inventory",
+    "Cross-household inventory reference is rejected",
+    "Household invitation is created"
+  ]
+}

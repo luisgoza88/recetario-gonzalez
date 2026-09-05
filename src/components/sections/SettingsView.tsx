@@ -1,5 +1,6 @@
 "use client";
 
+import { useTodayMenu } from "@/lib/hooks/useTodayDashboard";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -42,6 +43,7 @@ export default function SettingsView() {
   const [showCookingProfile, setShowCookingProfile] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [showMonthlyReport, setShowMonthlyReport] = useState(false);
+  const { menu: todayMenu } = useTodayMenu();
   const [showKidsMode, setShowKidsMode] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const { tier, isPremium } = useSubscription();
@@ -90,69 +92,14 @@ export default function SettingsView() {
       // 1. Sign out de Supabase (limpia cookies + localStorage)
       await signOut();
 
-      // 2. Limpiar IndexedDB (cache offline de la app)
-      try {
-        const dbs = await window.indexedDB.databases?.();
-        if (dbs) {
-          await Promise.all(
-            dbs.map(
-              (db) =>
-                new Promise<void>((resolve) => {
-                  if (!db.name) return resolve();
-                  const req = window.indexedDB.deleteDatabase(db.name);
-                  req.onsuccess = () => resolve();
-                  req.onerror = () => resolve();
-                  req.onblocked = () => resolve();
-                }),
-            ),
-          );
-        }
-      } catch {
-        /* ignore IndexedDB cleanup errors */
-      }
-
-      // 3. Limpiar localStorage residual (excepto preferencias mínimas)
-      try {
-        Object.keys(localStorage).forEach((key) => {
-          if (
-            key.startsWith("supabase.") ||
-            key.startsWith("sb-") ||
-            key.startsWith("ai_session_") ||
-            key.startsWith("recetario.")
-          ) {
-            localStorage.removeItem(key);
-          }
-        });
-      } catch {
-        /* ignore */
-      }
-
-      // 4. Desregistrar service workers
-      try {
-        if ("serviceWorker" in navigator) {
-          const regs = await navigator.serviceWorker.getRegistrations();
-          await Promise.all(regs.map((r) => r.unregister()));
-        }
-      } catch {
-        /* ignore SW unregister errors */
-      }
-
-      // 5. Limpiar caches del browser
-      try {
-        if ("caches" in window) {
-          const names = await caches.keys();
-          await Promise.all(names.map((n) => caches.delete(n)));
-        }
-      } catch {
-        /* ignore cache cleanup */
-      }
-
+      // AuthContext clears the visible session caches. Keep scoped pending
+      // operations so a connection failure never deletes unsynced work.
       // 6. Redirigir a login con hard reload para asegurar estado limpio
       window.location.href = "/auth/login";
     } catch (error) {
       console.error("Error al cerrar sesión:", error);
-      // Forzar redirect aunque falle algo
-      window.location.href = "/auth/login";
+      setSigningOut(false);
+      window.alert("No se pudo cerrar sesión. Vuelve a intentarlo.");
     }
   };
 
@@ -314,13 +261,12 @@ export default function SettingsView() {
             color="text-blue-600"
             label="Idioma"
             sub="Español"
-            onClick={() => {}}
           />
           <Row
             Icon={Moon}
             color="text-indigo-600"
-            label="Tema oscuro"
-            sub="Próximamente"
+            label="Apariencia"
+            sub="Tema claro"
             last
           />
         </Group>
@@ -359,14 +305,12 @@ export default function SettingsView() {
               color="text-cyan-600"
               label="Exportar datos"
               sub="Descarga tus recetas y menús"
-              onClick={() => {}}
             />
             <Row
               Icon={ShieldCheck}
               color="text-green-600"
               label="Privacidad"
               sub="Gestiona tus datos"
-              onClick={() => {}}
               last
             />
           </Group>
@@ -391,19 +335,12 @@ export default function SettingsView() {
           <Row
             Icon={Crown}
             color="text-yellow-600"
-            label={isPremium ? `Plan ${tier}` : "Actualizar a Premium"}
+            label={isPremium ? `Plan ${tier}` : "Tu cuenta"}
             sub={
               isPremium
                 ? "Funciones premium activas"
-                : "Recetas e imágenes ilimitadas, asistente de voz"
+                : "Las funciones disponibles aparecen en la aplicación"
             }
-            onClick={() => {
-              if (!isPremium) {
-                window.alert(
-                  "Premium llega pronto. Por ahora puedes activarlo manualmente desde la BD.",
-                );
-              }
-            }}
             rightContent={
               isPremium ? (
                 <span className="text-[10px] px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full font-bold flex-shrink-0">
@@ -421,7 +358,12 @@ export default function SettingsView() {
         )}
 
         {/* Modal Modo Niños */}
-        {showKidsMode && <KidsMode onClose={() => setShowKidsMode(false)} />}
+        {showKidsMode && (
+          <KidsMode
+            todayRecipe={todayMenu?.lunch ?? undefined}
+            onClose={() => setShowKidsMode(false)}
+          />
+        )}
 
         {/* Cuenta */}
         <Group title="Cuenta">

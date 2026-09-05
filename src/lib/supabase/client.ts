@@ -1,4 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr";
+import { createHouseholdFetch } from "./household-fetch";
 import { createClient } from "@supabase/supabase-js";
 
 // .trim() defensivo: si la env var en Vercel se pegó con un \n al final,
@@ -24,7 +25,15 @@ const supabaseAnonKey = (
  */
 export const supabase =
   supabaseUrl && supabaseAnonKey
-    ? createBrowserClient(supabaseUrl, supabaseAnonKey)
+    ? createBrowserClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          fetch: createHouseholdFetch(() =>
+            typeof window === "undefined"
+              ? null
+              : localStorage.getItem("currentHouseholdId"),
+          ),
+        },
+      })
     : createClient("https://placeholder.supabase.co", "placeholder");
 
 // Para uso en el servidor (helper, server.ts tiene la implementación canónica)

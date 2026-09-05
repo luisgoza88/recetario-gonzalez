@@ -1,0 +1,15 @@
+{
+  "checks": [
+    "Published login preserves destination and loads private household recipe",
+    "Authenticated recipe publication succeeds",
+    "Explicit shared snapshot is publicly readable",
+    "Shared recipe can be revoked",
+    "Revoked recipe is no longer public",
+    "Published proposal is approved and executed",
+    "Proposal change is persisted",
+    "Published undo restores recorded state",
+    "Inventory value is actually restored",
+    "No browser runtime errors in authenticated production flow"
+  ],
+  "errors": []
+}

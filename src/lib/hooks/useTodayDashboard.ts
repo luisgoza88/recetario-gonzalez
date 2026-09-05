@@ -1,3 +1,7 @@
+import { useHouseholdDate } from "@/hooks/useHouseholdDate";
+import { householdDate } from "@/lib/menu-date";
+import { getEffectiveMenu } from "@/lib/effective-menu";
+import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { Recipe, ScheduledTask, HomeEmployee } from "@/types";
@@ -38,6 +42,8 @@ export interface TodayAlerts {
 // ============================================
 
 export function useTodayMenu() {
+  const dateKey = useHouseholdDate();
+  const { currentHousehold } = useAuth();
   const [menu, setMenu] = useState<TodayMenu | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -47,55 +53,32 @@ export function useTodayMenu() {
       setLoading(true);
       setError(null);
 
-      const today = new Date();
-      // Calcular el día del ciclo (0-11, excluyendo domingos)
-      const startDate = new Date("2025-01-06"); // Inicio del ciclo
-      const diffDays = Math.floor(
-        (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
-      );
-
-      // Contar domingos entre startDate y today
-      let sundays = 0;
-      const tempDate = new Date(startDate);
-      while (tempDate <= today) {
-        if (tempDate.getDay() === 0) sundays++;
-        tempDate.setDate(tempDate.getDate() + 1);
+      if (!currentHousehold) {
+        setMenu(null);
+        return;
       }
-
-      const effectiveDays = diffDays - sundays;
-      const dayNumber = ((effectiveDays % 12) + 12) % 12;
-
-      // Cargar menú del día
-      const { data: menuData, error: menuError } = await supabase
-        .from("day_menu")
-        .select(
-          `
-          *,
-          breakfast:recipes!day_menu_breakfast_id_fkey(*),
-          lunch:recipes!day_menu_lunch_id_fkey(*),
-          dinner:recipes!day_menu_dinner_id_fkey(*)
-        `,
-        )
-        .eq("day_number", dayNumber)
-        .single();
-
-      if (menuError) throw menuError;
+      const today = new Date();
+      const menuData = await getEffectiveMenu(
+        supabase,
+        new Date(`${dateKey}T12:00:00-05:00`),
+      );
+      const dayNumber = menuData?.day_number ?? -1;
 
       if (menuData) {
         setMenu({
-          breakfast: menuData.breakfast,
-          lunch: menuData.lunch,
+          breakfast: menuData.breakfast ?? undefined,
+          lunch: menuData.lunch ?? undefined,
           dinner: menuData.dinner,
           dayNumber,
         });
-      }
+      } else setMenu(null);
     } catch (err) {
       console.error("Error loading menu:", err);
       setError(err instanceof Error ? err : new Error("Error loading menu"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentHousehold?.id, dateKey]);
 
   useEffect(() => {
     loadTodayMenu();
@@ -119,7 +102,7 @@ export function useTodayTasks() {
       setError(null);
 
       const today = new Date();
-      const todayStr = today.toISOString().split("T")[0];
+      const todayStr = householdDate(today);
 
       // Cargar empleados activos
       const { data: employees, error: empError } = await supabase
@@ -270,8 +253,8 @@ export function useWeeklyStats() {
       // Calcular inicio de semana (lunes)
       const startOfWeek = new Date(today);
       startOfWeek.setDate(today.getDate() - today.getDay() + 1);
-      const startStr = startOfWeek.toISOString().split("T")[0];
-      const endStr = today.toISOString().split("T")[0];
+      const startStr = householdDate(startOfWeek);
+      const endStr = householdDate(today);
 
       // Comidas completadas esta semana
       const { count: mealsCount } = await supabase

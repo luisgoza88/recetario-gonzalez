@@ -266,3 +266,7 @@ describe("POST /api/scan-receipt", () => {
     expect(body.items).toEqual([]);
   });
 });
+
+vi.mock("@/lib/rate-limit", () => ({
+  withRateLimit: vi.fn().mockResolvedValue({ allowed: true, headers: {} }),
+}));

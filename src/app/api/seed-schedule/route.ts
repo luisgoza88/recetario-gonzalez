@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api/auth";
+import {
+  requireAuth,
+  requirePermission,
+  forbiddenResponse,
+} from "@/lib/api/auth";
 
 // Tipo para estructura de horarios (migrado de schedule-seed.ts)
 interface WeekSchedule {
@@ -240,6 +244,8 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+    if (!(await requirePermission(householdId, "manage_tasks")))
+      return forbiddenResponse();
 
     // Horarios de ejemplo (schedule-seed.ts fue eliminado como parte de consolidación de datos)
     const YOLIMA_SCHEDULE: WeekSchedule[] = [];

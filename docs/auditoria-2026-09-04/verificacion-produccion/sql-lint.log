@@ -1,0 +1,20 @@
+
+> recetario-app@0.1.0 db:lint
+> node scripts/lint-new-migrations.mjs
+
+lint-new-migrations: revisando 10 migración(es) nueva(s):
+  • supabase/migrations/20260905000000_proposal_execution_guards.sql
+  • supabase/migrations/20260905001000_complete_onboarding.sql
+  • supabase/migrations/20260905002000_explicit_recipe_sharing.sql
+  • supabase/migrations/20260905003000_household_reference_integrity.sql
+  • supabase/migrations/20260905004000_household_write_permissions.sql
+  • supabase/migrations/20260905005000_audit_actor_and_real_rollback.sql
+  • supabase/migrations/20260905006000_live_household_boundaries.sql
+  • supabase/migrations/20260905007000_invitation_actor_reference.sql
+  • supabase/migrations/20260905008000_audit_update_timestamp.sql
+  • supabase/migrations/20260905009000_invitation_result_and_family_inventory.sql
+
+
+Found 0 issues in 10 files 🎉
+
+✅ Sin hallazgos de Squawk en las migraciones nuevas.

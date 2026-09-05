@@ -1,3 +1,4 @@
+import { householdDate } from "@/lib/menu-date";
 import { createAIClient } from "@/lib/ai-assistant/db";
 import { logger } from "@/lib/logger";
 
@@ -8,7 +9,7 @@ async function getSupabase() {
 export async function getTodayTasks() {
   try {
     const supabase = await getSupabase();
-    const today = new Date().toISOString().split("T")[0];
+    const today = householdDate(new Date());
 
     const { data: tasks, error } = await supabase
       .from("scheduled_tasks")
@@ -28,6 +29,7 @@ export async function getTodayTasks() {
         const { data: emps } = await supabase
           .from("home_employees")
           .select("id, name")
+          .throwOnError()
           .in("id", empIds as string[]);
         emps?.forEach((e) => {
           employeeNames[e.id] = e.name;
@@ -75,6 +77,7 @@ export async function getEmployeeSchedule(
   const { data: employee } = await supabase
     .from("home_employees")
     .select("id, name")
+    .throwOnError()
     .ilike("name", `%${employeeName}%`)
     .single();
 
@@ -82,13 +85,14 @@ export async function getEmployeeSchedule(
     return { error: `No se encontró empleado "${employeeName}"` };
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = householdDate(new Date());
 
   const { data: tasks } = await supabase
     .from("scheduled_tasks")
     .select(
       "*, task_template:task_templates(name, category, estimated_minutes)",
     )
+    .throwOnError()
     .eq("employee_id", employee.id)
     .eq("scheduled_date", today)
     .order("created_at");
@@ -110,7 +114,7 @@ export async function getEmployeeSchedule(
 export async function getTasksSummary() {
   try {
     const supabase = await getSupabase();
-    const today = new Date().toISOString().split("T")[0];
+    const today = householdDate(new Date());
 
     const { data: tasks, error } = await supabase
       .from("scheduled_tasks")

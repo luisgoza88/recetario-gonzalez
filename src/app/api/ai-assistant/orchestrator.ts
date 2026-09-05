@@ -1,3 +1,4 @@
+import { assertExecutionSucceeded } from "@/lib/ai/proposal-executor";
 /**
  * AI Assistant Orchestrator
  *
@@ -544,6 +545,7 @@ export async function executeFunctionWithLogging(
 
   try {
     const result = await executeFunction(name, args);
+    assertExecutionSucceeded(result);
     const newState = await capturePostState(name, args, previousState);
 
     if (auditLogId) {
@@ -567,7 +569,7 @@ export async function executeFunctionWithLogging(
     return {
       result,
       auditLogId: auditLogId || undefined,
-      canUndo: !!previousState && !!auditLogId,
+      canUndo: !!previousState && !!newState && !!auditLogId,
       riskLevel,
     };
   } catch (error) {

@@ -1,5 +1,6 @@
 "use client";
 
+import { safeRedirect } from "@/lib/safe-redirect";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -39,9 +40,7 @@ export default function LoginPage() {
       }
     } else {
       const redirectParam = searchParams.get("redirect");
-      const safeRedirect =
-        redirectParam && redirectParam.startsWith("/") ? redirectParam : "/";
-      router.push(safeRedirect);
+      router.push(safeRedirect(redirectParam));
     }
   };
 
@@ -68,7 +67,7 @@ export default function LoginPage() {
               Iniciar sesión
             </span>
             <Link
-              href="/auth/register"
+              href={`/auth/register?redirect=${encodeURIComponent(safeRedirect(searchParams.get("redirect")))}`}
               className="flex-1 py-2 rounded-lg text-[13px] font-semibold text-center text-stone-500 transition-all hover:text-[var(--ink)]"
             >
               Crear cuenta
@@ -183,7 +182,7 @@ export default function LoginPage() {
         <p className="mt-6 text-center text-[13px] text-[var(--ink-soft)]">
           ¿No tienes cuenta?{" "}
           <Link
-            href="/auth/register"
+            href={`/auth/register?redirect=${encodeURIComponent(safeRedirect(searchParams.get("redirect")))}`}
             className="text-[var(--accent)] font-semibold hover:underline"
           >
             Regístrate

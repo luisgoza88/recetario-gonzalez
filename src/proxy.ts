@@ -31,7 +31,7 @@ const PUBLIC_API_PATHS = [
   "/api/push/send", // GET es health check (solo VAPID public key); POST se auto-autentica via CRON_SECRET
 ];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Permitir rutas públicas sin verificación
@@ -45,7 +45,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Solo verificar autenticación para rutas de API protegidas
-  if (pathname.startsWith("/api")) {
+  if (pathname.startsWith("/api") || pathname === "/onboarding") {
     // Permitir APIs públicas
     if (PUBLIC_API_PATHS.some((path) => pathname.startsWith(path))) {
       return NextResponse.next();
@@ -94,6 +94,14 @@ export async function middleware(request: NextRequest) {
         );
       }
 
+      if (pathname === "/onboarding") {
+        const login = new URL("/auth/login", request.url);
+        login.searchParams.set(
+          "redirect",
+          request.nextUrl.pathname + request.nextUrl.search,
+        );
+        return NextResponse.redirect(login);
+      }
       const unauthorizedResponse = NextResponse.json(
         { error: "Authentication required", code: "UNAUTHORIZED" },
         { status: 401 },

@@ -1,3 +1,4 @@
+import { householdDate } from "@/lib/menu-date";
 import { createAIClient } from "@/lib/ai-assistant/db";
 import { logger } from "@/lib/logger";
 
@@ -48,8 +49,9 @@ export async function getWeeklyReport() {
   const { data: tasks } = await supabase
     .from("scheduled_tasks")
     .select("status")
-    .gte("scheduled_date", weekStart.toISOString().split("T")[0])
-    .lte("scheduled_date", weekEnd.toISOString().split("T")[0]);
+    .throwOnError()
+    .gte("scheduled_date", householdDate(weekStart))
+    .lte("scheduled_date", householdDate(weekEnd));
 
   const total = tasks?.length || 0;
   const completed = tasks?.filter((t) => t.status === "completada").length || 0;
@@ -59,12 +61,14 @@ export async function getWeeklyReport() {
   const { data: lowInventory } = await supabase
     .from("inventory")
     .select("*, market_item:market_items(name)")
+    .throwOnError()
     .lte("current_number", 2)
     .gt("current_number", 0);
 
   const { data: outOfStock } = await supabase
     .from("inventory")
     .select("*, market_item:market_items(name)")
+    .throwOnError()
     .eq("current_number", 0);
 
   return {
@@ -91,6 +95,7 @@ export async function getLowInventoryAlerts(threshold: number = 2) {
   const { data } = await supabase
     .from("inventory")
     .select("*, market_item:market_items(name, category)")
+    .throwOnError()
     .lte("current_number", threshold)
     .order("current_number");
 
@@ -156,6 +161,7 @@ export async function getUpcomingMeals(days: number = 3) {
         dinner:recipes!day_menu_dinner_id_fkey(name)
       `,
       )
+      .throwOnError()
       .eq("day_number", cycleDay)
       .single();
 
@@ -189,6 +195,7 @@ export async function calculatePortions(recipeName: string, portions: number) {
   const { data: recipe } = await supabase
     .from("recipes")
     .select("name, portions, ingredients")
+    .throwOnError()
     .ilike("name", `%${recipeName}%`)
     .single();
 
@@ -247,6 +254,7 @@ export async function getPreparationTips() {
       dinner:recipes!day_menu_dinner_id_fkey(name, prep_time, ingredients)
     `,
     )
+    .throwOnError()
     .eq("day_number", cycleDay)
     .single();
 
@@ -339,6 +347,7 @@ export async function smartShoppingList(daysAhead: number = 7): Promise<{
         dinner:recipes!day_menu_dinner_id_fkey(name, ingredients)
       `,
       )
+      .throwOnError()
       .eq("day_number", cycleDay)
       .single();
 
@@ -389,6 +398,7 @@ export async function smartShoppingList(daysAhead: number = 7): Promise<{
   const { data: inventory } = await supabase
     .from("inventory")
     .select("*, market_item:market_items(name, category)")
+    .throwOnError()
     .gt("current_number", 0);
 
   const availableMap: Map<string, { quantity: number; category: string }> =
@@ -420,6 +430,7 @@ export async function smartShoppingList(daysAhead: number = 7): Promise<{
       const { data: marketItem } = await supabase
         .from("market_items")
         .select("category")
+        .throwOnError()
         .ilike("name", `%${ingredient}%`)
         .single();
 

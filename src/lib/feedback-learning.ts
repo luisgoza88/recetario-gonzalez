@@ -470,17 +470,17 @@ export async function analyzeNewFeedback(
 /**
  * Obtener resumen de aprendizaje para mostrar al usuario
  */
-export async function getLearningInsights(): Promise<{
+export async function getLearningInsights(client = supabase): Promise<{
   totalFeedbacks: number;
   activePatterns: number;
   topRecipesNeedingAdjustment: string[];
   overallConfidence: number;
 }> {
-  const { count } = await supabase
+  const { count } = await client
     .from("meal_feedback")
     .select("id", { count: "exact", head: true });
 
-  const { data: pendingSuggestions } = await supabase
+  const { data: pendingSuggestions } = await client
     .from("adjustment_suggestions")
     .select("recipe_name, feedback_count")
     .eq("status", "pending")

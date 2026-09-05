@@ -35,6 +35,8 @@ function buildMockRequest(
   return request;
 }
 
+let currentDataClient: ReturnType<typeof createMockServiceClient>;
+
 function createMockAuthClient(shouldPass = true, isMember = true) {
   return {
     auth: {
@@ -48,7 +50,10 @@ function createMockAuthClient(shouldPass = true, isMember = true) {
     },
     // Chain used by requireHouseholdMembership() to verify the user belongs
     // to the requested household before the service-role client runs.
-    from: vi.fn().mockReturnThis(),
+    rpc: vi.fn().mockResolvedValue({ data: true, error: null }),
+    from: vi.fn(function (this: unknown, table: string) {
+      return table === "daily_completions" ? currentDataClient : this;
+    }),
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     maybeSingle: vi
@@ -62,7 +67,7 @@ function createMockAuthClient(shouldPass = true, isMember = true) {
 }
 
 function createMockServiceClient() {
-  return {
+  const client = {
     from: vi.fn().mockReturnThis(),
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
@@ -72,6 +77,8 @@ function createMockServiceClient() {
     maybeSingle: vi.fn(),
     single: vi.fn(),
   };
+  currentDataClient = client;
+  return client;
 }
 
 // ---------------------------------------------------------------------------

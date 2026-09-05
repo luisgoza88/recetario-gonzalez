@@ -18,11 +18,16 @@ export function useSubscription() {
       if (!householdId) return "free";
       const { data } = await supabase
         .from("subscriptions")
-        .select("tier")
+        .select("tier, status, trial_ends_at, current_period_end")
         .eq("household_id", householdId)
         .in("status", ["active", "trial"])
         .maybeSingle();
-      return (data?.tier as Tier) ?? "free";
+      if (!data || !["free", "premium", "family"].includes(data.tier))
+        return "free";
+      const expiry =
+        data.status === "trial" ? data.trial_ends_at : data.current_period_end;
+      if (expiry && new Date(expiry).getTime() <= Date.now()) return "free";
+      return data.tier as Tier;
     },
     enabled: !!householdId,
   });
